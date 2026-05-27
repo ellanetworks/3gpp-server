@@ -48,7 +48,7 @@ services:
         ipv4_address: 10.6.0.2
 
   3gpp-server-tester:
-    image: golang:1.24
+    image: golang:1.26
     entrypoint:
       - /bin/sh
       - -c

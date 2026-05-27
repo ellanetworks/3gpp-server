@@ -27,6 +27,8 @@ func buildPDU(msg *NGAPMessage) (ngapType.NGAPPDU, error) {
 	switch msg.ProcedureCode {
 	case ngapType.ProcedureCodeNGSetup:
 		return buildNGSetupRequest(msg)
+	case ngapType.ProcedureCodeInitialUEMessage:
+		return buildInitialUEMessage(msg)
 	default:
 		return ngapType.NGAPPDU{}, fmt.Errorf("unsupported procedure code: %d", msg.ProcedureCode)
 	}
@@ -189,6 +191,267 @@ func parseCriticality(s string) aper.Enumerated {
 	default:
 		return ngapType.CriticalityPresentIgnore
 	}
+}
+
+func buildInitialUEMessage(msg *NGAPMessage) (ngapType.NGAPPDU, error) {
+	pdu := ngapType.NGAPPDU{}
+	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
+	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
+
+	im := pdu.InitiatingMessage
+	im.ProcedureCode.Value = ngapType.ProcedureCodeInitialUEMessage
+	im.Criticality.Value = ngapType.CriticalityPresentIgnore
+	im.Value.Present = ngapType.InitiatingMessagePresentInitialUEMessage
+	im.Value.InitialUEMessage = new(ngapType.InitialUEMessage)
+
+	ies := &im.Value.InitialUEMessage.ProtocolIEs
+
+	for _, ie := range msg.IEs {
+		ngapIE, err := buildInitialUEMessageIE(&ie)
+		if err != nil {
+			return pdu, fmt.Errorf("IE id=%d: %w", ie.ID, err)
+		}
+		if ngapIE != nil {
+			ies.List = append(ies.List, *ngapIE)
+		}
+	}
+
+	return pdu, nil
+}
+
+func buildInitialUEMessageIE(ie *IE) (*ngapType.InitialUEMessageIEs, error) {
+	out := ngapType.InitialUEMessageIEs{}
+	out.Id.Value = ie.ID
+	out.Criticality.Value = parseCriticality(ie.Criticality)
+
+	switch ie.ID {
+	case ngapType.ProtocolIEIDRANUENGAPID:
+		if ie.RanUeNgapID == nil {
+			return nil, fmt.Errorf("ran_ue_ngap_id is required")
+		}
+		out.Value.Present = ngapType.InitialUEMessageIEsPresentRANUENGAPID
+		out.Value.RANUENGAPID = new(ngapType.RANUENGAPID)
+		out.Value.RANUENGAPID.Value = *ie.RanUeNgapID
+
+	case ngapType.ProtocolIEIDNASPDU:
+		if ie.NasPDU == nil {
+			return nil, fmt.Errorf("nas_pdu is required")
+		}
+		nasPDU, err := hex.DecodeString(*ie.NasPDU)
+		if err != nil {
+			return nil, fmt.Errorf("decode nas_pdu hex: %w", err)
+		}
+		out.Value.Present = ngapType.InitialUEMessageIEsPresentNASPDU
+		out.Value.NASPDU = new(ngapType.NASPDU)
+		out.Value.NASPDU.Value = nasPDU
+
+	case ngapType.ProtocolIEIDUserLocationInformation:
+		if ie.UserLocationInformation == nil {
+			return nil, fmt.Errorf("user_location_information is required")
+		}
+		out.Value.Present = ngapType.InitialUEMessageIEsPresentUserLocationInformation
+		out.Value.UserLocationInformation = new(ngapType.UserLocationInformation)
+
+		uli := out.Value.UserLocationInformation
+		uli.Present = ngapType.UserLocationInformationPresentUserLocationInformationNR
+		uli.UserLocationInformationNR = new(ngapType.UserLocationInformationNR)
+
+		nr := uli.UserLocationInformationNR
+		if ie.UserLocationInformation.NR != nil {
+			plmnBytes, err := hex.DecodeString(ie.UserLocationInformation.NR.NRCGI.PLMNIdentity)
+			if err != nil {
+				return nil, fmt.Errorf("decode nrcgi plmn: %w", err)
+			}
+			nr.NRCGI.PLMNIdentity.Value = plmnBytes
+
+			nrCellID, err := GetNRCellIdentity(ie.UserLocationInformation.NR.NRCGI.NRCellIdentity)
+			if err != nil {
+				return nil, fmt.Errorf("decode nr_cell_identity: %w", err)
+			}
+			nr.NRCGI.NRCellIdentity = nrCellID
+
+			taiPlmn, err := hex.DecodeString(ie.UserLocationInformation.NR.TAI.PLMNIdentity)
+			if err != nil {
+				return nil, fmt.Errorf("decode tai plmn: %w", err)
+			}
+			nr.TAI.PLMNIdentity.Value = taiPlmn
+
+			tac, err := GetTacInBytes(ie.UserLocationInformation.NR.TAI.TAC)
+			if err != nil {
+				return nil, fmt.Errorf("decode tai tac: %w", err)
+			}
+			nr.TAI.TAC.Value = tac
+		}
+
+	case ngapType.ProtocolIEIDRRCEstablishmentCause:
+		out.Value.Present = ngapType.InitialUEMessageIEsPresentRRCEstablishmentCause
+		out.Value.RRCEstablishmentCause = new(ngapType.RRCEstablishmentCause)
+		if ie.RRCEstablishmentCause != nil {
+			out.Value.RRCEstablishmentCause.Value = aper.Enumerated(*ie.RRCEstablishmentCause)
+		} else {
+			out.Value.RRCEstablishmentCause.Value = ngapType.RRCEstablishmentCausePresentMoSignalling
+		}
+
+	case ngapType.ProtocolIEIDFiveGSTMSI:
+		if ie.FiveGSTMSI == nil {
+			return nil, fmt.Errorf("five_g_s_tmsi is required")
+		}
+		out.Value.Present = ngapType.InitialUEMessageIEsPresentFiveGSTMSI
+		out.Value.FiveGSTMSI = new(ngapType.FiveGSTMSI)
+
+		amfSetIDBytes, err := hex.DecodeString(ie.FiveGSTMSI.AMFSetID)
+		if err != nil {
+			return nil, fmt.Errorf("decode amf_set_id: %w", err)
+		}
+		out.Value.FiveGSTMSI.AMFSetID.Value = aper.BitString{
+			Bytes:     amfSetIDBytes,
+			BitLength: 10,
+		}
+
+		amfPointerBytes, err := hex.DecodeString(ie.FiveGSTMSI.AMFPointer)
+		if err != nil {
+			return nil, fmt.Errorf("decode amf_pointer: %w", err)
+		}
+		out.Value.FiveGSTMSI.AMFPointer.Value = aper.BitString{
+			Bytes:     amfPointerBytes,
+			BitLength: 6,
+		}
+
+		tmsiBytes, err := hex.DecodeString(ie.FiveGSTMSI.FiveGTMSI)
+		if err != nil {
+			return nil, fmt.Errorf("decode five_g_tmsi: %w", err)
+		}
+		out.Value.FiveGSTMSI.FiveGTMSI.Value = tmsiBytes
+
+	case ngapType.ProtocolIEIDUEContextRequest:
+		out.Value.Present = ngapType.InitialUEMessageIEsPresentUEContextRequest
+		out.Value.UEContextRequest = new(ngapType.UEContextRequest)
+		if ie.UEContextRequest != nil {
+			out.Value.UEContextRequest.Value = aper.Enumerated(*ie.UEContextRequest)
+		} else {
+			out.Value.UEContextRequest.Value = ngapType.UEContextRequestPresentRequested
+		}
+
+	case ngapType.ProtocolIEIDAMFSetID:
+		if ie.AMFSetID == nil {
+			return nil, fmt.Errorf("amf_set_id_ie is required")
+		}
+		amfSetIDBytes, err := hex.DecodeString(*ie.AMFSetID)
+		if err != nil {
+			return nil, fmt.Errorf("decode amf_set_id: %w", err)
+		}
+		out.Value.Present = ngapType.InitialUEMessageIEsPresentAMFSetID
+		out.Value.AMFSetID = new(ngapType.AMFSetID)
+		out.Value.AMFSetID.Value = aper.BitString{
+			Bytes:     amfSetIDBytes,
+			BitLength: 10,
+		}
+
+	case ngapType.ProtocolIEIDAllowedNSSAI:
+		if ie.AllowedNSSAI == nil {
+			return nil, fmt.Errorf("allowed_nssai is required")
+		}
+		out.Value.Present = ngapType.InitialUEMessageIEsPresentAllowedNSSAI
+		out.Value.AllowedNSSAI = new(ngapType.AllowedNSSAI)
+		for _, item := range ie.AllowedNSSAI {
+			nssaiItem := ngapType.AllowedNSSAIItem{}
+			sstBytes, err := hex.DecodeString(item.SST)
+			if err != nil {
+				return nil, fmt.Errorf("decode allowed_nssai sst: %w", err)
+			}
+			nssaiItem.SNSSAI.SST.Value = sstBytes
+			if item.SD != "" {
+				sdBytes, err := hex.DecodeString(item.SD)
+				if err != nil {
+					return nil, fmt.Errorf("decode allowed_nssai sd: %w", err)
+				}
+				nssaiItem.SNSSAI.SD = new(ngapType.SD)
+				nssaiItem.SNSSAI.SD.Value = sdBytes
+			}
+			out.Value.AllowedNSSAI.List = append(out.Value.AllowedNSSAI.List, nssaiItem)
+		}
+
+	default:
+		return nil, fmt.Errorf("unsupported InitialUEMessage IE id: %d", ie.ID)
+	}
+
+	return &out, nil
+}
+
+// BuildInitialUEMessageFromState creates the NGAP InitialUEMessage using gNB and UE state.
+func BuildInitialUEMessageFromState(ranUeNgapID int64, nasPDU []byte, mcc, mnc, tac, gnbID string, guti *FiveGSTMSIFromGUTI) *NGAPMessage {
+	plmnID, _ := GetMccAndMncInOctets(mcc, mnc)
+	plmnHex := hex.EncodeToString(plmnID)
+	nasPDUHex := hex.EncodeToString(nasPDU)
+
+	rrcCause := int64(ngapType.RRCEstablishmentCausePresentMoSignalling)
+	ueContextReq := int64(ngapType.UEContextRequestPresentRequested)
+
+	ies := []IE{
+		{
+			ID:          ngapType.ProtocolIEIDRANUENGAPID,
+			Criticality: "reject",
+			RanUeNgapID: &ranUeNgapID,
+		},
+		{
+			ID:          ngapType.ProtocolIEIDNASPDU,
+			Criticality: "reject",
+			NasPDU:      &nasPDUHex,
+		},
+		{
+			ID:          ngapType.ProtocolIEIDUserLocationInformation,
+			Criticality: "reject",
+			UserLocationInformation: &UserLocationInformationJSON{
+				Present: "nr",
+				NR: &UserLocationInformationNRJSON{
+					NRCGI: NRCGIJSON{
+						PLMNIdentity:   plmnHex,
+						NRCellIdentity: gnbID,
+					},
+					TAI: TAIJSON{
+						PLMNIdentity: plmnHex,
+						TAC:          tac,
+					},
+				},
+			},
+		},
+		{
+			ID:                    ngapType.ProtocolIEIDRRCEstablishmentCause,
+			Criticality:           "ignore",
+			RRCEstablishmentCause: &rrcCause,
+		},
+	}
+
+	if guti != nil {
+		ies = append(ies, IE{
+			ID:          ngapType.ProtocolIEIDFiveGSTMSI,
+			Criticality: "reject",
+			FiveGSTMSI: &FiveGSTMSIJSON{
+				AMFSetID:   guti.AMFSetID,
+				AMFPointer: guti.AMFPointer,
+				FiveGTMSI:  guti.FiveGTMSI,
+			},
+		})
+	}
+
+	ies = append(ies, IE{
+		ID:               ngapType.ProtocolIEIDUEContextRequest,
+		Criticality:      "ignore",
+		UEContextRequest: &ueContextReq,
+	})
+
+	return &NGAPMessage{
+		ProcedureCode: ngapType.ProcedureCodeInitialUEMessage,
+		PDUType:       "initiating_message",
+		Criticality:   "ignore",
+		IEs:           ies,
+	}
+}
+
+type FiveGSTMSIFromGUTI struct {
+	AMFSetID   string
+	AMFPointer string
+	FiveGTMSI  string
 }
 
 // BuildNGSetupRequestFromStore builds the IE-level NGAPMessage for an
