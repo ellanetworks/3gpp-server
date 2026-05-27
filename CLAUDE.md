@@ -39,6 +39,8 @@ Test files are organized by purpose:
 - `message_*.go` — per-NGAP-message tests (crafted IE combinations, valid and invalid)
 - `scenario_*.go` — multi-step procedure tests (e.g. full registration flow)
 
+**Never work around Ella Core bugs in tests.** If Ella Core misbehaves, the test must fail — that's the whole point of this project. Don't add expected-failure assertions, skip annotations, or use separate subscribers/resources to avoid triggering AMF bugs. A failing test means a bug to fix in Ella Core.
+
 ## OpenAPI spec
 
 The spec at `internal/api/openapi.yaml` is embedded at compile time and served at `GET /openapi.yaml`. Update it when adding or changing endpoints.

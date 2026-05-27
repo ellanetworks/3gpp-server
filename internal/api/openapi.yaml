@@ -189,13 +189,16 @@ paths:
         ## Supported message types
 
         - `registration_request` — Sends RegistrationRequest inside InitialUEMessage.
+        - `authentication_response` — Computes 5G-AKA RES* from stored RAND/AUTN, sends AuthenticationResponse in UplinkNASTransport.
+        - `security_mode_complete` — Derives NAS keys, sends SecurityModeComplete (with integrity+ciphering) in UplinkNASTransport.
+        - `registration_complete` — Sends InitialContextSetupResponse + RegistrationComplete (with integrity+ciphering) in UplinkNASTransport.
 
         ## NAS IE overrides (TS 24.501 §8.2.6)
 
-        Every optional IE in the RegistrationRequest can be individually set
-        via the corresponding JSON field. Hex-encoded strings are used for
-        binary IEs. This enables both valid and deliberately malformed messages
-        for fuzz testing.
+        For `registration_request`, every optional IE in the RegistrationRequest
+        can be individually set via the corresponding JSON field. Hex-encoded
+        strings are used for binary IEs. This enables both valid and deliberately
+        malformed messages for fuzz testing.
       requestBody:
         required: true
         content:
@@ -482,8 +485,8 @@ components:
       properties:
         message_type:
           type: string
-          description: "NAS message to send. Currently supported: `registration_request`."
-          enum: [registration_request]
+          description: NAS message to send.
+          enum: [registration_request, authentication_response, security_mode_complete, registration_complete]
         registration_type:
           type: integer
           description: "5GS registration type: 1=initial, 2=mobility, 3=periodic, 4=emergency."
