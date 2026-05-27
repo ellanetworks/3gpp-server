@@ -51,6 +51,8 @@ func Decode(data []byte) (*NASResponse, error) {
 		decodeIdentityRequest(m, resp)
 	case gonas.MsgTypeRegistrationReject:
 		decodeRegistrationReject(m, resp)
+	case gonas.MsgTypeStatus5GMM:
+		decodeStatus5GMM(m, resp)
 	}
 
 	return resp, nil
@@ -155,6 +157,15 @@ func ParseGUTI(contents []byte) *nasType.GUTI5G {
 	return guti
 }
 
+func decodeStatus5GMM(m *gonas.Message, resp *NASResponse) {
+	if m.Status5GMM == nil {
+		return
+	}
+
+	cause := m.Status5GMM.GetCauseValue()
+	resp.CauseGMM = &cause
+}
+
 func gmmMessageTypeName(t uint8) string {
 	switch t {
 	case gonas.MsgTypeRegistrationRequest:
@@ -205,6 +216,8 @@ func gmmMessageTypeName(t uint8) string {
 		return "configuration_update_command"
 	case gonas.MsgTypeConfigurationUpdateComplete:
 		return "configuration_update_complete"
+	case gonas.MsgTypeStatus5GMM:
+		return "status_5gmm"
 	default:
 		return fmt.Sprintf("unknown(%d)", t)
 	}

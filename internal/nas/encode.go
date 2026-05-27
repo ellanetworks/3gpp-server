@@ -275,8 +275,12 @@ func BuildAuthenticationResponse(resStar []byte) ([]byte, error) {
 
 	if len(resStar) > 0 {
 		authResp.AuthenticationResponseParameter = nasType.NewAuthenticationResponseParameter(nasMessage.AuthenticationResponseAuthenticationResponseParameterType)
-		authResp.AuthenticationResponseParameter.SetLen(uint8(len(resStar)))
-		copy(authResp.AuthenticationResponseParameter.Octet[:], resStar[:16])
+		n := len(resStar)
+		if n > 16 {
+			n = 16
+		}
+		authResp.AuthenticationResponseParameter.SetLen(uint8(n))
+		copy(authResp.AuthenticationResponseParameter.Octet[:], resStar[:n])
 	}
 
 	m.AuthenticationResponse = authResp

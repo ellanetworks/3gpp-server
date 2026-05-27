@@ -487,6 +487,27 @@ components:
           type: string
           description: NAS message to send.
           enum: [registration_request, authentication_response, security_mode_complete, registration_complete]
+        raw_nas_pdu:
+          type: string
+          description: |
+            Raw NAS PDU override (hex). When set, all NAS building and security
+            encoding is skipped — these bytes are sent directly in the NGAP wrapper.
+            Use for fuzz testing with arbitrary/malformed NAS content.
+        rrc_establishment_cause:
+          type: integer
+          description: Override RRC establishment cause in InitialUEMessage (registration_request only).
+        ue_context_request:
+          type: integer
+          description: Override UE Context Request in InitialUEMessage. Set to -1 to omit entirely.
+        amf_ue_ngap_id_override:
+          type: integer
+          description: Override AMF UE NGAP ID in UplinkNASTransport messages.
+        ran_ue_ngap_id_override:
+          type: integer
+          description: Override RAN UE NGAP ID in the NGAP wrapper.
+        res_star_override:
+          type: string
+          description: Override RES* in authentication_response (hex, 16 bytes). Skips 5G-AKA computation.
         registration_type:
           type: integer
           description: "5GS registration type: 1=initial, 2=mobility, 3=periodic, 4=emergency."

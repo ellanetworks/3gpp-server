@@ -379,19 +379,32 @@ func buildInitialUEMessageIE(ie *IE) (*ngapType.InitialUEMessageIEs, error) {
 }
 
 // BuildInitialUEMessageFromState creates the NGAP InitialUEMessage using gNB and UE state.
-func BuildInitialUEMessageFromState(ranUeNgapID int64, nasPDU []byte, mcc, mnc, tac, gnbID string, guti *FiveGSTMSIFromGUTI) *NGAPMessage {
+type InitialUEMessageOverrides struct {
+	RRCEstablishmentCause *int64
+	UEContextRequest      *int64
+	RanUeNgapID           *int64
+}
+
+func BuildInitialUEMessageFromState(ranUeNgapID int64, nasPDU []byte, mcc, mnc, tac, gnbID string, guti *FiveGSTMSIFromGUTI, overrides *InitialUEMessageOverrides) *NGAPMessage {
 	plmnID, _ := GetMccAndMncInOctets(mcc, mnc)
 	plmnHex := hex.EncodeToString(plmnID)
 	nasPDUHex := hex.EncodeToString(nasPDU)
 
+	effectiveRanID := ranUeNgapID
+	if overrides != nil && overrides.RanUeNgapID != nil {
+		effectiveRanID = *overrides.RanUeNgapID
+	}
+
 	rrcCause := int64(ngapType.RRCEstablishmentCausePresentMoSignalling)
-	ueContextReq := int64(ngapType.UEContextRequestPresentRequested)
+	if overrides != nil && overrides.RRCEstablishmentCause != nil {
+		rrcCause = *overrides.RRCEstablishmentCause
+	}
 
 	ies := []IE{
 		{
 			ID:          ngapType.ProtocolIEIDRANUENGAPID,
 			Criticality: "reject",
-			RanUeNgapID: &ranUeNgapID,
+			RanUeNgapID: &effectiveRanID,
 		},
 		{
 			ID:          ngapType.ProtocolIEIDNASPDU,
@@ -434,11 +447,18 @@ func BuildInitialUEMessageFromState(ranUeNgapID int64, nasPDU []byte, mcc, mnc, 
 		})
 	}
 
-	ies = append(ies, IE{
-		ID:               ngapType.ProtocolIEIDUEContextRequest,
-		Criticality:      "ignore",
-		UEContextRequest: &ueContextReq,
-	})
+	if overrides == nil || overrides.UEContextRequest == nil || *overrides.UEContextRequest >= 0 {
+		ueContextReq := int64(ngapType.UEContextRequestPresentRequested)
+		if overrides != nil && overrides.UEContextRequest != nil {
+			ueContextReq = *overrides.UEContextRequest
+		}
+
+		ies = append(ies, IE{
+			ID:               ngapType.ProtocolIEIDUEContextRequest,
+			Criticality:      "ignore",
+			UEContextRequest: &ueContextReq,
+		})
+	}
 
 	return &NGAPMessage{
 		ProcedureCode: ngapType.ProcedureCodeInitialUEMessage,
@@ -529,7 +549,19 @@ func BuildNGSetupRequestFromStore(mcc, mnc, tac, gnbID, name string, sst int32, 
 	}
 }
 
-func BuildUplinkNASTransport(amfUeNgapID, ranUeNgapID int64, nasPDU []byte, mcc, mnc, tac, gnbID string) ([]byte, error) {
+type UplinkNASTransportOverrides struct {
+	AmfUeNgapID *int64
+	RanUeNgapID *int64
+}
+
+func BuildUplinkNASTransport(amfUeNgapID, ranUeNgapID int64, nasPDU []byte, mcc, mnc, tac, gnbID string, overrides *UplinkNASTransportOverrides) ([]byte, error) {
+	if overrides != nil && overrides.AmfUeNgapID != nil {
+		amfUeNgapID = *overrides.AmfUeNgapID
+	}
+
+	if overrides != nil && overrides.RanUeNgapID != nil {
+		ranUeNgapID = *overrides.RanUeNgapID
+	}
 	plmnID := GetPLMNIdentity(mcc, mnc)
 	nrCellID, err := GetNRCellIdentity(gnbID)
 	if err != nil {
