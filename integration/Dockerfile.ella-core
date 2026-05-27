@@ -1,0 +1,2 @@
+FROM ghcr.io/ellanetworks/ella-core:v1.11.0
+COPY ella-core /bin/core
