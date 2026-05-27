@@ -1,0 +1,23 @@
+name: Go Vet
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+
+jobs:
+  go-vet:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: "go.mod"
+
+      - name: Install libpcap headers
+        run: sudo apt-get update && sudo apt-get install -y libpcap-dev
+
+      - name: Go vet
+        run: go vet ./...

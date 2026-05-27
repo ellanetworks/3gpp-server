@@ -1,0 +1,26 @@
+name: Run Gosec
+
+permissions:
+  contents: read
+
+on:
+    workflow_call:
+
+jobs:
+  tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: "go.mod"
+
+      - name: Install libpcap headers
+        run: sudo apt-get update && sudo apt-get install -y libpcap-dev
+
+      - name: Install Gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@v2.24.7
+
+      - name: Run Gosec
+        run: gosec -exclude=G103,G115,G117 ./...
