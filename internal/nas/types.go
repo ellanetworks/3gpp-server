@@ -7,6 +7,19 @@ type NASRequest struct {
 	MessageType      string `json:"message_type"`
 	RegistrationType *uint8 `json:"registration_type,omitempty"`
 
+	// Raw NAS PDU override — when set, skip all NAS building and security
+	// encoding. The hex bytes are stuffed directly into the NGAP wrapper.
+	RawNASPDU *string `json:"raw_nas_pdu,omitempty"`
+
+	// NGAP-level overrides (apply to the NGAP wrapper, not the NAS PDU)
+	RRCEstablishmentCauseOverride *int64 `json:"rrc_establishment_cause,omitempty"`
+	UEContextRequestOverride      *int64 `json:"ue_context_request,omitempty"`
+	AmfUeNgapIDOverride           *int64 `json:"amf_ue_ngap_id_override,omitempty"`
+	RanUeNgapIDOverride           *int64 `json:"ran_ue_ngap_id_override,omitempty"`
+
+	// AuthenticationResponse override — replaces the computed RES*.
+	ResStarOverride *string `json:"res_star_override,omitempty"`
+
 	// RegistrationRequest optional IEs (TS 24.501 §8.2.6)
 	NgKSI                       *uint8  `json:"ng_ksi,omitempty"`
 	MobileIdentityOverride      *string `json:"mobile_identity_override,omitempty"`
@@ -62,6 +75,13 @@ type NASResponse struct {
 	ABBAContents string `json:"abba,omitempty"`
 	NgKSI      *uint8 `json:"ng_ksi,omitempty"`
 	EAPMessage string `json:"eap_message,omitempty"`
+
+	// SecurityModeCommand fields (TS 24.501 §8.2.25)
+	SelectedCipheringAlg  *uint8 `json:"selected_ciphering_alg,omitempty"`
+	SelectedIntegrityAlg  *uint8 `json:"selected_integrity_alg,omitempty"`
+
+	// RegistrationAccept fields (TS 24.501 §8.2.7)
+	GUTI string `json:"guti,omitempty"`
 
 	// RegistrationReject / AuthenticationReject
 	CauseGMM *uint8 `json:"cause_5gmm,omitempty"`

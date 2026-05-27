@@ -433,6 +433,98 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 			wantNGAPMsgType: "DownlinkNASTransport",
 			wantNASMsgType:  "authentication_request",
 		},
+		// --- NGAP-level overrides ---
+		{
+			name: "RRC establishment cause: mo-data",
+			body: `{
+				"message_type":"registration_request",
+				"rrc_establishment_cause":1
+			}`,
+			wantHTTP:        200,
+			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNASMsgType:  "authentication_request",
+		},
+		{
+			name: "RRC establishment cause: emergency",
+			body: `{
+				"message_type":"registration_request",
+				"rrc_establishment_cause":5
+			}`,
+			wantHTTP:        200,
+			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNASMsgType:  "authentication_request",
+		},
+		{
+			name: "RRC establishment cause: out-of-range value",
+			body: `{
+				"message_type":"registration_request",
+				"rrc_establishment_cause":99
+			}`,
+			wantHTTP:        200,
+			wantNGAPMsgType: "DownlinkNASTransport",
+		},
+		{
+			name: "UE context request omitted",
+			body: `{
+				"message_type":"registration_request",
+				"ue_context_request":-1
+			}`,
+			wantHTTP:        200,
+			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNASMsgType:  "authentication_request",
+		},
+		{
+			name: "RAN UE NGAP ID override: zero",
+			body: `{
+				"message_type":"registration_request",
+				"ran_ue_ngap_id_override":0
+			}`,
+			wantHTTP:        200,
+			wantNGAPMsgType: "DownlinkNASTransport",
+		},
+		// --- raw_nas_pdu overrides ---
+		{
+			name:            "raw NAS: completely empty PDU → ErrorIndication",
+			body:            `{"message_type":"registration_request","raw_nas_pdu":""}`,
+			wantHTTP:        200,
+			wantNGAPMsgType: "ErrorIndication",
+		},
+		{
+			name:            "raw NAS: single byte 0x7e (5GMM EPD only)",
+			body:            `{"message_type":"registration_request","raw_nas_pdu":"7e"}`,
+			wantHTTP:        200,
+			wantNGAPMsgType: "DownlinkNASTransport",
+		},
+		{
+			name:            "raw NAS: two bytes (EPD + security header, no message type)",
+			body:            `{"message_type":"registration_request","raw_nas_pdu":"7e00"}`,
+			wantHTTP:        200,
+			wantNGAPMsgType: "DownlinkNASTransport",
+		},
+		{
+			name:            "raw NAS: wrong EPD (not 5GMM)",
+			body:            `{"message_type":"registration_request","raw_nas_pdu":"2e004100"}`,
+			wantHTTP:        200,
+			wantNGAPMsgType: "DownlinkNASTransport",
+		},
+		{
+			name:            "raw NAS: valid 5GMM header but unknown message type 0xff",
+			body:            `{"message_type":"registration_request","raw_nas_pdu":"7e00ff"}`,
+			wantHTTP:        200,
+			wantNGAPMsgType: "DownlinkNASTransport",
+		},
+		{
+			name:            "raw NAS: RegistrationRequest truncated after mandatory header",
+			body:            `{"message_type":"registration_request","raw_nas_pdu":"7e004179"}`,
+			wantHTTP:        200,
+			wantNGAPMsgType: "DownlinkNASTransport",
+		},
+		{
+			name:            "raw NAS: integrity-protected wrapper around garbage",
+			body:            `{"message_type":"registration_request","raw_nas_pdu":"7e01deadbeef00cafebabe"}`,
+			wantHTTP:        200,
+			wantNGAPMsgType: "DownlinkNASTransport",
+		},
 		// --- API-level errors (3gpp-server rejects before sending) ---
 		{
 			name:     "unsupported message type",
@@ -464,12 +556,14 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				}
 			}
 
+			ngapMsgType := jsonGet(body, "ngap.message_type")
 			nasMsgType := jsonGet(body, "nas.message_type")
+
 			if tt.wantNASMsgType != "" {
 				if nasMsgType != tt.wantNASMsgType {
 					t.Errorf("nas.message_type = %q, want %q\n  body: %s", nasMsgType, tt.wantNASMsgType, body)
 				}
-			} else if nasMsgType == "" {
+			} else if nasMsgType == "" && ngapMsgType != "ErrorIndication" {
 				t.Errorf("nas.message_type is empty — AMF response did not contain a decodable NAS PDU\n  body: %s", body)
 			}
 

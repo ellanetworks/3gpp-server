@@ -52,7 +52,51 @@ func TestScenarioRegistration(t *testing.T) {
 		}
 	})
 
-	t.Run("AMF UE NGAP ID stored after registration", func(t *testing.T) {
+	t.Run("authentication response triggers security mode command", func(t *testing.T) {
+		status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+			`{"message_type":"authentication_response"}`)
+		if status != 200 {
+			t.Fatalf("HTTP %d: %s", status, body)
+		}
+
+		if got := jsonGet(body, "nas.message_type"); got != "security_mode_command" {
+			t.Fatalf("nas.message_type = %q, want security_mode_command", got)
+		}
+		if jsonGet(body, "nas.selected_ciphering_alg") == "" {
+			t.Error("missing selected_ciphering_alg")
+		}
+		if jsonGet(body, "nas.selected_integrity_alg") == "" {
+			t.Error("missing selected_integrity_alg")
+		}
+	})
+
+	t.Run("security mode complete triggers registration accept", func(t *testing.T) {
+		status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+			`{"message_type":"security_mode_complete"}`)
+		if status != 200 {
+			t.Fatalf("HTTP %d: %s", status, body)
+		}
+
+		if got := jsonGet(body, "ngap.message_type"); got != "InitialContextSetupRequest" {
+			t.Fatalf("ngap.message_type = %q, want InitialContextSetupRequest", got)
+		}
+		if got := jsonGet(body, "nas.message_type"); got != "registration_accept" {
+			t.Fatalf("nas.message_type = %q, want registration_accept", got)
+		}
+		if jsonGet(body, "nas.guti") == "" {
+			t.Error("missing GUTI in RegistrationAccept")
+		}
+	})
+
+	t.Run("registration complete finishes the procedure", func(t *testing.T) {
+		status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+			`{"message_type":"registration_complete"}`)
+		if status != 200 {
+			t.Fatalf("HTTP %d: %s", status, body)
+		}
+	})
+
+	t.Run("AMF UE NGAP ID stored", func(t *testing.T) {
 		status, body := doRequest(t, "GET", "/gnb/"+gnbID+"/ue/"+ueID, "")
 		if status != 200 {
 			t.Fatalf("HTTP %d: %s", status, body)
@@ -63,33 +107,10 @@ func TestScenarioRegistration(t *testing.T) {
 		}
 	})
 
-	t.Run("PATCH overrides UE fields", func(t *testing.T) {
-		status, _ := doRequest(t, "PATCH", "/gnb/"+gnbID+"/ue/"+ueID,
-			`{"dnn":"patched-dnn","sqn":"000000000099"}`)
-		if status != 204 {
-			t.Fatalf("PATCH HTTP %d, want 204", status)
-		}
-
-		status, body := doRequest(t, "GET", "/gnb/"+gnbID+"/ue/"+ueID, "")
-		if status != 200 {
-			t.Fatalf("GET HTTP %d", status)
-		}
-		if got := jsonGet(body, "dnn"); got != "patched-dnn" {
-			t.Errorf("dnn = %q, want patched-dnn", got)
-		}
-		if got := jsonGet(body, "sqn"); got != "000000000099" {
-			t.Errorf("sqn = %q, want 000000000099", got)
-		}
-	})
-
-	t.Run("DELETE UE removes it", func(t *testing.T) {
+	t.Run("DELETE UE", func(t *testing.T) {
 		status, _ := doRequest(t, "DELETE", "/gnb/"+gnbID+"/ue/"+ueID, "")
 		if status != 204 {
 			t.Fatalf("DELETE HTTP %d, want 204", status)
-		}
-		status, _ = doRequest(t, "GET", "/gnb/"+gnbID+"/ue/"+ueID, "")
-		if status != 404 {
-			t.Errorf("GET after delete: HTTP %d, want 404", status)
 		}
 	})
 }

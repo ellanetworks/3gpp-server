@@ -379,19 +379,32 @@ func buildInitialUEMessageIE(ie *IE) (*ngapType.InitialUEMessageIEs, error) {
 }
 
 // BuildInitialUEMessageFromState creates the NGAP InitialUEMessage using gNB and UE state.
-func BuildInitialUEMessageFromState(ranUeNgapID int64, nasPDU []byte, mcc, mnc, tac, gnbID string, guti *FiveGSTMSIFromGUTI) *NGAPMessage {
+type InitialUEMessageOverrides struct {
+	RRCEstablishmentCause *int64
+	UEContextRequest      *int64
+	RanUeNgapID           *int64
+}
+
+func BuildInitialUEMessageFromState(ranUeNgapID int64, nasPDU []byte, mcc, mnc, tac, gnbID string, guti *FiveGSTMSIFromGUTI, overrides *InitialUEMessageOverrides) *NGAPMessage {
 	plmnID, _ := GetMccAndMncInOctets(mcc, mnc)
 	plmnHex := hex.EncodeToString(plmnID)
 	nasPDUHex := hex.EncodeToString(nasPDU)
 
+	effectiveRanID := ranUeNgapID
+	if overrides != nil && overrides.RanUeNgapID != nil {
+		effectiveRanID = *overrides.RanUeNgapID
+	}
+
 	rrcCause := int64(ngapType.RRCEstablishmentCausePresentMoSignalling)
-	ueContextReq := int64(ngapType.UEContextRequestPresentRequested)
+	if overrides != nil && overrides.RRCEstablishmentCause != nil {
+		rrcCause = *overrides.RRCEstablishmentCause
+	}
 
 	ies := []IE{
 		{
 			ID:          ngapType.ProtocolIEIDRANUENGAPID,
 			Criticality: "reject",
-			RanUeNgapID: &ranUeNgapID,
+			RanUeNgapID: &effectiveRanID,
 		},
 		{
 			ID:          ngapType.ProtocolIEIDNASPDU,
@@ -434,11 +447,18 @@ func BuildInitialUEMessageFromState(ranUeNgapID int64, nasPDU []byte, mcc, mnc, 
 		})
 	}
 
-	ies = append(ies, IE{
-		ID:               ngapType.ProtocolIEIDUEContextRequest,
-		Criticality:      "ignore",
-		UEContextRequest: &ueContextReq,
-	})
+	if overrides == nil || overrides.UEContextRequest == nil || *overrides.UEContextRequest >= 0 {
+		ueContextReq := int64(ngapType.UEContextRequestPresentRequested)
+		if overrides != nil && overrides.UEContextRequest != nil {
+			ueContextReq = *overrides.UEContextRequest
+		}
+
+		ies = append(ies, IE{
+			ID:               ngapType.ProtocolIEIDUEContextRequest,
+			Criticality:      "ignore",
+			UEContextRequest: &ueContextReq,
+		})
+	}
 
 	return &NGAPMessage{
 		ProcedureCode: ngapType.ProcedureCodeInitialUEMessage,
@@ -527,4 +547,114 @@ func BuildNGSetupRequestFromStore(mcc, mnc, tac, gnbID, name string, sst int32, 
 			},
 		},
 	}
+}
+
+type UplinkNASTransportOverrides struct {
+	AmfUeNgapID *int64
+	RanUeNgapID *int64
+}
+
+func BuildUplinkNASTransport(amfUeNgapID, ranUeNgapID int64, nasPDU []byte, mcc, mnc, tac, gnbID string, overrides *UplinkNASTransportOverrides) ([]byte, error) {
+	if overrides != nil && overrides.AmfUeNgapID != nil {
+		amfUeNgapID = *overrides.AmfUeNgapID
+	}
+
+	if overrides != nil && overrides.RanUeNgapID != nil {
+		ranUeNgapID = *overrides.RanUeNgapID
+	}
+	plmnID := GetPLMNIdentity(mcc, mnc)
+	nrCellID, err := GetNRCellIdentity(gnbID)
+	if err != nil {
+		return nil, fmt.Errorf("NRCellIdentity: %w", err)
+	}
+
+	tacBytes, err := GetTacInBytes(tac)
+	if err != nil {
+		return nil, fmt.Errorf("TAC: %w", err)
+	}
+
+	pdu := ngapType.NGAPPDU{}
+	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
+	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
+
+	im := pdu.InitiatingMessage
+	im.ProcedureCode.Value = ngapType.ProcedureCodeUplinkNASTransport
+	im.Criticality.Value = ngapType.CriticalityPresentIgnore
+	im.Value.Present = ngapType.InitiatingMessagePresentUplinkNASTransport
+	im.Value.UplinkNASTransport = new(ngapType.UplinkNASTransport)
+
+	ies := &im.Value.UplinkNASTransport.ProtocolIEs
+
+	amfIE := ngapType.UplinkNASTransportIEs{}
+	amfIE.Id.Value = ngapType.ProtocolIEIDAMFUENGAPID
+	amfIE.Criticality.Value = ngapType.CriticalityPresentReject
+	amfIE.Value.Present = ngapType.UplinkNASTransportIEsPresentAMFUENGAPID
+	amfIE.Value.AMFUENGAPID = new(ngapType.AMFUENGAPID)
+	amfIE.Value.AMFUENGAPID.Value = amfUeNgapID
+	ies.List = append(ies.List, amfIE)
+
+	ranIE := ngapType.UplinkNASTransportIEs{}
+	ranIE.Id.Value = ngapType.ProtocolIEIDRANUENGAPID
+	ranIE.Criticality.Value = ngapType.CriticalityPresentReject
+	ranIE.Value.Present = ngapType.UplinkNASTransportIEsPresentRANUENGAPID
+	ranIE.Value.RANUENGAPID = new(ngapType.RANUENGAPID)
+	ranIE.Value.RANUENGAPID.Value = ranUeNgapID
+	ies.List = append(ies.List, ranIE)
+
+	nasIE := ngapType.UplinkNASTransportIEs{}
+	nasIE.Id.Value = ngapType.ProtocolIEIDNASPDU
+	nasIE.Criticality.Value = ngapType.CriticalityPresentReject
+	nasIE.Value.Present = ngapType.UplinkNASTransportIEsPresentNASPDU
+	nasIE.Value.NASPDU = new(ngapType.NASPDU)
+	nasIE.Value.NASPDU.Value = nasPDU
+	ies.List = append(ies.List, nasIE)
+
+	uliIE := ngapType.UplinkNASTransportIEs{}
+	uliIE.Id.Value = ngapType.ProtocolIEIDUserLocationInformation
+	uliIE.Criticality.Value = ngapType.CriticalityPresentIgnore
+	uliIE.Value.Present = ngapType.UplinkNASTransportIEsPresentUserLocationInformation
+	uliIE.Value.UserLocationInformation = new(ngapType.UserLocationInformation)
+
+	uli := uliIE.Value.UserLocationInformation
+	uli.Present = ngapType.UserLocationInformationPresentUserLocationInformationNR
+	uli.UserLocationInformationNR = new(ngapType.UserLocationInformationNR)
+	uli.UserLocationInformationNR.NRCGI.PLMNIdentity = plmnID
+	uli.UserLocationInformationNR.NRCGI.NRCellIdentity = nrCellID
+	uli.UserLocationInformationNR.TAI.PLMNIdentity = plmnID
+	uli.UserLocationInformationNR.TAI.TAC.Value = tacBytes
+	ies.List = append(ies.List, uliIE)
+
+	return ngap.Encoder(pdu)
+}
+
+func BuildInitialContextSetupResponse(amfUeNgapID, ranUeNgapID int64) ([]byte, error) {
+	pdu := ngapType.NGAPPDU{}
+	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome
+	pdu.SuccessfulOutcome = new(ngapType.SuccessfulOutcome)
+
+	so := pdu.SuccessfulOutcome
+	so.ProcedureCode.Value = ngapType.ProcedureCodeInitialContextSetup
+	so.Criticality.Value = ngapType.CriticalityPresentReject
+	so.Value.Present = ngapType.SuccessfulOutcomePresentInitialContextSetupResponse
+	so.Value.InitialContextSetupResponse = new(ngapType.InitialContextSetupResponse)
+
+	ies := &so.Value.InitialContextSetupResponse.ProtocolIEs
+
+	amfIE := ngapType.InitialContextSetupResponseIEs{}
+	amfIE.Id.Value = ngapType.ProtocolIEIDAMFUENGAPID
+	amfIE.Criticality.Value = ngapType.CriticalityPresentIgnore
+	amfIE.Value.Present = ngapType.InitialContextSetupResponseIEsPresentAMFUENGAPID
+	amfIE.Value.AMFUENGAPID = new(ngapType.AMFUENGAPID)
+	amfIE.Value.AMFUENGAPID.Value = amfUeNgapID
+	ies.List = append(ies.List, amfIE)
+
+	ranIE := ngapType.InitialContextSetupResponseIEs{}
+	ranIE.Id.Value = ngapType.ProtocolIEIDRANUENGAPID
+	ranIE.Criticality.Value = ngapType.CriticalityPresentIgnore
+	ranIE.Value.Present = ngapType.InitialContextSetupResponseIEsPresentRANUENGAPID
+	ranIE.Value.RANUENGAPID = new(ngapType.RANUENGAPID)
+	ranIE.Value.RANUENGAPID.Value = ranUeNgapID
+	ies.List = append(ies.List, ranIE)
+
+	return ngap.Encoder(pdu)
 }

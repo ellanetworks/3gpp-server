@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	gonas "github.com/free5gc/nas"
+	"github.com/free5gc/nas/nasType"
 )
 
 func Decode(data []byte) (*NASResponse, error) {
@@ -50,6 +51,8 @@ func Decode(data []byte) (*NASResponse, error) {
 		decodeIdentityRequest(m, resp)
 	case gonas.MsgTypeRegistrationReject:
 		decodeRegistrationReject(m, resp)
+	case gonas.MsgTypeStatus5GMM:
+		decodeStatus5GMM(m, resp)
 	}
 
 	return resp, nil
@@ -97,6 +100,34 @@ func decodeRegistrationReject(m *gonas.Message, resp *NASResponse) {
 	resp.CauseGMM = &cause
 }
 
+func decodeSecurityModeCommand(m *gonas.Message, resp *NASResponse) {
+	if m.SecurityModeCommand == nil {
+		return
+	}
+
+	cipherAlg := m.SelectedNASSecurityAlgorithms.GetTypeOfCipheringAlgorithm()
+	resp.SelectedCipheringAlg = &cipherAlg
+
+	integAlg := m.SelectedNASSecurityAlgorithms.GetTypeOfIntegrityProtectionAlgorithm()
+	resp.SelectedIntegrityAlg = &integAlg
+
+	ksi := m.SecurityModeCommand.GetNasKeySetIdentifiler()
+	resp.NgKSI = &ksi
+}
+
+func decodeRegistrationAccept(m *gonas.Message, resp *NASResponse) {
+	if m.RegistrationAccept == nil {
+		return
+	}
+
+	if m.RegistrationAccept.GUTI5G != nil {
+		gutiLen := m.RegistrationAccept.GUTI5G.GetLen()
+		if gutiLen > 0 && gutiLen <= 11 {
+			resp.GUTI = hex.EncodeToString(m.RegistrationAccept.GUTI5G.Octet[:gutiLen])
+		}
+	}
+}
+
 func securityHeaderTypeToString(t uint8) string {
 	switch t {
 	case gonas.SecurityHeaderTypePlainNas:
@@ -112,6 +143,27 @@ func securityHeaderTypeToString(t uint8) string {
 	default:
 		return fmt.Sprintf("unknown(%d)", t)
 	}
+}
+
+func ParseGUTI(contents []byte) *nasType.GUTI5G {
+	if len(contents) < 11 {
+		return nil
+	}
+
+	guti := &nasType.GUTI5G{}
+	guti.Len = uint16(len(contents))
+	copy(guti.Octet[:], contents)
+
+	return guti
+}
+
+func decodeStatus5GMM(m *gonas.Message, resp *NASResponse) {
+	if m.Status5GMM == nil {
+		return
+	}
+
+	cause := m.Status5GMM.GetCauseValue()
+	resp.CauseGMM = &cause
 }
 
 func gmmMessageTypeName(t uint8) string {
@@ -164,6 +216,8 @@ func gmmMessageTypeName(t uint8) string {
 		return "configuration_update_command"
 	case gonas.MsgTypeConfigurationUpdateComplete:
 		return "configuration_update_complete"
+	case gonas.MsgTypeStatus5GMM:
+		return "status_5gmm"
 	default:
 		return fmt.Sprintf("unknown(%d)", t)
 	}

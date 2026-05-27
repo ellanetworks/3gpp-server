@@ -40,6 +40,19 @@ type UEContext struct {
 
 	// Security
 	UeSecurityCapability *nasType.UESecurityCapability `json:"-"`
+	IntegrityAlg         uint8                         `json:"-"`
+	CipheringAlg         uint8                         `json:"-"`
+	KnasEnc              [16]uint8                     `json:"-"`
+	KnasInt              [16]uint8                     `json:"-"`
+	Kamf                 []byte                        `json:"-"`
+	NgKsi                uint8                         `json:"-"`
+	ULCount              uint32                        `json:"-"`
+	DLCount              uint32                        `json:"-"`
+	SecurityContextAvailable bool                      `json:"-"`
+
+	// Last received AuthenticationRequest parameters
+	LastRAND []byte `json:"-"`
+	LastAUTN []byte `json:"-"`
 
 	// Serving network name
 	Snn string `json:"snn"`

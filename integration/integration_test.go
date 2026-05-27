@@ -32,7 +32,7 @@ func TestMain(m *testing.M) {
 		log.Fatalf("Ella Core provisioning failed: %v", err)
 	}
 
-	if err := createSubscriber(token); err != nil {
+	if err := createSubscriber(token, "001010000000001"); err != nil {
 		log.Fatalf("Subscriber creation failed: %v", err)
 	}
 
@@ -116,14 +116,14 @@ func postForToken(url, body string) (string, error) {
 	return tokenResp.Result.Token, nil
 }
 
-func createSubscriber(token string) error {
-	body := `{
-		"imsi": "001010000000001",
+func createSubscriber(token, imsi string) error {
+	body := fmt.Sprintf(`{
+		"imsi": "%s",
 		"key": "00112233445566778899aabbccddeeff",
 		"opc": "63bfa50ee6523365ff14c1f45f88737d",
 		"sequenceNumber": "000000000020",
 		"profile_name": "default"
-	}`
+	}`, imsi)
 	req, _ := http.NewRequest("POST", ellaAPIURL+"/api/v1/subscribers", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -230,9 +230,10 @@ func mustCreateGnB(t *testing.T) string {
 	return gnbID
 }
 
-// mustCreateUE creates a standard UE on the given gNB and returns its ID.
+// mustCreateUE creates a UE on the given gNB and returns its ID.
 func mustCreateUE(t *testing.T, gnbID string) string {
 	t.Helper()
+
 	body := `{
 		"supi": "imsi-001010000000001",
 		"k": "00112233445566778899aabbccddeeff",
@@ -251,6 +252,7 @@ func mustCreateUE(t *testing.T, gnbID string) string {
 	if ueID == "" {
 		t.Fatal("create ue: no ue_id in response")
 	}
+
 	return ueID
 }
 
