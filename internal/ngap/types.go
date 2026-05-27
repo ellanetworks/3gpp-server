@@ -36,6 +36,18 @@ type IE struct {
 	UERetentionInformation   *int64                        `json:"ue_retention_information,omitempty"`
 	CriticalityDiagnostics   *CriticalityDiagnosticsJSON   `json:"criticality_diagnostics,omitempty"`
 	TimeToWait               *int64                        `json:"time_to_wait,omitempty"`
+
+	// InitialUEMessage optional IEs (TS 38.413 §9.2.5.1)
+	AMFSetID               *string                        `json:"amf_set_id_ie,omitempty"`
+	AllowedNSSAI           []AllowedNSSAIItemJSON         `json:"allowed_nssai,omitempty"`
+	SelectedPLMNIdentity   *string                        `json:"selected_plmn_identity,omitempty"`
+
+	// DownlinkNASTransport optional IEs (TS 38.413 §9.2.5.2)
+	OldAMF                  *string                       `json:"old_amf,omitempty"`
+	RANPagingPriority       *int64                        `json:"ran_paging_priority,omitempty"`
+	MobilityRestrictionList *MobilityRestrictionListJSON  `json:"mobility_restriction_list,omitempty"`
+	IndexToRFSP             *int64                        `json:"index_to_rfsp,omitempty"`
+	UEAggregateMaxBitRate   *UEAggregateMaxBitRateJSON    `json:"ue_aggregate_max_bit_rate,omitempty"`
 }
 
 type GlobalRANNodeIDJSON struct {
@@ -126,6 +138,24 @@ type IECriticalityDiagnosticJSON struct {
 	IECriticality string `json:"ie_criticality"`
 	IEID          int64  `json:"ie_id"`
 	TypeOfError   string `json:"type_of_error"`
+}
+
+type AllowedNSSAIItemJSON struct {
+	SST string `json:"sst"`
+	SD  string `json:"sd,omitempty"`
+}
+
+type MobilityRestrictionListJSON struct {
+	ServingPLMN              string   `json:"serving_plmn"`
+	EquivalentPLMNs          []string `json:"equivalent_plmns,omitempty"`
+	RATRestrictions          []string `json:"rat_restrictions,omitempty"`
+	ForbiddenAreaInformation []string `json:"forbidden_area_information,omitempty"`
+	ServiceAreaInformation   []string `json:"service_area_information,omitempty"`
+}
+
+type UEAggregateMaxBitRateJSON struct {
+	DL int64 `json:"dl"`
+	UL int64 `json:"ul"`
 }
 
 type NGAPResponse struct {

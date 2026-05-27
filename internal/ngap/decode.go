@@ -56,8 +56,89 @@ func decodeUnsuccessfulOutcome(uo *ngapType.UnsuccessfulOutcome, resp *NGAPRespo
 	}
 }
 
-func decodeInitiatingMessage(_ *ngapType.InitiatingMessage, _ *NGAPResponse) {
-	// Phase 2+ will decode DownlinkNASTransport, InitialContextSetupRequest, etc.
+func decodeInitiatingMessage(im *ngapType.InitiatingMessage, resp *NGAPResponse) {
+	switch im.Value.Present {
+	case ngapType.InitiatingMessagePresentDownlinkNASTransport:
+		decodeDownlinkNASTransport(im.Value.DownlinkNASTransport, resp)
+	}
+}
+
+func decodeDownlinkNASTransport(msg *ngapType.DownlinkNASTransport, resp *NGAPResponse) {
+	if msg == nil {
+		return
+	}
+	for _, ie := range msg.ProtocolIEs.List {
+		decoded := IE{
+			ID:          ie.Id.Value,
+			Criticality: criticalityToString(ie.Criticality.Value),
+		}
+
+		switch ie.Id.Value {
+		case ngapType.ProtocolIEIDAMFUENGAPID:
+			if ie.Value.AMFUENGAPID != nil {
+				v := ie.Value.AMFUENGAPID.Value
+				decoded.AmfUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDRANUENGAPID:
+			if ie.Value.RANUENGAPID != nil {
+				v := ie.Value.RANUENGAPID.Value
+				decoded.RanUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDNASPDU:
+			if ie.Value.NASPDU != nil {
+				s := hex.EncodeToString(ie.Value.NASPDU.Value)
+				decoded.NasPDU = &s
+			}
+		case ngapType.ProtocolIEIDOldAMF:
+			if ie.Value.OldAMF != nil {
+				s := ie.Value.OldAMF.Value
+				decoded.OldAMF = &s
+			}
+		case ngapType.ProtocolIEIDRANPagingPriority:
+			if ie.Value.RANPagingPriority != nil {
+				v := int64(ie.Value.RANPagingPriority.Value)
+				decoded.RANPagingPriority = &v
+			}
+		case ngapType.ProtocolIEIDMobilityRestrictionList:
+			if ie.Value.MobilityRestrictionList != nil {
+				mrl := &MobilityRestrictionListJSON{
+					ServingPLMN: hex.EncodeToString(ie.Value.MobilityRestrictionList.ServingPLMN.Value),
+				}
+				if ie.Value.MobilityRestrictionList.EquivalentPLMNs != nil {
+					for _, p := range ie.Value.MobilityRestrictionList.EquivalentPLMNs.List {
+						mrl.EquivalentPLMNs = append(mrl.EquivalentPLMNs, hex.EncodeToString(p.Value))
+					}
+				}
+				decoded.MobilityRestrictionList = mrl
+			}
+		case ngapType.ProtocolIEIDIndexToRFSP:
+			if ie.Value.IndexToRFSP != nil {
+				v := ie.Value.IndexToRFSP.Value
+				decoded.IndexToRFSP = &v
+			}
+		case ngapType.ProtocolIEIDUEAggregateMaximumBitRate:
+			if ie.Value.UEAggregateMaximumBitRate != nil {
+				decoded.UEAggregateMaxBitRate = &UEAggregateMaxBitRateJSON{
+					DL: ie.Value.UEAggregateMaximumBitRate.UEAggregateMaximumBitRateDL.Value,
+					UL: ie.Value.UEAggregateMaximumBitRate.UEAggregateMaximumBitRateUL.Value,
+				}
+			}
+		case ngapType.ProtocolIEIDAllowedNSSAI:
+			if ie.Value.AllowedNSSAI != nil {
+				for _, item := range ie.Value.AllowedNSSAI.List {
+					nssai := AllowedNSSAIItemJSON{
+						SST: hex.EncodeToString(item.SNSSAI.SST.Value),
+					}
+					if item.SNSSAI.SD != nil {
+						nssai.SD = hex.EncodeToString(item.SNSSAI.SD.Value)
+					}
+					decoded.AllowedNSSAI = append(decoded.AllowedNSSAI, nssai)
+				}
+			}
+		}
+
+		resp.IEs = append(resp.IEs, decoded)
+	}
 }
 
 func decodeNGSetupResponse(msg *ngapType.NGSetupResponse, resp *NGAPResponse) {

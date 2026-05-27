@@ -92,3 +92,37 @@ func (g *GnBContext) StoreUEAmbr(ranUeID int64, ambr *UEAmbrInfo) {
 	defer g.mu.Unlock()
 	g.UEAmbr[ranUeID] = ambr
 }
+
+func (g *GnBContext) CreateUE(ue *UEContext) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.UEs[ue.ID] = ue
+}
+
+func (g *GnBContext) GetUE(ueID string) (*UEContext, bool) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	ue, ok := g.UEs[ueID]
+	return ue, ok
+}
+
+func (g *GnBContext) DeleteUE(ueID string) bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if _, ok := g.UEs[ueID]; !ok {
+		return false
+	}
+	delete(g.UEs, ueID)
+	return true
+}
+
+func (g *GnBContext) ListUEs() []*UEContext {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	ues := make([]*UEContext, 0, len(g.UEs))
+	for _, ue := range g.UEs {
+		ues = append(ues, ue)
+	}
+	return ues
+}
+

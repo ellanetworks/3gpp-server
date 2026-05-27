@@ -4,6 +4,7 @@ go 1.26.2
 
 require (
 	github.com/free5gc/aper v1.1.1
+	github.com/free5gc/nas v1.2.3
 	github.com/free5gc/ngap v1.1.3
 	github.com/free5gc/openapi v1.2.4
 	github.com/ishidawataru/sctp v0.0.0-20250303034628-ecf9ed6df987
