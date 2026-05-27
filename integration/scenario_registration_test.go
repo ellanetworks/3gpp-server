@@ -96,6 +96,26 @@ func TestScenarioRegistration(t *testing.T) {
 		}
 	})
 
+	t.Run("PDU session establishment", func(t *testing.T) {
+		status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+			`{"message_type":"pdu_session_establishment_request"}`)
+		if status != 200 {
+			t.Fatalf("HTTP %d: %s", status, body)
+		}
+
+		if got := jsonGet(body, "ngap.message_type"); got != "PDUSessionResourceSetupRequest" {
+			t.Errorf("ngap.message_type = %q, want PDUSessionResourceSetupRequest", got)
+		}
+		if got := jsonGet(body, "nas.inner_nas_message_type"); got != "pdu_session_establishment_accept" {
+			t.Errorf("nas.inner_nas_message_type = %q, want pdu_session_establishment_accept", got)
+		}
+		if got := jsonGet(body, "nas.pdu_address"); got == "" {
+			t.Error("missing PDU address")
+		} else {
+			t.Logf("PDU address: %s", got)
+		}
+	})
+
 	t.Run("AMF UE NGAP ID stored", func(t *testing.T) {
 		status, body := doRequest(t, "GET", "/gnb/"+gnbID+"/ue/"+ueID, "")
 		if status != 200 {

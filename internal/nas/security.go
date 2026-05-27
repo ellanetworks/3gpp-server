@@ -158,6 +158,8 @@ func DecodeSecuredNAS(ue *store.UEContext, message []byte) (*NASResponse, error)
 		decodeIdentityRequest(m, resp)
 	case gonas.MsgTypeStatus5GMM:
 		decodeStatus5GMM(m, resp)
+	case gonas.MsgTypeDLNASTransport:
+		decodeDLNASTransport(m, resp)
 	}
 
 	return resp, nil

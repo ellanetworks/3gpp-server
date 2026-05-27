@@ -256,6 +256,24 @@ func mustCreateUE(t *testing.T, gnbID string) string {
 	return ueID
 }
 
+// doRegistrationFlow completes a full registration (all 4 steps) for the given gNB/UE.
+func doRegistrationFlow(t *testing.T, gnbID, ueID string) {
+	t.Helper()
+
+	steps := []string{
+		`{"message_type":"registration_request"}`,
+		`{"message_type":"authentication_response"}`,
+		`{"message_type":"security_mode_complete"}`,
+		`{"message_type":"registration_complete"}`,
+	}
+	for _, body := range steps {
+		status, resp := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap", body)
+		if status != 200 {
+			t.Fatalf("registration flow step failed: HTTP %d\n  body: %s", status, resp)
+		}
+	}
+}
+
 // fieldCheck is used in table-driven tests to assert a JSON field value.
 type fieldCheck struct {
 	wantNonEmpty bool

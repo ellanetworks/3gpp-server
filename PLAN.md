@@ -4,292 +4,227 @@
 
 A standalone Go HTTP server that translates JSON to/from NGAP/NAS 3GPP messages over SCTP, with crypto utilities. Designed to be driven by an AI agent for conformance testing, fuzzing, and security assessment of 5G core networks.
 
-The JSON schema mirrors NGAP/NAS IEs 1:1 so the caller controls which IEs are present, their order, criticality, and values — enabling both correct procedures and deliberate deviations.
+The JSON schema mirrors NGAP/NAS IEs 1:1 so the caller controls which IEs are present, their order, criticality, and values — enabling both correct procedures and deliberate deviations. Every message type supports a `raw_nas_pdu` escape hatch for sending arbitrary bytes.
+
+**Goals:**
+1. Full coverage of every NGAP message (TS 38.413) and every NAS message (TS 24.501).
+2. Enable comprehensive security testing of 5G core networks — not just conformance, but adversarial fuzzing.
+
+## Security Testing Objectives
+
+Once message coverage is complete, 3gpp-server enables the following test campaigns against a target AMF:
+
+- **Protocol state machine fuzzing.** Send messages in wrong order, repeat messages, interleave procedures. Every unexpected state transition is a potential bug.
+- **IE boundary testing.** For every IE in every message: minimum/maximum length, zero length, one byte over/under, all zeros, all 0xff. Systematic coverage of every field in every message.
+- **Credential and identity attacks.** Wrong K/OPc for a SUCI, RES* from subscriber A on subscriber B's session, replayed RAND/AUTN, GUTI belonging to a different UE.
+- **Concurrency and race conditions.** Hundreds of simultaneous registrations, same SUCI from multiple gNBs, deregistration during PDU session setup, SCTP disconnect mid-handshake.
+- **Resource exhaustion.** Thousands of half-open registrations, maximum PDU sessions, largest possible IEs, timer pile-up from never completing procedures.
+- **Replay and downgrade attacks.** Replayed SecurityModeComplete with reset ULCount, RegistrationRequest claiming null-only algorithms (EA0/IA0), integrity MAC computed with wrong key.
+- **Cross-session contamination.** Register, deregister, re-register with different credentials. Verify no state leaks: old GUTI rejected, old keys rejected, old PDU session IDs not reused.
+- **Negative testing at scale.** For every message type, generate thousands of variants with randomized IE values. The AMF must never crash, hang, or leak memory. Any silent drop is a spec violation.
+
+## Dependencies and Limitations
+
+We use free5gc libraries (aper, ngap, nas, util) for encoding/decoding. These are Release 15 (2018) — the specs are now on Release 18. This means:
+
+- IEs added in R16-R18 don't exist in the typed API
+- The APER encoder enforces ASN.1 constraints, preventing intentionally malformed NGAP messages
+- Fixed-size structs (e.g. `GUTI5G.Octet[11]`) prevent oversized field testing through the typed path
+
+**Mitigation (current):** `raw_nas_pdu` bypasses the NAS encoder entirely. A future `raw_ngap_pdu` override and the Phase 15 raw SCTP endpoint will complete the bypass at every layer.
+
+**Future: custom NGAP/NAS codec.** Once we've implemented all phases and have deep knowledge of which messages and IEs matter most, replace free5gc incrementally — one message type at a time, starting with whichever is most limiting. This is not a near-term priority; the raw bypass layers cover fuzzing needs in the meantime.
 
 ## Source Code Reference
 
-Porting from `/home/guillaume/code/core2/internal/tester/` (~17k lines, 127 files, zero Ella Core internal dependencies).
-
-External dependencies:
-- `github.com/free5gc/aper` v1.1.1 — ASN.1 PER encoding
-- `github.com/free5gc/ngap` v1.1.3 — NGAP message types + encode/decode
-- `github.com/free5gc/openapi` v1.2.4 — PLMN conversion helpers
-- `github.com/free5gc/nas` v1.2.3 — NAS message types + security (Phase 2+)
-- `github.com/free5gc/util` v1.3.2 — Milenage, 5G-AKA, KDF (Phase 3+)
-- `github.com/ishidawataru/sctp` — SCTP sockets
-
-## API
-
-### gNB Lifecycle
-
-```
-POST   /gnb           Create gNB, dial SCTP to AMF, send NGSetupRequest, return response
-GET    /gnb/{gnb_id}  Read gNB state
-DELETE /gnb/{gnb_id}  Tear down gNB, close SCTP
-```
-
-### UE Lifecycle (Phase 2)
-
-```
-POST   /gnb/{gnb_id}/ue            Create UE context (SUPI, K, OPc), compute SUCI, return ue_id
-GET    /gnb/{gnb_id}/ue/{ue_id}    Read full UE state (keys, IDs, SQN, GUTI, counts, ...)
-PATCH  /gnb/{gnb_id}/ue/{ue_id}    Override any UE state field (for fuzzing)
-DELETE /gnb/{gnb_id}/ue/{ue_id}    Tear down UE
-```
-
-### Message Sending (Phase 2)
-
-```
-POST /gnb/{gnb_id}/ue/{ue_id}/ngap   Send NGAP message using managed state, auto-update on response
-POST /ngap                            Raw stateless send (Phase 6)
-```
-
-### Crypto (Phase 3)
-
-```
-POST /crypto/compute-res-star     5G-AKA RES* computation + key derivation
-POST /crypto/derive-kamf          K_AMF derivation from CK'/IK'
-POST /crypto/derive-nas-keys      K_NASint / K_NASenc from K_AMF
-POST /crypto/nas-mac              NAS message authentication code
-POST /crypto/nas-cipher           NAS ciphering apply/remove
-```
+Porting from `/home/guillaume/code/core2/internal/tester/`.
 
 ## 3GPP Spec Cross-Reference
 
-Every message implementation must be cross-referenced against the 3GPP specs and free5gc types to ensure all IEs are exposed:
+Every message implementation must be cross-referenced against the 3GPP spec PDFs in the repo root and free5gc types:
 
 1. Look up the IE table in TS 38.413 §9.2.x (NGAP) or TS 24.501 §8.x (NAS)
-2. Cross-reference against free5gc `*IEsValue` structs in `ngapType/ProtocolIEField.go`
+2. Cross-reference against free5gc structs
 3. Verify all IEs (mandatory and optional) have encode and decode paths
 
-### Verified: NGSetup (Phase 1)
+## Completed
 
-#### NGSetupRequest (TS 38.413 §9.2.6.1)
-| IE | ID | M/O | Criticality | JSON field |
-|---|---|---|---|---|
-| Global RAN Node ID | 27 | M | reject | `global_ran_node_id` |
-| RAN Node Name | 82 | O | ignore | `ran_node_name` |
-| Supported TA List | 102 | M | reject | `supported_ta_list` |
-| Default Paging DRX | 21 | M | ignore | `default_paging_drx` |
-| UE Retention Information | 147 | O | ignore | `ue_retention_information` |
+- **Phases 1-3:** gNB lifecycle, UE lifecycle, full registration flow (NGSetup, InitialUEMessage, DownlinkNASTransport, UplinkNASTransport, InitialContextSetupRequest/Response, RegistrationRequest/Accept/Complete, AuthenticationRequest/Response, SecurityModeCommand/Complete, 5G-AKA, NAS security)
+- **Phase 4:** PDU session establishment (PDUSessionEstablishmentRequest/Accept, PDUSessionResourceSetupRequest/Response, ULNASTransport/DLNASTransport with 5GSM payloads)
 
-#### NGSetupResponse (TS 38.413 §9.2.6.2)
-| IE | ID | M/O | Criticality | JSON field |
-|---|---|---|---|---|
-| AMF Name | 1 | M | reject | `amf_name` |
-| Served GUAMI List | 96 | M | reject | `served_guami_list` |
-| Relative AMF Capacity | 86 | M | ignore | `relative_amf_capacity` |
-| PLMN Support List | 80 | M | reject | `plmn_support_list` |
-| Criticality Diagnostics | 19 | O | ignore | `criticality_diagnostics` |
-| UE Retention Information | 147 | O | ignore | `ue_retention_information` |
+97 integration tests. Full registration + PDU session via the API validated against Ella Core.
 
-#### NGSetupFailure (TS 38.413 §9.2.6.3)
-| IE | ID | M/O | Criticality | JSON field |
-|---|---|---|---|---|
-| Cause | 15 | M | ignore | `cause` |
-| Time To Wait | 107 | O | ignore | `time_to_wait` |
-| Criticality Diagnostics | 19 | O | ignore | `criticality_diagnostics` |
+## Phase 5: Deregistration + UE Context Release
 
-## Current Implementation (Phase 1+2 — Complete)
+| Direction | NGAP | NAS | Spec |
+|-----------|------|-----|------|
+| UE→AMF | UplinkNASTransport | DeregistrationRequest (UE-originated) | TS 24.501 §8.2.12 |
+| AMF→UE | DownlinkNASTransport | DeregistrationAccept | TS 24.501 §8.2.13 |
+| AMF→UE | DownlinkNASTransport | DeregistrationRequest (network-initiated) | TS 24.501 §8.2.14 |
+| UE→AMF | UplinkNASTransport | DeregistrationAccept (network-initiated) | TS 24.501 §8.2.15 |
+| AMF→gNB | UEContextReleaseCommand | — | TS 38.413 §9.2.2.5 |
+| gNB→AMF | UEContextReleaseComplete | — | TS 38.413 §9.2.2.6 |
+| gNB→AMF | UEContextReleaseRequest | — | TS 38.413 §9.2.2.4 |
 
-```
-3gpp-server/
-  cmd/3gpp-server/
-    main.go                     HTTP server, --listen flag
-  internal/
-    api/
-      router.go                 POST/GET/DELETE /gnb + POST/GET/PATCH/DELETE /gnb/{id}/ue/{id} + POST /gnb/{id}/ue/{id}/ngap
-      gnb_handlers.go           Create gNB (SCTP + NGSetup), Get, Delete
-      ue_handlers.go            Create/Get/Patch/Delete UE
-      ngap_handlers.go          Stateful NGAP send (RegistrationRequest → AuthenticationRequest)
-      types.go                  JSON request/response structs
-      errors.go                 writeError / writeJSON helpers
-    store/
-      store.go                  Thread-safe map[string]*GnBContext
-      gnb_context.go            gNB state: PLMN, TAC, slices, NGAP IDs, UE pool, UE CRUD
-      ue_context.go             Full UE state: credentials, identity, SUCI, NGAP IDs, security
-    transport/
-      sctp.go                   Dial, Send, Receive (channel-based), Close
-    crypto/
-      suci.go                   SUCI concealment (Null, Profile A X25519, Profile B P-256)
-    ngap/
-      encode.go                 IE-level JSON -> NGAP PDU (NGSetupRequest, InitialUEMessage)
-      decode.go                 NGAP PDU -> IE-level JSON (NGSetupResponse/Failure, DownlinkNASTransport)
-      types.go                  IE-level JSON types (NGAPMessage, IE, NGAPResponse, ...)
-      helpers.go                PLMN/TAC/NRCellIdentity byte encoding
-    nas/
-      encode.go                 NAS PDU builder (RegistrationRequest)
-      decode.go                 NAS PDU decoder (AuthenticationRequest, IdentityRequest, RegistrationReject)
-      types.go                  NAS JSON request/response types
-  integration/
-    compose.yaml                Docker Compose for testing against Ella Core image
-    compose-local.yaml          Docker Compose for testing against locally-built Ella Core
-    Dockerfile.ella-core        Builds image from local binary
-    test_ng_setup.sh            26-test battery for NGSetup
-    test_registration.sh        9-test battery for UE Registration (Phase 2)
-```
+## Phase 6: Service Request + Paging
 
-### State Management
+| Direction | NGAP | NAS | Spec |
+|-----------|------|-----|------|
+| UE→AMF | InitialUEMessage | ServiceRequest | TS 24.501 §8.2.16 |
+| AMF→UE | DownlinkNASTransport | ServiceAccept | TS 24.501 §8.2.17 |
+| AMF→UE | DownlinkNASTransport | ServiceReject | TS 24.501 §8.2.18 |
+| AMF→gNB | Paging | — | TS 38.413 §9.2.4.1 |
 
-The store holds gNB and UE contexts in memory. Each gNB has an SCTP transport and a UE pool.
+## Phase 7: Identity + Configuration + Notification
 
-The stateful `/gnb/{id}/ue/{id}/ngap` endpoint (Phase 2) will:
-1. Read stored state to fill omitted fields (RAN UE NGAP ID, NAS SQN, PLMN)
-2. Encode and send over SCTP, increment ULCount if NAS security active
-3. Receive AMF response, decode to IE-level JSON
-4. Auto-update context (AMF UE NGAP ID, security algorithms, GUTI, DLCount)
-5. Return decoded response — does NOT auto-respond
+| Direction | NGAP | NAS | Spec |
+|-----------|------|-----|------|
+| AMF→UE | DownlinkNASTransport | IdentityRequest | TS 24.501 §8.2.21 |
+| UE→AMF | UplinkNASTransport | IdentityResponse | TS 24.501 §8.2.22 |
+| AMF→UE | DownlinkNASTransport | ConfigurationUpdateCommand | TS 24.501 §8.2.19 |
+| UE→AMF | UplinkNASTransport | ConfigurationUpdateComplete | TS 24.501 §8.2.20 |
+| AMF→UE | DownlinkNASTransport | Notification | TS 24.501 §8.2.23 |
+| UE→AMF | UplinkNASTransport | NotificationResponse | TS 24.501 §8.2.24 |
+| UE→AMF | UplinkNASTransport | SecurityModeReject | TS 24.501 §8.2.27 |
 
-Any field explicitly provided in the request overrides stored state for that single request (for fuzzing). `PATCH` mutates stored state permanently.
+## Phase 8: PDU Session Modification + Release
 
-## Phase 2: UE Context + First NAS Message — Complete
+| Direction | NGAP | NAS | Spec |
+|-----------|------|-----|------|
+| UE→AMF | UplinkNASTransport | PDUSessionModificationRequest | TS 24.501 §8.3.7 |
+| AMF→UE | DownlinkNASTransport | PDUSessionModificationCommand | TS 24.501 §8.3.9 |
+| UE→AMF | UplinkNASTransport | PDUSessionModificationComplete | TS 24.501 §8.3.10 |
+| AMF→UE | DownlinkNASTransport | PDUSessionModificationReject | TS 24.501 §8.3.8 |
+| UE→AMF | UplinkNASTransport | PDUSessionModificationCommandReject | TS 24.501 §8.3.11 |
+| UE→AMF | UplinkNASTransport | PDUSessionReleaseRequest | TS 24.501 §8.3.12 |
+| AMF→UE | DownlinkNASTransport | PDUSessionReleaseCommand | TS 24.501 §8.3.14 |
+| UE→AMF | UplinkNASTransport | PDUSessionReleaseComplete | TS 24.501 §8.3.15 |
+| AMF→UE | DownlinkNASTransport | PDUSessionReleaseReject | TS 24.501 §8.3.13 |
+| AMF→gNB | PDUSessionResourceReleaseCommand | — | TS 38.413 §9.2.1.4 |
+| gNB→AMF | PDUSessionResourceReleaseResponse | — | TS 38.413 §9.2.1.5 |
+| AMF→gNB | PDUSessionResourceModifyRequest | — | TS 38.413 §9.2.1.6 |
+| gNB→AMF | PDUSessionResourceModifyResponse | — | TS 38.413 §9.2.1.7 |
+| gNB→AMF | PDUSessionResourceNotify | — | TS 38.413 §9.2.1.8 |
+| gNB→AMF | PDUSessionResourceModifyIndication | — | TS 38.413 §9.2.1.9 |
+| AMF→gNB | PDUSessionResourceModifyConfirm | — | TS 38.413 §9.2.1.10 |
 
-**3GPP cross-reference verified:**
-- InitialUEMessage: TS 38.413 §9.2.5.1
-- DownlinkNASTransport: TS 38.413 §9.2.5.2
-- RegistrationRequest: TS 24.501 §8.2.6
-- AuthenticationRequest: TS 24.501 §8.2.1
+## Phase 9: Authentication Extensions
 
-### Verified: InitialUEMessage ENCODE (TS 38.413 §9.2.5.1)
-| IE | ID | M/O | Criticality | JSON field | Status |
-|---|---|---|---|---|---|
-| RAN UE NGAP ID | 85 | M | reject | `ran_ue_ngap_id` | ✅ |
-| NAS-PDU | 38 | M | reject | `nas_pdu` | ✅ |
-| User Location Information | 116 | M | reject | `user_location_information` | ✅ |
-| RRC Establishment Cause | 90 | M | ignore | `rrc_establishment_cause` | ✅ |
-| 5G-S-TMSI | 26 | O | reject | `five_g_s_tmsi` | ✅ |
-| AMF Set ID | 3 | O | ignore | `amf_set_id_ie` | ✅ |
-| UE Context Request | 112 | O | ignore | `ue_context_request` | ✅ |
-| Allowed NSSAI | 0 | O | reject | `allowed_nssai` | ✅ |
-| Selected PLMN Identity | 174 | O | ignore | — | ❌ not in free5gc v1.1.3 |
-| Source to Target AMF Info Reroute | — | O | ignore | — | ❌ not in free5gc v1.1.3 |
-| IAB/RedCap/LTE-M/etc (R16-R18) | — | O | — | — | ❌ not in free5gc v1.1.3 |
+| Direction | NGAP | NAS | Spec |
+|-----------|------|-----|------|
+| UE→AMF | UplinkNASTransport | AuthenticationFailure | TS 24.501 §8.2.4 |
+| AMF→UE | DownlinkNASTransport | AuthenticationResult | TS 24.501 §8.2.3 |
+| AMF→UE | DownlinkNASTransport | AuthenticationReject | TS 24.501 §8.2.5 |
+| — | — | 5GMM STATUS | TS 24.501 §8.2.29 |
+| — | — | 5GSM STATUS | TS 24.501 §8.3.16 |
+| UE→AMF | UplinkNASTransport | ControlPlaneServiceRequest | TS 24.501 §8.2.30 |
 
-### Verified: DownlinkNASTransport DECODE (TS 38.413 §9.2.5.2)
-| IE | ID | M/O | Criticality | JSON field | Status |
-|---|---|---|---|---|---|
-| AMF UE NGAP ID | 10 | M | reject | `amf_ue_ngap_id` | ✅ |
-| RAN UE NGAP ID | 85 | M | reject | `ran_ue_ngap_id` | ✅ |
-| NAS-PDU | 38 | M | reject | `nas_pdu` | ✅ |
-| Old AMF | 48 | O | reject | `old_amf` | ✅ |
-| RAN Paging Priority | 83 | O | ignore | `ran_paging_priority` | ✅ |
-| Mobility Restriction List | 36 | O | ignore | `mobility_restriction_list` | ✅ |
-| Index to RAT/Freq Selection | 31 | O | ignore | `index_to_rfsp` | ✅ |
-| UE Aggregate Maximum Bit Rate | 110 | O | ignore | `ue_aggregate_max_bit_rate` | ✅ |
-| Allowed NSSAI | 0 | O | reject | `allowed_nssai` | ✅ |
-| SRVCC/Coverage/ConnTime/etc (R16+) | — | O | — | — | ❌ not in free5gc v1.1.3 |
+## Phase 10: Handover
 
-### Verified: RegistrationRequest ENCODE (TS 24.501 §8.2.6)
-| IEI | IE | M/O | JSON field | Status |
-|---|---|---|---|---|
-| — | 5GS Registration Type | M | `registration_type` | ✅ |
-| — | ngKSI | M | `ng_ksi` | ✅ |
-| — | 5GS Mobile Identity | M | auto (SUCI/GUTI) or `mobile_identity_override` | ✅ |
-| C- | Non-current native NAS KSI | O | `non_current_native_nas_ksi` | ✅ |
-| 10 | 5GMM capability | O | `capability_5gmm` | ✅ |
-| 2E | UE security capability | O | auto or `ue_security_capability` | ✅ |
-| 2F | Requested NSSAI | O | `requested_nssai` | ✅ |
-| 52 | Last visited registered TAI | O | `last_visited_registered_tai` | ✅ |
-| 17 | S1 UE network capability | O | `s1_ue_network_capability` | ✅ |
-| 40 | Uplink data status | O | `uplink_data_status` | ✅ |
-| 50 | PDU session status | O | `pdu_session_status` | ✅ |
-| B- | MICO indication | O | `mico_indication` | ✅ |
-| 2B | UE status | O | `ue_status` | ✅ |
-| 77 | Additional GUTI | O | `additional_guti` | ✅ |
-| 25 | Allowed PDU session status | O | `allowed_pdu_session_status` | ✅ |
-| 18 | UE's usage setting | O | `ues_usage_setting` | ✅ |
-| 51 | Requested DRX parameters | O | `requested_drx_parameters` | ✅ |
-| 70 | EPS NAS message container | O | `eps_nas_message_container` | ✅ |
-| 74 | LADN indication | O | `ladn_indication` | ✅ |
-| 7B | Payload container | O | `payload_container` | ✅ |
-| 9- | Network slicing indication | O | `network_slicing_indication` | ✅ |
-| 53 | 5GS update type | O | `update_type_5gs` | ✅ |
-| 71 | NAS message container | O | `nas_message_container` | ✅ |
-| 60 | EPS bearer context status | O | `eps_bearer_context_status` | ✅ |
-| — | Follow-On Request (FOR) | M | `follow_on_request` | ✅ |
-| 8- | Payload container type | O | `payload_container_type` | ❌ not in free5gc v1.2.3 |
-| 6E | Requested extended DRX | O | — | ❌ not in free5gc v1.2.3 |
-| 6A | T3324 value | O | — | ❌ not in free5gc v1.2.3 |
-| 67 | UE radio capability ID | O | — | ❌ not in free5gc v1.2.3 |
-| 35 | Requested mapped NSSAI | O | — | ❌ not in free5gc v1.2.3 |
-| 48 | Additional info requested | O | — | ❌ not in free5gc v1.2.3 |
-| 1A | Requested WUS assistance | O | — | ❌ not in free5gc v1.2.3 |
-| A- | N5GC indication | O | — | ❌ not in free5gc v1.2.3 |
-| 30 | Requested NB-N1 mode DRX | O | — | ❌ not in free5gc v1.2.3 |
-| 29 | UE request type | O | — | ❌ not in free5gc v1.2.3 |
-| 28 | Paging restriction | O | — | ❌ not in free5gc v1.2.3 |
+| Direction | NGAP | Spec |
+|-----------|------|------|
+| gNB→AMF | HandoverRequired | TS 38.413 §9.2.3.1 |
+| AMF→gNB | HandoverCommand | TS 38.413 §9.2.3.2 |
+| AMF→gNB | HandoverPreparationFailure | TS 38.413 §9.2.3.3 |
+| AMF→gNB(target) | HandoverRequest | TS 38.413 §9.2.3.4 |
+| gNB→AMF | HandoverRequestAcknowledge | TS 38.413 §9.2.3.5 |
+| gNB→AMF | HandoverFailure | TS 38.413 §9.2.3.6 |
+| gNB→AMF | HandoverNotify | TS 38.413 §9.2.3.7 |
+| gNB→AMF | PathSwitchRequest | TS 38.413 §9.2.3.8 |
+| AMF→gNB | PathSwitchRequestAcknowledge | TS 38.413 §9.2.3.9 |
+| AMF→gNB | PathSwitchRequestFailure | TS 38.413 §9.2.3.10 |
+| gNB→AMF | HandoverCancel | TS 38.413 §9.2.3.11 |
+| AMF→gNB | HandoverCancelAcknowledge | TS 38.413 §9.2.3.12 |
+| gNB→AMF | HandoverSuccess | TS 38.413 §9.2.3.13 |
+| gNB→AMF | UplinkRANStatusTransfer | TS 38.413 §9.2.3.14 |
+| AMF→gNB | DownlinkRANStatusTransfer | TS 38.413 §9.2.3.15 |
+| gNB→AMF | UplinkRANEarlyStatusTransfer | TS 38.413 §9.2.3.16 |
+| AMF→gNB | DownlinkRANEarlyStatusTransfer | TS 38.413 §9.2.3.17 |
 
-### Verified: AuthenticationRequest DECODE (TS 24.501 §8.2.1)
-| IEI | IE | M/O | JSON field | Status |
-|---|---|---|---|---|
-| — | ngKSI | M | `ng_ksi` | ✅ |
-| — | ABBA | M | `abba` | ✅ |
-| 21 | Authentication parameter RAND | O | `rand` | ✅ |
-| 20 | Authentication parameter AUTN | O | `autn` | ✅ |
-| 78 | EAP message | O | `eap_message` | ✅ |
+## Phase 11: Interface Management
 
-**Milestone**: Create gNB, create UE, send RegistrationRequest via InitialUEMessage, get back AuthenticationRequest with RAND and AUTN. ✅ Validated against Ella Core v1.11.0.
+| Direction | NGAP | Spec |
+|-----------|------|------|
+| gNB→AMF | RANConfigurationUpdate | TS 38.413 §9.2.6.7 |
+| AMF→gNB | RANConfigurationUpdateAcknowledge | TS 38.413 §9.2.6.8 |
+| AMF→gNB | RANConfigurationUpdateFailure | TS 38.413 §9.2.6.9 |
+| AMF→gNB | AMFConfigurationUpdate | TS 38.413 §9.2.6.10 |
+| gNB→AMF | AMFConfigurationUpdateAcknowledge | TS 38.413 §9.2.6.11 |
+| gNB→AMF | AMFConfigurationUpdateFailure | TS 38.413 §9.2.6.12 |
+| both | NGReset | TS 38.413 §9.2.6.4 |
+| both | NGResetAcknowledge | TS 38.413 §9.2.6.5 |
+| both | ErrorIndication | TS 38.413 §9.2.6.13 |
+| AMF→gNB | AMFStatusIndication | TS 38.413 §9.2.6.14 |
+| AMF→gNB | OverloadStart | TS 38.413 §9.2.6.15 |
+| AMF→gNB | OverloadStop | TS 38.413 §9.2.6.16 |
 
-## Phase 3: Crypto + Full Authentication Flow
+## Phase 12: UE Context Management (Extended)
 
-**3GPP cross-reference required:**
-- InitialContextSetupRequest/Response: TS 38.413 §9.2.2.1-2
-- SecurityModeCommand/Complete: TS 24.501 §8.2.25-26
-- AuthenticationRequest/Response: TS 24.501 §8.2.1-2
-- RegistrationAccept/Complete: TS 24.501 §8.2.7-8
-- 5G-AKA: TS 33.501 §6.1.3
+| Direction | NGAP | Spec |
+|-----------|------|------|
+| AMF→gNB | UEContextModificationRequest | TS 38.413 §9.2.2.7 |
+| gNB→AMF | UEContextModificationResponse | TS 38.413 §9.2.2.8 |
+| gNB→AMF | UEContextModificationFailure | TS 38.413 §9.2.2.9 |
+| gNB→AMF | RRCInactiveTransitionReport | TS 38.413 §9.2.2.10 |
+| gNB→AMF | ConnectionEstablishmentIndication | TS 38.413 §9.2.2.11 |
+| AMF→gNB | AMFCPRelocationIndication | TS 38.413 §9.2.2.12 |
+| gNB→AMF | RANCPRelocationIndication | TS 38.413 §9.2.2.13 |
+| AMF→gNB | RetrieveUEInformation | TS 38.413 §9.2.2.14 |
+| gNB→AMF | UEInformationTransfer | TS 38.413 §9.2.2.15 |
+| AMF→gNB | UEContextSuspendRequest | TS 38.413 §9.2.2.16 |
+| gNB→AMF | UEContextSuspendResponse/Failure | TS 38.413 §9.2.2.17-18 |
+| AMF→gNB | UEContextResumeRequest | TS 38.413 §9.2.2.19 |
+| gNB→AMF | UEContextResumeResponse/Failure | TS 38.413 §9.2.2.20-21 |
 
-**Files to create/modify:**
+## Phase 13: Remaining NGAP Procedures
 
-| File | Action |
-|------|--------|
-| `internal/crypto/aka.go` | ComputeResStar — pure function, port from `ue/ue.go` |
-| `internal/crypto/keys.go` | DeriveNASKeys — port from `ue/auth.go` |
-| `internal/crypto/mac.go` | NAS MAC — wraps `security.NASMacCalculate` |
-| `internal/crypto/cipher.go` | NAS cipher — wraps `security.NASEncrypt` |
-| `internal/nas/security.go` | NAS encode/decode with integrity + ciphering |
-| `internal/nas/encode.go` | Add AuthenticationResponse, SecurityModeComplete, RegistrationComplete |
-| `internal/nas/decode.go` | Add SecurityModeCommand, RegistrationAccept field extraction |
-| `internal/ngap/encode.go` | Add InitialContextSetupResponse |
-| `internal/ngap/decode.go` | Add InitialContextSetupRequest decoder |
-| `internal/api/crypto_handlers.go` | All 5 crypto endpoints |
+| Direction | NGAP | Spec |
+|-----------|------|------|
+| gNB→AMF | UplinkRANConfigurationTransfer | TS 38.413 §9.2.7.1 |
+| AMF→gNB | DownlinkRANConfigurationTransfer | TS 38.413 §9.2.7.2 |
+| AMF→gNB | WriteReplaceWarningRequest | TS 38.413 §9.2.8.1 |
+| gNB→AMF | WriteReplaceWarningResponse | TS 38.413 §9.2.8.2 |
+| AMF→gNB | PWSCancelRequest | TS 38.413 §9.2.8.3 |
+| gNB→AMF | PWSCancelResponse | TS 38.413 §9.2.8.4 |
+| gNB→AMF | PWSRestartIndication | TS 38.413 §9.2.8.5 |
+| gNB→AMF | PWSFailureIndication | TS 38.413 §9.2.8.6 |
+| gNB→AMF | NASNonDeliveryIndication | TS 38.413 §9.2.5.4 |
+| AMF→gNB | RerouteNASRequest | TS 38.413 §9.2.5.5 |
+| both | NRPPaTransport (UL/DL) | TS 38.413 §9.2.9.1-2 |
+| both | LocationReport/Control | TS 38.413 §9.2.11.1-3 |
+| both | UETNLABindingRelease | TS 38.413 §9.2.12.1 |
+| AMF→gNB | UERadioCapabilityCheckRequest | TS 38.413 §9.2.13.1 |
+| gNB→AMF | UERadioCapabilityCheckResponse | TS 38.413 §9.2.13.2 |
+| gNB→AMF | UERadioCapabilityInfoIndication | TS 38.413 §9.2.13.3 |
+| both | SecondaryRATDataUsageReport | TS 38.413 §9.2.14.1 |
+| AMF→gNB | TraceStart / DeactivateTrace | TS 38.413 §9.2.10.1-2 |
+| gNB→AMF | TraceFailureIndication / CellTrafficTrace | TS 38.413 §9.2.10.3-4 |
+| AMF→gNB | MulticastGroupPaging | TS 38.413 §9.2.4.2 |
+| AMF→gNB | BroadcastSession* | TS 38.413 §9.2.16.1-8 |
+| AMF→gNB | MulticastSession* | TS 38.413 §9.2.17.1-4 |
+| AMF→gNB | TimingSynchronisationStatus* | TS 38.413 §9.2.18.1-2 |
 
-**Milestone**: Full registration via curl.
+## Phase 14: NAS Extensions
 
-## Phase 4: PDU Session + Deregistration
+| Direction | NAS | Spec |
+|-----------|-----|------|
+| AMF→UE | PDUSessionAuthenticationCommand | TS 24.501 §8.3.4 |
+| UE→AMF | PDUSessionAuthenticationComplete | TS 24.501 §8.3.5 |
+| AMF→UE | PDUSessionAuthenticationResult | TS 24.501 §8.3.6 |
+| AMF→UE | NetworkSliceSpecificAuthenticationCommand | TS 24.501 §8.2.31 |
+| UE→AMF | NetworkSliceSpecificAuthenticationComplete | TS 24.501 §8.2.32 |
+| AMF→UE | NetworkSliceSpecificAuthenticationResult | TS 24.501 §8.2.33 |
+| AMF→UE | ServiceLevelAuthenticationCommand | TS 24.501 §8.3.17 |
+| UE→AMF | ServiceLevelAuthenticationComplete | TS 24.501 §8.3.18 |
+| UE→AMF | RelayKeyRequest | TS 24.501 §8.2.34 |
+| AMF→UE | RelayKeyAccept / Reject | TS 24.501 §8.2.35-36 |
+| AMF→UE | RelayAuthenticationRequest | TS 24.501 §8.2.37 |
+| UE→AMF | RelayAuthenticationResponse | TS 24.501 §8.2.38 |
+| UE→AMF | RemoteUEReport | TS 24.501 §8.3.19 |
+| AMF→UE | RemoteUEReportResponse | TS 24.501 §8.3.20 |
 
-**3GPP cross-reference required:**
-- UplinkNASTransport: TS 38.413 §9.2.3.2
-- PDUSessionResourceSetup Request/Response: TS 38.413 §9.2.1.1-2
-- UEContextRelease Command/Complete: TS 38.413 §9.2.2.5-6
-- PDUSessionEstablishment Request/Accept: TS 24.501 §8.3.1-2
-- DeregistrationRequest: TS 24.501 §8.2.11
+## Phase 15: Raw Endpoint
 
-**Milestone**: Full happy path — registration + PDU session + deregistration.
-
-## Phase 5: Remaining Messages
-
-**3GPP cross-reference required:**
-- IdentityRequest/Response: TS 24.501 §8.2.21-22
-- ServiceRequest/Accept: TS 24.501 §8.2.15-16
-- Paging: TS 38.413 §9.2.4.1
-- ErrorIndication: TS 38.413 §9.2.7.1
-
-**Milestone**: Every NAS/NGAP message the existing core2 tester supports.
-
-## Phase 6: Raw Endpoint + OpenAPI Spec
-
-| File | Action |
-|------|--------|
-| `internal/api/ngap_handlers.go` | POST /ngap — raw hex in/out, best-effort decode |
-| `api/openapi.yaml` | Hand-written spec for all endpoints |
-
-## What Gets Ported vs Written Fresh vs Skipped
-
-**Port verbatim:** `gnb/helpers.go`, `gnb/msg_name.go`, `gnb/cause.go`, `ue/auth.go`, `ue/sidf/`
-
-**Port with adaptation:** `gnb/server.go` (SCTP only, no failover/GTP), `gnb/build_*.go` (IE-level JSON input), `gnb/handle_*.go` (decode only, no auto-response), `ue/ue.go` (state struct only), `ue/build_*.go` (all IEs optional), `ue/handle_*.go` (field extraction only), `ue/nas_encode.go`, `ue/nas_decode.go`
-
-**Write fresh:** `cmd/3gpp-server/main.go`, `internal/api/*`, `internal/store/*`, `internal/ngap/types.go`, `internal/nas/types.go`, `api/openapi.yaml`
-
-**Skip:** `gnb/gtp.go`, multi-peer failover, WaitFor*/cond queues, `air/air.go`, `scenarios/**`, `testutil/**`, `enb/**`
+| Endpoint | Purpose |
+|----------|---------|
+| POST /ngap | Raw hex in/out — send arbitrary NGAP PDU bytes, receive raw response. Best-effort decode. |
