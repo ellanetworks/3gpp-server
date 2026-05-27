@@ -19,7 +19,6 @@ type GnBContext struct {
 
 	mu          sync.RWMutex
 	UEs         map[string]*UEContext
-	nextUeID    atomic.Int64
 	nextRanUeID atomic.Int64
 
 	NGAPIDs     map[int64]int64

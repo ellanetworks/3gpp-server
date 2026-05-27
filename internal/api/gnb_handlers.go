@@ -80,7 +80,7 @@ func (h *Handler) CreateGnB(w http.ResponseWriter, r *http.Request) {
 	encoded, err := ngap.Encode(msg)
 	if err != nil {
 		_ = t.Close()
-		h.Store.DeleteGnB(gnb.ID)
+		_ = h.Store.DeleteGnB(gnb.ID)
 		delete(h.Transports, gnb.ID)
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("ngap encode: %v", err))
 		return
@@ -88,7 +88,7 @@ func (h *Handler) CreateGnB(w http.ResponseWriter, r *http.Request) {
 
 	if err := t.Send(encoded, true); err != nil {
 		_ = t.Close()
-		h.Store.DeleteGnB(gnb.ID)
+		_ = h.Store.DeleteGnB(gnb.ID)
 		delete(h.Transports, gnb.ID)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("sctp send: %v", err))
 		return
@@ -100,7 +100,7 @@ func (h *Handler) CreateGnB(w http.ResponseWriter, r *http.Request) {
 	respData, err := t.Receive(ctx)
 	if err != nil {
 		_ = t.Close()
-		h.Store.DeleteGnB(gnb.ID)
+		_ = h.Store.DeleteGnB(gnb.ID)
 		delete(h.Transports, gnb.ID)
 		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for NGSetupResponse: %v", err))
 		return
@@ -109,7 +109,7 @@ func (h *Handler) CreateGnB(w http.ResponseWriter, r *http.Request) {
 	ngapResp, err := ngap.Decode(respData)
 	if err != nil {
 		_ = t.Close()
-		h.Store.DeleteGnB(gnb.ID)
+		_ = h.Store.DeleteGnB(gnb.ID)
 		delete(h.Transports, gnb.ID)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("ngap decode: %v", err))
 		return
