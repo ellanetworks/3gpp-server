@@ -63,6 +63,13 @@ type NASResponse struct {
 	NgKSI      *uint8 `json:"ng_ksi,omitempty"`
 	EAPMessage string `json:"eap_message,omitempty"`
 
+	// SecurityModeCommand fields (TS 24.501 §8.2.25)
+	SelectedCipheringAlg  *uint8 `json:"selected_ciphering_alg,omitempty"`
+	SelectedIntegrityAlg  *uint8 `json:"selected_integrity_alg,omitempty"`
+
+	// RegistrationAccept fields (TS 24.501 §8.2.7)
+	GUTI string `json:"guti,omitempty"`
+
 	// RegistrationReject / AuthenticationReject
 	CauseGMM *uint8 `json:"cause_5gmm,omitempty"`
 

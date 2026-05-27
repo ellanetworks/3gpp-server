@@ -261,3 +261,126 @@ func applyRegistrationRequestOverrides(rr *nasMessage.RegistrationRequest, req *
 		}
 	}
 }
+
+func BuildAuthenticationResponse(resStar []byte) ([]byte, error) {
+	m := nas.NewMessage()
+	m.GmmMessage = nas.NewGmmMessage()
+	m.GmmHeader.SetMessageType(nas.MsgTypeAuthenticationResponse)
+
+	authResp := nasMessage.NewAuthenticationResponse(0)
+	authResp.SetExtendedProtocolDiscriminator(nasMessage.Epd5GSMobilityManagementMessage)
+	authResp.SetSecurityHeaderType(nas.SecurityHeaderTypePlainNas)
+	authResp.SetSpareHalfOctet(0)
+	authResp.SetMessageType(nas.MsgTypeAuthenticationResponse)
+
+	if len(resStar) > 0 {
+		authResp.AuthenticationResponseParameter = nasType.NewAuthenticationResponseParameter(nasMessage.AuthenticationResponseAuthenticationResponseParameterType)
+		authResp.AuthenticationResponseParameter.SetLen(uint8(len(resStar)))
+		copy(authResp.AuthenticationResponseParameter.Octet[:], resStar[:16])
+	}
+
+	m.AuthenticationResponse = authResp
+
+	data := new(bytes.Buffer)
+	if err := m.GmmMessageEncode(data); err != nil {
+		return nil, fmt.Errorf("GMM encode AuthenticationResponse: %w", err)
+	}
+
+	return data.Bytes(), nil
+}
+
+func BuildSecurityModeComplete(regRequestPdu []byte, imeisv string) ([]byte, error) {
+	m := nas.NewMessage()
+	m.GmmMessage = nas.NewGmmMessage()
+	m.GmmHeader.SetMessageType(nas.MsgTypeSecurityModeComplete)
+
+	smc := nasMessage.NewSecurityModeComplete(0)
+	smc.SetExtendedProtocolDiscriminator(nasMessage.Epd5GSMobilityManagementMessage)
+	smc.SetSecurityHeaderType(nas.SecurityHeaderTypePlainNas)
+	smc.SetSpareHalfOctet(0)
+	smc.SetMessageType(nas.MsgTypeSecurityModeComplete)
+
+	if imeisv != "" && len(imeisv) == 16 {
+		pei, err := buildIMEISV(imeisv)
+		if err == nil {
+			smc.IMEISV = pei
+		}
+	}
+
+	if regRequestPdu != nil {
+		smc.NASMessageContainer = nasType.NewNASMessageContainer(nasMessage.SecurityModeCompleteNASMessageContainerType)
+		smc.NASMessageContainer.SetLen(uint16(len(regRequestPdu)))
+		smc.Buffer = regRequestPdu
+	}
+
+	m.SecurityModeComplete = smc
+
+	data := new(bytes.Buffer)
+	if err := m.GmmMessageEncode(data); err != nil {
+		return nil, fmt.Errorf("GMM encode SecurityModeComplete: %w", err)
+	}
+
+	return data.Bytes(), nil
+}
+
+func BuildRegistrationComplete() ([]byte, error) {
+	m := nas.NewMessage()
+	m.GmmMessage = nas.NewGmmMessage()
+	m.GmmHeader.SetMessageType(nas.MsgTypeRegistrationComplete)
+
+	regComplete := nasMessage.NewRegistrationComplete(0)
+	regComplete.SetExtendedProtocolDiscriminator(nasMessage.Epd5GSMobilityManagementMessage)
+	regComplete.SetSecurityHeaderType(nas.SecurityHeaderTypePlainNas)
+	regComplete.SetSpareHalfOctet(0)
+	regComplete.SetMessageType(nas.MsgTypeRegistrationComplete)
+
+	m.RegistrationComplete = regComplete
+
+	data := new(bytes.Buffer)
+	if err := m.GmmMessageEncode(data); err != nil {
+		return nil, fmt.Errorf("GMM encode RegistrationComplete: %w", err)
+	}
+
+	return data.Bytes(), nil
+}
+
+func buildIMEISV(imeisv string) (*nasType.IMEISV, error) {
+	if len(imeisv) != 16 {
+		return nil, fmt.Errorf("IMEISV must be 16 digits")
+	}
+
+	var d [16]uint8
+	for i := range 16 {
+		if imeisv[i] < '0' || imeisv[i] > '9' {
+			return nil, fmt.Errorf("IMEISV contains non-digit characters")
+		}
+
+		d[i] = imeisv[i] - '0'
+	}
+
+	pei := nasType.NewIMEISV(nasMessage.SecurityModeCompleteIMEISVType)
+	pei.SetLen(9)
+
+	pei.SetIdentityDigit1(d[0])
+	pei.SetOddEvenIdic(0)
+	pei.SetTypeOfIdentity(nasMessage.MobileIdentity5GSTypeImeisv)
+
+	pei.SetIdentityDigitP(d[1])
+	pei.SetIdentityDigitP_1(d[2])
+	pei.SetIdentityDigitP_2(d[3])
+	pei.SetIdentityDigitP_3(d[4])
+	pei.SetIdentityDigitP_4(d[5])
+	pei.SetIdentityDigitP_5(d[6])
+	pei.SetIdentityDigitP_6(d[7])
+	pei.SetIdentityDigitP_7(d[8])
+	pei.SetIdentityDigitP_8(d[9])
+	pei.SetIdentityDigitP_9(d[10])
+	pei.SetIdentityDigitP_10(d[11])
+	pei.SetIdentityDigitP_11(d[12])
+	pei.SetIdentityDigitP_12(d[13])
+	pei.SetIdentityDigitP_13(d[14])
+	pei.SetIdentityDigitP_14(d[15])
+	pei.SetIdentityDigitP_15(0xF)
+
+	return pei, nil
+}

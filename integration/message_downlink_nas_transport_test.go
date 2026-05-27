@@ -14,7 +14,7 @@ import (
 
 func TestDownlinkNASTransport_Decode(t *testing.T) {
 	gnbID := mustCreateGnB(t)
-	ueID := mustCreateUE(t, gnbID)
+	ueID := mustCreateUE2(t, gnbID)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
 		`{"message_type":"registration_request"}`)

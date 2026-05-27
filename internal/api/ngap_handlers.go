@@ -8,10 +8,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ellanetworks/3gpp-server/internal/crypto"
 	nasCodec "github.com/ellanetworks/3gpp-server/internal/nas"
 	"github.com/ellanetworks/3gpp-server/internal/ngap"
 	"github.com/ellanetworks/3gpp-server/internal/store"
 	"github.com/ellanetworks/3gpp-server/internal/transport"
+	gonas "github.com/free5gc/nas"
 )
 
 func (h *Handler) SendNGAP(w http.ResponseWriter, r *http.Request) {
@@ -45,6 +47,12 @@ func (h *Handler) SendNGAP(w http.ResponseWriter, r *http.Request) {
 	switch req.MessageType {
 	case "registration_request":
 		handleRegistrationRequest(w, r, gnb, ue, t, &req)
+	case "authentication_response":
+		handleAuthenticationResponse(w, r, gnb, ue, t)
+	case "security_mode_complete":
+		handleSecurityModeComplete(w, r, gnb, ue, t)
+	case "registration_complete":
+		handleRegistrationComplete(w, r, gnb, ue, t)
 	default:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unsupported message_type: %s", req.MessageType))
 	}
@@ -70,21 +78,136 @@ func handleRegistrationRequest(w http.ResponseWriter, r *http.Request, gnb *stor
 	}
 
 	ngapMsg := ngap.BuildInitialUEMessageFromState(
-		ue.RanUeNgapID,
-		nasPDU,
-		gnb.MCC,
-		gnb.MNC,
-		gnb.TAC,
-		gnb.GnbID,
-		nil,
+		ue.RanUeNgapID, nasPDU,
+		gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, nil,
 	)
 
+	sendAndRespond(w, r, gnb, ue, t, ngapMsg, false)
+}
+
+func handleAuthenticationResponse(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport) {
+	if len(ue.LastRAND) == 0 || len(ue.LastAUTN) == 0 {
+		writeError(w, http.StatusBadRequest, "no RAND/AUTN stored — send registration_request first")
+		return
+	}
+
+	akaResult, err := crypto.ComputeResStar(ue.K, ue.OPc, ue.Sqn, ue.Supi, ue.Snn, ue.LastRAND, ue.LastAUTN)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("5G-AKA: %v", err))
+		return
+	}
+
+	ue.Kamf = akaResult.Kamf
+
+	nasPDU, err := nasCodec.BuildAuthenticationResponse(akaResult.RESstar)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build AuthenticationResponse: %v", err))
+		return
+	}
+
+	encoded, err := ngap.BuildUplinkNASTransport(
+		ue.AmfUeNgapID, ue.RanUeNgapID, nasPDU,
+		gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID,
+	)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NGAP encode: %v", err))
+		return
+	}
+
+	sendRawAndRespond(w, r, gnb, ue, t, encoded)
+}
+
+func handleSecurityModeComplete(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport) {
+	regReqPDU, err := nasCodec.BuildRegistrationRequest(&nasCodec.RegistrationRequestOpts{
+		RegistrationType: nasCodec.RegistrationTypeInitial,
+		Suci:             ue.Suci,
+		Guti:             ue.Guti,
+		SecurityCap:      ue.UeSecurityCapability,
+		NgKsi:            ue.NgKsi,
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build inner RegistrationRequest: %v", err))
+		return
+	}
+
+	smcPDU, err := nasCodec.BuildSecurityModeComplete(regReqPDU, ue.IMEISV)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build SecurityModeComplete: %v", err))
+		return
+	}
+
+	securedPDU, err := nasCodec.EncodeNasPduWithSecurity(ue, smcPDU,
+		gonas.SecurityHeaderTypeIntegrityProtectedAndCipheredWithNew5gNasSecurityContext)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NAS security encode: %v", err))
+		return
+	}
+
+	encoded, err := ngap.BuildUplinkNASTransport(
+		ue.AmfUeNgapID, ue.RanUeNgapID, securedPDU,
+		gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID,
+	)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NGAP encode: %v", err))
+		return
+	}
+
+	sendRawAndRespond(w, r, gnb, ue, t, encoded)
+}
+
+func handleRegistrationComplete(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport) {
+	icsResp, err := ngap.BuildInitialContextSetupResponse(ue.AmfUeNgapID, ue.RanUeNgapID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build InitialContextSetupResponse: %v", err))
+		return
+	}
+
+	if err := t.Send(icsResp, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send InitialContextSetupResponse: %v", err))
+		return
+	}
+
+	regCompletePDU, err := nasCodec.BuildRegistrationComplete()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build RegistrationComplete: %v", err))
+		return
+	}
+
+	securedPDU, err := nasCodec.EncodeNasPduWithSecurity(ue, regCompletePDU,
+		gonas.SecurityHeaderTypeIntegrityProtectedAndCiphered)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NAS security encode: %v", err))
+		return
+	}
+
+	encoded, err := ngap.BuildUplinkNASTransport(
+		ue.AmfUeNgapID, ue.RanUeNgapID, securedPDU,
+		gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID,
+	)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NGAP encode: %v", err))
+		return
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send RegistrationComplete: %v", err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{})
+}
+
+func sendAndRespond(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, ngapMsg *ngap.NGAPMessage, _ bool) {
 	encoded, err := ngap.Encode(ngapMsg)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NGAP encode: %v", err))
 		return
 	}
 
+	sendRawAndRespond(w, r, gnb, ue, t, encoded)
+}
+
+func sendRawAndRespond(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, encoded []byte) {
 	if err := t.Send(encoded, false); err != nil {
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
 		return
@@ -111,10 +234,35 @@ func handleRegistrationRequest(w http.ResponseWriter, r *http.Request, gnb *stor
 			ue.AmfUeNgapID = *ie.AmfUeNgapID
 			gnb.UpdateNGAPIDs(ue.RanUeNgapID, *ie.AmfUeNgapID)
 		}
+
 		if ie.NasPDU != nil {
 			nasPDUBytes, err := hex.DecodeString(*ie.NasPDU)
-			if err == nil {
+			if err != nil {
+				continue
+			}
+
+			if len(ue.Kamf) > 0 {
+				nasResp, _ = nasCodec.DecodeSecuredNAS(ue, nasPDUBytes)
+			} else {
 				nasResp, _ = nasCodec.Decode(nasPDUBytes)
+			}
+
+			if nasResp != nil && nasResp.RAND != "" {
+				randBytes, _ := hex.DecodeString(nasResp.RAND)
+				autnBytes, _ := hex.DecodeString(nasResp.AUTN)
+				ue.LastRAND = randBytes
+				ue.LastAUTN = autnBytes
+			}
+
+			if nasResp != nil && nasResp.NgKSI != nil && nasResp.SelectedCipheringAlg != nil {
+				ue.NgKsi = *nasResp.NgKSI
+			}
+
+			if nasResp != nil && nasResp.GUTI != "" {
+				gutiBytes, err := hex.DecodeString(nasResp.GUTI)
+				if err == nil {
+					ue.Guti = nasCodec.ParseGUTI(gutiBytes)
+				}
 			}
 		}
 	}

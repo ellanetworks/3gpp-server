@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	gonas "github.com/free5gc/nas"
+	"github.com/free5gc/nas/nasType"
 )
 
 func Decode(data []byte) (*NASResponse, error) {
@@ -97,6 +98,34 @@ func decodeRegistrationReject(m *gonas.Message, resp *NASResponse) {
 	resp.CauseGMM = &cause
 }
 
+func decodeSecurityModeCommand(m *gonas.Message, resp *NASResponse) {
+	if m.SecurityModeCommand == nil {
+		return
+	}
+
+	cipherAlg := m.SelectedNASSecurityAlgorithms.GetTypeOfCipheringAlgorithm()
+	resp.SelectedCipheringAlg = &cipherAlg
+
+	integAlg := m.SelectedNASSecurityAlgorithms.GetTypeOfIntegrityProtectionAlgorithm()
+	resp.SelectedIntegrityAlg = &integAlg
+
+	ksi := m.SecurityModeCommand.GetNasKeySetIdentifiler()
+	resp.NgKSI = &ksi
+}
+
+func decodeRegistrationAccept(m *gonas.Message, resp *NASResponse) {
+	if m.RegistrationAccept == nil {
+		return
+	}
+
+	if m.RegistrationAccept.GUTI5G != nil {
+		gutiLen := m.RegistrationAccept.GUTI5G.GetLen()
+		if gutiLen > 0 && gutiLen <= 11 {
+			resp.GUTI = hex.EncodeToString(m.RegistrationAccept.GUTI5G.Octet[:gutiLen])
+		}
+	}
+}
+
 func securityHeaderTypeToString(t uint8) string {
 	switch t {
 	case gonas.SecurityHeaderTypePlainNas:
@@ -112,6 +141,18 @@ func securityHeaderTypeToString(t uint8) string {
 	default:
 		return fmt.Sprintf("unknown(%d)", t)
 	}
+}
+
+func ParseGUTI(contents []byte) *nasType.GUTI5G {
+	if len(contents) < 11 {
+		return nil
+	}
+
+	guti := &nasType.GUTI5G{}
+	guti.Len = uint16(len(contents))
+	copy(guti.Octet[:], contents)
+
+	return guti
 }
 
 func gmmMessageTypeName(t uint8) string {

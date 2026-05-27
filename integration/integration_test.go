@@ -32,8 +32,12 @@ func TestMain(m *testing.M) {
 		log.Fatalf("Ella Core provisioning failed: %v", err)
 	}
 
-	if err := createSubscriber(token); err != nil {
-		log.Fatalf("Subscriber creation failed: %v", err)
+	if err := createSubscriber(token, "001010000000001"); err != nil {
+		log.Fatalf("Subscriber 001 creation failed: %v", err)
+	}
+
+	if err := createSubscriber(token, "001010000000002"); err != nil {
+		log.Fatalf("Subscriber 002 creation failed: %v", err)
 	}
 
 	if err := waitForTester(30 * time.Second); err != nil {
@@ -116,14 +120,14 @@ func postForToken(url, body string) (string, error) {
 	return tokenResp.Result.Token, nil
 }
 
-func createSubscriber(token string) error {
-	body := `{
-		"imsi": "001010000000001",
+func createSubscriber(token, imsi string) error {
+	body := fmt.Sprintf(`{
+		"imsi": "%s",
 		"key": "00112233445566778899aabbccddeeff",
 		"opc": "63bfa50ee6523365ff14c1f45f88737d",
 		"sequenceNumber": "000000000020",
 		"profile_name": "default"
-	}`
+	}`, imsi)
 	req, _ := http.NewRequest("POST", ellaAPIURL+"/api/v1/subscribers", strings.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
@@ -230,11 +234,25 @@ func mustCreateGnB(t *testing.T) string {
 	return gnbID
 }
 
-// mustCreateUE creates a standard UE on the given gNB and returns its ID.
+// mustCreateUE creates a UE on the given gNB with subscriber 001 and returns its ID.
 func mustCreateUE(t *testing.T, gnbID string) string {
 	t.Helper()
-	body := `{
-		"supi": "imsi-001010000000001",
+
+	return mustCreateUEWithSUPI(t, gnbID, "imsi-001010000000001")
+}
+
+// mustCreateUE2 creates a UE on the given gNB with subscriber 002 and returns its ID.
+func mustCreateUE2(t *testing.T, gnbID string) string {
+	t.Helper()
+
+	return mustCreateUEWithSUPI(t, gnbID, "imsi-001010000000002")
+}
+
+func mustCreateUEWithSUPI(t *testing.T, gnbID, supi string) string {
+	t.Helper()
+
+	body := fmt.Sprintf(`{
+		"supi": "%s",
 		"k": "00112233445566778899aabbccddeeff",
 		"opc": "63bfa50ee6523365ff14c1f45f88737d",
 		"amf": "8000", "sqn": "000000000020",
@@ -242,7 +260,7 @@ func mustCreateUE(t *testing.T, gnbID string) string {
 		"routing_indicator": "0",
 		"protection_scheme": "0",
 		"public_key_id": "0"
-	}`
+	}`, supi)
 	status, resp := doRequest(t, "POST", "/gnb/"+gnbID+"/ue", body)
 	if status != 201 {
 		t.Fatalf("create ue: HTTP %d: %s", status, resp)
@@ -251,6 +269,7 @@ func mustCreateUE(t *testing.T, gnbID string) string {
 	if ueID == "" {
 		t.Fatal("create ue: no ue_id in response")
 	}
+
 	return ueID
 }
 

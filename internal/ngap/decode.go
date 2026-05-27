@@ -60,6 +60,60 @@ func decodeInitiatingMessage(im *ngapType.InitiatingMessage, resp *NGAPResponse)
 	switch im.Value.Present {
 	case ngapType.InitiatingMessagePresentDownlinkNASTransport:
 		decodeDownlinkNASTransport(im.Value.DownlinkNASTransport, resp)
+	case ngapType.InitiatingMessagePresentInitialContextSetupRequest:
+		decodeInitialContextSetupRequest(im.Value.InitialContextSetupRequest, resp)
+	}
+}
+
+func decodeInitialContextSetupRequest(msg *ngapType.InitialContextSetupRequest, resp *NGAPResponse) {
+	if msg == nil {
+		return
+	}
+
+	for _, ie := range msg.ProtocolIEs.List {
+		decoded := IE{
+			ID:          ie.Id.Value,
+			Criticality: criticalityToString(ie.Criticality.Value),
+		}
+
+		switch ie.Id.Value {
+		case ngapType.ProtocolIEIDAMFUENGAPID:
+			if ie.Value.AMFUENGAPID != nil {
+				v := ie.Value.AMFUENGAPID.Value
+				decoded.AmfUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDRANUENGAPID:
+			if ie.Value.RANUENGAPID != nil {
+				v := ie.Value.RANUENGAPID.Value
+				decoded.RanUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDNASPDU:
+			if ie.Value.NASPDU != nil {
+				s := hex.EncodeToString(ie.Value.NASPDU.Value)
+				decoded.NasPDU = &s
+			}
+		case ngapType.ProtocolIEIDUEAggregateMaximumBitRate:
+			if ie.Value.UEAggregateMaximumBitRate != nil {
+				decoded.UEAggregateMaxBitRate = &UEAggregateMaxBitRateJSON{
+					DL: ie.Value.UEAggregateMaximumBitRate.UEAggregateMaximumBitRateDL.Value,
+					UL: ie.Value.UEAggregateMaximumBitRate.UEAggregateMaximumBitRateUL.Value,
+				}
+			}
+		case ngapType.ProtocolIEIDAllowedNSSAI:
+			if ie.Value.AllowedNSSAI != nil {
+				for _, item := range ie.Value.AllowedNSSAI.List {
+					nssai := AllowedNSSAIItemJSON{
+						SST: hex.EncodeToString(item.SNSSAI.SST.Value),
+					}
+					if item.SNSSAI.SD != nil {
+						nssai.SD = hex.EncodeToString(item.SNSSAI.SD.Value)
+					}
+					decoded.AllowedNSSAI = append(decoded.AllowedNSSAI, nssai)
+				}
+			}
+		}
+
+		resp.IEs = append(resp.IEs, decoded)
 	}
 }
 

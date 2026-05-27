@@ -124,7 +124,7 @@ func TestInitialUEMessage_Valid(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ueID := mustCreateUE(t, gnbID)
+			ueID := mustCreateUE2(t, gnbID)
 			status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap", tt.body)
 			if status != tt.wantHTTP {
 				t.Fatalf("HTTP %d, want %d\n  body: %s", status, tt.wantHTTP, body)
@@ -448,7 +448,7 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ueID := mustCreateUE(t, gnbID)
+			ueID := mustCreateUE2(t, gnbID)
 			status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap", tt.body)
 
 			if status != tt.wantHTTP {
