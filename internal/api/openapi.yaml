@@ -1,0 +1,625 @@
+openapi: "3.1.0"
+info:
+  title: 3GPP Server API
+  description: |
+    A JSON-to-NGAP/NAS translation server for conformance testing, fuzzing,
+    and security assessment of 5G core networks.
+
+    The server manages gNB and UE contexts, translates JSON requests into
+    NGAP/NAS messages over SCTP, and returns decoded responses as JSON.
+
+    ## Workflow
+
+    1. **Create a gNB** — dials SCTP to the AMF, performs NG Setup.
+    2. **Create a UE** — provisions credentials (K, OPc), computes SUCI.
+    3. **Send NGAP messages** — builds NAS inside NGAP, sends over SCTP,
+       returns the decoded AMF response.
+
+    ## IE Control
+
+    The JSON schema mirrors NGAP/NAS IEs 1:1. Every optional IE can be
+    individually set, overridden, or omitted — enabling both correct
+    procedures and deliberate deviations for fuzz testing.
+
+    ## 3GPP References
+
+    - NGAP: TS 38.413
+    - NAS 5GS: TS 24.501
+    - 5G Security: TS 33.501
+  version: "0.2.0"
+  license:
+    name: Apache-2.0
+
+paths:
+  /openapi.yaml:
+    get:
+      operationId: getOpenAPISpec
+      summary: Get OpenAPI specification
+      description: Returns this OpenAPI specification document.
+      responses:
+        "200":
+          description: OpenAPI YAML document
+          content:
+            application/openapi+yaml:
+              schema:
+                type: string
+
+  /gnb:
+    post:
+      operationId: createGnB
+      summary: Create gNB
+      description: |
+        Dials SCTP to the AMF, sends an NGSetupRequest, and returns the
+        NGSetupResponse or NGSetupFailure.
+
+        Use `ng_setup_ies` to send a hand-crafted IE list instead of
+        auto-building from the top-level fields.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGnBRequest"
+      responses:
+        "201":
+          description: gNB created and NG Setup completed.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateGnBResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /gnb/{gnb_id}:
+    parameters:
+      - $ref: "#/components/parameters/gnb_id"
+    get:
+      operationId: getGnB
+      summary: Get gNB state
+      responses:
+        "200":
+          description: gNB state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GnBStateResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteGnB
+      summary: Delete gNB
+      description: Closes the SCTP connection and removes the gNB.
+      responses:
+        "204":
+          description: gNB deleted.
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /gnb/{gnb_id}/ue:
+    parameters:
+      - $ref: "#/components/parameters/gnb_id"
+    post:
+      operationId: createUE
+      summary: Create UE
+      description: |
+        Creates a UE context with subscriber credentials, computes the SUCI,
+        and allocates a RAN UE NGAP ID.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUERequest"
+      responses:
+        "201":
+          description: UE created.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateUEResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /gnb/{gnb_id}/ue/{ue_id}:
+    parameters:
+      - $ref: "#/components/parameters/gnb_id"
+      - $ref: "#/components/parameters/ue_id"
+    get:
+      operationId: getUE
+      summary: Get UE state
+      description: Returns the full UE context including credentials, NGAP IDs, and session config.
+      responses:
+        "200":
+          description: UE state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UEStateResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: patchUE
+      summary: Patch UE state
+      description: |
+        Overrides any UE state field permanently. Useful for fuzzing — mutate
+        credentials, NGAP IDs, or session config before sending the next message.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchUERequest"
+      responses:
+        "204":
+          description: UE patched.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteUE
+      summary: Delete UE
+      responses:
+        "204":
+          description: UE deleted.
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /gnb/{gnb_id}/ue/{ue_id}/ngap:
+    parameters:
+      - $ref: "#/components/parameters/gnb_id"
+      - $ref: "#/components/parameters/ue_id"
+    post:
+      operationId: sendNGAP
+      summary: Send NGAP message
+      description: |
+        Builds an NGAP message using stored gNB/UE state, sends it over SCTP,
+        waits for the AMF response, and returns the decoded NGAP + NAS.
+
+        The request body controls which NAS message to send and which optional
+        IEs to include. Any field present overrides the stored default.
+        Omitted fields use sensible defaults from the UE context.
+
+        **Does NOT auto-respond** — the caller controls the entire flow.
+
+        ## Supported message types
+
+        - `registration_request` — Sends RegistrationRequest inside InitialUEMessage.
+
+        ## NAS IE overrides (TS 24.501 §8.2.6)
+
+        Every optional IE in the RegistrationRequest can be individually set
+        via the corresponding JSON field. Hex-encoded strings are used for
+        binary IEs. This enables both valid and deliberately malformed messages
+        for fuzz testing.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendNGAPRequest"
+      responses:
+        "200":
+          description: NGAP message sent and response received.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendNGAPResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "504":
+          $ref: "#/components/responses/GatewayTimeout"
+
+components:
+  parameters:
+    gnb_id:
+      name: gnb_id
+      in: path
+      required: true
+      schema:
+        type: string
+    ue_id:
+      name: ue_id
+      in: path
+      required: true
+      schema:
+        type: string
+
+  responses:
+    BadRequest:
+      description: Invalid request.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    BadGateway:
+      description: SCTP or NGAP error communicating with the AMF.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    GatewayTimeout:
+      description: Timed out waiting for AMF response.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    CreateGnBRequest:
+      type: object
+      required: [amf_address]
+      properties:
+        amf_address:
+          type: string
+          description: "AMF SCTP address (host:port)."
+          example: "10.3.0.2:38412"
+        gnb_n2_address:
+          type: string
+          description: Local bind address for SCTP. Defaults to 0.0.0.0.
+        mcc:
+          type: string
+          pattern: "^\\d{3}$"
+          example: "001"
+        mnc:
+          type: string
+          pattern: "^\\d{2,3}$"
+          example: "01"
+        tac:
+          type: string
+          description: Tracking Area Code (hex).
+          example: "000001"
+        gnb_id:
+          type: string
+          description: gNB ID (hex).
+          example: "000001"
+        name:
+          type: string
+        sst:
+          type: integer
+          description: Slice/Service Type.
+        sd:
+          type: string
+          description: Slice Differentiator (hex, optional).
+        slices:
+          type: array
+          items:
+            $ref: "#/components/schemas/SliceInput"
+        ng_setup_ies:
+          type: array
+          description: Override — send these raw IEs instead of auto-building.
+          items:
+            type: object
+
+    SliceInput:
+      type: object
+      properties:
+        sst:
+          type: integer
+        sd:
+          type: string
+
+    CreateGnBResponse:
+      type: object
+      properties:
+        gnb_id:
+          type: string
+        ng_setup_response:
+          $ref: "#/components/schemas/NGAPResponse"
+
+    GnBStateResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        mcc:
+          type: string
+        mnc:
+          type: string
+        tac:
+          type: string
+        gnb_id:
+          type: string
+        name:
+          type: string
+        sst:
+          type: integer
+        sd:
+          type: string
+
+    CreateUERequest:
+      type: object
+      required: [supi, k, opc]
+      properties:
+        supi:
+          type: string
+          description: "Subscription Permanent Identifier (e.g. imsi-001010000000001)."
+          example: "imsi-001010000000001"
+        k:
+          type: string
+          pattern: "^[0-9a-fA-F]{32}$"
+          description: Permanent key (32 hex chars).
+        opc:
+          type: string
+          pattern: "^[0-9a-fA-F]{32}$"
+          description: Operator code (32 hex chars).
+        amf:
+          type: string
+          description: Authentication Management Field (4 hex chars). Default 8000.
+          default: "8000"
+        sqn:
+          type: string
+          description: Sequence number (12 hex chars). Default 000000000000.
+          default: "000000000000"
+        sst:
+          type: integer
+        sd:
+          type: string
+        dnn:
+          type: string
+        routing_indicator:
+          type: string
+          default: "0"
+        protection_scheme:
+          type: string
+          description: "SUCI protection scheme: 0=null, 1=Profile A (X25519), 2=Profile B (P-256)."
+          default: "0"
+        public_key_id:
+          type: string
+          default: "0"
+        public_key_hex:
+          type: string
+          description: Home network public key (hex). Required for protection_scheme 1 or 2.
+        pdu_session_id:
+          type: integer
+        pdu_session_type:
+          type: integer
+        imeisv:
+          type: string
+
+    CreateUEResponse:
+      type: object
+      properties:
+        ue_id:
+          type: string
+        supi:
+          type: string
+        suci:
+          type: string
+          description: Computed SUCI string.
+        ran_ue_ngap_id:
+          type: integer
+
+    UEStateResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        supi:
+          type: string
+        suci:
+          type: string
+        mcc:
+          type: string
+        mnc:
+          type: string
+        ran_ue_ngap_id:
+          type: integer
+        amf_ue_ngap_id:
+          type: integer
+          description: Set by the AMF after the first NGAP exchange.
+        k:
+          type: string
+        opc:
+          type: string
+        amf:
+          type: string
+        sqn:
+          type: string
+        snn:
+          type: string
+          description: Serving Network Name (derived from MCC/MNC).
+        dnn:
+          type: string
+        sst:
+          type: integer
+        sd:
+          type: string
+        protection_scheme:
+          type: string
+        routing_indicator:
+          type: string
+        imeisv:
+          type: string
+
+    PatchUERequest:
+      type: object
+      description: Any field present is overwritten in the UE context.
+      properties:
+        k:
+          type: string
+        opc:
+          type: string
+        amf:
+          type: string
+        sqn:
+          type: string
+        amf_ue_ngap_id:
+          type: integer
+        dnn:
+          type: string
+        sst:
+          type: integer
+        sd:
+          type: string
+        imeisv:
+          type: string
+
+    SendNGAPRequest:
+      type: object
+      required: [message_type]
+      properties:
+        message_type:
+          type: string
+          description: "NAS message to send. Currently supported: `registration_request`."
+          enum: [registration_request]
+        registration_type:
+          type: integer
+          description: "5GS registration type: 1=initial, 2=mobility, 3=periodic, 4=emergency."
+        ng_ksi:
+          type: integer
+          description: NAS Key Set Identifier override.
+        follow_on_request:
+          type: integer
+          description: "FOR bit (0 or 1). Default 1."
+        mobile_identity_override:
+          type: string
+          description: Override mobile identity (hex). Replaces SUCI/GUTI.
+        ue_security_capability:
+          type: string
+          description: Override UE security capability (hex, 2-8 bytes).
+        requested_nssai:
+          type: array
+          items:
+            type: object
+            properties:
+              sst:
+                type: integer
+              sd:
+                type: string
+        capability_5gmm:
+          type: string
+          description: 5GMM capability (hex).
+        non_current_native_nas_ksi:
+          type: integer
+        last_visited_registered_tai:
+          type: string
+          description: Last visited TAI (hex, 6 bytes).
+        s1_ue_network_capability:
+          type: string
+          description: S1 UE network capability (hex).
+        uplink_data_status:
+          type: string
+          description: Uplink data status (hex, 2+ bytes).
+        pdu_session_status:
+          type: string
+          description: PDU session status (hex, 2+ bytes).
+        mico_indication:
+          type: integer
+          description: "MICO indication (RAAI bit)."
+        ue_status:
+          type: integer
+          description: "UE status (bit 0: S1 mode, bit 1: N1 mode)."
+        additional_guti:
+          type: string
+          description: Additional GUTI (hex).
+        allowed_pdu_session_status:
+          type: string
+          description: Allowed PDU session status (hex).
+        ues_usage_setting:
+          type: integer
+        requested_drx_parameters:
+          type: integer
+        eps_nas_message_container:
+          type: string
+          description: EPS NAS message container (hex).
+        ladn_indication:
+          type: string
+          description: LADN indication (hex).
+        payload_container_type:
+          type: integer
+        payload_container:
+          type: string
+          description: Payload container (hex).
+        network_slicing_indication:
+          type: integer
+          description: "Network slicing indication (bit 0: NSSCI, bit 1: DCNI)."
+        update_type_5gs:
+          type: string
+          description: 5GS update type (hex).
+        nas_message_container:
+          type: string
+          description: NAS message container (hex).
+        eps_bearer_context_status:
+          type: string
+          description: EPS bearer context status (hex, 2 bytes).
+
+    SendNGAPResponse:
+      type: object
+      properties:
+        ngap:
+          $ref: "#/components/schemas/NGAPResponse"
+        nas:
+          $ref: "#/components/schemas/NASResponse"
+
+    NGAPResponse:
+      type: object
+      properties:
+        pdu_type:
+          type: string
+          enum: [initiating_message, successful_outcome, unsuccessful_outcome]
+        message_type:
+          type: string
+          description: "Decoded message name (e.g. NGSetupResponse, DownlinkNASTransport)."
+        raw_hex:
+          type: string
+          description: Full NGAP PDU as hex.
+        ies:
+          type: array
+          items:
+            type: object
+            description: Decoded IE with typed fields.
+
+    NASResponse:
+      type: object
+      properties:
+        message_type:
+          type: string
+          description: "Decoded NAS message name (e.g. authentication_request)."
+        security_header_type:
+          type: string
+        rand:
+          type: string
+          description: Authentication parameter RAND (hex, 16 bytes).
+        autn:
+          type: string
+          description: Authentication parameter AUTN (hex, 16 bytes).
+        abba:
+          type: string
+          description: ABBA contents (hex).
+        ng_ksi:
+          type: integer
+          description: NAS Key Set Identifier.
+        eap_message:
+          type: string
+          description: EAP message (hex).
+        cause_5gmm:
+          type: integer
+          description: 5GMM cause code (for reject messages).
+        identity_type:
+          type: integer
+          description: Identity type (for IdentityRequest).
+        raw_hex:
+          type: string
+          description: Full NAS PDU as hex.
