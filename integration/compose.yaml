@@ -1,0 +1,78 @@
+configs:
+  ella_config:
+    content: |
+      logging:
+        system:
+          level: "debug"
+          output: "stdout"
+        audit:
+          output: "stdout"
+      db:
+        path: "core.db"
+      interfaces:
+        n2:
+          address: "10.3.0.2"
+          port: 38412
+        n3:
+          name: "n3"
+        n6:
+          name: "n6"
+        api:
+          address: "10.3.0.2"
+          port: 5002
+      xdp:
+        attach-mode: "generic"
+
+services:
+  ella-core:
+    image: ghcr.io/ellanetworks/ella-core:v1.11.0
+    configs:
+      - source: ella_config
+        target: /core.yaml
+    restart: unless-stopped
+    entrypoint: /bin/core --config /core.yaml
+    privileged: true
+    ports:
+      - "5002:5002"
+    networks:
+      default:
+        driver_opts:
+          com.docker.network.endpoint.ifname: eth0
+      n3:
+        driver_opts:
+          com.docker.network.endpoint.ifname: n3
+        ipv4_address: 10.3.0.2
+      n6:
+        driver_opts:
+          com.docker.network.endpoint.ifname: n6
+        ipv4_address: 10.6.0.2
+
+  3gpp-server-tester:
+    image: golang:1.24
+    entrypoint:
+      - /bin/sh
+      - -c
+      - "sleep infinity"
+    volumes:
+      - ../:/app
+    working_dir: /app
+    privileged: true
+    networks:
+      default:
+        driver_opts:
+          com.docker.network.endpoint.ifname: eth0
+      n3:
+        driver_opts:
+          com.docker.network.endpoint.ifname: n3
+        ipv4_address: 10.3.0.3
+
+networks:
+  n3:
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.3.0.0/24
+  n6:
+    ipam:
+      config:
+        - subnet: 10.6.0.0/24
