@@ -89,6 +89,17 @@ type NASResponse struct {
 	// IdentityRequest
 	IdentityType *uint8 `json:"identity_type,omitempty"`
 
+	// PDU Session Establishment Accept (TS 24.501 §8.3.2)
+	PDUSessionID   uint8  `json:"pdu_session_id,omitempty"`
+	PDUSessionType uint8  `json:"pdu_session_type,omitempty"`
+	PDUAddress     string `json:"pdu_address,omitempty"`
+
+	// PDU Session Establishment Reject
+	Cause5GSM *uint8 `json:"cause_5gsm,omitempty"`
+
+	// DL NAS Transport inner message type
+	InnerNASMessageType string `json:"inner_nas_message_type,omitempty"`
+
 	// Raw hex of the NAS PDU
 	RawHex string `json:"raw_hex,omitempty"`
 }

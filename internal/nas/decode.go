@@ -53,6 +53,8 @@ func Decode(data []byte) (*NASResponse, error) {
 		decodeRegistrationReject(m, resp)
 	case gonas.MsgTypeStatus5GMM:
 		decodeStatus5GMM(m, resp)
+	case gonas.MsgTypeDLNASTransport:
+		decodeDLNASTransport(m, resp)
 	}
 
 	return resp, nil
@@ -142,6 +144,63 @@ func securityHeaderTypeToString(t uint8) string {
 		return "integrity_protected_and_ciphered_with_new_5g_nas_security_context"
 	default:
 		return fmt.Sprintf("unknown(%d)", t)
+	}
+}
+
+func decodeDLNASTransport(m *gonas.Message, resp *NASResponse) {
+	if m.DLNASTransport == nil {
+		return
+	}
+
+	payload := m.DLNASTransport.GetPayloadContainerContents()
+	if len(payload) == 0 {
+		return
+	}
+
+	inner := new(gonas.Message)
+	if err := inner.GsmMessageDecode(&payload); err != nil {
+		return
+	}
+
+	if inner.GsmMessage == nil {
+		return
+	}
+
+	innerType := inner.GsmHeader.GetMessageType()
+	resp.InnerNASMessageType = gsmMessageTypeName(innerType)
+
+	switch innerType {
+	case gonas.MsgTypePDUSessionEstablishmentAccept:
+		DecodePDUSessionEstablishmentAccept(resp, inner.GsmMessage)
+	case gonas.MsgTypePDUSessionEstablishmentReject:
+		DecodePDUSessionEstablishmentReject(resp, inner.GsmMessage)
+	}
+}
+
+func gsmMessageTypeName(t uint8) string {
+	switch t {
+	case gonas.MsgTypePDUSessionEstablishmentRequest:
+		return "pdu_session_establishment_request"
+	case gonas.MsgTypePDUSessionEstablishmentAccept:
+		return "pdu_session_establishment_accept"
+	case gonas.MsgTypePDUSessionEstablishmentReject:
+		return "pdu_session_establishment_reject"
+	case gonas.MsgTypePDUSessionModificationRequest:
+		return "pdu_session_modification_request"
+	case gonas.MsgTypePDUSessionModificationReject:
+		return "pdu_session_modification_reject"
+	case gonas.MsgTypePDUSessionModificationCommand:
+		return "pdu_session_modification_command"
+	case gonas.MsgTypePDUSessionReleaseRequest:
+		return "pdu_session_release_request"
+	case gonas.MsgTypePDUSessionReleaseReject:
+		return "pdu_session_release_reject"
+	case gonas.MsgTypePDUSessionReleaseCommand:
+		return "pdu_session_release_command"
+	case gonas.MsgTypePDUSessionReleaseComplete:
+		return "pdu_session_release_complete"
+	default:
+		return fmt.Sprintf("unknown_gsm(%d)", t)
 	}
 }
 

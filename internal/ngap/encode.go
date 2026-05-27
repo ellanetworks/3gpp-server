@@ -627,6 +627,38 @@ func BuildUplinkNASTransport(amfUeNgapID, ranUeNgapID int64, nasPDU []byte, mcc,
 	return ngap.Encoder(pdu)
 }
 
+func BuildPDUSessionResourceSetupResponse(amfUeNgapID, ranUeNgapID int64) ([]byte, error) {
+	pdu := ngapType.NGAPPDU{}
+	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome
+	pdu.SuccessfulOutcome = new(ngapType.SuccessfulOutcome)
+
+	so := pdu.SuccessfulOutcome
+	so.ProcedureCode.Value = ngapType.ProcedureCodePDUSessionResourceSetup
+	so.Criticality.Value = ngapType.CriticalityPresentReject
+	so.Value.Present = ngapType.SuccessfulOutcomePresentPDUSessionResourceSetupResponse
+	so.Value.PDUSessionResourceSetupResponse = new(ngapType.PDUSessionResourceSetupResponse)
+
+	ies := &so.Value.PDUSessionResourceSetupResponse.ProtocolIEs
+
+	amfIE := ngapType.PDUSessionResourceSetupResponseIEs{}
+	amfIE.Id.Value = ngapType.ProtocolIEIDAMFUENGAPID
+	amfIE.Criticality.Value = ngapType.CriticalityPresentIgnore
+	amfIE.Value.Present = ngapType.PDUSessionResourceSetupResponseIEsPresentAMFUENGAPID
+	amfIE.Value.AMFUENGAPID = new(ngapType.AMFUENGAPID)
+	amfIE.Value.AMFUENGAPID.Value = amfUeNgapID
+	ies.List = append(ies.List, amfIE)
+
+	ranIE := ngapType.PDUSessionResourceSetupResponseIEs{}
+	ranIE.Id.Value = ngapType.ProtocolIEIDRANUENGAPID
+	ranIE.Criticality.Value = ngapType.CriticalityPresentIgnore
+	ranIE.Value.Present = ngapType.PDUSessionResourceSetupResponseIEsPresentRANUENGAPID
+	ranIE.Value.RANUENGAPID = new(ngapType.RANUENGAPID)
+	ranIE.Value.RANUENGAPID.Value = ranUeNgapID
+	ies.List = append(ies.List, ranIE)
+
+	return ngap.Encoder(pdu)
+}
+
 func BuildInitialContextSetupResponse(amfUeNgapID, ranUeNgapID int64) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome

@@ -62,6 +62,8 @@ func decodeInitiatingMessage(im *ngapType.InitiatingMessage, resp *NGAPResponse)
 		decodeDownlinkNASTransport(im.Value.DownlinkNASTransport, resp)
 	case ngapType.InitiatingMessagePresentInitialContextSetupRequest:
 		decodeInitialContextSetupRequest(im.Value.InitialContextSetupRequest, resp)
+	case ngapType.InitiatingMessagePresentPDUSessionResourceSetupRequest:
+		decodePDUSessionResourceSetupRequest(im.Value.PDUSessionResourceSetupRequest, resp)
 	}
 }
 
@@ -187,6 +189,50 @@ func decodeDownlinkNASTransport(msg *ngapType.DownlinkNASTransport, resp *NGAPRe
 						nssai.SD = hex.EncodeToString(item.SNSSAI.SD.Value)
 					}
 					decoded.AllowedNSSAI = append(decoded.AllowedNSSAI, nssai)
+				}
+			}
+		}
+
+		resp.IEs = append(resp.IEs, decoded)
+	}
+}
+
+func decodePDUSessionResourceSetupRequest(msg *ngapType.PDUSessionResourceSetupRequest, resp *NGAPResponse) {
+	if msg == nil {
+		return
+	}
+
+	for _, ie := range msg.ProtocolIEs.List {
+		decoded := IE{
+			ID:          ie.Id.Value,
+			Criticality: criticalityToString(ie.Criticality.Value),
+		}
+
+		switch ie.Id.Value {
+		case ngapType.ProtocolIEIDAMFUENGAPID:
+			if ie.Value.AMFUENGAPID != nil {
+				v := ie.Value.AMFUENGAPID.Value
+				decoded.AmfUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDRANUENGAPID:
+			if ie.Value.RANUENGAPID != nil {
+				v := ie.Value.RANUENGAPID.Value
+				decoded.RanUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDUEAggregateMaximumBitRate:
+			if ie.Value.UEAggregateMaximumBitRate != nil {
+				decoded.UEAggregateMaxBitRate = &UEAggregateMaxBitRateJSON{
+					DL: ie.Value.UEAggregateMaximumBitRate.UEAggregateMaximumBitRateDL.Value,
+					UL: ie.Value.UEAggregateMaximumBitRate.UEAggregateMaximumBitRateUL.Value,
+				}
+			}
+		case ngapType.ProtocolIEIDPDUSessionResourceSetupListSUReq:
+			if ie.Value.PDUSessionResourceSetupListSUReq != nil {
+				for _, item := range ie.Value.PDUSessionResourceSetupListSUReq.List {
+					if item.PDUSessionNASPDU != nil {
+						s := hex.EncodeToString(item.PDUSessionNASPDU.Value)
+						decoded.NasPDU = &s
+					}
 				}
 			}
 		}
