@@ -97,21 +97,12 @@ func (h *Handler) CreateGnB(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	respData, err := t.Receive(ctx)
+	ngapResp, err := t.WaitForMessage(ctx, "NGSetupResponse", "NGSetupFailure", "ErrorIndication")
 	if err != nil {
 		_ = t.Close()
 		_ = h.Store.DeleteGnB(gnb.ID)
 		delete(h.Transports, gnb.ID)
 		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for NGSetupResponse: %v", err))
-		return
-	}
-
-	ngapResp, err := ngap.Decode(respData)
-	if err != nil {
-		_ = t.Close()
-		_ = h.Store.DeleteGnB(gnb.ID)
-		delete(h.Transports, gnb.ID)
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("ngap decode: %v", err))
 		return
 	}
 

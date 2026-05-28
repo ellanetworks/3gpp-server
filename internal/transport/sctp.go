@@ -6,18 +6,24 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 	"sync/atomic"
 
 	"github.com/free5gc/ngap"
 	"github.com/ishidawataru/sctp"
+
+	ngapCodec "github.com/ellanetworks/3gpp-server/internal/ngap"
 )
 
 const sctpReadBufferSize = 65535
 
 type SCTPTransport struct {
-	conn     *sctp.SCTPConn
-	recvChan chan []byte
-	closed   atomic.Bool
+	conn   *sctp.SCTPConn
+	closed atomic.Bool
+
+	mu     sync.Mutex
+	frames map[string][]*ngapCodec.NGAPResponse
+	notify chan struct{}
 }
 
 func Dial(localAddr, remoteAddr string) (*SCTPTransport, error) {
@@ -46,8 +52,9 @@ func Dial(localAddr, remoteAddr string) (*SCTPTransport, error) {
 	}
 
 	t := &SCTPTransport{
-		conn:     conn,
-		recvChan: make(chan []byte, 64),
+		conn:   conn,
+		frames: make(map[string][]*ngapCodec.NGAPResponse),
+		notify: make(chan struct{}, 1),
 	}
 
 	go t.runReceiver()
@@ -64,9 +71,11 @@ func (t *SCTPTransport) runReceiver() {
 			if t.closed.Load() {
 				return
 			}
+
 			if errors.Is(err, io.EOF) {
 				return
 			}
+
 			return
 		}
 
@@ -76,7 +85,20 @@ func (t *SCTPTransport) runReceiver() {
 
 		cp := make([]byte, n)
 		copy(cp, buf[:n])
-		t.recvChan <- cp
+
+		resp, err := ngapCodec.Decode(cp)
+		if err != nil {
+			continue
+		}
+
+		t.mu.Lock()
+		t.frames[resp.MessageType] = append(t.frames[resp.MessageType], resp)
+		t.mu.Unlock()
+
+		select {
+		case t.notify <- struct{}{}:
+		default:
+		}
 	}
 }
 
@@ -105,12 +127,32 @@ func (t *SCTPTransport) Send(data []byte, nonUE bool) error {
 	return nil
 }
 
-func (t *SCTPTransport) Receive(ctx context.Context) ([]byte, error) {
-	select {
-	case data := <-t.recvChan:
-		return data, nil
-	case <-ctx.Done():
-		return nil, ctx.Err()
+func (t *SCTPTransport) WaitForMessage(ctx context.Context, messageTypes ...string) (*ngapCodec.NGAPResponse, error) {
+	for {
+		t.mu.Lock()
+
+		for _, msgType := range messageTypes {
+			if frames, ok := t.frames[msgType]; ok && len(frames) > 0 {
+				resp := frames[0]
+				if len(frames) == 1 {
+					delete(t.frames, msgType)
+				} else {
+					t.frames[msgType] = frames[1:]
+				}
+
+				t.mu.Unlock()
+
+				return resp, nil
+			}
+		}
+
+		t.mu.Unlock()
+
+		select {
+		case <-t.notify:
+		case <-ctx.Done():
+			return nil, fmt.Errorf("timeout waiting for %v", messageTypes)
+		}
 	}
 }
 
@@ -118,5 +160,6 @@ func (t *SCTPTransport) Close() error {
 	if t.closed.Swap(true) {
 		return nil
 	}
+
 	return t.conn.Close()
 }

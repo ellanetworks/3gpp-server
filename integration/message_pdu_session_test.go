@@ -67,6 +67,7 @@ func TestPDUSessionEstablishment_Fuzz(t *testing.T) {
 					t.Errorf("nas.%s = %q, want %q\n  body: %s", tt.wantNASField, got, tt.wantNASValue, body)
 				}
 			}
+
 		})
 	}
 }

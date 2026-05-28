@@ -55,6 +55,8 @@ func (h *Handler) SendNGAP(w http.ResponseWriter, r *http.Request) {
 		handleRegistrationComplete(w, r, gnb, ue, t, &req)
 	case "pdu_session_establishment_request":
 		handlePDUSessionEstablishmentRequest(w, r, gnb, ue, t, &req)
+	case "deregistration_request":
+		handleDeregistrationRequest(w, r, gnb, ue, t, &req)
 	default:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unsupported message_type: %s", req.MessageType))
 	}
@@ -95,7 +97,7 @@ func handleRegistrationRequest(w http.ResponseWriter, r *http.Request, gnb *stor
 			ue.RanUeNgapID, nasPDU,
 			gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, nil, initialUEOverrides(req),
 		)
-		sendAndRespond(w, r, gnb, ue, t, ngapMsg)
+		sendAndWait(w, r, gnb, ue, t, ngapMsg, "DownlinkNASTransport", "ErrorIndication")
 
 		return
 	}
@@ -122,7 +124,7 @@ func handleRegistrationRequest(w http.ResponseWriter, r *http.Request, gnb *stor
 		ue.RanUeNgapID, nasPDU,
 		gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, nil, initialUEOverrides(req),
 	)
-	sendAndRespond(w, r, gnb, ue, t, ngapMsg)
+	sendAndWait(w, r, gnb, ue, t, ngapMsg, "DownlinkNASTransport", "ErrorIndication")
 }
 
 func handleAuthenticationResponse(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
@@ -172,16 +174,7 @@ func handleAuthenticationResponse(w http.ResponseWriter, r *http.Request, gnb *s
 		}
 	}
 
-	encoded, err := ngap.BuildUplinkNASTransport(
-		ue.AmfUeNgapID, ue.RanUeNgapID, nasPDU,
-		gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, uplinkOverrides(req),
-	)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NGAP encode: %v", err))
-		return
-	}
-
-	sendRawAndRespond(w, r, gnb, ue, t, encoded)
+	sendUplinkAndWait(w, r, gnb, ue, t, req, nasPDU, "DownlinkNASTransport", "ErrorIndication")
 }
 
 func handleSecurityModeComplete(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
@@ -222,16 +215,7 @@ func handleSecurityModeComplete(w http.ResponseWriter, r *http.Request, gnb *sto
 		}
 	}
 
-	encoded, err := ngap.BuildUplinkNASTransport(
-		ue.AmfUeNgapID, ue.RanUeNgapID, nasPDU,
-		gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, uplinkOverrides(req),
-	)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NGAP encode: %v", err))
-		return
-	}
-
-	sendRawAndRespond(w, r, gnb, ue, t, encoded)
+	sendUplinkAndWait(w, r, gnb, ue, t, req, nasPDU, "InitialContextSetupRequest", "DownlinkNASTransport", "ErrorIndication")
 }
 
 func handleRegistrationComplete(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
@@ -269,16 +253,7 @@ func handleRegistrationComplete(w http.ResponseWriter, r *http.Request, gnb *sto
 		}
 	}
 
-	encoded, err := ngap.BuildUplinkNASTransport(
-		ue.AmfUeNgapID, ue.RanUeNgapID, nasPDU,
-		gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, uplinkOverrides(req),
-	)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NGAP encode: %v", err))
-		return
-	}
-
-	sendRawAndRespond(w, r, gnb, ue, t, encoded)
+	sendUplinkAndWait(w, r, gnb, ue, t, req, nasPDU, "DownlinkNASTransport")
 }
 
 func handlePDUSessionEstablishmentRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
@@ -299,16 +274,7 @@ func handlePDUSessionEstablishmentRequest(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		encoded, err := ngap.BuildUplinkNASTransport(
-			ue.AmfUeNgapID, ue.RanUeNgapID, raw,
-			gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, uplinkOverrides(req),
-		)
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, fmt.Sprintf("NGAP encode: %v", err))
-			return
-		}
-
-		sendRawAndRespond(w, r, gnb, ue, t, encoded)
+		sendUplinkAndWait(w, r, gnb, ue, t, req, raw, "PDUSessionResourceSetupRequest", "DownlinkNASTransport")
 
 		return
 	}
@@ -322,11 +288,7 @@ func handlePDUSessionEstablishmentRequest(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	dnn := ue.DNN
-	sst := ue.SST
-	sd := ue.SD
-
-	ulNas, err := nasCodec.BuildULNASTransport(pduSessionID, pduReq, dnn, sst, sd)
+	ulNas, err := nasCodec.BuildULNASTransport(pduSessionID, pduReq, ue.DNN, ue.SST, ue.SD)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build ULNASTransport: %v", err))
 		return
@@ -356,15 +318,9 @@ func handlePDUSessionEstablishmentRequest(w http.ResponseWriter, r *http.Request
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	respData, err := t.Receive(ctx)
+	ngapResp, err := t.WaitForMessage(ctx, "PDUSessionResourceSetupRequest")
 	if err != nil {
-		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for response: %v", err))
-		return
-	}
-
-	ngapResp, err := ngap.Decode(respData)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("NGAP decode: %v", err))
+		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for PDUSessionResourceSetupRequest: %v", err))
 		return
 	}
 
@@ -392,17 +348,45 @@ func handlePDUSessionEstablishmentRequest(w http.ResponseWriter, r *http.Request
 	})
 }
 
-func sendAndRespond(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, ngapMsg *ngap.NGAPMessage) {
-	encoded, err := ngap.Encode(ngapMsg)
+func handleDeregistrationRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
+	var nasPDU []byte
+
+	if req.RawNASPDU != nil {
+		raw, err := hex.DecodeString(*req.RawNASPDU)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("decode raw_nas_pdu: %v", err))
+			return
+		}
+
+		nasPDU = raw
+	} else {
+		deregPDU, err := nasCodec.BuildDeregistrationRequest(&nasCodec.DeregistrationRequestOpts{
+			Guti:  ue.Guti,
+			Suci:  &ue.Suci,
+			NgKsi: ue.NgKsi,
+		})
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("build DeregistrationRequest: %v", err))
+			return
+		}
+
+		nasPDU, err = nasCodec.EncodeNasPduWithSecurity(ue, deregPDU,
+			gonas.SecurityHeaderTypeIntegrityProtectedAndCiphered)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("NAS security encode: %v", err))
+			return
+		}
+	}
+
+	encoded, err := ngap.BuildUplinkNASTransport(
+		ue.AmfUeNgapID, ue.RanUeNgapID, nasPDU,
+		gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, uplinkOverrides(req),
+	)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NGAP encode: %v", err))
 		return
 	}
 
-	sendRawAndRespond(w, r, gnb, ue, t, encoded)
-}
-
-func sendRawAndRespond(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, encoded []byte) {
 	if err := t.Send(encoded, false); err != nil {
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
 		return
@@ -411,15 +395,73 @@ func sendRawAndRespond(w http.ResponseWriter, r *http.Request, gnb *store.GnBCon
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	respData, err := t.Receive(ctx)
+	ngapResp, err := t.WaitForMessage(ctx, "UEContextReleaseCommand", "DownlinkNASTransport", "ErrorIndication")
 	if err != nil {
 		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for response: %v", err))
 		return
 	}
 
-	ngapResp, err := ngap.Decode(respData)
+	var nasResp *nasCodec.NASResponse
+
+	for _, ie := range ngapResp.IEs {
+		if ie.NasPDU != nil {
+			nasPDUBytes, err := hex.DecodeString(*ie.NasPDU)
+			if err != nil {
+				continue
+			}
+
+			nasResp, _ = nasCodec.DecodeSecuredNAS(ue, nasPDUBytes)
+		}
+	}
+
+	if ngapResp.MessageType == "UEContextReleaseCommand" {
+		releaseComplete, err := ngap.BuildUEContextReleaseComplete(ue.AmfUeNgapID, ue.RanUeNgapID)
+		if err == nil {
+			_ = t.Send(releaseComplete, false)
+		}
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{
+		NGAP: ngapResp,
+		NAS:  nasResp,
+	})
+}
+
+func sendAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, ngapMsg *ngap.NGAPMessage, waitFor ...string) {
+	encoded, err := ngap.Encode(ngapMsg)
 	if err != nil {
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("NGAP decode: %v", err))
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NGAP encode: %v", err))
+		return
+	}
+
+	sendRawAndWait(w, r, gnb, ue, t, encoded, waitFor...)
+}
+
+func sendUplinkAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest, nasPDU []byte, waitFor ...string) {
+	encoded, err := ngap.BuildUplinkNASTransport(
+		ue.AmfUeNgapID, ue.RanUeNgapID, nasPDU,
+		gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, uplinkOverrides(req),
+	)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NGAP encode: %v", err))
+		return
+	}
+
+	sendRawAndWait(w, r, gnb, ue, t, encoded, waitFor...)
+}
+
+func sendRawAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, encoded []byte, waitFor ...string) {
+	if err := t.Send(encoded, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	ngapResp, err := t.WaitForMessage(ctx, waitFor...)
+	if err != nil {
+		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for response: %v", err))
 		return
 	}
 

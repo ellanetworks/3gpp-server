@@ -5,14 +5,21 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/ellanetworks/3gpp-server/internal/api"
 	"github.com/ellanetworks/3gpp-server/internal/store"
 )
 
 func main() {
+	signal.Ignore(syscall.SIGPIPE)
+
 	listen := flag.String("listen", ":8080", "HTTP listen address")
 	flag.Parse()
+
+	log.SetOutput(os.Stderr)
 
 	s := store.New()
 	h := api.NewHandler(s)

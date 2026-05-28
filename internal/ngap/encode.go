@@ -690,3 +690,35 @@ func BuildInitialContextSetupResponse(amfUeNgapID, ranUeNgapID int64) ([]byte, e
 
 	return ngap.Encoder(pdu)
 }
+
+func BuildUEContextReleaseComplete(amfUeNgapID, ranUeNgapID int64) ([]byte, error) {
+	pdu := ngapType.NGAPPDU{}
+	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome
+	pdu.SuccessfulOutcome = new(ngapType.SuccessfulOutcome)
+
+	so := pdu.SuccessfulOutcome
+	so.ProcedureCode.Value = ngapType.ProcedureCodeUEContextRelease
+	so.Criticality.Value = ngapType.CriticalityPresentReject
+	so.Value.Present = ngapType.SuccessfulOutcomePresentUEContextReleaseComplete
+	so.Value.UEContextReleaseComplete = new(ngapType.UEContextReleaseComplete)
+
+	ies := &so.Value.UEContextReleaseComplete.ProtocolIEs
+
+	amfIE := ngapType.UEContextReleaseCompleteIEs{}
+	amfIE.Id.Value = ngapType.ProtocolIEIDAMFUENGAPID
+	amfIE.Criticality.Value = ngapType.CriticalityPresentIgnore
+	amfIE.Value.Present = ngapType.UEContextReleaseCompleteIEsPresentAMFUENGAPID
+	amfIE.Value.AMFUENGAPID = new(ngapType.AMFUENGAPID)
+	amfIE.Value.AMFUENGAPID.Value = amfUeNgapID
+	ies.List = append(ies.List, amfIE)
+
+	ranIE := ngapType.UEContextReleaseCompleteIEs{}
+	ranIE.Id.Value = ngapType.ProtocolIEIDRANUENGAPID
+	ranIE.Criticality.Value = ngapType.CriticalityPresentIgnore
+	ranIE.Value.Present = ngapType.UEContextReleaseCompleteIEsPresentRANUENGAPID
+	ranIE.Value.RANUENGAPID = new(ngapType.RANUENGAPID)
+	ranIE.Value.RANUENGAPID.Value = ranUeNgapID
+	ies.List = append(ies.List, ranIE)
+
+	return ngap.Encoder(pdu)
+}

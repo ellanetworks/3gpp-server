@@ -201,7 +201,7 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 			body:            `{"message_type":"registration_request","mobile_identity_override":""}`,
 			wantHTTP:        200,
 			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "registration_reject",
+			wantNASMsgType:  "status_5gmm",
 		},
 		{
 			name:            "mobile identity override: type byte only (no content)",

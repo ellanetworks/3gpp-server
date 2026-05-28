@@ -116,6 +116,14 @@ func TestScenarioRegistration(t *testing.T) {
 		}
 	})
 
+	t.Run("deregistration", func(t *testing.T) {
+		status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+			`{"message_type":"deregistration_request"}`)
+		if status != 200 {
+			t.Fatalf("HTTP %d: %s", status, body)
+		}
+	})
+
 	t.Run("AMF UE NGAP ID stored", func(t *testing.T) {
 		status, body := doRequest(t, "GET", "/gnb/"+gnbID+"/ue/"+ueID, "")
 		if status != 200 {

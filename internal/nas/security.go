@@ -26,6 +26,10 @@ func EncodeNasPduWithSecurity(ue *store.UEContext, pdu []byte, securityHeaderTyp
 }
 
 func nasEncode(ue *store.UEContext, msg *gonas.Message, securityHeaderType uint8) ([]byte, error) {
+	if !ue.SecurityContextAvailable && len(ue.Kamf) == 0 {
+		return nil, fmt.Errorf("no security context available")
+	}
+
 	if securityHeaderType == gonas.SecurityHeaderTypeIntegrityProtectedWithNew5gNasSecurityContext ||
 		securityHeaderType == gonas.SecurityHeaderTypeIntegrityProtectedAndCipheredWithNew5gNasSecurityContext {
 		ue.ULCount = 0
