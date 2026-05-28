@@ -274,7 +274,7 @@ func handlePDUSessionEstablishmentRequest(w http.ResponseWriter, r *http.Request
 			return
 		}
 
-		sendUplinkAndWait(w, r, gnb, ue, t, req, raw, "PDUSessionResourceSetupRequest", "DownlinkNASTransport")
+		sendUplinkAndWait(w, r, gnb, ue, t, req, raw, "PDUSessionResourceSetupRequest", "DownlinkNASTransport", "ErrorIndication")
 
 		return
 	}
