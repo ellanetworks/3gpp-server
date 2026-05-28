@@ -274,6 +274,25 @@ func doRegistrationFlow(t *testing.T, gnbID, ueID string) {
 	}
 }
 
+// doFullFlow completes registration + PDU session + deregistration.
+func doFullFlow(t *testing.T, gnbID, ueID string) {
+	t.Helper()
+
+	doRegistrationFlow(t, gnbID, ueID)
+
+	status, resp := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+		`{"message_type":"pdu_session_establishment_request"}`)
+	if status != 200 {
+		t.Fatalf("pdu_session: HTTP %d: %s", status, resp)
+	}
+
+	status, resp = doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+		`{"message_type":"deregistration_request"}`)
+	if status != 200 {
+		t.Fatalf("deregistration: HTTP %d: %s", status, resp)
+	}
+}
+
 // fieldCheck is used in table-driven tests to assert a JSON field value.
 type fieldCheck struct {
 	wantNonEmpty bool

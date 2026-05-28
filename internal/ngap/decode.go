@@ -64,6 +64,8 @@ func decodeInitiatingMessage(im *ngapType.InitiatingMessage, resp *NGAPResponse)
 		decodeInitialContextSetupRequest(im.Value.InitialContextSetupRequest, resp)
 	case ngapType.InitiatingMessagePresentPDUSessionResourceSetupRequest:
 		decodePDUSessionResourceSetupRequest(im.Value.PDUSessionResourceSetupRequest, resp)
+	case ngapType.InitiatingMessagePresentUEContextReleaseCommand:
+		decodeUEContextReleaseCommand(im.Value.UEContextReleaseCommand, resp)
 	}
 }
 
@@ -484,5 +486,34 @@ func getUnsuccessfulOutcomeName(msgType int) string {
 		return "InitialContextSetupFailure"
 	default:
 		return fmt.Sprintf("Unknown(%d)", msgType)
+	}
+}
+
+func decodeUEContextReleaseCommand(msg *ngapType.UEContextReleaseCommand, resp *NGAPResponse) {
+	if msg == nil {
+		return
+	}
+
+	for _, ie := range msg.ProtocolIEs.List {
+		decoded := IE{
+			ID:          ie.Id.Value,
+			Criticality: criticalityToString(ie.Criticality.Value),
+		}
+
+		switch ie.Id.Value {
+		case ngapType.ProtocolIEIDUENGAPIDs:
+			if ie.Value.UENGAPIDs != nil && ie.Value.UENGAPIDs.UENGAPIDPair != nil {
+				amfID := ie.Value.UENGAPIDs.UENGAPIDPair.AMFUENGAPID.Value
+				ranID := ie.Value.UENGAPIDs.UENGAPIDPair.RANUENGAPID.Value
+				decoded.AmfUeNgapID = &amfID
+				decoded.RanUeNgapID = &ranID
+			}
+		case ngapType.ProtocolIEIDCause:
+			if ie.Value.Cause != nil {
+				decoded.Cause = decodeCause(ie.Value.Cause)
+			}
+		}
+
+		resp.IEs = append(resp.IEs, decoded)
 	}
 }
