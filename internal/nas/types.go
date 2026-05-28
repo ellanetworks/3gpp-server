@@ -20,6 +20,13 @@ type NASRequest struct {
 	// AuthenticationResponse override — replaces the computed RES*.
 	ResStarOverride *string `json:"res_star_override,omitempty"`
 
+	// PDU Session Establishment Request override — replaces the auto-built
+	// inner SM payload that goes into the UL NAS Transport's payload container.
+	// The outer UL NAS Transport, NAS security wrapping and NGAP encoding are
+	// applied as usual. Used to exercise the AMF→SMF SM-payload error paths
+	// without bypassing security.
+	InnerSMPayload *string `json:"inner_sm_payload,omitempty"`
+
 	// RegistrationRequest optional IEs (TS 24.501 §8.2.6)
 	NgKSI                       *uint8  `json:"ng_ksi,omitempty"`
 	MobileIdentityOverride      *string `json:"mobile_identity_override,omitempty"`

@@ -253,7 +253,7 @@ func handleRegistrationComplete(w http.ResponseWriter, r *http.Request, gnb *sto
 		}
 	}
 
-	sendUplinkAndWait(w, r, gnb, ue, t, req, nasPDU, "DownlinkNASTransport")
+	sendUplinkAndWait(w, r, gnb, ue, t, req, nasPDU, "DownlinkNASTransport", "ErrorIndication", "UEContextReleaseCommand")
 }
 
 func handlePDUSessionEstablishmentRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
@@ -279,13 +279,26 @@ func handlePDUSessionEstablishmentRequest(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	pduReq, err := nasCodec.BuildPDUSessionEstablishmentRequest(&nasCodec.PDUSessionEstablishmentRequestOpts{
-		PDUSessionID:   pduSessionID,
-		PDUSessionType: pduSessionType,
-	})
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build PDUSessionEstablishmentRequest: %v", err))
-		return
+	var (
+		pduReq []byte
+		err    error
+	)
+
+	if req.InnerSMPayload != nil {
+		pduReq, err = hex.DecodeString(*req.InnerSMPayload)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("decode inner_sm_payload: %v", err))
+			return
+		}
+	} else {
+		pduReq, err = nasCodec.BuildPDUSessionEstablishmentRequest(&nasCodec.PDUSessionEstablishmentRequestOpts{
+			PDUSessionID:   pduSessionID,
+			PDUSessionType: pduSessionType,
+		})
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("build PDUSessionEstablishmentRequest: %v", err))
+			return
+		}
 	}
 
 	ulNas, err := nasCodec.BuildULNASTransport(pduSessionID, pduReq, ue.DNN, ue.SST, ue.SD)
@@ -318,9 +331,9 @@ func handlePDUSessionEstablishmentRequest(w http.ResponseWriter, r *http.Request
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	ngapResp, err := t.WaitForMessage(ctx, "PDUSessionResourceSetupRequest")
+	ngapResp, err := t.WaitForMessage(ctx, "PDUSessionResourceSetupRequest", "DownlinkNASTransport", "ErrorIndication")
 	if err != nil {
-		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for PDUSessionResourceSetupRequest: %v", err))
+		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for PDU establishment response: %v", err))
 		return
 	}
 

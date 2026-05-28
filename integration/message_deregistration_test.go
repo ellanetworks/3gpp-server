@@ -34,6 +34,64 @@ func TestDeregistration_Fuzz(t *testing.T) {
 			body:     `{"message_type":"deregistration_request","raw_nas_pdu":"7e00450900"}`,
 			wantHTTP: 200,
 		},
+		{
+			// TS 24.501 §8.2.12 — DeregistrationRequestUEOriginating
+			// EPD=7E SHT=00 plain, msg type=45, then deregistration-type octet:
+			//   access type=01 (3GPP), re-reg=0, switch-off=1 → 0x09
+			// followed by Mobile identity (5GS).
+			// Empty mobile identity → AMF should respond.
+			name:     "raw NAS: plain deregistration with switch-off bit set",
+			body:     `{"message_type":"deregistration_request","raw_nas_pdu":"7e0045090000"}`,
+			wantHTTP: 200,
+		},
+		{
+			// access type=02 (non-3GPP) — Ella Core only supports 3GPP access
+			name:     "raw NAS: plain deregistration with non-3GPP access type",
+			body:     `{"message_type":"deregistration_request","raw_nas_pdu":"7e00450a00"}`,
+			wantHTTP: 200,
+		},
+		{
+			// access type=03 (both 3GPP + non-3GPP)
+			name:     "raw NAS: plain deregistration with both access types",
+			body:     `{"message_type":"deregistration_request","raw_nas_pdu":"7e00450b00"}`,
+			wantHTTP: 200,
+		},
+		{
+			// re-registration-required bit set
+			name:     "raw NAS: plain deregistration with re-registration-required",
+			body:     `{"message_type":"deregistration_request","raw_nas_pdu":"7e0045110000"}`,
+			wantHTTP: 200,
+		},
+		{
+			// truncated — missing mobile identity octet entirely
+			name:     "raw NAS: truncated (missing mobile identity)",
+			body:     `{"message_type":"deregistration_request","raw_nas_pdu":"7e004509"}`,
+			wantHTTP: 200,
+		},
+		{
+			// valid 5GMM header but unknown deregistration message type
+			// (0x46 = DeregistrationAcceptUEOriginating — wrong direction)
+			name:     "raw NAS: deregistration accept type (wrong direction)",
+			body:     `{"message_type":"deregistration_request","raw_nas_pdu":"7e0046"}`,
+			wantHTTP: 200,
+		},
+		{
+			name:            "raw NAS: missing security header (single byte EPD)",
+			body:            `{"message_type":"deregistration_request","raw_nas_pdu":"7e"}`,
+			wantHTTP:        200,
+			wantNGAPMsgType: "DownlinkNASTransport",
+		},
+		{
+			// NGAP-level: stale AMF UE NGAP ID — AMF context not found
+			name:     "NGAP override: AMF UE NGAP ID = 0",
+			body:     `{"message_type":"deregistration_request","amf_ue_ngap_id_override":0}`,
+			wantHTTP: 200,
+		},
+		{
+			name:     "NGAP override: RAN UE NGAP ID = 999999",
+			body:     `{"message_type":"deregistration_request","ran_ue_ngap_id_override":999999}`,
+			wantHTTP: 200,
+		},
 	}
 
 	for _, tt := range tests {
