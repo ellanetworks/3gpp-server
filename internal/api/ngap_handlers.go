@@ -57,6 +57,8 @@ func (h *Handler) SendNGAP(w http.ResponseWriter, r *http.Request) {
 		handlePDUSessionEstablishmentRequest(w, r, gnb, ue, t, &req)
 	case "deregistration_request":
 		handleDeregistrationRequest(w, r, gnb, ue, t, &req)
+	case "ue_context_release_request":
+		handleUEContextReleaseRequest(w, r, gnb, ue, t, &req)
 	default:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unsupported message_type: %s", req.MessageType))
 	}
@@ -438,6 +440,57 @@ func handleDeregistrationRequest(w http.ResponseWriter, r *http.Request, gnb *st
 		NGAP: ngapResp,
 		NAS:  nasResp,
 	})
+}
+
+// handleUEContextReleaseRequest sends a gNB-initiated UE CONTEXT RELEASE
+// REQUEST and expects the AMF to answer with a UE CONTEXT RELEASE COMMAND, to
+// which the gNB replies with UE CONTEXT RELEASE COMPLETE. This transitions the
+// UE to CM-IDLE while it stays RM-REGISTERED.
+func handleUEContextReleaseRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
+	// Default cause: user-inactivity (TS 38.413 §9.3.1.2, radio-network value 20).
+	cause := int64(20)
+	if req.ReleaseCause != nil {
+		cause = *req.ReleaseCause
+	}
+
+	amfUeNgapID := ue.AmfUeNgapID
+	if req.AmfUeNgapIDOverride != nil {
+		amfUeNgapID = *req.AmfUeNgapIDOverride
+	}
+
+	ranUeNgapID := ue.RanUeNgapID
+	if req.RanUeNgapIDOverride != nil {
+		ranUeNgapID = *req.RanUeNgapIDOverride
+	}
+
+	encoded, err := ngap.BuildUEContextReleaseRequest(amfUeNgapID, ranUeNgapID, cause)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build UEContextReleaseRequest: %v", err))
+		return
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	ngapResp, err := t.WaitForMessage(ctx, "UEContextReleaseCommand", "ErrorIndication")
+	if err != nil {
+		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for response: %v", err))
+		return
+	}
+
+	if ngapResp.MessageType == "UEContextReleaseCommand" {
+		releaseComplete, err := ngap.BuildUEContextReleaseComplete(ue.AmfUeNgapID, ue.RanUeNgapID)
+		if err == nil {
+			_ = t.Send(releaseComplete, false)
+		}
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
 }
 
 func sendAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, ngapMsg *ngap.NGAPMessage, waitFor ...string) {
