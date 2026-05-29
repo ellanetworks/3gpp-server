@@ -14,6 +14,7 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/store"
 	"github.com/ellanetworks/3gpp-server/internal/transport"
 	gonas "github.com/free5gc/nas"
+	"github.com/free5gc/nas/nasType"
 )
 
 func (h *Handler) SendNGAP(w http.ResponseWriter, r *http.Request) {
@@ -57,6 +58,10 @@ func (h *Handler) SendNGAP(w http.ResponseWriter, r *http.Request) {
 		handlePDUSessionEstablishmentRequest(w, r, gnb, ue, t, &req)
 	case "deregistration_request":
 		handleDeregistrationRequest(w, r, gnb, ue, t, &req)
+	case "ue_context_release_request":
+		handleUEContextReleaseRequest(w, r, gnb, ue, t, &req)
+	case "service_request":
+		handleServiceRequest(w, r, gnb, ue, t, &req)
 	default:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unsupported message_type: %s", req.MessageType))
 	}
@@ -431,6 +436,202 @@ func handleDeregistrationRequest(w http.ResponseWriter, r *http.Request, gnb *st
 		releaseComplete, err := ngap.BuildUEContextReleaseComplete(ue.AmfUeNgapID, ue.RanUeNgapID)
 		if err == nil {
 			_ = t.Send(releaseComplete, false)
+		}
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{
+		NGAP: ngapResp,
+		NAS:  nasResp,
+	})
+}
+
+// handleUEContextReleaseRequest sends a gNB-initiated UE CONTEXT RELEASE
+// REQUEST and expects the AMF to answer with a UE CONTEXT RELEASE COMMAND, to
+// which the gNB replies with UE CONTEXT RELEASE COMPLETE. This transitions the
+// UE to CM-IDLE while it stays RM-REGISTERED.
+func handleUEContextReleaseRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
+	// Default cause: user-inactivity (TS 38.413 §9.3.1.2, radio-network value 20).
+	cause := int64(20)
+	if req.ReleaseCause != nil {
+		cause = *req.ReleaseCause
+	}
+
+	amfUeNgapID := ue.AmfUeNgapID
+	if req.AmfUeNgapIDOverride != nil {
+		amfUeNgapID = *req.AmfUeNgapIDOverride
+	}
+
+	ranUeNgapID := ue.RanUeNgapID
+	if req.RanUeNgapIDOverride != nil {
+		ranUeNgapID = *req.RanUeNgapIDOverride
+	}
+
+	encoded, err := ngap.BuildUEContextReleaseRequest(amfUeNgapID, ranUeNgapID, cause)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build UEContextReleaseRequest: %v", err))
+		return
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	ngapResp, err := t.WaitForMessage(ctx, "UEContextReleaseCommand", "ErrorIndication")
+	if err != nil {
+		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for response: %v", err))
+		return
+	}
+
+	if ngapResp.MessageType == "UEContextReleaseCommand" {
+		releaseComplete, err := ngap.BuildUEContextReleaseComplete(ue.AmfUeNgapID, ue.RanUeNgapID)
+		if err == nil {
+			_ = t.Send(releaseComplete, false)
+		}
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
+}
+
+// fiveGSTMSIFromGUTI derives the 5G-S-TMSI IE (for the Initial UE Message)
+// from a stored GUTI. The AMF Set ID is a 10-bit field and the AMF Pointer a
+// 6-bit field; both are left-aligned into their octets per the NGAP BitString
+// encoding.
+func fiveGSTMSIFromGUTI(guti *nasType.GUTI5G) *ngap.FiveGSTMSIFromGUTI {
+	if guti == nil {
+		return nil
+	}
+
+	setID := guti.GetAMFSetID() // 10-bit value, right-aligned
+	pointer := guti.GetAMFPointer() // 6-bit value, right-aligned
+	tmsi := guti.GetTMSI5G()
+
+	setIDBytes := []byte{byte(setID >> 2), byte((setID & 0x3) << 6)}
+	pointerByte := []byte{pointer << 2}
+
+	return &ngap.FiveGSTMSIFromGUTI{
+		AMFSetID:   hex.EncodeToString(setIDBytes),
+		AMFPointer: hex.EncodeToString(pointerByte),
+		FiveGTMSI:  hex.EncodeToString(tmsi[:]),
+	}
+}
+
+// handleServiceRequest sends a 5GMM Service Request to bring a CM-IDLE UE back
+// to CM-CONNECTED (TS 24.501 §5.6.1). It opens a fresh RAN connection (new RAN
+// UE NGAP ID + Initial UE Message carrying the 5G-S-TMSI), then drives the
+// resulting Initial Context Setup so the AMF re-activates the UE context.
+func handleServiceRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
+	if len(ue.Kamf) == 0 || ue.Guti == nil {
+		writeError(w, http.StatusBadRequest, "service_request requires a registered UE with a security context and GUTI")
+		return
+	}
+
+	// A Service Request starts a new RRC/NG connection, so allocate a fresh
+	// RAN UE NGAP ID.
+	ue.RanUeNgapID = gnb.AllocateRanUeNgapID()
+
+	var nasPDU []byte
+
+	if req.RawNASPDU != nil {
+		raw, err := hex.DecodeString(*req.RawNASPDU)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("decode raw_nas_pdu: %v", err))
+			return
+		}
+
+		nasPDU = raw
+	} else {
+		serviceType := uint8(1) // nasMessage.ServiceTypeData
+		if req.ServiceType != nil {
+			serviceType = *req.ServiceType
+		}
+
+		// Reactivate any session the UE established before going idle.
+		var status [16]bool
+		if ue.PDUSessionID >= 1 && ue.PDUSessionID <= 15 {
+			status[ue.PDUSessionID] = true
+		}
+
+		srPDU, err := nasCodec.BuildServiceRequest(&nasCodec.ServiceRequestOpts{
+			ServiceType:      serviceType,
+			NgKsi:            ue.NgKsi,
+			Guti:             ue.Guti,
+			PDUSessionStatus: &status,
+		})
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("build ServiceRequest: %v", err))
+			return
+		}
+
+		nasPDU, err = nasCodec.EncodeNasPduWithSecurity(ue, srPDU, gonas.SecurityHeaderTypeIntegrityProtected)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("NAS security encode: %v", err))
+			return
+		}
+	}
+
+	// Initial UE Message with mo-Data establishment cause and the 5G-S-TMSI.
+	overrides := initialUEOverrides(req)
+	if overrides == nil || overrides.RRCEstablishmentCause == nil {
+		moData := int64(4) // RRCEstablishmentCausePresentMoData
+		if overrides == nil {
+			overrides = &ngap.InitialUEMessageOverrides{}
+		}
+		overrides.RRCEstablishmentCause = &moData
+	}
+
+	ngapMsg := ngap.BuildInitialUEMessageFromState(
+		ue.RanUeNgapID, nasPDU,
+		gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, fiveGSTMSIFromGUTI(ue.Guti), overrides,
+	)
+
+	encoded, err := ngap.Encode(ngapMsg)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NGAP encode: %v", err))
+		return
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	ngapResp, err := t.WaitForMessage(ctx,
+		"InitialContextSetupRequest", "DownlinkNASTransport", "PDUSessionResourceSetupRequest", "ErrorIndication")
+	if err != nil {
+		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for service request response: %v", err))
+		return
+	}
+
+	var nasResp *nasCodec.NASResponse
+
+	for _, ie := range ngapResp.IEs {
+		if ie.AmfUeNgapID != nil {
+			ue.AmfUeNgapID = *ie.AmfUeNgapID
+			gnb.UpdateNGAPIDs(ue.RanUeNgapID, *ie.AmfUeNgapID)
+		}
+
+		if ie.NasPDU != nil {
+			nasPDUBytes, derr := hex.DecodeString(*ie.NasPDU)
+			if derr != nil {
+				continue
+			}
+
+			nasResp, _ = nasCodec.DecodeSecuredNAS(ue, nasPDUBytes)
+		}
+	}
+
+	// The AMF reactivates the UE context via Initial Context Setup; acknowledge it.
+	if ngapResp.MessageType == "InitialContextSetupRequest" {
+		icsResp, berr := ngap.BuildInitialContextSetupResponse(ue.AmfUeNgapID, ue.RanUeNgapID)
+		if berr == nil {
+			_ = t.Send(icsResp, false)
 		}
 	}
 

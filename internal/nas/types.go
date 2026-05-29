@@ -27,6 +27,14 @@ type NASRequest struct {
 	// without bypassing security.
 	InnerSMPayload *string `json:"inner_sm_payload,omitempty"`
 
+	// UE Context Release Request — radio-network Cause value (TS 38.413
+	// §9.3.1.2) the gNB puts in the request. Defaults to user-inactivity.
+	ReleaseCause *int64 `json:"release_cause,omitempty"`
+
+	// Service Request — service type (TS 24.501 §9.11.3.50). Defaults to
+	// data (1). 0=signalling, 2=mobile-terminated services.
+	ServiceType *uint8 `json:"service_type,omitempty"`
+
 	// RegistrationRequest optional IEs (TS 24.501 §8.2.6)
 	NgKSI                       *uint8  `json:"ng_ksi,omitempty"`
 	MobileIdentityOverride      *string `json:"mobile_identity_override,omitempty"`

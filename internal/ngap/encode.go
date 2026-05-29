@@ -722,3 +722,48 @@ func BuildUEContextReleaseComplete(amfUeNgapID, ranUeNgapID int64) ([]byte, erro
 
 	return ngap.Encoder(pdu)
 }
+
+// BuildUEContextReleaseRequest builds a gNB-initiated UE CONTEXT RELEASE REQUEST
+// (TS 38.413 §8.3.2). It carries the AMF/RAN UE NGAP IDs and a radio-network
+// cause. The AMF answers with a UE CONTEXT RELEASE COMMAND.
+func BuildUEContextReleaseRequest(amfUeNgapID, ranUeNgapID int64, causeRadioNetwork int64) ([]byte, error) {
+	pdu := ngapType.NGAPPDU{}
+	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
+	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
+
+	im := pdu.InitiatingMessage
+	im.ProcedureCode.Value = ngapType.ProcedureCodeUEContextReleaseRequest
+	im.Criticality.Value = ngapType.CriticalityPresentReject
+	im.Value.Present = ngapType.InitiatingMessagePresentUEContextReleaseRequest
+	im.Value.UEContextReleaseRequest = new(ngapType.UEContextReleaseRequest)
+
+	ies := &im.Value.UEContextReleaseRequest.ProtocolIEs
+
+	amfIE := ngapType.UEContextReleaseRequestIEs{}
+	amfIE.Id.Value = ngapType.ProtocolIEIDAMFUENGAPID
+	amfIE.Criticality.Value = ngapType.CriticalityPresentReject
+	amfIE.Value.Present = ngapType.UEContextReleaseRequestIEsPresentAMFUENGAPID
+	amfIE.Value.AMFUENGAPID = new(ngapType.AMFUENGAPID)
+	amfIE.Value.AMFUENGAPID.Value = amfUeNgapID
+	ies.List = append(ies.List, amfIE)
+
+	ranIE := ngapType.UEContextReleaseRequestIEs{}
+	ranIE.Id.Value = ngapType.ProtocolIEIDRANUENGAPID
+	ranIE.Criticality.Value = ngapType.CriticalityPresentReject
+	ranIE.Value.Present = ngapType.UEContextReleaseRequestIEsPresentRANUENGAPID
+	ranIE.Value.RANUENGAPID = new(ngapType.RANUENGAPID)
+	ranIE.Value.RANUENGAPID.Value = ranUeNgapID
+	ies.List = append(ies.List, ranIE)
+
+	causeIE := ngapType.UEContextReleaseRequestIEs{}
+	causeIE.Id.Value = ngapType.ProtocolIEIDCause
+	causeIE.Criticality.Value = ngapType.CriticalityPresentIgnore
+	causeIE.Value.Present = ngapType.UEContextReleaseRequestIEsPresentCause
+	causeIE.Value.Cause = new(ngapType.Cause)
+	causeIE.Value.Cause.Present = ngapType.CausePresentRadioNetwork
+	causeIE.Value.Cause.RadioNetwork = new(ngapType.CauseRadioNetwork)
+	causeIE.Value.Cause.RadioNetwork.Value = aper.Enumerated(causeRadioNetwork)
+	ies.List = append(ies.List, causeIE)
+
+	return ngap.Encoder(pdu)
+}
