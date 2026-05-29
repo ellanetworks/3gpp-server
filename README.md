@@ -223,7 +223,7 @@ Legend:
 | Deregistration Accept (UE originating) | — | 🟡 |
 | Deregistration Request (UE terminated) | ❌ | 🟡 |
 | Deregistration Accept (UE terminated) | ❌ | 🟡 |
-| Service Request | ❌ | 🟡 |
+| Service Request | ✅ | 🟡 |
 | Service Accept | — | 🟡 |
 | Service Reject | — | 🟡 |
 | Control Plane Service Request | ❌ | ❌ |
