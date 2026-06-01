@@ -71,6 +71,7 @@ const (
 	nasSecurityModeCommand           = "security_mode_command"
 	nasServiceAccept                 = "service_accept"
 	nasStatus5GMM                    = "status_5gmm"
+	nasDeregistrationAccept          = "deregistration_accept"
 	nasPDUSessionEstablishmentAccept = "pdu_session_establishment_accept"
 	nasPDUSessionEstablishmentReject = "pdu_session_establishment_reject"
 )

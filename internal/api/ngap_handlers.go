@@ -102,7 +102,7 @@ func handleRegistrationRequest(w http.ResponseWriter, r *http.Request, gnb *stor
 			ue.RanUeNgapID, nasPDU,
 			gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, nil, initialUEOverrides(req),
 		)
-		sendAndWait(w, r, gnb, ue, t, ngapMsg, "DownlinkNASTransport", "ErrorIndication")
+		sendAndWait(w, r, gnb, ue, t, ngapMsg, "DownlinkNASTransport", "InitialContextSetupRequest", "ErrorIndication")
 
 		return
 	}
@@ -112,12 +112,24 @@ func handleRegistrationRequest(w http.ResponseWriter, r *http.Request, gnb *stor
 		regType = *req.RegistrationType
 	}
 
+	// A mobility or periodic registration update from a UE that holds a 5G NAS
+	// security context is integrity-protected with that context and carries its
+	// ngKSI, so the AMF can reuse it and accept directly (TS 24.501 §5.5.1.3).
+	// Initial registration is sent as a cleartext (plain) message.
+	mobilityOrPeriodic := regType == nasCodec.RegistrationTypeMobility || regType == nasCodec.RegistrationTypePeriodic
+	secured := mobilityOrPeriodic && len(ue.Kamf) > 0
+
+	ngKsi := uint8(7) // "no key available"
+	if secured {
+		ngKsi = ue.NgKsi
+	}
+
 	nasPDU, err := nasCodec.BuildRegistrationRequest(&nasCodec.RegistrationRequestOpts{
 		RegistrationType: regType,
 		Suci:             ue.Suci,
 		Guti:             ue.Guti,
 		SecurityCap:      ue.UeSecurityCapability,
-		NgKsi:            7,
+		NgKsi:            ngKsi,
 		Overrides:        req,
 	})
 	if err != nil {
@@ -125,11 +137,19 @@ func handleRegistrationRequest(w http.ResponseWriter, r *http.Request, gnb *stor
 		return
 	}
 
+	if secured {
+		nasPDU, err = nasCodec.EncodeNasPduWithSecurity(ue, nasPDU, gonas.SecurityHeaderTypeIntegrityProtected)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("NAS security encode: %v", err))
+			return
+		}
+	}
+
 	ngapMsg := ngap.BuildInitialUEMessageFromState(
 		ue.RanUeNgapID, nasPDU,
 		gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, nil, initialUEOverrides(req),
 	)
-	sendAndWait(w, r, gnb, ue, t, ngapMsg, "DownlinkNASTransport", "ErrorIndication")
+	sendAndWait(w, r, gnb, ue, t, ngapMsg, "DownlinkNASTransport", "InitialContextSetupRequest", "ErrorIndication")
 }
 
 func handleAuthenticationResponse(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
@@ -195,8 +215,15 @@ func handleSecurityModeComplete(w http.ResponseWriter, r *http.Request, gnb *sto
 
 		nasPDU = raw
 	} else {
+		// The NAS message container replays the registration request the UE
+		// sent; keep its registration type consistent with that request.
+		innerRegType := uint8(nasCodec.RegistrationTypeInitial)
+		if req.RegistrationType != nil {
+			innerRegType = *req.RegistrationType
+		}
+
 		regReqPDU, err := nasCodec.BuildRegistrationRequest(&nasCodec.RegistrationRequestOpts{
-			RegistrationType: nasCodec.RegistrationTypeInitial,
+			RegistrationType: innerRegType,
 			Suci:             ue.Suci,
 			Guti:             ue.Guti,
 			SecurityCap:      ue.UeSecurityCapability,
@@ -379,10 +406,16 @@ func handleDeregistrationRequest(w http.ResponseWriter, r *http.Request, gnb *st
 
 		nasPDU = raw
 	} else {
+		switchOff := uint8(1)
+		if req.DeregSwitchOff != nil {
+			switchOff = *req.DeregSwitchOff
+		}
+
 		deregPDU, err := nasCodec.BuildDeregistrationRequest(&nasCodec.DeregistrationRequestOpts{
-			Guti:  ue.Guti,
-			Suci:  &ue.Suci,
-			NgKsi: ue.NgKsi,
+			Guti:      ue.Guti,
+			Suci:      &ue.Suci,
+			NgKsi:     ue.NgKsi,
+			SwitchOff: switchOff,
 		})
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, fmt.Sprintf("build DeregistrationRequest: %v", err))
@@ -750,6 +783,15 @@ func sendRawAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GnBContex
 					ue.Guti = nasCodec.ParseGUTI(gutiBytes)
 				}
 			}
+		}
+	}
+
+	// A gNB answers an Initial Context Setup Request with a Response. The AMF
+	// uses this to re-establish the UE context (e.g. for a mobility/periodic
+	// registration update or a service request that reactivates the UE).
+	if ngapResp.MessageType == "InitialContextSetupRequest" {
+		if icsResp, berr := ngap.BuildInitialContextSetupResponse(ue.AmfUeNgapID, ue.RanUeNgapID); berr == nil {
+			_ = t.Send(icsResp, false)
 		}
 	}
 

@@ -29,12 +29,7 @@ func BuildDeregistrationRequest(opts *DeregistrationRequestOpts) ([]byte, error)
 	dereg.SetTSC(nasMessage.TypeOfSecurityContextFlagNative)
 	dereg.SetNasKeySetIdentifiler(opts.NgKsi)
 
-	switchOff := opts.SwitchOff
-	if switchOff == 0 {
-		switchOff = 1
-	}
-
-	dereg.SetSwitchOff(switchOff)
+	dereg.SetSwitchOff(opts.SwitchOff)
 	dereg.SetReRegistrationRequired(0)
 	dereg.SetAccessType(1)
 

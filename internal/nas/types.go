@@ -31,6 +31,11 @@ type NASRequest struct {
 	// §9.3.1.2) the gNB puts in the request. Defaults to user-inactivity.
 	ReleaseCause *int64 `json:"release_cause,omitempty"`
 
+	// Deregistration Request — switch-off flag (TS 24.501 §9.11.3.20).
+	// 1 = switch off (no Deregistration Accept expected), 0 = normal
+	// de-registration (AMF replies with Deregistration Accept). Defaults to 1.
+	DeregSwitchOff *uint8 `json:"switch_off,omitempty"`
+
 	// Service Request — service type (TS 24.501 §9.11.3.50). Defaults to
 	// data (1). 0=signalling, 2=mobile-terminated services.
 	//

@@ -514,6 +514,9 @@ components:
         service_type:
           type: integer
           description: "Service type for service_request (TS 24.501 §9.11.3.50). Default 1 (data). 0=signalling, 2=mobile-terminated."
+        switch_off:
+          type: integer
+          description: "Deregistration switch-off flag (TS 24.501 §9.11.3.20). Default 1 (switch off, no accept). 0 = normal de-registration (AMF replies with Deregistration Accept)."
         registration_type:
           type: integer
           description: "5GS registration type: 1=initial, 2=mobility, 3=periodic, 4=emergency."

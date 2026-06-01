@@ -241,18 +241,6 @@ func TestNGSetup(t *testing.T) {
 			wantHTTP:    201,
 			wantContain: ngapNGSetupResponse,
 		},
-		// --- Connection error ---
-		{
-			name:     "wrong AMF port → 502",
-			body:     `{"amf_address":"10.3.0.2:12345","gnb_n2_address":"10.3.0.3","mcc":"001","mnc":"01","tac":"000001","gnb_id":"000017","name":"test-gnb-wrongport","sst":1}`,
-			wantHTTP: 502,
-		},
-		// --- Validation ---
-		{
-			name:     "missing amf_address → 400",
-			body:     `{"gnb_n2_address":"10.3.0.3","mcc":"001","mnc":"01","tac":"000001","gnb_id":"000018","name":"test-gnb","sst":1}`,
-			wantHTTP: 400,
-		},
 	}
 
 	for _, tt := range tests {

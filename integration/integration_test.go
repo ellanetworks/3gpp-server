@@ -242,7 +242,8 @@ func mustCreateUE(t *testing.T, gnbID string) string {
 		"sst": 1, "dnn": "internet",
 		"routing_indicator": "0",
 		"protection_scheme": "0",
-		"public_key_id": "0"
+		"public_key_id": "0",
+		"imeisv": "1122334455667788"
 	}`
 	status, resp := doRequest(t, "POST", "/gnb/"+gnbID+"/ue", body)
 	if status != 201 {

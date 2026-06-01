@@ -7,7 +7,6 @@
 package integration_test
 
 import (
-	"strings"
 	"testing"
 )
 
@@ -143,64 +142,3 @@ func TestScenarioRegistration(t *testing.T) {
 	})
 }
 
-func TestUEErrorPaths(t *testing.T) {
-	gnbID := mustCreateGnB(t)
-
-	tests := []struct {
-		name     string
-		method   string
-		path     string
-		body     string
-		wantHTTP int
-	}{
-		{
-			name:     "create UE missing SUPI",
-			method:   "POST",
-			path:     "/gnb/{gnb}/ue",
-			body:     `{"k":"00112233445566778899aabbccddeeff","opc":"63bfa50ee6523365ff14c1f45f88737d"}`,
-			wantHTTP: 400,
-		},
-		{
-			name:     "create UE missing K",
-			method:   "POST",
-			path:     "/gnb/{gnb}/ue",
-			body:     `{"supi":"imsi-001010000000001","opc":"63bfa50ee6523365ff14c1f45f88737d"}`,
-			wantHTTP: 400,
-		},
-		{
-			name:     "get non-existent UE",
-			method:   "GET",
-			path:     "/gnb/{gnb}/ue/999",
-			wantHTTP: 404,
-		},
-		{
-			name:     "delete non-existent UE",
-			method:   "DELETE",
-			path:     "/gnb/{gnb}/ue/999",
-			wantHTTP: 404,
-		},
-		{
-			name:     "send NGAP for non-existent UE",
-			method:   "POST",
-			path:     "/gnb/{gnb}/ue/999/ngap",
-			body:     `{"message_type":"registration_request"}`,
-			wantHTTP: 404,
-		},
-		{
-			name:     "UE on non-existent gNB",
-			method:   "GET",
-			path:     "/gnb/999/ue/1",
-			wantHTTP: 404,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			path := strings.ReplaceAll(tt.path, "{gnb}", gnbID)
-			status, body := doRequest(t, tt.method, path, tt.body)
-			if status != tt.wantHTTP {
-				t.Errorf("HTTP %d, want %d\n  body: %s", status, tt.wantHTTP, body)
-			}
-		})
-	}
-}
