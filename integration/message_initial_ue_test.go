@@ -173,20 +173,20 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 		},
 		// --- Wrong registration types for unknown UE ---
 		{
-			name: "registration_type=2 (mobility updating) for fresh UE",
-			body: fmt.Sprintf(`{"message_type":"registration_request","registration_type":%d}`, registrationTypeMobility),
+			name:            "registration_type=2 (mobility updating) for fresh UE",
+			body:            fmt.Sprintf(`{"message_type":"registration_request","registration_type":%d}`, registrationTypeMobility),
 			wantHTTP:        200,
 			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
-			name: "registration_type=3 (periodic) for fresh UE",
-			body: fmt.Sprintf(`{"message_type":"registration_request","registration_type":%d}`, registrationTypePeriodic),
+			name:            "registration_type=3 (periodic) for fresh UE",
+			body:            fmt.Sprintf(`{"message_type":"registration_request","registration_type":%d}`, registrationTypePeriodic),
 			wantHTTP:        200,
 			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
-			name: "registration_type=4 (emergency) for fresh UE",
-			body: fmt.Sprintf(`{"message_type":"registration_request","registration_type":%d}`, registrationTypeEmergency),
+			name:            "registration_type=4 (emergency) for fresh UE",
+			body:            fmt.Sprintf(`{"message_type":"registration_request","registration_type":%d}`, registrationTypeEmergency),
 			wantHTTP:        200,
 			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},

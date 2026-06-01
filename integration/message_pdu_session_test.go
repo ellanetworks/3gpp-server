@@ -106,13 +106,13 @@ func TestPDUSessionEstablishment_Fuzz(t *testing.T) {
 //
 // Expected behaviour:
 //   - Inner SM payload undecodable as 5GSM
-//       → SMF builds PDU SESSION ESTABLISHMENT REJECT with 5GSM cause #111
-//       → AMF forwards inside DL NAS TRANSPORT
+//     → SMF builds PDU SESSION ESTABLISHMENT REJECT with 5GSM cause #111
+//     → AMF forwards inside DL NAS TRANSPORT
 //   - Inner SM payload decodes but message type is not "establishment request"
-//       → SMF builds reject with 5GSM cause #98
-//       → AMF forwards inside DL NAS TRANSPORT
+//     → SMF builds reject with 5GSM cause #98
+//     → AMF forwards inside DL NAS TRANSPORT
 //   - Inner SM payload absent entirely (empty bytes)
-//       → SMF can't decode → reject with cause #111 (as above)
+//     → SMF can't decode → reject with cause #111 (as above)
 func TestPDUSessionEstablishment_InnerSMFuzz(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -228,7 +228,7 @@ func TestPDUSessionEstablishment_InnerSMRequestIEFuzz(t *testing.T) {
 			wantInnerNASType: nasPDUSessionEstablishmentAccept,
 		},
 		{
-			name: "REQUEST with SSC mode IE = 1 (A- IEI = 0xA1)",
+			name:             "REQUEST with SSC mode IE = 1 (A- IEI = 0xA1)",
 			innerSMPayload:   "2e0301c1ffffa1",
 			wantNGAPMsgType:  ngapPDUSessionResourceSetupRequest,
 			wantInnerNASType: nasPDUSessionEstablishmentAccept,
@@ -246,7 +246,7 @@ func TestPDUSessionEstablishment_InnerSMRequestIEFuzz(t *testing.T) {
 			wantNASCause5GSM: cause5GSMUnknownPDUSessionType,
 		},
 		{
-			name: "REQUEST with PTI = 1 (smallest valid)",
+			name:             "REQUEST with PTI = 1 (smallest valid)",
 			innerSMPayload:   "2e0501c1ffff",
 			wantNGAPMsgType:  ngapPDUSessionResourceSetupRequest,
 			wantInnerNASType: nasPDUSessionEstablishmentAccept,
@@ -259,13 +259,13 @@ func TestPDUSessionEstablishment_InnerSMRequestIEFuzz(t *testing.T) {
 			wantInnerNASType: nasPDUSessionEstablishmentAccept,
 		},
 		{
-			name: "REQUEST with IPMDR = 0x0000 (lowest)",
+			name:             "REQUEST with IPMDR = 0x0000 (lowest)",
 			innerSMPayload:   "2e0701c10000",
 			wantNGAPMsgType:  ngapPDUSessionResourceSetupRequest,
 			wantInnerNASType: nasPDUSessionEstablishmentAccept,
 		},
 		{
-			name: "REQUEST with always-on PDU session requested (B-, IEI=B1)",
+			name:             "REQUEST with always-on PDU session requested (B-, IEI=B1)",
 			innerSMPayload:   "2e0801c1ffffb1",
 			wantNGAPMsgType:  ngapPDUSessionResourceSetupRequest,
 			wantInnerNASType: nasPDUSessionEstablishmentAccept,

@@ -68,7 +68,7 @@ func TestRegistrationComplete_Fuzz(t *testing.T) {
 			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
-			name: "raw NAS: single byte (truncated)",
+			name:            "raw NAS: single byte (truncated)",
 			body:            `{"message_type":"registration_complete","raw_nas_pdu":"7e"}`,
 			wantHTTP:        200,
 			wantNGAPMsgType: ngapDownlinkNASTransport,

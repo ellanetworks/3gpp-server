@@ -112,7 +112,11 @@ func TestServiceRequest_ThenDeregister(t *testing.T) {
 // TestServiceRequest_WithoutRegistration sends a Service Request for a UE that
 // was never registered. The server sends it plain (no security context) with a
 // zeroed 5G-S-TMSI so it reaches the AMF, which must NOT grant service to an
-// unknown, unprotected UE.
+// unknown, unprotected UE. The exact rejection form is not pinned: a SERVICE
+// REQUEST must be integrity protected (TS 24.501 §4.4.4.2), so an unprotected
+// one from an unknown UE may be answered either with a 5GMM STATUS (protocol
+// error) or a SERVICE REJECT — both satisfy the security property. We only
+// assert service is not granted.
 func TestServiceRequest_WithoutRegistration(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -208,8 +212,9 @@ func TestServiceRequest_WhileConnected(t *testing.T) {
 }
 
 // TestServiceRequest_AfterDeregistration sends a Service Request after the UE
-// has fully deregistered. The AMF no longer holds the context, so it must not
-// grant service (expects a reject, never a Service Accept).
+// has fully deregistered. The AMF no longer holds the context, so per
+// TS 24.501 §5.6.1.5 it must answer with a SERVICE REJECT (not a Service
+// Accept, and not silence).
 func TestServiceRequest_AfterDeregistration(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -230,8 +235,8 @@ func TestServiceRequest_AfterDeregistration(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
 	}
-	if got := jsonGet(body, "nas.message_type"); got == nasServiceAccept {
-		t.Errorf("AMF granted service to a deregistered UE\n  body: %s", body)
+	if got := jsonGet(body, "nas.message_type"); got != nasServiceReject {
+		t.Errorf("nas.message_type = %q, want service_reject (TS 24.501 §5.6.1.5)\n  body: %s", got, body)
 	}
 }
 

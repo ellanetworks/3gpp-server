@@ -8,11 +8,12 @@ import (
 
 func TestAuthenticationResponse(t *testing.T) {
 	tests := []struct {
-		name            string
-		body            string
-		wantHTTP        int
-		wantNGAPMsgType string
-		wantNASMsgType  string
+		name             string
+		body             string
+		wantHTTP         int
+		wantNGAPMsgType  string
+		wantNASMsgType   string
+		wantNASCause5GMM int
 	}{
 		{
 			name:            "correct RES* (happy path)",
@@ -22,41 +23,53 @@ func TestAuthenticationResponse(t *testing.T) {
 			wantNASMsgType:  nasSecurityModeCommand,
 		},
 		{
+			// RES* mismatch for a SUCI-identified UE: the AMF aborts
+			// authentication with Authentication Reject (TS 33.501 §6.1.3.2.2).
 			name:            "wrong RES*: 16 bytes of zeros",
 			body:            `{"message_type":"authentication_response","res_star_override":"00000000000000000000000000000000"}`,
 			wantHTTP:        200,
 			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationReject,
 		},
 		{
 			name:            "wrong RES*: 16 bytes of 0xff",
 			body:            `{"message_type":"authentication_response","res_star_override":"ffffffffffffffffffffffffffffffff"}`,
 			wantHTTP:        200,
 			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationReject,
 		},
 		{
-			name:            "truncated RES*: 8 bytes",
-			body:            `{"message_type":"authentication_response","res_star_override":"0000000000000000"}`,
-			wantHTTP:        200,
-			wantNGAPMsgType: ngapDownlinkNASTransport,
-			wantNASMsgType:  nasStatus5GMM,
+			// A short RES* yields a syntactically invalid Authentication
+			// Response: the AMF returns 5GMM STATUS #111 (TS 24.501 §7.8).
+			name:             "truncated RES*: 8 bytes",
+			body:             `{"message_type":"authentication_response","res_star_override":"0000000000000000"}`,
+			wantHTTP:         200,
+			wantNGAPMsgType:  ngapDownlinkNASTransport,
+			wantNASMsgType:   nasStatus5GMM,
+			wantNASCause5GMM: cause5GMMProtocolErrorUnspecified,
 		},
 		{
+			// 32 bytes still decode as a 16-octet RES* that mismatches → reject.
 			name:            "oversized RES*: 32 bytes",
 			body:            `{"message_type":"authentication_response","res_star_override":"0000000000000000000000000000000000000000000000000000000000000000"}`,
 			wantHTTP:        200,
 			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationReject,
 		},
 		{
-			name:            "empty RES*",
-			body:            `{"message_type":"authentication_response","res_star_override":""}`,
-			wantHTTP:        200,
-			wantNGAPMsgType: ngapDownlinkNASTransport,
+			name:             "empty RES*",
+			body:             `{"message_type":"authentication_response","res_star_override":""}`,
+			wantHTTP:         200,
+			wantNGAPMsgType:  ngapDownlinkNASTransport,
+			wantNASMsgType:   nasStatus5GMM,
+			wantNASCause5GMM: cause5GMMProtocolErrorUnspecified,
 		},
 		{
-			name: "raw NAS PDU: valid AuthResponse structure with garbage RES*",
-			body: `{"message_type":"authentication_response","raw_nas_pdu":"7e00572d10deadbeefcafebabe0011223344556677"}`,
+			name:            "raw NAS PDU: valid AuthResponse structure with garbage RES*",
+			body:            `{"message_type":"authentication_response","raw_nas_pdu":"7e00572d10deadbeefcafebabe0011223344556677"}`,
 			wantHTTP:        200,
 			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationReject,
 		},
 		{
 			name:            "raw NAS PDU: single byte",
@@ -103,6 +116,8 @@ func TestAuthenticationResponse(t *testing.T) {
 					t.Errorf("nas.message_type = %q, want %q\n  body: %s", got, tt.wantNASMsgType, body)
 				}
 			}
+
+			assertNASCause(t, body, "nas.cause_5gmm", tt.wantNASCause5GMM)
 		})
 	}
 }

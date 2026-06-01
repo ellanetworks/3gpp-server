@@ -9,11 +9,12 @@ import (
 
 func TestNGSetup(t *testing.T) {
 	tests := []struct {
-		name         string
-		body         string
-		wantHTTP     int
-		wantContain  string
-		wantAbsent   string
+		name              string
+		body              string
+		wantHTTP          int
+		wantContain       string
+		wantAbsent        string
+		wantFailCauseMisc int
 	}{
 		// --- Happy path ---
 		{
@@ -42,22 +43,25 @@ func TestNGSetup(t *testing.T) {
 		},
 		// --- Wrong PLMN ---
 		{
-			name:        "wrong MCC (999/01) → NGSetupFailure",
-			body:        `{"amf_address":"10.3.0.2:38412","gnb_n2_address":"10.3.0.3","mcc":"999","mnc":"01","tac":"000001","gnb_id":"000006","name":"test-gnb-wrongmcc","sst":1}`,
-			wantHTTP:    201,
-			wantContain: ngapNGSetupFailure,
+			name:              "wrong MCC (999/01) → NGSetupFailure",
+			body:              `{"amf_address":"10.3.0.2:38412","gnb_n2_address":"10.3.0.3","mcc":"999","mnc":"01","tac":"000001","gnb_id":"000006","name":"test-gnb-wrongmcc","sst":1}`,
+			wantHTTP:          201,
+			wantContain:       ngapNGSetupFailure,
+			wantFailCauseMisc: causeMiscUnknownPLMNOrSNPN,
 		},
 		{
-			name:        "wrong MNC (001/99) → NGSetupFailure",
-			body:        `{"amf_address":"10.3.0.2:38412","gnb_n2_address":"10.3.0.3","mcc":"001","mnc":"99","tac":"000001","gnb_id":"000007","name":"test-gnb-wrongmnc","sst":1}`,
-			wantHTTP:    201,
-			wantContain: ngapNGSetupFailure,
+			name:              "wrong MNC (001/99) → NGSetupFailure",
+			body:              `{"amf_address":"10.3.0.2:38412","gnb_n2_address":"10.3.0.3","mcc":"001","mnc":"99","tac":"000001","gnb_id":"000007","name":"test-gnb-wrongmnc","sst":1}`,
+			wantHTTP:          201,
+			wantContain:       ngapNGSetupFailure,
+			wantFailCauseMisc: causeMiscUnknownPLMNOrSNPN,
 		},
 		{
-			name:        "completely wrong PLMN (310/410) → NGSetupFailure",
-			body:        `{"amf_address":"10.3.0.2:38412","gnb_n2_address":"10.3.0.3","mcc":"310","mnc":"410","tac":"000001","gnb_id":"000008","name":"test-gnb-us-plmn","sst":1}`,
-			wantHTTP:    201,
-			wantContain: ngapNGSetupFailure,
+			name:              "completely wrong PLMN (310/410) → NGSetupFailure",
+			body:              `{"amf_address":"10.3.0.2:38412","gnb_n2_address":"10.3.0.3","mcc":"310","mnc":"410","tac":"000001","gnb_id":"000008","name":"test-gnb-us-plmn","sst":1}`,
+			wantHTTP:          201,
+			wantContain:       ngapNGSetupFailure,
+			wantFailCauseMisc: causeMiscUnknownPLMNOrSNPN,
 		},
 		// --- Custom IE tests ---
 		{
@@ -84,7 +88,7 @@ func TestNGSetup(t *testing.T) {
 					{"id":21,"criticality":"ignore","default_paging_drx":3}
 				]
 			}`,
-			wantAbsent: ngapNGSetupResponse,
+			wantContain: ngapErrorIndication,
 		},
 		{
 			name: "custom IEs missing SupportedTAList",
@@ -96,7 +100,7 @@ func TestNGSetup(t *testing.T) {
 					{"id":21,"criticality":"ignore","default_paging_drx":3}
 				]
 			}`,
-			wantAbsent: ngapNGSetupResponse,
+			wantContain: ngapErrorIndication,
 		},
 		{
 			name: "custom IEs missing DefaultPagingDRX (AMF accepts it)",
@@ -194,10 +198,13 @@ func TestNGSetup(t *testing.T) {
 					{"id":21,"criticality":"ignore","default_paging_drx":3}
 				]
 			}`,
-			wantHTTP:    201,
-			wantContain: ngapNGSetupFailure,
+			wantHTTP:          201,
+			wantContain:       ngapNGSetupFailure,
+			wantFailCauseMisc: causeMiscUnknownPLMNOrSNPN,
 		},
 		{
+			// Empty SupportedTAList cannot be encoded (ASN.1 SEQUENCE OF lower bound),
+			// so the request never reaches the AMF; the server itself rejects the build.
 			name: "custom IEs empty SupportedTAList",
 			body: `{
 				"amf_address":"10.3.0.2:38412", "gnb_n2_address":"10.3.0.3",
@@ -258,6 +265,8 @@ func TestNGSetup(t *testing.T) {
 			if tt.wantAbsent != "" && strings.Contains(bodyStr, tt.wantAbsent) {
 				t.Errorf("body should not contain %q\n  body: %s", tt.wantAbsent, bodyStr)
 			}
+
+			assertNGAPCauseMisc(t, body, "ng_setup_response", tt.wantFailCauseMisc)
 
 			if status == 201 {
 				gnbID := jsonGet(body, "gnb_id")

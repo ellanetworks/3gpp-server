@@ -8,6 +8,7 @@
 package integration_test
 
 import (
+	"encoding/json"
 	"strconv"
 	"testing"
 )
@@ -52,13 +53,13 @@ const (
 // NGAP message-type names as decoded by the server (internal/ngap/decode.go),
 // used as assertion targets for ngap.message_type.
 const (
-	ngapDownlinkNASTransport          = "DownlinkNASTransport"
-	ngapErrorIndication               = "ErrorIndication"
-	ngapInitialContextSetupRequest    = "InitialContextSetupRequest"
+	ngapDownlinkNASTransport           = "DownlinkNASTransport"
+	ngapErrorIndication                = "ErrorIndication"
+	ngapInitialContextSetupRequest     = "InitialContextSetupRequest"
 	ngapPDUSessionResourceSetupRequest = "PDUSessionResourceSetupRequest"
-	ngapUEContextReleaseCommand       = "UEContextReleaseCommand"
-	ngapNGSetupResponse               = "NGSetupResponse"
-	ngapNGSetupFailure                = "NGSetupFailure"
+	ngapUEContextReleaseCommand        = "UEContextReleaseCommand"
+	ngapNGSetupResponse                = "NGSetupResponse"
+	ngapNGSetupFailure                 = "NGSetupFailure"
 )
 
 // NAS message-type names as decoded by the server (internal/nas/decode.go),
@@ -72,8 +73,15 @@ const (
 	nasServiceAccept                 = "service_accept"
 	nasStatus5GMM                    = "status_5gmm"
 	nasDeregistrationAccept          = "deregistration_accept"
+	nasServiceReject                 = "service_reject"
 	nasPDUSessionEstablishmentAccept = "pdu_session_establishment_accept"
 	nasPDUSessionEstablishmentReject = "pdu_session_establishment_reject"
+)
+
+// NGAP Cause, Misc group — TS 38.413 §9.3.1.2.
+const (
+	causePresentMisc           = "misc"
+	causeMiscUnknownPLMNOrSNPN = 4
 )
 
 // NAS registration types — TS 24.501 §9.11.3.7, Table 9.11.3.7.1.
@@ -104,5 +112,63 @@ func assertNASCause(t *testing.T, body []byte, path string, want int) {
 
 	if got := jsonGet(body, path); got != strconv.Itoa(want) {
 		t.Errorf("%s = %q, want %d\n  body: %s", path, got, want, body)
+	}
+}
+
+// ngapCause extracts the NGAP Cause carried in the IE list of the response
+// object at responseKey (e.g. "ng_setup_response"). It returns the Cause group
+// ("misc", "radioNetwork", …) and the integer value within that group, or
+// ("", 0) if no Cause IE is present.
+func ngapCause(body []byte, responseKey string) (string, int) {
+	var top map[string]any
+	if err := json.Unmarshal(body, &top); err != nil {
+		return "", 0
+	}
+
+	resp, ok := top[responseKey].(map[string]any)
+	if !ok {
+		return "", 0
+	}
+
+	ies, ok := resp["ies"].([]any)
+	if !ok {
+		return "", 0
+	}
+
+	for _, ie := range ies {
+		iem, ok := ie.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		cause, ok := iem["cause"].(map[string]any)
+		if !ok {
+			continue
+		}
+
+		present, _ := cause["present"].(string)
+		if v, ok := cause[present].(float64); ok {
+			return present, int(v)
+		}
+
+		return present, 0
+	}
+
+	return "", 0
+}
+
+// assertNGAPCauseMisc checks the response carries an NGAP Misc Cause equal to
+// the expected value. A want of 0 means "do not check".
+func assertNGAPCauseMisc(t *testing.T, body []byte, responseKey string, want int) {
+	t.Helper()
+
+	if want == 0 {
+		return
+	}
+
+	group, val := ngapCause(body, responseKey)
+	if group != causePresentMisc || val != want {
+		t.Errorf("%s NGAP cause = (%q, %d), want (%q, %d)\n  body: %s",
+			responseKey, group, val, causePresentMisc, want, body)
 	}
 }

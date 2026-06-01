@@ -26,8 +26,8 @@ func completeRegistration(t *testing.T, gnbID, ueID string, regType int) []byte 
 	}
 
 	steps := []struct {
-		body         string
-		wantNASType  string // "" = don't check
+		body        string
+		wantNASType string // "" = don't check
 	}{
 		{regBody, nasAuthenticationRequest},
 		{`{"message_type":"authentication_response"}`, nasSecurityModeCommand},
@@ -152,6 +152,9 @@ func TestNGSetup_UnknownPLMN(t *testing.T) {
 	if got := jsonGet(resp, "ng_setup_response.message_type"); got != ngapNGSetupFailure {
 		t.Errorf("ng_setup_response.message_type = %q, want NGSetupFailure (TS 38.413 §8.7.1.3)\n  body: %s", got, resp)
 	}
+
+	// The failure cause must be Misc "unknown-PLMN-or-SNPN" (TS 38.413 §9.3.1.2).
+	assertNGAPCauseMisc(t, resp, "ng_setup_response", causeMiscUnknownPLMNOrSNPN)
 }
 
 // TestRegistration_DuringSecurityMode drives a registration into the Security
