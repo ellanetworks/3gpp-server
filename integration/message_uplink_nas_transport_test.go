@@ -24,22 +24,22 @@ func TestUplinkNASTransport_NGAPIDFuzz(t *testing.T) {
 			// local UE NGAP ID.
 			name:            "AMF UE NGAP ID = 0 (never allocated)",
 			body:            `{"message_type":"authentication_response","amf_ue_ngap_id_override":0}`,
-			wantNGAPMsgType: "ErrorIndication",
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
 			name:            "AMF UE NGAP ID = 99999 (never allocated)",
 			body:            `{"message_type":"authentication_response","amf_ue_ngap_id_override":99999}`,
-			wantNGAPMsgType: "ErrorIndication",
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
 			name:            "RAN UE NGAP ID = 99999 (never allocated)",
 			body:            `{"message_type":"authentication_response","ran_ue_ngap_id_override":99999}`,
-			wantNGAPMsgType: "ErrorIndication",
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
 			name:            "AMF UE NGAP ID = 2^40 - 1 (never allocated, edge of valid range)",
 			body:            `{"message_type":"authentication_response","amf_ue_ngap_id_override":1099511627775}`,
-			wantNGAPMsgType: "ErrorIndication",
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
 			// Both AMF and RAN IDs forged to a never-allocated value — the
@@ -47,7 +47,7 @@ func TestUplinkNASTransport_NGAPIDFuzz(t *testing.T) {
 			// for ErrorIndication per TS 38.413 §8.7.5.2).
 			name:            "both AMF and RAN UE NGAP IDs forged",
 			body:            `{"message_type":"authentication_response","amf_ue_ngap_id_override":99999,"ran_ue_ngap_id_override":99999}`,
-			wantNGAPMsgType: "ErrorIndication",
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 	}
 

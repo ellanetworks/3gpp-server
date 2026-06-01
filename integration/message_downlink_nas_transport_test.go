@@ -26,7 +26,7 @@ func TestDownlinkNASTransport_Decode(t *testing.T) {
 		if got := jsonGet(body, "ngap.pdu_type"); got != "initiating_message" {
 			t.Errorf("pdu_type = %q, want initiating_message", got)
 		}
-		if got := jsonGet(body, "ngap.message_type"); got != "DownlinkNASTransport" {
+		if got := jsonGet(body, "ngap.message_type"); got != ngapDownlinkNASTransport {
 			t.Errorf("message_type = %q, want DownlinkNASTransport", got)
 		}
 		if got := jsonGet(body, "ngap.raw_hex"); got == "" {
@@ -92,7 +92,7 @@ func TestDownlinkNASTransport_Decode(t *testing.T) {
 	})
 
 	t.Run("NAS PDU decoded as AuthenticationRequest", func(t *testing.T) {
-		if got := jsonGet(body, "nas.message_type"); got != "authentication_request" {
+		if got := jsonGet(body, "nas.message_type"); got != nasAuthenticationRequest {
 			t.Fatalf("nas.message_type = %q, want authentication_request", got)
 		}
 		if got := jsonGet(body, "nas.security_header_type"); got != "plain" {

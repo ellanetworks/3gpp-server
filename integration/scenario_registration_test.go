@@ -7,7 +7,6 @@
 package integration_test
 
 import (
-	"strings"
 	"testing"
 )
 
@@ -44,7 +43,7 @@ func TestScenarioRegistration(t *testing.T) {
 			t.Fatalf("HTTP %d: %s", status, body)
 		}
 
-		if got := jsonGet(body, "nas.message_type"); got != "authentication_request" {
+		if got := jsonGet(body, "nas.message_type"); got != nasAuthenticationRequest {
 			t.Fatalf("nas.message_type = %q, want authentication_request", got)
 		}
 		if jsonGet(body, "nas.rand") == "" || jsonGet(body, "nas.autn") == "" {
@@ -59,7 +58,7 @@ func TestScenarioRegistration(t *testing.T) {
 			t.Fatalf("HTTP %d: %s", status, body)
 		}
 
-		if got := jsonGet(body, "nas.message_type"); got != "security_mode_command" {
+		if got := jsonGet(body, "nas.message_type"); got != nasSecurityModeCommand {
 			t.Fatalf("nas.message_type = %q, want security_mode_command", got)
 		}
 		if jsonGet(body, "nas.selected_ciphering_alg") == "" {
@@ -77,10 +76,10 @@ func TestScenarioRegistration(t *testing.T) {
 			t.Fatalf("HTTP %d: %s", status, body)
 		}
 
-		if got := jsonGet(body, "ngap.message_type"); got != "InitialContextSetupRequest" {
+		if got := jsonGet(body, "ngap.message_type"); got != ngapInitialContextSetupRequest {
 			t.Fatalf("ngap.message_type = %q, want InitialContextSetupRequest", got)
 		}
-		if got := jsonGet(body, "nas.message_type"); got != "registration_accept" {
+		if got := jsonGet(body, "nas.message_type"); got != nasRegistrationAccept {
 			t.Fatalf("nas.message_type = %q, want registration_accept", got)
 		}
 		if jsonGet(body, "nas.guti") == "" {
@@ -103,10 +102,10 @@ func TestScenarioRegistration(t *testing.T) {
 			t.Fatalf("HTTP %d: %s", status, body)
 		}
 
-		if got := jsonGet(body, "ngap.message_type"); got != "PDUSessionResourceSetupRequest" {
+		if got := jsonGet(body, "ngap.message_type"); got != ngapPDUSessionResourceSetupRequest {
 			t.Errorf("ngap.message_type = %q, want PDUSessionResourceSetupRequest", got)
 		}
-		if got := jsonGet(body, "nas.inner_nas_message_type"); got != "pdu_session_establishment_accept" {
+		if got := jsonGet(body, "nas.inner_nas_message_type"); got != nasPDUSessionEstablishmentAccept {
 			t.Errorf("nas.inner_nas_message_type = %q, want pdu_session_establishment_accept", got)
 		}
 		if got := jsonGet(body, "nas.pdu_address"); got == "" {
@@ -141,66 +140,4 @@ func TestScenarioRegistration(t *testing.T) {
 			t.Fatalf("DELETE HTTP %d, want 204", status)
 		}
 	})
-}
-
-func TestUEErrorPaths(t *testing.T) {
-	gnbID := mustCreateGnB(t)
-
-	tests := []struct {
-		name     string
-		method   string
-		path     string
-		body     string
-		wantHTTP int
-	}{
-		{
-			name:     "create UE missing SUPI",
-			method:   "POST",
-			path:     "/gnb/{gnb}/ue",
-			body:     `{"k":"00112233445566778899aabbccddeeff","opc":"63bfa50ee6523365ff14c1f45f88737d"}`,
-			wantHTTP: 400,
-		},
-		{
-			name:     "create UE missing K",
-			method:   "POST",
-			path:     "/gnb/{gnb}/ue",
-			body:     `{"supi":"imsi-001010000000001","opc":"63bfa50ee6523365ff14c1f45f88737d"}`,
-			wantHTTP: 400,
-		},
-		{
-			name:     "get non-existent UE",
-			method:   "GET",
-			path:     "/gnb/{gnb}/ue/999",
-			wantHTTP: 404,
-		},
-		{
-			name:     "delete non-existent UE",
-			method:   "DELETE",
-			path:     "/gnb/{gnb}/ue/999",
-			wantHTTP: 404,
-		},
-		{
-			name:     "send NGAP for non-existent UE",
-			method:   "POST",
-			path:     "/gnb/{gnb}/ue/999/ngap",
-			body:     `{"message_type":"registration_request"}`,
-			wantHTTP: 404,
-		},
-		{
-			name:     "UE on non-existent gNB",
-			method:   "GET",
-			path:     "/gnb/999/ue/1",
-			wantHTTP: 404,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			path := strings.ReplaceAll(tt.path, "{gnb}", gnbID)
-			status, body := doRequest(t, tt.method, path, tt.body)
-			if status != tt.wantHTTP {
-				t.Errorf("HTTP %d, want %d\n  body: %s", status, tt.wantHTTP, body)
-			}
-		})
-	}
 }

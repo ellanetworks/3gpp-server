@@ -79,7 +79,7 @@ func TestDeregistration_Fuzz(t *testing.T) {
 			name:            "raw NAS: missing security header (single byte EPD)",
 			body:            `{"message_type":"deregistration_request","raw_nas_pdu":"7e"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			// NGAP-level: stale AMF UE NGAP ID — AMF context not found

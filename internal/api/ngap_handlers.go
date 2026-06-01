@@ -14,6 +14,7 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/store"
 	"github.com/ellanetworks/3gpp-server/internal/transport"
 	gonas "github.com/free5gc/nas"
+	"github.com/free5gc/nas/nasType"
 )
 
 func (h *Handler) SendNGAP(w http.ResponseWriter, r *http.Request) {
@@ -57,6 +58,10 @@ func (h *Handler) SendNGAP(w http.ResponseWriter, r *http.Request) {
 		handlePDUSessionEstablishmentRequest(w, r, gnb, ue, t, &req)
 	case "deregistration_request":
 		handleDeregistrationRequest(w, r, gnb, ue, t, &req)
+	case "ue_context_release_request":
+		handleUEContextReleaseRequest(w, r, gnb, ue, t, &req)
+	case "service_request":
+		handleServiceRequest(w, r, gnb, ue, t, &req)
 	default:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unsupported message_type: %s", req.MessageType))
 	}
@@ -97,7 +102,7 @@ func handleRegistrationRequest(w http.ResponseWriter, r *http.Request, gnb *stor
 			ue.RanUeNgapID, nasPDU,
 			gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, nil, initialUEOverrides(req),
 		)
-		sendAndWait(w, r, gnb, ue, t, ngapMsg, "DownlinkNASTransport", "ErrorIndication")
+		sendAndWait(w, r, gnb, ue, t, ngapMsg, "DownlinkNASTransport", "InitialContextSetupRequest", "ErrorIndication")
 
 		return
 	}
@@ -107,12 +112,24 @@ func handleRegistrationRequest(w http.ResponseWriter, r *http.Request, gnb *stor
 		regType = *req.RegistrationType
 	}
 
+	// A mobility or periodic registration update from a UE that holds a 5G NAS
+	// security context is integrity-protected with that context and carries its
+	// ngKSI, so the AMF can reuse it and accept directly (TS 24.501 §5.5.1.3).
+	// Initial registration is sent as a cleartext (plain) message.
+	mobilityOrPeriodic := regType == nasCodec.RegistrationTypeMobility || regType == nasCodec.RegistrationTypePeriodic
+	secured := mobilityOrPeriodic && len(ue.Kamf) > 0
+
+	ngKsi := uint8(7) // "no key available"
+	if secured {
+		ngKsi = ue.NgKsi
+	}
+
 	nasPDU, err := nasCodec.BuildRegistrationRequest(&nasCodec.RegistrationRequestOpts{
 		RegistrationType: regType,
 		Suci:             ue.Suci,
 		Guti:             ue.Guti,
 		SecurityCap:      ue.UeSecurityCapability,
-		NgKsi:            7,
+		NgKsi:            ngKsi,
 		Overrides:        req,
 	})
 	if err != nil {
@@ -120,11 +137,19 @@ func handleRegistrationRequest(w http.ResponseWriter, r *http.Request, gnb *stor
 		return
 	}
 
+	if secured {
+		nasPDU, err = nasCodec.EncodeNasPduWithSecurity(ue, nasPDU, gonas.SecurityHeaderTypeIntegrityProtected)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("NAS security encode: %v", err))
+			return
+		}
+	}
+
 	ngapMsg := ngap.BuildInitialUEMessageFromState(
 		ue.RanUeNgapID, nasPDU,
 		gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, nil, initialUEOverrides(req),
 	)
-	sendAndWait(w, r, gnb, ue, t, ngapMsg, "DownlinkNASTransport", "ErrorIndication")
+	sendAndWait(w, r, gnb, ue, t, ngapMsg, "DownlinkNASTransport", "InitialContextSetupRequest", "ErrorIndication")
 }
 
 func handleAuthenticationResponse(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
@@ -149,12 +174,13 @@ func handleAuthenticationResponse(w http.ResponseWriter, r *http.Request, gnb *s
 				writeError(w, http.StatusBadRequest, fmt.Sprintf("decode res_star_override: %v", err))
 				return
 			}
+		} else if len(ue.LastRAND) == 0 || len(ue.LastAUTN) == 0 {
+			// No authentication challenge stored (e.g. the response is sent out
+			// of order, before any registration). Send a zeroed RES* so the
+			// message still reaches the AMF, which decides how to react. Use
+			// res_star_override to supply a specific value.
+			resStar = make([]byte, 16)
 		} else {
-			if len(ue.LastRAND) == 0 || len(ue.LastAUTN) == 0 {
-				writeError(w, http.StatusBadRequest, "no RAND/AUTN stored — send registration_request first")
-				return
-			}
-
 			akaResult, err := crypto.ComputeResStar(ue.K, ue.OPc, ue.Sqn, ue.Supi, ue.Snn, ue.LastRAND, ue.LastAUTN)
 			if err != nil {
 				writeError(w, http.StatusInternalServerError, fmt.Sprintf("5G-AKA: %v", err))
@@ -189,12 +215,20 @@ func handleSecurityModeComplete(w http.ResponseWriter, r *http.Request, gnb *sto
 
 		nasPDU = raw
 	} else {
+		// The NAS message container replays the registration request the UE
+		// sent; keep its registration type consistent with that request.
+		innerRegType := uint8(nasCodec.RegistrationTypeInitial)
+		if req.RegistrationType != nil {
+			innerRegType = *req.RegistrationType
+		}
+
 		regReqPDU, err := nasCodec.BuildRegistrationRequest(&nasCodec.RegistrationRequestOpts{
-			RegistrationType: nasCodec.RegistrationTypeInitial,
+			RegistrationType: innerRegType,
 			Suci:             ue.Suci,
 			Guti:             ue.Guti,
 			SecurityCap:      ue.UeSecurityCapability,
 			NgKsi:            ue.NgKsi,
+			Overrides:        req,
 		})
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, fmt.Sprintf("build inner RegistrationRequest: %v", err))
@@ -373,10 +407,16 @@ func handleDeregistrationRequest(w http.ResponseWriter, r *http.Request, gnb *st
 
 		nasPDU = raw
 	} else {
+		switchOff := uint8(1)
+		if req.DeregSwitchOff != nil {
+			switchOff = *req.DeregSwitchOff
+		}
+
 		deregPDU, err := nasCodec.BuildDeregistrationRequest(&nasCodec.DeregistrationRequestOpts{
-			Guti:  ue.Guti,
-			Suci:  &ue.Suci,
-			NgKsi: ue.NgKsi,
+			Guti:      ue.Guti,
+			Suci:      &ue.Suci,
+			NgKsi:     ue.NgKsi,
+			SwitchOff: switchOff,
 		})
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, fmt.Sprintf("build DeregistrationRequest: %v", err))
@@ -431,6 +471,235 @@ func handleDeregistrationRequest(w http.ResponseWriter, r *http.Request, gnb *st
 		releaseComplete, err := ngap.BuildUEContextReleaseComplete(ue.AmfUeNgapID, ue.RanUeNgapID)
 		if err == nil {
 			_ = t.Send(releaseComplete, false)
+		}
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{
+		NGAP: ngapResp,
+		NAS:  nasResp,
+	})
+}
+
+// handleUEContextReleaseRequest sends a gNB-initiated UE CONTEXT RELEASE
+// REQUEST and expects the AMF to answer with a UE CONTEXT RELEASE COMMAND, to
+// which the gNB replies with UE CONTEXT RELEASE COMPLETE. This transitions the
+// UE to CM-IDLE while it stays RM-REGISTERED.
+func handleUEContextReleaseRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
+	// Default cause: user-inactivity (TS 38.413 §9.3.1.2, radio-network value 20).
+	cause := int64(20)
+	if req.ReleaseCause != nil {
+		cause = *req.ReleaseCause
+	}
+
+	amfUeNgapID := ue.AmfUeNgapID
+	if req.AmfUeNgapIDOverride != nil {
+		amfUeNgapID = *req.AmfUeNgapIDOverride
+	}
+
+	ranUeNgapID := ue.RanUeNgapID
+	if req.RanUeNgapIDOverride != nil {
+		ranUeNgapID = *req.RanUeNgapIDOverride
+	}
+
+	encoded, err := ngap.BuildUEContextReleaseRequest(amfUeNgapID, ranUeNgapID, cause)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build UEContextReleaseRequest: %v", err))
+		return
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	ngapResp, err := t.WaitForMessage(ctx, "UEContextReleaseCommand", "ErrorIndication")
+	if err != nil {
+		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for response: %v", err))
+		return
+	}
+
+	if ngapResp.MessageType == "UEContextReleaseCommand" {
+		releaseComplete, err := ngap.BuildUEContextReleaseComplete(ue.AmfUeNgapID, ue.RanUeNgapID)
+		if err == nil {
+			_ = t.Send(releaseComplete, false)
+		}
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
+}
+
+// fiveGSTMSIFromGUTI derives the 5G-S-TMSI IE (for the Initial UE Message)
+// from a stored GUTI. The AMF Set ID is a 10-bit field and the AMF Pointer a
+// 6-bit field; both are left-aligned into their octets per the NGAP BitString
+// encoding.
+func fiveGSTMSIFromGUTI(guti *nasType.GUTI5G) *ngap.FiveGSTMSIFromGUTI {
+	if guti == nil {
+		return nil
+	}
+
+	setID := guti.GetAMFSetID() // 10-bit value, right-aligned
+	pointer := guti.GetAMFPointer() // 6-bit value, right-aligned
+	tmsi := guti.GetTMSI5G()
+
+	setIDBytes := []byte{byte(setID >> 2), byte((setID & 0x3) << 6)}
+	pointerByte := []byte{pointer << 2}
+
+	return &ngap.FiveGSTMSIFromGUTI{
+		AMFSetID:   hex.EncodeToString(setIDBytes),
+		AMFPointer: hex.EncodeToString(pointerByte),
+		FiveGTMSI:  hex.EncodeToString(tmsi[:]),
+	}
+}
+
+// serviceRequestPDUStatus resolves the PDU Session Status bitmap for a Service
+// Request. An explicit hex override (2-byte IE buffer, little-endian) wins;
+// otherwise the bitmap is auto-derived from the UE's configured PDU session.
+// Returns nil to omit the IE entirely.
+func serviceRequestPDUStatus(ue *store.UEContext, req *SendNGAPRequest) (*[16]bool, error) {
+	if req.PDUSessionStatus != nil {
+		raw, err := hex.DecodeString(*req.PDUSessionStatus)
+		if err != nil {
+			return nil, err
+		}
+
+		var buf [2]byte
+		copy(buf[:], raw)
+		flags := uint16(buf[0]) | uint16(buf[1])<<8
+
+		var status [16]bool
+		for i := range status {
+			status[i] = flags&(1<<uint(i)) != 0
+		}
+
+		return &status, nil
+	}
+
+	var status [16]bool
+	if ue.PDUSessionID >= 1 && ue.PDUSessionID <= 15 {
+		status[ue.PDUSessionID] = true
+	}
+
+	return &status, nil
+}
+
+// handleServiceRequest sends a 5GMM Service Request to bring a CM-IDLE UE back
+// to CM-CONNECTED (TS 24.501 §5.6.1). It opens a fresh RAN connection (new RAN
+// UE NGAP ID + Initial UE Message carrying the 5G-S-TMSI), then drives the
+// resulting Initial Context Setup so the AMF re-activates the UE context.
+func handleServiceRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
+	// A Service Request starts a new RRC/NG connection, so allocate a fresh
+	// RAN UE NGAP ID.
+	ue.RanUeNgapID = gnb.AllocateRanUeNgapID()
+
+	var nasPDU []byte
+
+	if req.RawNASPDU != nil {
+		raw, err := hex.DecodeString(*req.RawNASPDU)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("decode raw_nas_pdu: %v", err))
+			return
+		}
+
+		nasPDU = raw
+	} else {
+		serviceType := uint8(1) // nasMessage.ServiceTypeData
+		if req.ServiceType != nil {
+			serviceType = *req.ServiceType
+		}
+
+		status, err := serviceRequestPDUStatus(ue, req)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("decode pdu_session_status: %v", err))
+			return
+		}
+
+		srPDU, err := nasCodec.BuildServiceRequest(&nasCodec.ServiceRequestOpts{
+			ServiceType:      serviceType,
+			NgKsi:            ue.NgKsi,
+			Guti:             ue.Guti,
+			PDUSessionStatus: status,
+		})
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("build ServiceRequest: %v", err))
+			return
+		}
+
+		// Integrity-protect when a security context exists; otherwise send the
+		// Service Request plain so it still reaches the AMF (which must reject
+		// an unprotected / unknown-UE Service Request).
+		if len(ue.Kamf) > 0 {
+			nasPDU, err = nasCodec.EncodeNasPduWithSecurity(ue, srPDU, gonas.SecurityHeaderTypeIntegrityProtected)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, fmt.Sprintf("NAS security encode: %v", err))
+				return
+			}
+		} else {
+			nasPDU = srPDU
+		}
+	}
+
+	// Initial UE Message with mo-Data establishment cause and the 5G-S-TMSI.
+	overrides := initialUEOverrides(req)
+	if overrides == nil || overrides.RRCEstablishmentCause == nil {
+		moData := int64(4) // RRCEstablishmentCausePresentMoData
+		if overrides == nil {
+			overrides = &ngap.InitialUEMessageOverrides{}
+		}
+		overrides.RRCEstablishmentCause = &moData
+	}
+
+	ngapMsg := ngap.BuildInitialUEMessageFromState(
+		ue.RanUeNgapID, nasPDU,
+		gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, fiveGSTMSIFromGUTI(ue.Guti), overrides,
+	)
+
+	encoded, err := ngap.Encode(ngapMsg)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NGAP encode: %v", err))
+		return
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	ngapResp, err := t.WaitForMessage(ctx,
+		"InitialContextSetupRequest", "DownlinkNASTransport", "PDUSessionResourceSetupRequest", "ErrorIndication")
+	if err != nil {
+		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for service request response: %v", err))
+		return
+	}
+
+	var nasResp *nasCodec.NASResponse
+
+	for _, ie := range ngapResp.IEs {
+		if ie.AmfUeNgapID != nil {
+			ue.AmfUeNgapID = *ie.AmfUeNgapID
+			gnb.UpdateNGAPIDs(ue.RanUeNgapID, *ie.AmfUeNgapID)
+		}
+
+		if ie.NasPDU != nil {
+			nasPDUBytes, derr := hex.DecodeString(*ie.NasPDU)
+			if derr != nil {
+				continue
+			}
+
+			nasResp, _ = nasCodec.DecodeSecuredNAS(ue, nasPDUBytes)
+		}
+	}
+
+	// The AMF reactivates the UE context via Initial Context Setup; acknowledge it.
+	if ngapResp.MessageType == "InitialContextSetupRequest" {
+		icsResp, berr := ngap.BuildInitialContextSetupResponse(ue.AmfUeNgapID, ue.RanUeNgapID)
+		if berr == nil {
+			_ = t.Send(icsResp, false)
 		}
 	}
 
@@ -515,6 +784,15 @@ func sendRawAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GnBContex
 					ue.Guti = nasCodec.ParseGUTI(gutiBytes)
 				}
 			}
+		}
+	}
+
+	// A gNB answers an Initial Context Setup Request with a Response. The AMF
+	// uses this to re-establish the UE context (e.g. for a mobility/periodic
+	// registration update or a service request that reactivates the UE).
+	if ngapResp.MessageType == "InitialContextSetupRequest" {
+		if icsResp, berr := ngap.BuildInitialContextSetupResponse(ue.AmfUeNgapID, ue.RanUeNgapID); berr == nil {
+			_ = t.Send(icsResp, false)
 		}
 	}
 

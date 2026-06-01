@@ -24,37 +24,37 @@ func TestPDUSessionEstablishment_Fuzz(t *testing.T) {
 		wantHTTP         int
 		wantNGAPMsgType  string
 		wantNASMsgType   string
-		wantNASCause5GMM string
+		wantNASCause5GMM int
 		wantInnerNASType string
 	}{
 		{
 			name:             "valid PDU session establishment",
 			body:             `{"message_type":"pdu_session_establishment_request"}`,
 			wantHTTP:         200,
-			wantNGAPMsgType:  "PDUSessionResourceSetupRequest",
-			wantInnerNASType: "pdu_session_establishment_accept",
+			wantNGAPMsgType:  ngapPDUSessionResourceSetupRequest,
+			wantInnerNASType: nasPDUSessionEstablishmentAccept,
 		},
 		{
 			name:            "raw NAS: empty PDU",
 			body:            `{"message_type":"pdu_session_establishment_request","raw_nas_pdu":""}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "ErrorIndication",
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
 			name:             "raw NAS: garbage bytes",
 			body:             `{"message_type":"pdu_session_establishment_request","raw_nas_pdu":"deadbeefcafebabe"}`,
 			wantHTTP:         200,
-			wantNGAPMsgType:  "DownlinkNASTransport",
-			wantNASMsgType:   "status_5gmm",
-			wantNASCause5GMM: "111",
+			wantNGAPMsgType:  ngapDownlinkNASTransport,
+			wantNASMsgType:   nasStatus5GMM,
+			wantNASCause5GMM: cause5GMMProtocolErrorUnspecified,
 		},
 		{
 			name:             "raw NAS: valid 5GMM header but wrong message type",
 			body:             `{"message_type":"pdu_session_establishment_request","raw_nas_pdu":"7e00ff"}`,
 			wantHTTP:         200,
-			wantNGAPMsgType:  "DownlinkNASTransport",
-			wantNASMsgType:   "status_5gmm",
-			wantNASCause5GMM: "111",
+			wantNGAPMsgType:  ngapDownlinkNASTransport,
+			wantNASMsgType:   nasStatus5GMM,
+			wantNASCause5GMM: cause5GMMProtocolErrorUnspecified,
 		},
 	}
 
@@ -86,11 +86,7 @@ func TestPDUSessionEstablishment_Fuzz(t *testing.T) {
 				}
 			}
 
-			if tt.wantNASCause5GMM != "" {
-				if got := jsonGet(body, "nas.cause_5gmm"); got != tt.wantNASCause5GMM {
-					t.Errorf("nas.cause_5gmm = %q, want %q\n  body: %s", got, tt.wantNASCause5GMM, body)
-				}
-			}
+			assertNASCause(t, body, "nas.cause_5gmm", tt.wantNASCause5GMM)
 
 			if tt.wantInnerNASType != "" {
 				if got := jsonGet(body, "nas.inner_nas_message_type"); got != tt.wantInnerNASType {
@@ -110,35 +106,35 @@ func TestPDUSessionEstablishment_Fuzz(t *testing.T) {
 //
 // Expected behaviour:
 //   - Inner SM payload undecodable as 5GSM
-//       → SMF builds PDU SESSION ESTABLISHMENT REJECT with 5GSM cause #111
-//       → AMF forwards inside DL NAS TRANSPORT
+//     → SMF builds PDU SESSION ESTABLISHMENT REJECT with 5GSM cause #111
+//     → AMF forwards inside DL NAS TRANSPORT
 //   - Inner SM payload decodes but message type is not "establishment request"
-//       → SMF builds reject with 5GSM cause #98
-//       → AMF forwards inside DL NAS TRANSPORT
+//     → SMF builds reject with 5GSM cause #98
+//     → AMF forwards inside DL NAS TRANSPORT
 //   - Inner SM payload absent entirely (empty bytes)
-//       → SMF can't decode → reject with cause #111 (as above)
+//     → SMF can't decode → reject with cause #111 (as above)
 func TestPDUSessionEstablishment_InnerSMFuzz(t *testing.T) {
 	tests := []struct {
 		name             string
 		innerSMPayload   string
 		wantNGAPMsgType  string
 		wantInnerNASType string
-		wantNASCause5GSM string
+		wantNASCause5GSM int
 	}{
 		{
 			name:             "inner SM: garbage bytes (decode fails)",
 			innerSMPayload:   "deadbeefcafebabe",
-			wantNGAPMsgType:  "DownlinkNASTransport",
-			wantInnerNASType: "pdu_session_establishment_reject",
-			wantNASCause5GSM: "111",
+			wantNGAPMsgType:  ngapDownlinkNASTransport,
+			wantInnerNASType: nasPDUSessionEstablishmentReject,
+			wantNASCause5GSM: cause5GSMProtocolErrorUnspecified,
 		},
 		{
 			name: "inner SM: valid 5GSM header but wrong message type 0xff",
 			// 2E EPD, 01 PDU session ID, 01 PTI, FF unknown msg type
 			innerSMPayload:   "2e0101ff",
-			wantNGAPMsgType:  "DownlinkNASTransport",
-			wantInnerNASType: "pdu_session_establishment_reject",
-			wantNASCause5GSM: "111",
+			wantNGAPMsgType:  ngapDownlinkNASTransport,
+			wantInnerNASType: nasPDUSessionEstablishmentReject,
+			wantNASCause5GSM: cause5GSMProtocolErrorUnspecified,
 		},
 		{
 			name: "inner SM: PDU SESSION ESTABLISHMENT ACCEPT (wrong direction, truncated)",
@@ -147,34 +143,34 @@ func TestPDUSessionEstablishment_InnerSMFuzz(t *testing.T) {
 			// so the 4-byte input fails GsmMessageDecode before the message-type
 			// check fires. SMF therefore returns #111 (protocol error, unspecified).
 			innerSMPayload:   "2e0101c2",
-			wantNGAPMsgType:  "DownlinkNASTransport",
-			wantInnerNASType: "pdu_session_establishment_reject",
-			wantNASCause5GSM: "111",
+			wantNGAPMsgType:  ngapDownlinkNASTransport,
+			wantInnerNASType: nasPDUSessionEstablishmentReject,
+			wantNASCause5GSM: cause5GSMProtocolErrorUnspecified,
 		},
 		{
 			name: "inner SM: PDU SESSION RELEASE REQUEST (wrong message type)",
 			// 2E EPD, 01 PDU session ID, 01 PTI, D1 msg type = release request
 			innerSMPayload:   "2e0101d1",
-			wantNGAPMsgType:  "DownlinkNASTransport",
-			wantInnerNASType: "pdu_session_establishment_reject",
-			wantNASCause5GSM: "98",
+			wantNGAPMsgType:  ngapDownlinkNASTransport,
+			wantInnerNASType: nasPDUSessionEstablishmentReject,
+			wantNASCause5GSM: cause5GSMMessageTypeNotCompatibleWithProtocolState,
 		},
 		{
 			name: "inner SM: truncated PDU SESSION ESTABLISHMENT REQUEST (missing mandatory IPMDR)",
 			// 2E EPD, 01 PDU session ID, 01 PTI, C1 msg type — missing 2-byte
 			// Integrity Protection Maximum Data Rate (mandatory per TS 24.501 §8.3.1).
 			innerSMPayload:   "2e0101c1",
-			wantNGAPMsgType:  "DownlinkNASTransport",
-			wantInnerNASType: "pdu_session_establishment_reject",
-			wantNASCause5GSM: "111",
+			wantNGAPMsgType:  ngapDownlinkNASTransport,
+			wantInnerNASType: nasPDUSessionEstablishmentReject,
+			wantNASCause5GSM: cause5GSMProtocolErrorUnspecified,
 		},
 		{
 			name: "inner SM: missing PTI octet",
 			// 2E EPD, 01 PDU session ID — missing PTI + msg type + IPMDR.
 			innerSMPayload:   "2e01",
-			wantNGAPMsgType:  "DownlinkNASTransport",
-			wantInnerNASType: "pdu_session_establishment_reject",
-			wantNASCause5GSM: "111",
+			wantNGAPMsgType:  ngapDownlinkNASTransport,
+			wantInnerNASType: nasPDUSessionEstablishmentReject,
+			wantNASCause5GSM: cause5GSMProtocolErrorUnspecified,
 		},
 	}
 
@@ -200,9 +196,7 @@ func TestPDUSessionEstablishment_InnerSMFuzz(t *testing.T) {
 				t.Errorf("nas.inner_nas_message_type = %q, want %q\n  body: %s", got, tt.wantInnerNASType, resp)
 			}
 
-			if got := jsonGet(resp, "nas.cause_5gsm"); got != tt.wantNASCause5GSM {
-				t.Errorf("nas.cause_5gsm = %q, want %q\n  body: %s", got, tt.wantNASCause5GSM, resp)
-			}
+			assertNASCause(t, resp, "nas.cause_5gsm", tt.wantNASCause5GSM)
 		})
 	}
 }
@@ -217,27 +211,27 @@ func TestPDUSessionEstablishment_InnerSMRequestIEFuzz(t *testing.T) {
 		innerSMPayload   string
 		wantNGAPMsgType  string
 		wantInnerNASType string
-		wantNASCause5GSM string
+		wantNASCause5GSM int
 	}{
 		{
 			name: "minimal valid REQUEST (PDU id 1, PTI 1, IPMDR=full speed)",
 			// 2E EPD, 01 PDU id, 01 PTI, C1 msg type, FF FF IPMDR
 			innerSMPayload:   "2e0101c1ffff",
-			wantNGAPMsgType:  "PDUSessionResourceSetupRequest",
-			wantInnerNASType: "pdu_session_establishment_accept",
+			wantNGAPMsgType:  ngapPDUSessionResourceSetupRequest,
+			wantInnerNASType: nasPDUSessionEstablishmentAccept,
 		},
 		{
 			name: "REQUEST with PDU session type IE = IPv4 (9- IEI = 0x91)",
 			// trailer: 91 = IEI 9 + value 1 (IPv4)
 			innerSMPayload:   "2e0201c1ffff91",
-			wantNGAPMsgType:  "PDUSessionResourceSetupRequest",
-			wantInnerNASType: "pdu_session_establishment_accept",
+			wantNGAPMsgType:  ngapPDUSessionResourceSetupRequest,
+			wantInnerNASType: nasPDUSessionEstablishmentAccept,
 		},
 		{
-			name: "REQUEST with SSC mode IE = 1 (A- IEI = 0xA1)",
+			name:             "REQUEST with SSC mode IE = 1 (A- IEI = 0xA1)",
 			innerSMPayload:   "2e0301c1ffffa1",
-			wantNGAPMsgType:  "PDUSessionResourceSetupRequest",
-			wantInnerNASType: "pdu_session_establishment_accept",
+			wantNGAPMsgType:  ngapPDUSessionResourceSetupRequest,
+			wantInnerNASType: nasPDUSessionEstablishmentAccept,
 		},
 		{
 			// TS 24.501 §6.4.1.4.1: when the requested PDU session type is
@@ -247,34 +241,34 @@ func TestPDUSessionEstablishment_InnerSMRequestIEFuzz(t *testing.T) {
 			name: "REQUEST with PDU session type = Unstructured (4)",
 			// 9- IEI (0x90) with value 4 (Unstructured) = 0x94
 			innerSMPayload:   "2e0401c1ffff94",
-			wantNGAPMsgType:  "DownlinkNASTransport",
-			wantInnerNASType: "pdu_session_establishment_reject",
-			wantNASCause5GSM: "28",
+			wantNGAPMsgType:  ngapDownlinkNASTransport,
+			wantInnerNASType: nasPDUSessionEstablishmentReject,
+			wantNASCause5GSM: cause5GSMUnknownPDUSessionType,
 		},
 		{
-			name: "REQUEST with PTI = 1 (smallest valid)",
+			name:             "REQUEST with PTI = 1 (smallest valid)",
 			innerSMPayload:   "2e0501c1ffff",
-			wantNGAPMsgType:  "PDUSessionResourceSetupRequest",
-			wantInnerNASType: "pdu_session_establishment_accept",
+			wantNGAPMsgType:  ngapPDUSessionResourceSetupRequest,
+			wantInnerNASType: nasPDUSessionEstablishmentAccept,
 		},
 		{
 			name: "REQUEST with PTI = 254 (largest valid)",
 			// TS 24.007 §11.2.3.1.1: PTI values 1-254 valid, 0/255 reserved.
 			innerSMPayload:   "2e06fec1ffff",
-			wantNGAPMsgType:  "PDUSessionResourceSetupRequest",
-			wantInnerNASType: "pdu_session_establishment_accept",
+			wantNGAPMsgType:  ngapPDUSessionResourceSetupRequest,
+			wantInnerNASType: nasPDUSessionEstablishmentAccept,
 		},
 		{
-			name: "REQUEST with IPMDR = 0x0000 (lowest)",
+			name:             "REQUEST with IPMDR = 0x0000 (lowest)",
 			innerSMPayload:   "2e0701c10000",
-			wantNGAPMsgType:  "PDUSessionResourceSetupRequest",
-			wantInnerNASType: "pdu_session_establishment_accept",
+			wantNGAPMsgType:  ngapPDUSessionResourceSetupRequest,
+			wantInnerNASType: nasPDUSessionEstablishmentAccept,
 		},
 		{
-			name: "REQUEST with always-on PDU session requested (B-, IEI=B1)",
+			name:             "REQUEST with always-on PDU session requested (B-, IEI=B1)",
 			innerSMPayload:   "2e0801c1ffffb1",
-			wantNGAPMsgType:  "PDUSessionResourceSetupRequest",
-			wantInnerNASType: "pdu_session_establishment_accept",
+			wantNGAPMsgType:  ngapPDUSessionResourceSetupRequest,
+			wantInnerNASType: nasPDUSessionEstablishmentAccept,
 		},
 	}
 
@@ -300,11 +294,7 @@ func TestPDUSessionEstablishment_InnerSMRequestIEFuzz(t *testing.T) {
 				t.Errorf("nas.inner_nas_message_type = %q, want %q\n  body: %s", got, tt.wantInnerNASType, resp)
 			}
 
-			if tt.wantNASCause5GSM != "" {
-				if got := jsonGet(resp, "nas.cause_5gsm"); got != tt.wantNASCause5GSM {
-					t.Errorf("nas.cause_5gsm = %q, want %q\n  body: %s", got, tt.wantNASCause5GSM, resp)
-				}
-			}
+			assertNASCause(t, resp, "nas.cause_5gsm", tt.wantNASCause5GSM)
 		})
 	}
 }
