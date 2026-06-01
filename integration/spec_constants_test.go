@@ -66,6 +66,7 @@ const (
 	ngapPDUSessionResourceReleaseCommand = "PDUSessionResourceReleaseCommand"
 	ngapNGSetupResponse                  = "NGSetupResponse"
 	ngapNGSetupFailure                   = "NGSetupFailure"
+	ngapNGResetAcknowledge               = "NGResetAcknowledge"
 )
 
 // NAS message-type names as decoded by the server (internal/nas/decode.go),

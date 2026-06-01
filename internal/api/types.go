@@ -32,6 +32,17 @@ type CreateGnBResponse struct {
 	NGSetupResponse *ngap.NGAPResponse `json:"ng_setup_response"`
 }
 
+// SendGnBNGAPRequest is the JSON body for a gNB-level (non-UE-associated) NGAP
+// message sent on the gNB's existing N2 association.
+type SendGnBNGAPRequest struct {
+	MessageType string `json:"message_type"`
+
+	// NG Reset: when ResetUEIDs is empty the whole NG interface is reset
+	// (ResetType nG-Interface); otherwise only the listed UEs' associations are
+	// reset (ResetType partOfNG-Interface).
+	ResetUEIDs []string `json:"reset_ue_ids,omitempty"`
+}
+
 type GnBStateResponse struct {
 	ID    string `json:"id"`
 	MCC   string `json:"mcc"`

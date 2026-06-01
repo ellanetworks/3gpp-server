@@ -78,6 +78,78 @@ func (h *Handler) SendNGAP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// SendGnBNGAP sends a gNB-level (non-UE-associated) NGAP message on the gNB's
+// existing N2 association.
+func (h *Handler) SendGnBNGAP(w http.ResponseWriter, r *http.Request) {
+	gnbID := r.PathValue("gnb_id")
+
+	gnb, err := h.Store.GetGnB(gnbID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("gnb not found: %v", err))
+		return
+	}
+
+	t, ok := h.Transports[gnbID]
+	if !ok {
+		writeError(w, http.StatusBadRequest, "gnb has no active SCTP transport")
+		return
+	}
+
+	var req SendGnBNGAPRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
+		return
+	}
+
+	switch req.MessageType {
+	case "ng_reset":
+		handleNGReset(w, r, gnb, t, &req)
+	default:
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("unsupported message_type: %s", req.MessageType))
+	}
+}
+
+// handleNGReset sends an NG RESET (TS 38.413 §8.7.4) initiated by the gNB: a
+// full reset of the NG interface when no UEs are listed, or a partial reset of
+// the listed UEs' associations. The AMF answers with NG RESET ACKNOWLEDGE.
+func handleNGReset(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, t *transport.SCTPTransport, req *SendGnBNGAPRequest) {
+	var connections []ngap.NGResetConnection
+
+	for _, ueID := range req.ResetUEIDs {
+		ue, ok := gnb.GetUE(ueID)
+		if !ok {
+			writeError(w, http.StatusNotFound, fmt.Sprintf("ue %s not found", ueID))
+			return
+		}
+
+		amf := ue.AmfUeNgapID
+		ran := ue.RanUeNgapID
+		connections = append(connections, ngap.NGResetConnection{AmfUeNgapID: &amf, RanUeNgapID: &ran})
+	}
+
+	encoded, err := ngap.BuildNGReset(connections)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build NGReset: %v", err))
+		return
+	}
+
+	if err := t.Send(encoded, true); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	ngapResp, err := t.WaitForMessage(ctx, "NGResetAcknowledge", "ErrorIndication")
+	if err != nil {
+		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for NGResetAcknowledge: %v", err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
+}
+
 func uplinkOverrides(req *SendNGAPRequest) *ngap.UplinkNASTransportOverrides {
 	if req.AmfUeNgapIDOverride == nil && req.RanUeNgapIDOverride == nil {
 		return nil

@@ -46,6 +46,43 @@ func decodeSuccessfulOutcome(so *ngapType.SuccessfulOutcome, resp *NGAPResponse)
 	switch so.Value.Present {
 	case ngapType.SuccessfulOutcomePresentNGSetupResponse:
 		decodeNGSetupResponse(so.Value.NGSetupResponse, resp)
+	case ngapType.SuccessfulOutcomePresentNGResetAcknowledge:
+		decodeNGResetAcknowledge(so.Value.NGResetAcknowledge, resp)
+	}
+}
+
+// decodeNGResetAcknowledge surfaces the UE-associated Logical NG-connection
+// List (TS 38.413 §9.2.6.7): one IE per reset connection, carrying the AMF/RAN
+// UE NGAP IDs the AMF echoed back.
+func decodeNGResetAcknowledge(msg *ngapType.NGResetAcknowledge, resp *NGAPResponse) {
+	if msg == nil {
+		return
+	}
+
+	for _, ie := range msg.ProtocolIEs.List {
+		if ie.Id.Value != ngapType.ProtocolIEIDUEAssociatedLogicalNGConnectionList ||
+			ie.Value.UEAssociatedLogicalNGConnectionList == nil {
+			continue
+		}
+
+		for _, item := range ie.Value.UEAssociatedLogicalNGConnectionList.List {
+			decoded := IE{
+				ID:          ie.Id.Value,
+				Criticality: criticalityToString(ie.Criticality.Value),
+			}
+
+			if item.AMFUENGAPID != nil {
+				v := item.AMFUENGAPID.Value
+				decoded.AmfUeNgapID = &v
+			}
+
+			if item.RANUENGAPID != nil {
+				v := item.RANUENGAPID.Value
+				decoded.RanUeNgapID = &v
+			}
+
+			resp.IEs = append(resp.IEs, decoded)
+		}
 	}
 }
 

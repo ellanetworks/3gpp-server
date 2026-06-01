@@ -47,8 +47,8 @@ to allow fully granular control over every IE without this escape hatch.
 | AMF Configuration Update | ❌ | ❌ |
 | AMF Configuration Update Acknowledge | ❌ | ❌ |
 | AMF Configuration Update Failure | ❌ | ❌ |
-| NG Reset | ❌ | 🟡 |
-| NG Reset Acknowledge | ❌ | 🟡 |
+| NG Reset | ✅ | 🟡 |
+| NG Reset Acknowledge | — | ✅ |
 | Overload Start | ❌ | ❌ |
 | Overload Stop | ❌ | ❌ |
 | Error Indication | ❌ | 🟡 |
