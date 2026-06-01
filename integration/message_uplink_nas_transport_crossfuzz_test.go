@@ -29,7 +29,7 @@ func TestULNasTransport_CrossFuzz(t *testing.T) {
 				"message_type":"authentication_response",
 				"amf_ue_ngap_id_override":99999
 			}`,
-			wantNGAPMsgType: "ErrorIndication",
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
 			name: "zero RAN UE NGAP ID + garbage NAS",
@@ -38,7 +38,7 @@ func TestULNasTransport_CrossFuzz(t *testing.T) {
 				"ran_ue_ngap_id_override":0,
 				"raw_nas_pdu":"deadbeefcafebabe"
 			}`,
-			wantNGAPMsgType: "ErrorIndication",
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
 			name: "stale RAN UE NGAP ID + empty NAS",
@@ -47,7 +47,7 @@ func TestULNasTransport_CrossFuzz(t *testing.T) {
 				"ran_ue_ngap_id_override":999999,
 				"raw_nas_pdu":""
 			}`,
-			wantNGAPMsgType: "ErrorIndication",
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
 			name: "both IDs zero + plain NAS",
@@ -57,7 +57,7 @@ func TestULNasTransport_CrossFuzz(t *testing.T) {
 				"ran_ue_ngap_id_override":0,
 				"raw_nas_pdu":"7e005700"
 			}`,
-			wantNGAPMsgType: "ErrorIndication",
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
 			name: "max IDs + truncated NAS",
@@ -67,7 +67,7 @@ func TestULNasTransport_CrossFuzz(t *testing.T) {
 				"ran_ue_ngap_id_override":4294967295,
 				"raw_nas_pdu":"7e"
 			}`,
-			wantNGAPMsgType: "ErrorIndication",
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 	}
 

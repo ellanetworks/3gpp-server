@@ -24,13 +24,11 @@ type ServiceRequestOpts struct {
 }
 
 // BuildServiceRequest builds a plain (unprotected) Service Request NAS PDU. The
-// caller wraps it with EncodeNasPduWithSecurity using an integrity-protected
-// security header before transport.
+// caller wraps it with EncodeNasPduWithSecurity (when a security context
+// exists) before transport. When Guti is nil the 5G-S-TMSI is zeroed — this is
+// intentionally permitted so an unregistered/unknown UE can still emit a
+// Service Request for the AMF to reject.
 func BuildServiceRequest(opts *ServiceRequestOpts) ([]byte, error) {
-	if opts.Guti == nil {
-		return nil, fmt.Errorf("service request requires a GUTI (UE not registered?)")
-	}
-
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
 	m.GmmHeader.SetMessageType(nas.MsgTypeServiceRequest)
@@ -44,9 +42,11 @@ func BuildServiceRequest(opts *ServiceRequestOpts) ([]byte, error) {
 
 	// 5G-S-TMSI mobile identity (type of identity = 4) derived from the GUTI.
 	sr.SetTypeOfIdentity(nasMessage.MobileIdentity5GSType5gSTmsi)
-	sr.SetAMFSetID(opts.Guti.GetAMFSetID())
-	sr.SetAMFPointer(opts.Guti.GetAMFPointer())
-	sr.SetTMSI5G(opts.Guti.GetTMSI5G())
+	if opts.Guti != nil {
+		sr.SetAMFSetID(opts.Guti.GetAMFSetID())
+		sr.SetAMFPointer(opts.Guti.GetAMFPointer())
+		sr.SetTMSI5G(opts.Guti.GetTMSI5G())
+	}
 	sr.TMSI5GS.SetLen(7)
 
 	if opts.PDUSessionStatus != nil {

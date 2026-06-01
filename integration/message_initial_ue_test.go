@@ -13,6 +13,7 @@
 package integration_test
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -31,8 +32,8 @@ func TestInitialUEMessage_Valid(t *testing.T) {
 			name:            "default initial registration",
 			body:            `{"message_type":"registration_request"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 			wantNASFields: map[string]fieldCheck{
 				"rand": nonEmpty,
 				"autn": nonEmpty,
@@ -41,10 +42,10 @@ func TestInitialUEMessage_Valid(t *testing.T) {
 		},
 		{
 			name:            "explicit registration_type=1 (initial)",
-			body:            `{"message_type":"registration_request","registration_type":1}`,
+			body:            fmt.Sprintf(`{"message_type":"registration_request","registration_type":%d}`, registrationTypeInitial),
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		{
 			name: "with requested_nssai matching AMF slice",
@@ -53,8 +54,8 @@ func TestInitialUEMessage_Valid(t *testing.T) {
 				"requested_nssai":[{"sst":1}]
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		{
 			name: "with requested_nssai SST=1 SD=000001",
@@ -63,8 +64,8 @@ func TestInitialUEMessage_Valid(t *testing.T) {
 				"requested_nssai":[{"sst":1,"sd":"000001"}]
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		{
 			name: "with 5GMM capability",
@@ -73,8 +74,8 @@ func TestInitialUEMessage_Valid(t *testing.T) {
 				"capability_5gmm":"07"
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		{
 			name: "with overridden UE security capability (NIA1+NIA2, NEA1+NEA2)",
@@ -83,8 +84,8 @@ func TestInitialUEMessage_Valid(t *testing.T) {
 				"ue_security_capability":"6060"
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		{
 			name: "with follow_on_request=0",
@@ -93,8 +94,8 @@ func TestInitialUEMessage_Valid(t *testing.T) {
 				"follow_on_request":0
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		{
 			name: "with DRX parameters",
@@ -103,8 +104,8 @@ func TestInitialUEMessage_Valid(t *testing.T) {
 				"requested_drx_parameters":2
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		{
 			name: "with multiple optional IEs combined",
@@ -117,8 +118,8 @@ func TestInitialUEMessage_Valid(t *testing.T) {
 				"s1_ue_network_capability":"e0e0"
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 	}
 
@@ -167,53 +168,53 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 			name:            "unknown subscriber SUPI (not provisioned in AMF)",
 			body:            `{"message_type":"registration_request","mobile_identity_override":"0100f110f00000000001"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "registration_reject",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasRegistrationReject,
 		},
 		// --- Wrong registration types for unknown UE ---
 		{
 			name: "registration_type=2 (mobility updating) for fresh UE",
-			body: `{"message_type":"registration_request","registration_type":2}`,
+			body: fmt.Sprintf(`{"message_type":"registration_request","registration_type":%d}`, registrationTypeMobility),
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name: "registration_type=3 (periodic) for fresh UE",
-			body: `{"message_type":"registration_request","registration_type":3}`,
+			body: fmt.Sprintf(`{"message_type":"registration_request","registration_type":%d}`, registrationTypePeriodic),
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name: "registration_type=4 (emergency) for fresh UE",
-			body: `{"message_type":"registration_request","registration_type":4}`,
+			body: fmt.Sprintf(`{"message_type":"registration_request","registration_type":%d}`, registrationTypeEmergency),
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		// --- Malformed mobile identity ---
 		{
 			name:            "mobile identity override: single zero byte",
 			body:            `{"message_type":"registration_request","mobile_identity_override":"00"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name:            "mobile identity override: empty string",
 			body:            `{"message_type":"registration_request","mobile_identity_override":""}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "status_5gmm",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasStatus5GMM,
 		},
 		{
 			name:            "mobile identity override: type byte only (no content)",
 			body:            `{"message_type":"registration_request","mobile_identity_override":"01"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name:            "mobile identity override: 255 bytes of 0xff",
 			body:            `{"message_type":"registration_request","mobile_identity_override":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		// --- UE security capability edge cases ---
 		{
@@ -223,7 +224,7 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				"ue_security_capability":"8080"
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name: "security capability: no algorithms at all (0x0000)",
@@ -232,7 +233,7 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				"ue_security_capability":"0000"
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name: "security capability: all algorithms enabled (0xffff)",
@@ -241,8 +242,8 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				"ue_security_capability":"ffff"
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		{
 			name: "security capability: truncated to 1 byte",
@@ -251,7 +252,7 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				"ue_security_capability":"e0"
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name: "security capability: extended to 4 bytes (with EPS algorithms)",
@@ -260,8 +261,8 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				"ue_security_capability":"e0e0e0e0"
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		{
 			name: "security capability: maximum length 8 bytes",
@@ -270,8 +271,8 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				"ue_security_capability":"e0e0e0e0e0e0e0e0"
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		// --- NSSAI edge cases ---
 		{
@@ -281,8 +282,8 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				"requested_nssai":[{"sst":99}]
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		{
 			name: "requested NSSAI with many slices (4 including unknown)",
@@ -291,8 +292,8 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				"requested_nssai":[{"sst":1},{"sst":2},{"sst":3},{"sst":255}]
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		{
 			name: "requested NSSAI with SST=0",
@@ -301,8 +302,8 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				"requested_nssai":[{"sst":0}]
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		{
 			name: "requested NSSAI with SST=255 SD=ffffff",
@@ -311,8 +312,8 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				"requested_nssai":[{"sst":255,"sd":"ffffff"}]
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		{
 			name: "empty requested NSSAI array",
@@ -321,8 +322,8 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				"requested_nssai":[]
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		// --- ngKSI edge cases ---
 		{
@@ -332,7 +333,7 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				"ng_ksi":0
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name: "ng_ksi=6",
@@ -341,7 +342,7 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				"ng_ksi":6
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		// --- Conflicting / nonsensical IE combinations ---
 		{
@@ -351,8 +352,8 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				"pdu_session_status":"ffff"
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		{
 			name: "uplink data status set when no sessions exist",
@@ -361,8 +362,8 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				"uplink_data_status":"ffff"
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		{
 			name: "MICO + network slicing + UE status all set",
@@ -373,8 +374,8 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				"ue_status":3
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		{
 			name: "EPS bearer context status with all bearers active",
@@ -383,8 +384,8 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				"eps_bearer_context_status":"ffff"
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		{
 			name: "allowed PDU session status claiming all sessions allowed",
@@ -393,8 +394,8 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				"allowed_pdu_session_status":"ffff"
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		// --- NAS message container (nested NAS) ---
 		{
@@ -404,8 +405,8 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				"nas_message_container":"deadbeefcafebabe"
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		// --- Kitchen sink: every optional IE at once ---
 		{
@@ -430,38 +431,38 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				"ues_usage_setting":0
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		// --- NGAP-level overrides ---
 		{
-			name: "RRC establishment cause: mo-data",
-			body: `{
+			name: "RRC establishment cause: high-priority-access",
+			body: fmt.Sprintf(`{
 				"message_type":"registration_request",
-				"rrc_establishment_cause":1
-			}`,
+				"rrc_establishment_cause":%d
+			}`, rrcEstablishmentCauseHighPriorityAccess),
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		{
-			name: "RRC establishment cause: emergency",
-			body: `{
+			name: "RRC establishment cause: mo-voice-call",
+			body: fmt.Sprintf(`{
 				"message_type":"registration_request",
-				"rrc_establishment_cause":5
-			}`,
+				"rrc_establishment_cause":%d
+			}`, rrcEstablishmentCauseMoVoiceCall),
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		{
 			name: "RRC establishment cause: out-of-range value",
-			body: `{
+			body: fmt.Sprintf(`{
 				"message_type":"registration_request",
-				"rrc_establishment_cause":99
-			}`,
+				"rrc_establishment_cause":%d
+			}`, rrcEstablishmentCauseOutOfRange),
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name: "UE context request omitted",
@@ -470,8 +471,8 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				"ue_context_request":-1
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "authentication_request",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationRequest,
 		},
 		{
 			name: "RAN UE NGAP ID override: zero",
@@ -480,61 +481,50 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				"ran_ue_ngap_id_override":0
 			}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		// --- raw_nas_pdu overrides ---
 		{
 			name:            "raw NAS: completely empty PDU → ErrorIndication",
 			body:            `{"message_type":"registration_request","raw_nas_pdu":""}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "ErrorIndication",
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
 			name:            "raw NAS: single byte 0x7e (5GMM EPD only)",
 			body:            `{"message_type":"registration_request","raw_nas_pdu":"7e"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name:            "raw NAS: two bytes (EPD + security header, no message type)",
 			body:            `{"message_type":"registration_request","raw_nas_pdu":"7e00"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name:            "raw NAS: wrong EPD (not 5GMM)",
 			body:            `{"message_type":"registration_request","raw_nas_pdu":"2e004100"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name:            "raw NAS: valid 5GMM header but unknown message type 0xff",
 			body:            `{"message_type":"registration_request","raw_nas_pdu":"7e00ff"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name:            "raw NAS: RegistrationRequest truncated after mandatory header",
 			body:            `{"message_type":"registration_request","raw_nas_pdu":"7e004179"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name:            "raw NAS: integrity-protected wrapper around garbage",
 			body:            `{"message_type":"registration_request","raw_nas_pdu":"7e01deadbeef00cafebabe"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-		},
-		// --- API-level errors (3gpp-server rejects before sending) ---
-		{
-			name:     "unsupported message type",
-			body:     `{"message_type":"authentication_response"}`,
-			wantHTTP: 400,
-		},
-		{
-			name:     "empty message type",
-			body:     `{"message_type":""}`,
-			wantHTTP: 400,
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 	}
 
@@ -563,7 +553,7 @@ func TestInitialUEMessage_Fuzz(t *testing.T) {
 				if nasMsgType != tt.wantNASMsgType {
 					t.Errorf("nas.message_type = %q, want %q\n  body: %s", nasMsgType, tt.wantNASMsgType, body)
 				}
-			} else if nasMsgType == "" && ngapMsgType != "ErrorIndication" {
+			} else if nasMsgType == "" && ngapMsgType != ngapErrorIndication {
 				t.Errorf("nas.message_type is empty — AMF response did not contain a decodable NAS PDU\n  body: %s", body)
 			}
 

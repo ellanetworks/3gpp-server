@@ -34,13 +34,13 @@ func TestRegistrationComplete_Fuzz(t *testing.T) {
 			name:            "raw NAS: empty PDU",
 			body:            `{"message_type":"registration_complete","raw_nas_pdu":""}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "ErrorIndication",
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
 			name:            "raw NAS: garbage bytes",
 			body:            `{"message_type":"registration_complete","raw_nas_pdu":"deadbeefcafebabe"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 			// Garbage 5GMM payload → AMF rejects with 5GMM STATUS
 		},
 		{
@@ -51,27 +51,27 @@ func TestRegistrationComplete_Fuzz(t *testing.T) {
 			// in the whitelist, so AMF should reject.
 			body:            `{"message_type":"registration_complete","raw_nas_pdu":"7e0043"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name: "raw NAS: integrity header with zeroed MAC",
 			// 7E 04 (integrity protected, new context) MAC=0000000000 SQN=00 then 7e0043
 			body:            `{"message_type":"registration_complete","raw_nas_pdu":"7e0400000000000000007e0043"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name: "raw NAS: valid security wrapper but wrong inner message type 0xff",
 			// SHT=02 integrity+cipher, then wrong msg type inside
 			body:            `{"message_type":"registration_complete","raw_nas_pdu":"7e02000000000000007e00ff"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name: "raw NAS: single byte (truncated)",
 			body:            `{"message_type":"registration_complete","raw_nas_pdu":"7e"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 			// Truncated → AMF should respond, not silently drop
 		},
 	}
@@ -136,14 +136,14 @@ func TestRegistrationComplete_NGAPIDFuzz(t *testing.T) {
 			name:            "RAN UE NGAP ID = 0",
 			body:            `{"message_type":"registration_complete","ran_ue_ngap_id_override":0}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "ErrorIndication",
+			wantNGAPMsgType: ngapErrorIndication,
 			// TS 38.413 §8.6.2 — wrong RAN UE NGAP ID → ErrorIndication
 		},
 		{
 			name:            "RAN UE NGAP ID = max 32-bit",
 			body:            `{"message_type":"registration_complete","ran_ue_ngap_id_override":4294967295}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "ErrorIndication",
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
 			name:     "AMF UE NGAP ID = max valid 40-bit",

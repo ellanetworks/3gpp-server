@@ -154,12 +154,13 @@ func handleAuthenticationResponse(w http.ResponseWriter, r *http.Request, gnb *s
 				writeError(w, http.StatusBadRequest, fmt.Sprintf("decode res_star_override: %v", err))
 				return
 			}
+		} else if len(ue.LastRAND) == 0 || len(ue.LastAUTN) == 0 {
+			// No authentication challenge stored (e.g. the response is sent out
+			// of order, before any registration). Send a zeroed RES* so the
+			// message still reaches the AMF, which decides how to react. Use
+			// res_star_override to supply a specific value.
+			resStar = make([]byte, 16)
 		} else {
-			if len(ue.LastRAND) == 0 || len(ue.LastAUTN) == 0 {
-				writeError(w, http.StatusBadRequest, "no RAND/AUTN stored — send registration_request first")
-				return
-			}
-
 			akaResult, err := crypto.ComputeResStar(ue.K, ue.OPc, ue.Sqn, ue.Supi, ue.Snn, ue.LastRAND, ue.LastAUTN)
 			if err != nil {
 				writeError(w, http.StatusInternalServerError, fmt.Sprintf("5G-AKA: %v", err))
@@ -519,16 +520,42 @@ func fiveGSTMSIFromGUTI(guti *nasType.GUTI5G) *ngap.FiveGSTMSIFromGUTI {
 	}
 }
 
+// serviceRequestPDUStatus resolves the PDU Session Status bitmap for a Service
+// Request. An explicit hex override (2-byte IE buffer, little-endian) wins;
+// otherwise the bitmap is auto-derived from the UE's configured PDU session.
+// Returns nil to omit the IE entirely.
+func serviceRequestPDUStatus(ue *store.UEContext, req *SendNGAPRequest) (*[16]bool, error) {
+	if req.PDUSessionStatus != nil {
+		raw, err := hex.DecodeString(*req.PDUSessionStatus)
+		if err != nil {
+			return nil, err
+		}
+
+		var buf [2]byte
+		copy(buf[:], raw)
+		flags := uint16(buf[0]) | uint16(buf[1])<<8
+
+		var status [16]bool
+		for i := range status {
+			status[i] = flags&(1<<uint(i)) != 0
+		}
+
+		return &status, nil
+	}
+
+	var status [16]bool
+	if ue.PDUSessionID >= 1 && ue.PDUSessionID <= 15 {
+		status[ue.PDUSessionID] = true
+	}
+
+	return &status, nil
+}
+
 // handleServiceRequest sends a 5GMM Service Request to bring a CM-IDLE UE back
 // to CM-CONNECTED (TS 24.501 §5.6.1). It opens a fresh RAN connection (new RAN
 // UE NGAP ID + Initial UE Message carrying the 5G-S-TMSI), then drives the
 // resulting Initial Context Setup so the AMF re-activates the UE context.
 func handleServiceRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
-	if len(ue.Kamf) == 0 || ue.Guti == nil {
-		writeError(w, http.StatusBadRequest, "service_request requires a registered UE with a security context and GUTI")
-		return
-	}
-
 	// A Service Request starts a new RRC/NG connection, so allocate a fresh
 	// RAN UE NGAP ID.
 	ue.RanUeNgapID = gnb.AllocateRanUeNgapID()
@@ -549,27 +576,34 @@ func handleServiceRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnB
 			serviceType = *req.ServiceType
 		}
 
-		// Reactivate any session the UE established before going idle.
-		var status [16]bool
-		if ue.PDUSessionID >= 1 && ue.PDUSessionID <= 15 {
-			status[ue.PDUSessionID] = true
+		status, err := serviceRequestPDUStatus(ue, req)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("decode pdu_session_status: %v", err))
+			return
 		}
 
 		srPDU, err := nasCodec.BuildServiceRequest(&nasCodec.ServiceRequestOpts{
 			ServiceType:      serviceType,
 			NgKsi:            ue.NgKsi,
 			Guti:             ue.Guti,
-			PDUSessionStatus: &status,
+			PDUSessionStatus: status,
 		})
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, fmt.Sprintf("build ServiceRequest: %v", err))
 			return
 		}
 
-		nasPDU, err = nasCodec.EncodeNasPduWithSecurity(ue, srPDU, gonas.SecurityHeaderTypeIntegrityProtected)
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, fmt.Sprintf("NAS security encode: %v", err))
-			return
+		// Integrity-protect when a security context exists; otherwise send the
+		// Service Request plain so it still reaches the AMF (which must reject
+		// an unprotected / unknown-UE Service Request).
+		if len(ue.Kamf) > 0 {
+			nasPDU, err = nasCodec.EncodeNasPduWithSecurity(ue, srPDU, gonas.SecurityHeaderTypeIntegrityProtected)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, fmt.Sprintf("NAS security encode: %v", err))
+				return
+			}
+		} else {
+			nasPDU = srPDU
 		}
 	}
 

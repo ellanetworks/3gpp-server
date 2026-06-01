@@ -17,45 +17,45 @@ func TestSecurityModeComplete_Fuzz(t *testing.T) {
 			name:            "raw NAS: plain SecurityModeComplete (no integrity protection)",
 			body:            `{"message_type":"security_mode_complete","raw_nas_pdu":"7e005e00"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 			// AMF should reject — plain NAS when security context is active
 		},
 		{
 			name:            "raw NAS: integrity header but zeroed MAC",
 			body:            `{"message_type":"security_mode_complete","raw_nas_pdu":"7e04000000000000005e00"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name:            "raw NAS: security header claiming ciphering, plaintext content",
 			body:            `{"message_type":"security_mode_complete","raw_nas_pdu":"7e02000000000000005e00"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name:            "raw NAS: single byte",
 			body:            `{"message_type":"security_mode_complete","raw_nas_pdu":"7e"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name:            "raw NAS: empty → ErrorIndication",
 			body:            `{"message_type":"security_mode_complete","raw_nas_pdu":""}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "ErrorIndication",
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
 			name:            "raw NAS: garbage bytes",
 			body:            `{"message_type":"security_mode_complete","raw_nas_pdu":"deadbeefcafebabe0011223344556677"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 			// AMF should respond with a reject, not silently drop
 		},
 		{
 			name:            "raw NAS: valid NAS header but unknown message type 0xff",
 			body:            `{"message_type":"security_mode_complete","raw_nas_pdu":"7e00ff"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 	}
 
@@ -92,7 +92,7 @@ func TestSecurityModeComplete_Fuzz(t *testing.T) {
 			}
 
 			ngapMsgType := jsonGet(body, "ngap.message_type")
-			if ngapMsgType != "ErrorIndication" {
+			if ngapMsgType != ngapErrorIndication {
 				nasMsgType := jsonGet(body, "nas.message_type")
 				if nasMsgType == "" {
 					nasMsgType = jsonGet(body, "nas.security_header_type")

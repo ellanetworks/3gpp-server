@@ -33,6 +33,11 @@ type NASRequest struct {
 
 	// Service Request — service type (TS 24.501 §9.11.3.50). Defaults to
 	// data (1). 0=signalling, 2=mobile-terminated services.
+	//
+	// The PDU Session Status / Uplink Data Status bitmap is taken from the
+	// existing PDUSessionStatus field (hex of the 2-byte IE buffer, bit i =
+	// session i, little-endian); when unset the server auto-derives it from
+	// the UE's configured PDU session.
 	ServiceType *uint8 `json:"service_type,omitempty"`
 
 	// RegistrationRequest optional IEs (TS 24.501 §8.2.6)

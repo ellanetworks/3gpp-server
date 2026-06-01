@@ -8,6 +8,7 @@
 package integration_test
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -33,7 +34,7 @@ func idleRegisteredUE(t *testing.T) (string, string) {
 	if status != 200 {
 		t.Fatalf("ue_context_release: HTTP %d\n  body: %s", status, body)
 	}
-	if got := jsonGet(body, "ngap.message_type"); got != "UEContextReleaseCommand" {
+	if got := jsonGet(body, "ngap.message_type"); got != ngapUEContextReleaseCommand {
 		t.Fatalf("release ngap.message_type = %q, want UEContextReleaseCommand\n  body: %s", got, body)
 	}
 
@@ -53,12 +54,12 @@ func TestServiceRequest_Data(t *testing.T) {
 	}
 
 	// The AMF reactivates the session via Initial Context Setup Request.
-	if got := jsonGet(body, "ngap.message_type"); got != "InitialContextSetupRequest" {
+	if got := jsonGet(body, "ngap.message_type"); got != ngapInitialContextSetupRequest {
 		t.Errorf("ngap.message_type = %q, want InitialContextSetupRequest\n  body: %s", got, body)
 	}
 
 	// The Service Accept rides in the Initial Context Setup Request's NAS PDU.
-	if got := jsonGet(body, "nas.message_type"); got != "service_accept" {
+	if got := jsonGet(body, "nas.message_type"); got != nasServiceAccept {
 		t.Errorf("nas.message_type = %q, want service_accept\n  body: %s", got, body)
 	}
 }
@@ -68,18 +69,19 @@ func TestServiceRequest_Data(t *testing.T) {
 func TestServiceRequest_Signalling(t *testing.T) {
 	gnbID, ueID := idleRegisteredUE(t)
 
-	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
-		`{"message_type":"service_request","service_type":0}`)
+	body := fmt.Sprintf(`{"message_type":"service_request","service_type":%d}`, serviceTypeSignalling)
+
+	status, resp := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap", body)
 	if status != 200 {
-		t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
+		t.Fatalf("HTTP %d, want 200\n  body: %s", status, resp)
 	}
 
-	got := jsonGet(body, "ngap.message_type")
-	if got != "InitialContextSetupRequest" && got != "DownlinkNASTransport" {
-		t.Errorf("ngap.message_type = %q, want InitialContextSetupRequest or DownlinkNASTransport\n  body: %s", got, body)
+	got := jsonGet(resp, "ngap.message_type")
+	if got != ngapInitialContextSetupRequest && got != ngapDownlinkNASTransport {
+		t.Errorf("ngap.message_type = %q, want InitialContextSetupRequest or DownlinkNASTransport\n  body: %s", got, resp)
 	}
-	if nasType := jsonGet(body, "nas.message_type"); nasType != "service_accept" {
-		t.Errorf("nas.message_type = %q, want service_accept\n  body: %s", nasType, body)
+	if nasType := jsonGet(resp, "nas.message_type"); nasType != nasServiceAccept {
+		t.Errorf("nas.message_type = %q, want service_accept\n  body: %s", nasType, resp)
 	}
 }
 
@@ -93,7 +95,7 @@ func TestServiceRequest_ThenDeregister(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("service_request: HTTP %d\n  body: %s", status, body)
 	}
-	if got := jsonGet(body, "nas.message_type"); got != "service_accept" {
+	if got := jsonGet(body, "nas.message_type"); got != nasServiceAccept {
 		t.Fatalf("service_request nas.message_type = %q, want service_accept\n  body: %s", got, body)
 	}
 
@@ -102,22 +104,189 @@ func TestServiceRequest_ThenDeregister(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("deregistration: HTTP %d\n  body: %s", status, body)
 	}
-	if got := jsonGet(body, "ngap.message_type"); got != "UEContextReleaseCommand" {
+	if got := jsonGet(body, "ngap.message_type"); got != ngapUEContextReleaseCommand {
 		t.Errorf("deregistration ngap.message_type = %q, want UEContextReleaseCommand\n  body: %s", got, body)
 	}
 }
 
 // TestServiceRequest_WithoutRegistration sends a Service Request for a UE that
-// was never registered (no security context / GUTI). The server rejects it
-// locally with HTTP 400.
+// was never registered. The server sends it plain (no security context) with a
+// zeroed 5G-S-TMSI so it reaches the AMF, which must NOT grant service to an
+// unknown, unprotected UE.
 func TestServiceRequest_WithoutRegistration(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
 		`{"message_type":"service_request"}`)
-	if status != 400 {
-		t.Fatalf("HTTP %d, want 400 (no security context)\n  body: %s", status, body)
+	if status == 504 {
+		t.Fatalf("service request hung (HTTP 504) — message may not have reached the AMF\n  body: %s", body)
+	}
+	if status != 200 {
+		t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
+	}
+
+	// The AMF must not accept an unprotected Service Request from an unknown UE.
+	if got := jsonGet(body, "nas.message_type"); got == nasServiceAccept {
+		t.Errorf("AMF granted service to an unregistered UE (nas.message_type=service_accept)\n  body: %s", body)
+	}
+}
+
+// idleRegisteredUENoSession registers a UE and releases it without ever
+// establishing a PDU session — CM-IDLE with no active session.
+func idleRegisteredUENoSession(t *testing.T) (string, string) {
+	t.Helper()
+
+	gnbID := mustCreateGnB(t)
+	ueID := mustCreateUE(t, gnbID)
+
+	doRegistrationFlow(t, gnbID, ueID)
+
+	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+		`{"message_type":"ue_context_release_request"}`)
+	if status != 200 {
+		t.Fatalf("ue_context_release: HTTP %d\n  body: %s", status, body)
+	}
+	if got := jsonGet(body, "ngap.message_type"); got != ngapUEContextReleaseCommand {
+		t.Fatalf("release ngap.message_type = %q, want UEContextReleaseCommand\n  body: %s", got, body)
+	}
+
+	return gnbID, ueID
+}
+
+// TestServiceRequest_IdleNoSession sends a Service Request claiming no active
+// PDU sessions from an idle UE that never had one. The AMF should accept it
+// (signalling-style reactivation) without trying to set up any session.
+func TestServiceRequest_IdleNoSession(t *testing.T) {
+	gnbID, ueID := idleRegisteredUENoSession(t)
+
+	// pdu_session_status "0000" => claim no active sessions.
+	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+		`{"message_type":"service_request","pdu_session_status":"0000"}`)
+	if status != 200 {
+		t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
+	}
+	if got := jsonGet(body, "nas.message_type"); got != nasServiceAccept {
+		t.Errorf("nas.message_type = %q, want service_accept\n  body: %s", got, body)
+	}
+}
+
+// TestServiceRequest_PDUStatusMismatch claims an active PDU session (id 1) the
+// AMF does not have (the UE never established one). The AMF must reconcile and
+// still accept the Service Request, not error out.
+func TestServiceRequest_PDUStatusMismatch(t *testing.T) {
+	gnbID, ueID := idleRegisteredUENoSession(t)
+
+	// bit 1 set => claim session 1 active; AMF has none.
+	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+		`{"message_type":"service_request","pdu_session_status":"0200"}`)
+	if status != 200 {
+		t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
+	}
+	if got := jsonGet(body, "nas.message_type"); got != nasServiceAccept {
+		t.Errorf("nas.message_type = %q, want service_accept\n  body: %s", got, body)
+	}
+}
+
+// TestServiceRequest_WhileConnected sends a Service Request while the UE is
+// still CM-CONNECTED (no prior release). This is out-of-state; the AMF must
+// respond (accept on the new connection or reject), never hang.
+func TestServiceRequest_WhileConnected(t *testing.T) {
+	gnbID := mustCreateGnB(t)
+	ueID := mustCreateUE(t, gnbID)
+
+	doRegistrationFlow(t, gnbID, ueID)
+
+	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+		`{"message_type":"service_request"}`)
+	if status == 504 {
+		t.Fatalf("service request hung (HTTP 504)\n  body: %s", body)
+	}
+	if status != 200 {
+		t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
+	}
+}
+
+// TestServiceRequest_AfterDeregistration sends a Service Request after the UE
+// has fully deregistered. The AMF no longer holds the context, so it must not
+// grant service (expects a reject, never a Service Accept).
+func TestServiceRequest_AfterDeregistration(t *testing.T) {
+	gnbID := mustCreateGnB(t)
+	ueID := mustCreateUE(t, gnbID)
+
+	doRegistrationFlow(t, gnbID, ueID)
+
+	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+		`{"message_type":"deregistration_request"}`)
+	if status != 200 {
+		t.Fatalf("deregistration: HTTP %d\n  body: %s", status, body)
+	}
+
+	status, body = doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+		`{"message_type":"service_request"}`)
+	if status == 504 {
+		t.Fatalf("service request hung (HTTP 504)\n  body: %s", body)
+	}
+	if status != 200 {
+		t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
+	}
+	if got := jsonGet(body, "nas.message_type"); got == nasServiceAccept {
+		t.Errorf("AMF granted service to a deregistered UE\n  body: %s", body)
+	}
+}
+
+// TestServiceRequest_BackToBack sends two Service Requests in a row. The first
+// brings the UE to CM-CONNECTED; the second is therefore an out-of-state
+// (already-connected) request. Neither must hang.
+func TestServiceRequest_BackToBack(t *testing.T) {
+	gnbID, ueID := idleRegisteredUE(t)
+
+	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+		`{"message_type":"service_request"}`)
+	if status != 200 {
+		t.Fatalf("first service_request: HTTP %d\n  body: %s", status, body)
+	}
+	if got := jsonGet(body, "nas.message_type"); got != nasServiceAccept {
+		t.Fatalf("first service_request nas.message_type = %q, want service_accept\n  body: %s", got, body)
+	}
+
+	status, body = doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+		`{"message_type":"service_request"}`)
+	if status == 504 {
+		t.Fatalf("second service request hung (HTTP 504)\n  body: %s", body)
+	}
+	if status != 200 {
+		t.Fatalf("second service_request: HTTP %d\n  body: %s", status, body)
+	}
+}
+
+// TestServiceRequest_ServiceTypes exercises the remaining service types from an
+// idle UE. Behaviour varies by type (and whether the UE is emergency-
+// registered), so we assert the AMF responds and does not hang.
+func TestServiceRequest_ServiceTypes(t *testing.T) {
+	tests := []struct {
+		name        string
+		serviceType int
+	}{
+		{name: "mobile-terminated", serviceType: serviceTypeMobileTerminatedServices},
+		{name: "emergency", serviceType: serviceTypeEmergencyServices},
+		{name: "emergency fallback", serviceType: serviceTypeEmergencyServicesFallback},
+		{name: "high-priority access", serviceType: serviceTypeHighPriorityAccess},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gnbID, ueID := idleRegisteredUE(t)
+
+			body := fmt.Sprintf(`{"message_type":"service_request","service_type":%d}`, tt.serviceType)
+			status, resp := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap", body)
+			if status == 504 {
+				t.Fatalf("service request hung (HTTP 504)\n  body: %s", resp)
+			}
+			if status != 200 {
+				t.Fatalf("HTTP %d, want 200\n  body: %s", status, resp)
+			}
+		})
 	}
 }
 
@@ -142,8 +311,8 @@ func TestServiceRequest_Fuzz(t *testing.T) {
 			body: `{"message_type":"service_request","raw_nas_pdu":"7e004c"}`,
 		},
 		{
-			name: "service_type out of range (7)",
-			body: `{"message_type":"service_request","service_type":7}`,
+			name: "service_type out of range",
+			body: fmt.Sprintf(`{"message_type":"service_request","service_type":%d}`, serviceTypeOutOfRange),
 		},
 	}
 
@@ -178,7 +347,7 @@ func TestServiceRequest_StaleAMFIDOverride(t *testing.T) {
 	}
 	// Initial UE Message carries no AMF UE NGAP ID, so the override is inert;
 	// the AMF should still process the service request normally.
-	if got := jsonGet(body, "nas.message_type"); got != "service_accept" {
+	if got := jsonGet(body, "nas.message_type"); got != nasServiceAccept {
 		t.Errorf("nas.message_type = %q, want service_accept\n  body: %s", got, body)
 	}
 }

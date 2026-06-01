@@ -8,6 +8,7 @@
 package integration_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -16,29 +17,15 @@ import (
 // In every case a registered UE's release request must elicit a UE Context
 // Release Command from the AMF.
 func TestUEContextReleaseRequest(t *testing.T) {
+	// releaseCause of -1 omits the IE so the server applies its default.
 	tests := []struct {
-		name string
-		body string
+		name         string
+		releaseCause int
 	}{
-		{
-			name: "default cause (user-inactivity)",
-			body: `{"message_type":"ue_context_release_request"}`,
-		},
-		{
-			// TS 38.413 §9.3.1.2 radio-network cause 20.
-			name: "cause user-inactivity (20)",
-			body: `{"message_type":"ue_context_release_request","release_cause":20}`,
-		},
-		{
-			// radio-network cause 3.
-			name: "cause release-due-to-ngran-generated-reason (3)",
-			body: `{"message_type":"ue_context_release_request","release_cause":3}`,
-		},
-		{
-			// radio-network cause 0 (unspecified).
-			name: "cause unspecified (0)",
-			body: `{"message_type":"ue_context_release_request","release_cause":0}`,
-		},
+		{name: "default cause", releaseCause: -1},
+		{name: "user-inactivity", releaseCause: causeRadioNetworkUserInactivity},
+		{name: "release-due-to-ngran-generated-reason", releaseCause: causeRadioNetworkReleaseDueToNgranGeneratedReason},
+		{name: "unspecified", releaseCause: causeRadioNetworkUnspecified},
 	}
 
 	for _, tt := range tests {
@@ -48,13 +35,18 @@ func TestUEContextReleaseRequest(t *testing.T) {
 
 			doRegistrationFlow(t, gnbID, ueID)
 
-			status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap", tt.body)
-			if status != 200 {
-				t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
+			body := `{"message_type":"ue_context_release_request"}`
+			if tt.releaseCause >= 0 {
+				body = fmt.Sprintf(`{"message_type":"ue_context_release_request","release_cause":%d}`, tt.releaseCause)
 			}
 
-			if got := jsonGet(body, "ngap.message_type"); got != "UEContextReleaseCommand" {
-				t.Errorf("ngap.message_type = %q, want %q\n  body: %s", got, "UEContextReleaseCommand", body)
+			status, resp := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap", body)
+			if status != 200 {
+				t.Fatalf("HTTP %d, want 200\n  body: %s", status, resp)
+			}
+
+			if got := jsonGet(resp, "ngap.message_type"); got != ngapUEContextReleaseCommand {
+				t.Errorf("ngap.message_type = %q, want %q\n  body: %s", got, ngapUEContextReleaseCommand, resp)
 			}
 		})
 	}
@@ -80,8 +72,8 @@ func TestUEContextReleaseRequest_AfterPDUSession(t *testing.T) {
 		t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
 	}
 
-	if got := jsonGet(body, "ngap.message_type"); got != "UEContextReleaseCommand" {
-		t.Errorf("ngap.message_type = %q, want %q\n  body: %s", got, "UEContextReleaseCommand", body)
+	if got := jsonGet(body, "ngap.message_type"); got != ngapUEContextReleaseCommand {
+		t.Errorf("ngap.message_type = %q, want %q\n  body: %s", got, ngapUEContextReleaseCommand, body)
 	}
 }
 
@@ -99,7 +91,7 @@ func TestUEContextReleaseRequest_ThenReregister(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("release: HTTP %d\n  body: %s", status, body)
 	}
-	if got := jsonGet(body, "ngap.message_type"); got != "UEContextReleaseCommand" {
+	if got := jsonGet(body, "ngap.message_type"); got != ngapUEContextReleaseCommand {
 		t.Fatalf("release ngap.message_type = %q, want UEContextReleaseCommand\n  body: %s", got, body)
 	}
 
@@ -109,7 +101,7 @@ func TestUEContextReleaseRequest_ThenReregister(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("re-register: HTTP %d\n  body: %s", status, body)
 	}
-	if got := jsonGet(body, "nas.message_type"); got != "authentication_request" {
+	if got := jsonGet(body, "nas.message_type"); got != nasAuthenticationRequest {
 		t.Errorf("re-register nas.message_type = %q, want authentication_request\n  body: %s", got, body)
 	}
 }
@@ -126,22 +118,22 @@ func TestUEContextReleaseRequest_NGAPIDFuzz(t *testing.T) {
 		{
 			name:            "AMF UE NGAP ID = 0 (never allocated)",
 			body:            `{"message_type":"ue_context_release_request","amf_ue_ngap_id_override":0}`,
-			wantNGAPMsgType: "ErrorIndication",
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
 			name:            "AMF UE NGAP ID = 99999 (never allocated)",
 			body:            `{"message_type":"ue_context_release_request","amf_ue_ngap_id_override":99999}`,
-			wantNGAPMsgType: "ErrorIndication",
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
 			name:            "RAN UE NGAP ID = 99999 (never allocated)",
 			body:            `{"message_type":"ue_context_release_request","ran_ue_ngap_id_override":99999}`,
-			wantNGAPMsgType: "ErrorIndication",
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
 			name:            "both IDs forged",
 			body:            `{"message_type":"ue_context_release_request","amf_ue_ngap_id_override":99999,"ran_ue_ngap_id_override":99999}`,
-			wantNGAPMsgType: "ErrorIndication",
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 	}
 
@@ -177,7 +169,7 @@ func TestUEContextReleaseRequest_BeforeRegistration(t *testing.T) {
 		t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
 	}
 
-	if got := jsonGet(body, "ngap.message_type"); got != "ErrorIndication" {
+	if got := jsonGet(body, "ngap.message_type"); got != ngapErrorIndication {
 		t.Errorf("ngap.message_type = %q, want ErrorIndication\n  body: %s", got, body)
 	}
 }
@@ -196,7 +188,7 @@ func TestUEContextReleaseRequest_DoubleRelease(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("first release: HTTP %d\n  body: %s", status, body)
 	}
-	if got := jsonGet(body, "ngap.message_type"); got != "UEContextReleaseCommand" {
+	if got := jsonGet(body, "ngap.message_type"); got != ngapUEContextReleaseCommand {
 		t.Fatalf("first release ngap.message_type = %q, want UEContextReleaseCommand\n  body: %s", got, body)
 	}
 
@@ -205,7 +197,7 @@ func TestUEContextReleaseRequest_DoubleRelease(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("second release: HTTP %d\n  body: %s", status, body)
 	}
-	if got := jsonGet(body, "ngap.message_type"); got != "ErrorIndication" {
+	if got := jsonGet(body, "ngap.message_type"); got != ngapErrorIndication {
 		t.Errorf("second release ngap.message_type = %q, want ErrorIndication\n  body: %s", got, body)
 	}
 }
@@ -219,15 +211,16 @@ func TestUEContextReleaseRequest_OutOfRangeCause(t *testing.T) {
 
 	doRegistrationFlow(t, gnbID, ueID)
 
-	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
-		`{"message_type":"ue_context_release_request","release_cause":250}`)
+	body := fmt.Sprintf(`{"message_type":"ue_context_release_request","release_cause":%d}`, causeRadioNetworkOutOfRange)
+
+	status, resp := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap", body)
 	if status != 200 {
-		t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
+		t.Fatalf("HTTP %d, want 200\n  body: %s", status, resp)
 	}
 
-	got := jsonGet(body, "ngap.message_type")
-	if got != "UEContextReleaseCommand" && got != "ErrorIndication" {
-		t.Errorf("ngap.message_type = %q, want UEContextReleaseCommand or ErrorIndication\n  body: %s", got, body)
+	got := jsonGet(resp, "ngap.message_type")
+	if got != ngapUEContextReleaseCommand && got != ngapErrorIndication {
+		t.Errorf("ngap.message_type = %q, want UEContextReleaseCommand or ErrorIndication\n  body: %s", got, resp)
 	}
 }
 
@@ -244,7 +237,7 @@ func TestUEContextReleaseRequest_CommandCarriesCause(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
 	}
-	if got := jsonGet(body, "ngap.message_type"); got != "UEContextReleaseCommand" {
+	if got := jsonGet(body, "ngap.message_type"); got != ngapUEContextReleaseCommand {
 		t.Fatalf("ngap.message_type = %q, want UEContextReleaseCommand\n  body: %s", got, body)
 	}
 	if !strings.Contains(string(body), `"cause"`) {

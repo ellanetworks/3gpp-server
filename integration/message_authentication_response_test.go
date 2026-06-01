@@ -18,57 +18,57 @@ func TestAuthenticationResponse(t *testing.T) {
 			name:            "correct RES* (happy path)",
 			body:            `{"message_type":"authentication_response"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "security_mode_command",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasSecurityModeCommand,
 		},
 		{
 			name:            "wrong RES*: 16 bytes of zeros",
 			body:            `{"message_type":"authentication_response","res_star_override":"00000000000000000000000000000000"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name:            "wrong RES*: 16 bytes of 0xff",
 			body:            `{"message_type":"authentication_response","res_star_override":"ffffffffffffffffffffffffffffffff"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name:            "truncated RES*: 8 bytes",
 			body:            `{"message_type":"authentication_response","res_star_override":"0000000000000000"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  "status_5gmm",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasStatus5GMM,
 		},
 		{
 			name:            "oversized RES*: 32 bytes",
 			body:            `{"message_type":"authentication_response","res_star_override":"0000000000000000000000000000000000000000000000000000000000000000"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name:            "empty RES*",
 			body:            `{"message_type":"authentication_response","res_star_override":""}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name: "raw NAS PDU: valid AuthResponse structure with garbage RES*",
 			body: `{"message_type":"authentication_response","raw_nas_pdu":"7e00572d10deadbeefcafebabe0011223344556677"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name:            "raw NAS PDU: single byte",
 			body:            `{"message_type":"authentication_response","raw_nas_pdu":"7e"}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "DownlinkNASTransport",
+			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
 			name:            "raw NAS PDU: empty → ErrorIndication",
 			body:            `{"message_type":"authentication_response","raw_nas_pdu":""}`,
 			wantHTTP:        200,
-			wantNGAPMsgType: "ErrorIndication",
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 	}
 
@@ -104,5 +104,24 @@ func TestAuthenticationResponse(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestAuthenticationResponse_WithoutChallenge sends an Authentication Response
+// before any registration challenge was received. The server must still put it
+// on the wire (zeroed RES*, no local 400) so the AMF can react — it must not be
+// refused locally and must not hang.
+func TestAuthenticationResponse_WithoutChallenge(t *testing.T) {
+	gnbID := mustCreateGnB(t)
+	ueID := mustCreateUE(t, gnbID)
+
+	// No registration_request first — there is no stored RAND/AUTN.
+	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+		`{"message_type":"authentication_response"}`)
+	if status == 504 {
+		t.Fatalf("authentication response hung (HTTP 504) — message may not have reached the AMF\n  body: %s", body)
+	}
+	if status != 200 {
+		t.Fatalf("HTTP %d, want 200 (message must reach the AMF, not be refused locally)\n  body: %s", status, body)
 	}
 }
