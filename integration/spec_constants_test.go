@@ -15,8 +15,13 @@ import (
 
 // 5GMM cause values — TS 24.501 §9.11.3.2, Table 9.11.3.2.1.
 const (
-	cause5GMMPayloadWasNotForwarded   = 90
-	cause5GMMProtocolErrorUnspecified = 111
+	cause5GMMMACFailure                      = 20
+	cause5GMMSynchFailure                    = 21
+	cause5GMMUESecurityCapabilitiesMismatch  = 23
+	cause5GMMNon5GAuthenticationUnacceptable = 26
+	cause5GMMngKSIAlreadyInUse               = 71
+	cause5GMMPayloadWasNotForwarded          = 90
+	cause5GMMProtocolErrorUnspecified        = 111
 )
 
 // 5GSM cause values — TS 24.501 §9.11.4.2, Table 9.11.4.2.1.
@@ -53,13 +58,15 @@ const (
 // NGAP message-type names as decoded by the server (internal/ngap/decode.go),
 // used as assertion targets for ngap.message_type.
 const (
-	ngapDownlinkNASTransport           = "DownlinkNASTransport"
-	ngapErrorIndication                = "ErrorIndication"
-	ngapInitialContextSetupRequest     = "InitialContextSetupRequest"
-	ngapPDUSessionResourceSetupRequest = "PDUSessionResourceSetupRequest"
-	ngapUEContextReleaseCommand        = "UEContextReleaseCommand"
-	ngapNGSetupResponse                = "NGSetupResponse"
-	ngapNGSetupFailure                 = "NGSetupFailure"
+	ngapDownlinkNASTransport             = "DownlinkNASTransport"
+	ngapErrorIndication                  = "ErrorIndication"
+	ngapInitialContextSetupRequest       = "InitialContextSetupRequest"
+	ngapPDUSessionResourceSetupRequest   = "PDUSessionResourceSetupRequest"
+	ngapUEContextReleaseCommand          = "UEContextReleaseCommand"
+	ngapPDUSessionResourceReleaseCommand = "PDUSessionResourceReleaseCommand"
+	ngapNGSetupResponse                  = "NGSetupResponse"
+	ngapNGSetupFailure                   = "NGSetupFailure"
+	ngapNGResetAcknowledge               = "NGResetAcknowledge"
 )
 
 // NAS message-type names as decoded by the server (internal/nas/decode.go),
@@ -67,6 +74,8 @@ const (
 const (
 	nasAuthenticationRequest         = "authentication_request"
 	nasAuthenticationReject          = "authentication_reject"
+	nasIdentityRequest               = "identity_request"
+	nasPDUSessionReleaseCommand      = "pdu_session_release_command"
 	nasRegistrationAccept            = "registration_accept"
 	nasRegistrationReject            = "registration_reject"
 	nasSecurityModeCommand           = "security_mode_command"

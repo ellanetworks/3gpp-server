@@ -174,6 +174,11 @@ func decodeDLNASTransport(m *gonas.Message, resp *NASResponse) {
 		DecodePDUSessionEstablishmentAccept(resp, inner.GsmMessage)
 	case gonas.MsgTypePDUSessionEstablishmentReject:
 		DecodePDUSessionEstablishmentReject(resp, inner.GsmMessage)
+	case gonas.MsgTypePDUSessionReleaseCommand:
+		if inner.PDUSessionReleaseCommand != nil {
+			cause := inner.PDUSessionReleaseCommand.GetCauseValue()
+			resp.Cause5GSM = &cause
+		}
 	}
 }
 

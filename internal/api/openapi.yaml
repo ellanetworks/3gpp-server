@@ -169,6 +169,46 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
+  /gnb/{gnb_id}/ngap:
+    parameters:
+      - $ref: "#/components/parameters/gnb_id"
+    post:
+      operationId: sendGnBNGAP
+      summary: Send a gNB-level (non-UE-associated) NGAP message
+      description: |
+        Sends a non-UE-associated NGAP message on the gNB's existing N2
+        association and returns the decoded AMF response.
+
+        ## Supported message types
+
+        - `ng_reset` — Sends an NG RESET (TS 38.413 §8.7.4). With no
+          `reset_ue_ids` it resets the whole NG interface; with `reset_ue_ids`
+          it resets only those UEs' associations (partOfNG-Interface). The AMF
+          answers with NG RESET ACKNOWLEDGE.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message_type]
+              properties:
+                message_type:
+                  type: string
+                  enum: [ng_reset]
+                reset_ue_ids:
+                  type: array
+                  items:
+                    type: string
+                  description: "UE IDs whose NG associations to reset (NG Reset). Empty = reset all."
+      responses:
+        "200":
+          description: Decoded AMF response.
+        "404":
+          description: gNB not found.
+        "504":
+          description: No response from the AMF.
+
   /gnb/{gnb_id}/ue/{ue_id}/ngap:
     parameters:
       - $ref: "#/components/parameters/gnb_id"
@@ -486,7 +526,7 @@ components:
         message_type:
           type: string
           description: NAS message to send.
-          enum: [registration_request, authentication_response, security_mode_complete, registration_complete, pdu_session_establishment_request, deregistration_request, ue_context_release_request, service_request]
+          enum: [registration_request, authentication_response, security_mode_complete, registration_complete, pdu_session_establishment_request, deregistration_request, ue_context_release_request, service_request, identity_response, pdu_session_release_request, pdu_session_release_complete, authentication_failure, security_mode_reject]
         raw_nas_pdu:
           type: string
           description: |

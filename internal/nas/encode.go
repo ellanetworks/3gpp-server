@@ -327,6 +327,90 @@ func BuildSecurityModeComplete(regRequestPdu []byte, imeisv string) ([]byte, err
 	return data.Bytes(), nil
 }
 
+// BuildAuthenticationFailure builds an AUTHENTICATION FAILURE with the given
+// 5GMM cause (TS 24.501 §8.2.3). For cause #21 "synch failure" the caller
+// supplies the AUTS re-synchronisation token in the Authentication failure
+// parameter IE.
+func BuildAuthenticationFailure(cause uint8, auts []byte) ([]byte, error) {
+	m := nas.NewMessage()
+	m.GmmMessage = nas.NewGmmMessage()
+	m.GmmHeader.SetMessageType(nas.MsgTypeAuthenticationFailure)
+
+	af := nasMessage.NewAuthenticationFailure(0)
+	af.SetExtendedProtocolDiscriminator(nasMessage.Epd5GSMobilityManagementMessage)
+	af.SetSecurityHeaderType(nas.SecurityHeaderTypePlainNas)
+	af.SetSpareHalfOctet(0)
+	af.SetMessageType(nas.MsgTypeAuthenticationFailure)
+	af.SetCauseValue(cause)
+
+	if len(auts) > 0 {
+		afp := nasType.NewAuthenticationFailureParameter(nasMessage.AuthenticationFailureAuthenticationFailureParameterType)
+		afp.SetLen(uint8(len(auts)))
+		copy(afp.Octet[:], auts)
+		af.AuthenticationFailureParameter = afp
+	}
+
+	m.AuthenticationFailure = af
+
+	data := new(bytes.Buffer)
+	if err := m.GmmMessageEncode(data); err != nil {
+		return nil, fmt.Errorf("GMM encode AuthenticationFailure: %w", err)
+	}
+
+	return data.Bytes(), nil
+}
+
+// BuildSecurityModeReject builds a SECURITY MODE REJECT with the given 5GMM
+// cause (TS 24.501 §8.2.26).
+func BuildSecurityModeReject(cause uint8) ([]byte, error) {
+	m := nas.NewMessage()
+	m.GmmMessage = nas.NewGmmMessage()
+	m.GmmHeader.SetMessageType(nas.MsgTypeSecurityModeReject)
+
+	smr := nasMessage.NewSecurityModeReject(0)
+	smr.SetExtendedProtocolDiscriminator(nasMessage.Epd5GSMobilityManagementMessage)
+	smr.SetSecurityHeaderType(nas.SecurityHeaderTypePlainNas)
+	smr.SetSpareHalfOctet(0)
+	smr.SetMessageType(nas.MsgTypeSecurityModeReject)
+	smr.SetCauseValue(cause)
+
+	m.SecurityModeReject = smr
+
+	data := new(bytes.Buffer)
+	if err := m.GmmMessageEncode(data); err != nil {
+		return nil, fmt.Errorf("GMM encode SecurityModeReject: %w", err)
+	}
+
+	return data.Bytes(), nil
+}
+
+// BuildIdentityResponse builds an IDENTITY RESPONSE carrying the given mobile
+// identity contents (TS 24.501 §8.2.22). The caller supplies the identity bytes
+// matching the type the AMF requested (e.g. the UE's SUCI).
+func BuildIdentityResponse(mobileIdentity []byte) ([]byte, error) {
+	m := nas.NewMessage()
+	m.GmmMessage = nas.NewGmmMessage()
+	m.GmmHeader.SetMessageType(nas.MsgTypeIdentityResponse)
+
+	resp := nasMessage.NewIdentityResponse(0)
+	resp.SetExtendedProtocolDiscriminator(nasMessage.Epd5GSMobilityManagementMessage)
+	resp.SetSecurityHeaderType(nas.SecurityHeaderTypePlainNas)
+	resp.SetSpareHalfOctet(0)
+	resp.SetMessageType(nas.MsgTypeIdentityResponse)
+
+	resp.SetLen(uint16(len(mobileIdentity)))
+	copy(resp.Buffer, mobileIdentity)
+
+	m.IdentityResponse = resp
+
+	data := new(bytes.Buffer)
+	if err := m.GmmMessageEncode(data); err != nil {
+		return nil, fmt.Errorf("GMM encode IdentityResponse: %w", err)
+	}
+
+	return data.Bytes(), nil
+}
+
 func BuildRegistrationComplete() ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()

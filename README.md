@@ -47,8 +47,8 @@ to allow fully granular control over every IE without this escape hatch.
 | AMF Configuration Update | ❌ | ❌ |
 | AMF Configuration Update Acknowledge | ❌ | ❌ |
 | AMF Configuration Update Failure | ❌ | ❌ |
-| NG Reset | ❌ | 🟡 |
-| NG Reset Acknowledge | ❌ | 🟡 |
+| NG Reset | ✅ | 🟡 |
+| NG Reset Acknowledge | — | ✅ |
 | Overload Start | ❌ | ❌ |
 | Overload Stop | ❌ | ❌ |
 | Error Indication | ❌ | 🟡 |
@@ -90,8 +90,8 @@ to allow fully granular control over every IE without this escape hatch.
 | PDU Session Resource Modify Response | ❌ | ❌ |
 | PDU Session Resource Modify Indication | ❌ | ❌ |
 | PDU Session Resource Modify Confirm | ❌ | ❌ |
-| PDU Session Resource Release Command | ❌ | ❌ |
-| PDU Session Resource Release Response | ❌ | ❌ |
+| PDU Session Resource Release Command | — | ✅ |
+| PDU Session Resource Release Response | ✅ | — |
 | PDU Session Resource Notify | ❌ | ❌ |
 
 #### NAS transport
@@ -249,13 +249,13 @@ to allow fully granular control over every IE without this escape hatch.
 | Authentication Request | — | ✅ |
 | Authentication Response | ✅ | 🟡 |
 | Authentication Reject | — | 🟡 |
-| Authentication Failure | ❌ | ❌ |
+| Authentication Failure | ✅ | — |
 | Authentication Result | — | 🟡 |
 | Identity Request | — | ✅ |
-| Identity Response | ❌ | 🟡 |
+| Identity Response | ✅ | 🟡 |
 | Security Mode Command | — | ✅ |
 | Security Mode Complete | ✅ | 🟡 |
-| Security Mode Reject | ❌ | 🟡 |
+| Security Mode Reject | ✅ | 🟡 |
 | 5GMM Status | ❌ | ✅ |
 | Notification | — | ❌ |
 | Notification Response | ❌ | ❌ |
@@ -282,10 +282,10 @@ to allow fully granular control over every IE without this escape hatch.
 | PDU Session Modification Command | — | 🟡 |
 | PDU Session Modification Complete | ❌ | ❌ |
 | PDU Session Modification Command Reject | ❌ | ❌ |
-| PDU Session Release Request | ❌ | 🟡 |
+| PDU Session Release Request | ✅ | 🟡 |
 | PDU Session Release Reject | — | 🟡 |
-| PDU Session Release Command | — | 🟡 |
-| PDU Session Release Complete | ❌ | 🟡 |
+| PDU Session Release Command | — | ✅ |
+| PDU Session Release Complete | ✅ | 🟡 |
 | 5GSM Status | ❌ | ❌ |
 | Service-Level Authentication Command | — | ❌ |
 | Service-Level Authentication Complete | ❌ | ❌ |
