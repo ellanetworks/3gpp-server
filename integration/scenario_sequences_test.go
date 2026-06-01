@@ -1,9 +1,7 @@
 //go:build integration
 
 // Tier-1 procedure-sequence tests: multi-step 5G flows that exercise the core's
-// state machine beyond single-message handling. All are achievable with the
-// existing send capabilities. Assertions follow the spec; a failure here means
-// a real Ella Core deviation, not a test that should be relaxed.
+// state machine beyond single-message handling. Assertions follow the spec.
 
 package integration_test
 

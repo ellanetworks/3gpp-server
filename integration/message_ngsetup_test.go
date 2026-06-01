@@ -79,6 +79,9 @@ func TestNGSetup(t *testing.T) {
 			wantContain: ngapNGSetupResponse,
 		},
 		{
+			// A missing mandatory (reject-criticality) IE must be rejected. TS 38.413
+			// §10.3.5 prefers NG SETUP FAILURE over Error Indication, so assert only
+			// that no NG Setup Response is produced, not the rejection form.
 			name: "custom IEs missing GlobalRANNodeID",
 			body: `{
 				"amf_address":"10.3.0.2:38412", "gnb_n2_address":"10.3.0.3",
@@ -88,7 +91,7 @@ func TestNGSetup(t *testing.T) {
 					{"id":21,"criticality":"ignore","default_paging_drx":3}
 				]
 			}`,
-			wantContain: ngapErrorIndication,
+			wantAbsent: ngapNGSetupResponse,
 		},
 		{
 			name: "custom IEs missing SupportedTAList",
@@ -100,7 +103,7 @@ func TestNGSetup(t *testing.T) {
 					{"id":21,"criticality":"ignore","default_paging_drx":3}
 				]
 			}`,
-			wantContain: ngapErrorIndication,
+			wantAbsent: ngapNGSetupResponse,
 		},
 		{
 			name: "custom IEs missing DefaultPagingDRX (AMF accepts it)",

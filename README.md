@@ -18,6 +18,20 @@ Legend:
 - ❌ — not implemented (neither built nor decoded)
 - — — not used in this direction by the emulated gNB/UE role
 
+### Limitations
+
+Structured message building uses [`github.com/free5gc/nas`](https://github.com/free5gc/nas)
+and `github.com/free5gc/ngap`. Those libraries model a fixed set of IEs, so some
+later-3GPP-release information elements (e.g. the RegistrationRequest extended
+DRX, T3324, UE radio capability ID, requested mapped NSSAI, WUS assistance,
+N5GC indication, NB-N1 mode DRX, UE request type, and paging restriction IEs)
+cannot be set through the structured request fields. To send these — or any
+fully arbitrary or deliberately malformed message — use the `raw_nas_pdu`
+override, which puts caller-supplied bytes directly into the NAS PDU.
+
+We may drop the free5gc dependency in the future and build messages directly,
+to allow fully granular control over every IE without this escape hatch.
+
 ### NGAP (TS 38.413)
 
 #### Interface management

@@ -580,8 +580,6 @@ components:
         ladn_indication:
           type: string
           description: LADN indication (hex).
-        payload_container_type:
-          type: integer
         payload_container:
           type: string
           description: Payload container (hex).

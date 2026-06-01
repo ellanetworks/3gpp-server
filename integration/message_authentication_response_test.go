@@ -39,8 +39,9 @@ func TestAuthenticationResponse(t *testing.T) {
 			wantNASMsgType:  nasAuthenticationReject,
 		},
 		{
-			// A short RES* yields a syntactically invalid Authentication
-			// Response: the AMF returns 5GMM STATUS #111 (TS 24.501 §7.8).
+			// The free5gc NAS decoder requires a 16-octet RES*, so a shorter one
+			// makes the message undecodable and the AMF returns 5GMM STATUS #111
+			// rather than the §5.4.1.3.5 reject.
 			name:             "truncated RES*: 8 bytes",
 			body:             `{"message_type":"authentication_response","res_star_override":"0000000000000000"}`,
 			wantHTTP:         200,
@@ -57,12 +58,14 @@ func TestAuthenticationResponse(t *testing.T) {
 			wantNASMsgType:  nasAuthenticationReject,
 		},
 		{
-			name:             "empty RES*",
-			body:             `{"message_type":"authentication_response","res_star_override":""}`,
-			wantHTTP:         200,
-			wantNGAPMsgType:  ngapDownlinkNASTransport,
-			wantNASMsgType:   nasStatus5GMM,
-			wantNASCause5GMM: cause5GMMProtocolErrorUnspecified,
+			// With the Authentication response parameter IE omitted there is no
+			// RES* to verify, so the AMF rejects authentication (TS 24.501
+			// §5.4.1.3.5).
+			name:            "empty RES*",
+			body:            `{"message_type":"authentication_response","res_star_override":""}`,
+			wantHTTP:        200,
+			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasAuthenticationReject,
 		},
 		{
 			name:            "raw NAS PDU: valid AuthResponse structure with garbage RES*",

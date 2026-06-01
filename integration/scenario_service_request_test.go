@@ -212,9 +212,8 @@ func TestServiceRequest_WhileConnected(t *testing.T) {
 }
 
 // TestServiceRequest_AfterDeregistration sends a Service Request after the UE
-// has fully deregistered. The AMF no longer holds the context, so per
-// TS 24.501 §5.6.1.5 it must answer with a SERVICE REJECT (not a Service
-// Accept, and not silence).
+// has fully deregistered. With no context for the UE, the AMF must answer with
+// a SERVICE REJECT (TS 24.501 §5.6.1.5).
 func TestServiceRequest_AfterDeregistration(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)

@@ -228,6 +228,7 @@ func handleSecurityModeComplete(w http.ResponseWriter, r *http.Request, gnb *sto
 			Guti:             ue.Guti,
 			SecurityCap:      ue.UeSecurityCapability,
 			NgKsi:            ue.NgKsi,
+			Overrides:        req,
 		})
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, fmt.Sprintf("build inner RegistrationRequest: %v", err))
