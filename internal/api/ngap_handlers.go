@@ -62,6 +62,12 @@ func (h *Handler) SendNGAP(w http.ResponseWriter, r *http.Request) {
 		handleUEContextReleaseRequest(w, r, gnb, ue, t, &req)
 	case "service_request":
 		handleServiceRequest(w, r, gnb, ue, t, &req)
+	case "identity_response":
+		handleIdentityResponse(w, r, gnb, ue, t, &req)
+	case "pdu_session_release_request":
+		handlePDUSessionReleaseRequest(w, r, gnb, ue, t, &req)
+	case "pdu_session_release_complete":
+		handlePDUSessionReleaseComplete(w, r, gnb, ue, t, &req)
 	default:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unsupported message_type: %s", req.MessageType))
 	}
@@ -531,6 +537,159 @@ func handleUEContextReleaseRequest(w http.ResponseWriter, r *http.Request, gnb *
 	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
 }
 
+// handleIdentityResponse answers an AMF IDENTITY REQUEST (TS 24.501 §5.4.3).
+// It replies with the UE's SUCI by default; mobile_identity_override supplies a
+// different identity (e.g. an IMEISV when the AMF requested the PEI). The
+// response is sent plain before a security context exists, secured otherwise.
+func handleIdentityResponse(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
+	var nasPDU []byte
+
+	if req.RawNASPDU != nil {
+		raw, err := hex.DecodeString(*req.RawNASPDU)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("decode raw_nas_pdu: %v", err))
+			return
+		}
+
+		nasPDU = raw
+	} else {
+		mobileIdentity := ue.Suci.Buffer
+		if req.MobileIdentityOverride != nil {
+			b, err := hex.DecodeString(*req.MobileIdentityOverride)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, fmt.Sprintf("decode mobile_identity_override: %v", err))
+				return
+			}
+
+			mobileIdentity = b
+		}
+
+		idPDU, err := nasCodec.BuildIdentityResponse(mobileIdentity)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("build IdentityResponse: %v", err))
+			return
+		}
+
+		nasPDU = idPDU
+
+		if len(ue.Kamf) > 0 {
+			nasPDU, err = nasCodec.EncodeNasPduWithSecurity(ue, idPDU, gonas.SecurityHeaderTypeIntegrityProtectedAndCiphered)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, fmt.Sprintf("NAS security encode: %v", err))
+				return
+			}
+		}
+	}
+
+	sendUplinkAndWait(w, r, gnb, ue, t, req, nasPDU, "DownlinkNASTransport", "InitialContextSetupRequest", "ErrorIndication")
+}
+
+// pduSessionIDForRelease resolves the PDU session ID to release, defaulting to
+// the UE's configured session.
+func pduSessionIDForRelease(ue *store.UEContext) uint8 {
+	if ue.PDUSessionID >= 1 && ue.PDUSessionID <= 15 {
+		return ue.PDUSessionID
+	}
+
+	return 1
+}
+
+// handlePDUSessionReleaseRequest sends a UE-requested PDU SESSION RELEASE
+// REQUEST (TS 24.501 §6.3.3). The SMF answers with a PDU Session Resource
+// Release Command carrying the NAS Release Command; the gNB auto-replies with a
+// Release Response (in sendRawAndWait).
+func handlePDUSessionReleaseRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
+	pduSessionID := pduSessionIDForRelease(ue)
+
+	var inner []byte
+
+	if req.RawNASPDU != nil {
+		raw, err := hex.DecodeString(*req.RawNASPDU)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("decode raw_nas_pdu: %v", err))
+			return
+		}
+
+		inner = raw
+	} else {
+		relReq, err := nasCodec.BuildPDUSessionReleaseRequest(pduSessionID, 0x01)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("build PDUSessionReleaseRequest: %v", err))
+			return
+		}
+
+		inner = relReq
+	}
+
+	ulNas, err := nasCodec.BuildULNASTransportExisting(pduSessionID, inner)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build ULNASTransport: %v", err))
+		return
+	}
+
+	secured, err := nasCodec.EncodeNasPduWithSecurity(ue, ulNas, gonas.SecurityHeaderTypeIntegrityProtectedAndCiphered)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NAS security encode: %v", err))
+		return
+	}
+
+	sendUplinkAndWait(w, r, gnb, ue, t, req, secured, "PDUSessionResourceReleaseCommand", "DownlinkNASTransport", "ErrorIndication")
+}
+
+// handlePDUSessionReleaseComplete sends a PDU SESSION RELEASE COMPLETE
+// (TS 24.501 §6.3.3). The network does not answer, so this is fire-and-forget.
+func handlePDUSessionReleaseComplete(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
+	pduSessionID := pduSessionIDForRelease(ue)
+
+	var inner []byte
+
+	if req.RawNASPDU != nil {
+		raw, err := hex.DecodeString(*req.RawNASPDU)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("decode raw_nas_pdu: %v", err))
+			return
+		}
+
+		inner = raw
+	} else {
+		cmp, err := nasCodec.BuildPDUSessionReleaseComplete(pduSessionID, 0x01)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("build PDUSessionReleaseComplete: %v", err))
+			return
+		}
+
+		inner = cmp
+	}
+
+	ulNas, err := nasCodec.BuildULNASTransportExisting(pduSessionID, inner)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build ULNASTransport: %v", err))
+		return
+	}
+
+	secured, err := nasCodec.EncodeNasPduWithSecurity(ue, ulNas, gonas.SecurityHeaderTypeIntegrityProtectedAndCiphered)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NAS security encode: %v", err))
+		return
+	}
+
+	encoded, err := ngap.BuildUplinkNASTransport(
+		ue.AmfUeNgapID, ue.RanUeNgapID, secured,
+		gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, uplinkOverrides(req),
+	)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NGAP encode: %v", err))
+		return
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{})
+}
+
 // fiveGSTMSIFromGUTI derives the 5G-S-TMSI IE (for the Initial UE Message)
 // from a stored GUTI. The AMF Set ID is a 10-bit field and the AMF Pointer a
 // 6-bit field; both are left-aligned into their octets per the NGAP BitString
@@ -793,6 +952,14 @@ func sendRawAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GnBContex
 	if ngapResp.MessageType == "InitialContextSetupRequest" {
 		if icsResp, berr := ngap.BuildInitialContextSetupResponse(ue.AmfUeNgapID, ue.RanUeNgapID); berr == nil {
 			_ = t.Send(icsResp, false)
+		}
+	}
+
+	// A gNB answers a PDU Session Resource Release Command by releasing the
+	// resources and returning a Release Response.
+	if ngapResp.MessageType == "PDUSessionResourceReleaseCommand" {
+		if relResp, berr := ngap.BuildPDUSessionResourceReleaseResponse(ue.AmfUeNgapID, ue.RanUeNgapID); berr == nil {
+			_ = t.Send(relResp, false)
 		}
 	}
 

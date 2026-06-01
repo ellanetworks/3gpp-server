@@ -113,6 +113,87 @@ func BuildULNASTransport(pduSessionID uint8, payloadContainer []byte, dnn string
 	return data.Bytes(), nil
 }
 
+// BuildPDUSessionReleaseRequest builds a UE-requested PDU SESSION RELEASE
+// REQUEST (TS 24.501 §8.3.8). The PTI is UE-allocated and echoed by the network
+// in the resulting Release Command.
+func BuildPDUSessionReleaseRequest(pduSessionID, pti uint8) ([]byte, error) {
+	m := gonas.NewMessage()
+	m.GsmMessage = gonas.NewGsmMessage()
+	m.GsmHeader.SetMessageType(gonas.MsgTypePDUSessionReleaseRequest)
+
+	req := nasMessage.NewPDUSessionReleaseRequest(0)
+	req.SetExtendedProtocolDiscriminator(nasMessage.Epd5GSSessionManagementMessage)
+	req.SetMessageType(gonas.MsgTypePDUSessionReleaseRequest)
+	req.SetPDUSessionID(pduSessionID)
+	req.SetPTI(pti)
+
+	m.PDUSessionReleaseRequest = req
+
+	data := new(bytes.Buffer)
+	if err := m.GsmMessageEncode(data); err != nil {
+		return nil, fmt.Errorf("GSM encode PDUSessionReleaseRequest: %w", err)
+	}
+
+	return data.Bytes(), nil
+}
+
+// BuildPDUSessionReleaseComplete builds a PDU SESSION RELEASE COMPLETE
+// (TS 24.501 §8.3.10), acknowledging a Release Command. The PTI matches the one
+// the network used in the command.
+func BuildPDUSessionReleaseComplete(pduSessionID, pti uint8) ([]byte, error) {
+	m := gonas.NewMessage()
+	m.GsmMessage = gonas.NewGsmMessage()
+	m.GsmHeader.SetMessageType(gonas.MsgTypePDUSessionReleaseComplete)
+
+	cmp := nasMessage.NewPDUSessionReleaseComplete(0)
+	cmp.SetExtendedProtocolDiscriminator(nasMessage.Epd5GSSessionManagementMessage)
+	cmp.SetMessageType(gonas.MsgTypePDUSessionReleaseComplete)
+	cmp.SetPDUSessionID(pduSessionID)
+	cmp.SetPTI(pti)
+
+	m.PDUSessionReleaseComplete = cmp
+
+	data := new(bytes.Buffer)
+	if err := m.GsmMessageEncode(data); err != nil {
+		return nil, fmt.Errorf("GSM encode PDUSessionReleaseComplete: %w", err)
+	}
+
+	return data.Bytes(), nil
+}
+
+// BuildULNASTransportExisting wraps a 5GSM message for an existing PDU session
+// (release, modification) in a UL NAS TRANSPORT. Unlike BuildULNASTransport it
+// omits the Request Type, DNN and S-NSSAI IEs, which are establishment-only;
+// their absence makes the AMF forward the message to the SMF for the existing
+// session rather than treating it as a new/duplicate session (TS 24.501 §8.2.10).
+func BuildULNASTransportExisting(pduSessionID uint8, payloadContainer []byte) ([]byte, error) {
+	m := gonas.NewMessage()
+	m.GmmMessage = gonas.NewGmmMessage()
+	m.GmmHeader.SetMessageType(gonas.MsgTypeULNASTransport)
+
+	ul := nasMessage.NewULNASTransport(0)
+	ul.SetSecurityHeaderType(gonas.SecurityHeaderTypePlainNas)
+	ul.SetMessageType(gonas.MsgTypeULNASTransport)
+	ul.SetExtendedProtocolDiscriminator(nasMessage.Epd5GSMobilityManagementMessage)
+
+	ul.PduSessionID2Value = new(nasType.PduSessionID2Value)
+	ul.PduSessionID2Value.SetIei(nasMessage.ULNASTransportPduSessionID2ValueType)
+	ul.SetPduSessionID2Value(pduSessionID)
+
+	ul.SetPayloadContainerType(nasMessage.PayloadContainerTypeN1SMInfo)
+	ul.PayloadContainer.SetLen(uint16(len(payloadContainer)))
+	ul.SetPayloadContainerContents(payloadContainer)
+
+	m.ULNASTransport = ul
+
+	data := new(bytes.Buffer)
+	if err := m.GmmMessageEncode(data); err != nil {
+		return nil, fmt.Errorf("GMM encode: %w", err)
+	}
+
+	return data.Bytes(), nil
+}
+
 func DecodePDUSessionEstablishmentAccept(nasResp *NASResponse, gsmMsg *gonas.GsmMessage) {
 	if gsmMsg == nil || gsmMsg.PDUSessionEstablishmentAccept == nil {
 		return

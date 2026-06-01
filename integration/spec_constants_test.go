@@ -53,13 +53,14 @@ const (
 // NGAP message-type names as decoded by the server (internal/ngap/decode.go),
 // used as assertion targets for ngap.message_type.
 const (
-	ngapDownlinkNASTransport           = "DownlinkNASTransport"
-	ngapErrorIndication                = "ErrorIndication"
-	ngapInitialContextSetupRequest     = "InitialContextSetupRequest"
-	ngapPDUSessionResourceSetupRequest = "PDUSessionResourceSetupRequest"
-	ngapUEContextReleaseCommand        = "UEContextReleaseCommand"
-	ngapNGSetupResponse                = "NGSetupResponse"
-	ngapNGSetupFailure                 = "NGSetupFailure"
+	ngapDownlinkNASTransport             = "DownlinkNASTransport"
+	ngapErrorIndication                  = "ErrorIndication"
+	ngapInitialContextSetupRequest       = "InitialContextSetupRequest"
+	ngapPDUSessionResourceSetupRequest   = "PDUSessionResourceSetupRequest"
+	ngapUEContextReleaseCommand          = "UEContextReleaseCommand"
+	ngapPDUSessionResourceReleaseCommand = "PDUSessionResourceReleaseCommand"
+	ngapNGSetupResponse                  = "NGSetupResponse"
+	ngapNGSetupFailure                   = "NGSetupFailure"
 )
 
 // NAS message-type names as decoded by the server (internal/nas/decode.go),
@@ -67,6 +68,8 @@ const (
 const (
 	nasAuthenticationRequest         = "authentication_request"
 	nasAuthenticationReject          = "authentication_reject"
+	nasIdentityRequest               = "identity_request"
+	nasPDUSessionReleaseCommand      = "pdu_session_release_command"
 	nasRegistrationAccept            = "registration_accept"
 	nasRegistrationReject            = "registration_reject"
 	nasSecurityModeCommand           = "security_mode_command"

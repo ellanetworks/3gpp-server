@@ -66,6 +66,41 @@ func decodeInitiatingMessage(im *ngapType.InitiatingMessage, resp *NGAPResponse)
 		decodePDUSessionResourceSetupRequest(im.Value.PDUSessionResourceSetupRequest, resp)
 	case ngapType.InitiatingMessagePresentUEContextReleaseCommand:
 		decodeUEContextReleaseCommand(im.Value.UEContextReleaseCommand, resp)
+	case ngapType.InitiatingMessagePresentPDUSessionResourceReleaseCommand:
+		decodePDUSessionResourceReleaseCommand(im.Value.PDUSessionResourceReleaseCommand, resp)
+	}
+}
+
+func decodePDUSessionResourceReleaseCommand(msg *ngapType.PDUSessionResourceReleaseCommand, resp *NGAPResponse) {
+	if msg == nil {
+		return
+	}
+
+	for _, ie := range msg.ProtocolIEs.List {
+		decoded := IE{
+			ID:          ie.Id.Value,
+			Criticality: criticalityToString(ie.Criticality.Value),
+		}
+
+		switch ie.Id.Value {
+		case ngapType.ProtocolIEIDAMFUENGAPID:
+			if ie.Value.AMFUENGAPID != nil {
+				v := ie.Value.AMFUENGAPID.Value
+				decoded.AmfUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDRANUENGAPID:
+			if ie.Value.RANUENGAPID != nil {
+				v := ie.Value.RANUENGAPID.Value
+				decoded.RanUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDNASPDU:
+			if ie.Value.NASPDU != nil {
+				s := hex.EncodeToString(ie.Value.NASPDU.Value)
+				decoded.NasPDU = &s
+			}
+		}
+
+		resp.IEs = append(resp.IEs, decoded)
 	}
 }
 
@@ -438,6 +473,8 @@ func getInitiatingMessageName(msgType int) string {
 		return "InitialContextSetupRequest"
 	case ngapType.InitiatingMessagePresentPDUSessionResourceSetupRequest:
 		return "PDUSessionResourceSetupRequest"
+	case ngapType.InitiatingMessagePresentPDUSessionResourceReleaseCommand:
+		return "PDUSessionResourceReleaseCommand"
 	case ngapType.InitiatingMessagePresentUEContextReleaseCommand:
 		return "UEContextReleaseCommand"
 	case ngapType.InitiatingMessagePresentPaging:

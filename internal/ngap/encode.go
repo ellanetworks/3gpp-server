@@ -659,6 +659,38 @@ func BuildPDUSessionResourceSetupResponse(amfUeNgapID, ranUeNgapID int64) ([]byt
 	return ngap.Encoder(pdu)
 }
 
+func BuildPDUSessionResourceReleaseResponse(amfUeNgapID, ranUeNgapID int64) ([]byte, error) {
+	pdu := ngapType.NGAPPDU{}
+	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome
+	pdu.SuccessfulOutcome = new(ngapType.SuccessfulOutcome)
+
+	so := pdu.SuccessfulOutcome
+	so.ProcedureCode.Value = ngapType.ProcedureCodePDUSessionResourceRelease
+	so.Criticality.Value = ngapType.CriticalityPresentReject
+	so.Value.Present = ngapType.SuccessfulOutcomePresentPDUSessionResourceReleaseResponse
+	so.Value.PDUSessionResourceReleaseResponse = new(ngapType.PDUSessionResourceReleaseResponse)
+
+	ies := &so.Value.PDUSessionResourceReleaseResponse.ProtocolIEs
+
+	amfIE := ngapType.PDUSessionResourceReleaseResponseIEs{}
+	amfIE.Id.Value = ngapType.ProtocolIEIDAMFUENGAPID
+	amfIE.Criticality.Value = ngapType.CriticalityPresentIgnore
+	amfIE.Value.Present = ngapType.PDUSessionResourceReleaseResponseIEsPresentAMFUENGAPID
+	amfIE.Value.AMFUENGAPID = new(ngapType.AMFUENGAPID)
+	amfIE.Value.AMFUENGAPID.Value = amfUeNgapID
+	ies.List = append(ies.List, amfIE)
+
+	ranIE := ngapType.PDUSessionResourceReleaseResponseIEs{}
+	ranIE.Id.Value = ngapType.ProtocolIEIDRANUENGAPID
+	ranIE.Criticality.Value = ngapType.CriticalityPresentIgnore
+	ranIE.Value.Present = ngapType.PDUSessionResourceReleaseResponseIEsPresentRANUENGAPID
+	ranIE.Value.RANUENGAPID = new(ngapType.RANUENGAPID)
+	ranIE.Value.RANUENGAPID.Value = ranUeNgapID
+	ies.List = append(ies.List, ranIE)
+
+	return ngap.Encoder(pdu)
+}
+
 func BuildInitialContextSetupResponse(amfUeNgapID, ranUeNgapID int64) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome

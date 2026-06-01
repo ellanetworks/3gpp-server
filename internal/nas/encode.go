@@ -327,6 +327,33 @@ func BuildSecurityModeComplete(regRequestPdu []byte, imeisv string) ([]byte, err
 	return data.Bytes(), nil
 }
 
+// BuildIdentityResponse builds an IDENTITY RESPONSE carrying the given mobile
+// identity contents (TS 24.501 §8.2.22). The caller supplies the identity bytes
+// matching the type the AMF requested (e.g. the UE's SUCI).
+func BuildIdentityResponse(mobileIdentity []byte) ([]byte, error) {
+	m := nas.NewMessage()
+	m.GmmMessage = nas.NewGmmMessage()
+	m.GmmHeader.SetMessageType(nas.MsgTypeIdentityResponse)
+
+	resp := nasMessage.NewIdentityResponse(0)
+	resp.SetExtendedProtocolDiscriminator(nasMessage.Epd5GSMobilityManagementMessage)
+	resp.SetSecurityHeaderType(nas.SecurityHeaderTypePlainNas)
+	resp.SetSpareHalfOctet(0)
+	resp.SetMessageType(nas.MsgTypeIdentityResponse)
+
+	resp.SetLen(uint16(len(mobileIdentity)))
+	copy(resp.Buffer, mobileIdentity)
+
+	m.IdentityResponse = resp
+
+	data := new(bytes.Buffer)
+	if err := m.GmmMessageEncode(data); err != nil {
+		return nil, fmt.Errorf("GMM encode IdentityResponse: %w", err)
+	}
+
+	return data.Bytes(), nil
+}
+
 func BuildRegistrationComplete() ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
