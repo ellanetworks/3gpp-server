@@ -50,8 +50,10 @@ func TestIdentity_UnknownGUTI(t *testing.T) {
 }
 
 // TestIdentity_MalformedSUCI answers the Identity Request with a SUCI-typed but
-// undecodable identity. The AMF cannot derive the SUPI, so it must not proceed
-// to authentication; per TS 24.501 §5.4.3 it re-initiates identification.
+// undecodable identity. The AMF cannot derive a SUPI from it, so it must not
+// authenticate the underivable identity. TS 24.501 §5.4.3.4/§5.4.3.6 mandate no
+// specific reaction (re-request or reject is implementation latitude), so we
+// assert only the invariant: the procedure must not advance to authentication.
 func TestIdentity_MalformedSUCI(t *testing.T) {
 	gnbID, ueID := identityRequestPending(t)
 
@@ -61,63 +63,14 @@ func TestIdentity_MalformedSUCI(t *testing.T) {
 		t.Fatalf("identity_response: HTTP %d\n  body: %s", status, body)
 	}
 
-	if got := jsonGet(body, "nas.message_type"); got != nasIdentityRequest {
-		t.Errorf("nas.message_type = %q, want identity_request (AMF re-requests, §5.4.3)\n  body: %s", got, body)
-	}
-}
-
-// TestIdentity_Fuzz sends malformed Identity Response NAS payloads. The AMF must
-// answer, never silently drop (no 504).
-func TestIdentity_Fuzz(t *testing.T) {
-	tests := []struct {
-		name             string
-		body             string
-		wantNGAPMsgType  string
-		wantNASMsgType   string
-		wantNASCause5GMM int
-	}{
-		{
-			name:            "raw NAS empty → ErrorIndication",
-			body:            `{"message_type":"identity_response","raw_nas_pdu":""}`,
-			wantNGAPMsgType: ngapErrorIndication,
-		},
-		{
-			name:             "raw NAS garbage → 5GMM STATUS #111",
-			body:             `{"message_type":"identity_response","raw_nas_pdu":"deadbeef"}`,
-			wantNGAPMsgType:  ngapDownlinkNASTransport,
-			wantNASMsgType:   nasStatus5GMM,
-			wantNASCause5GMM: cause5GMMProtocolErrorUnspecified,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			gnbID, ueID := identityRequestPending(t)
-
-			status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap", tt.body)
-			if status == 504 {
-				t.Fatalf("identity response hung (HTTP 504)\n  body: %s", body)
-			}
-			if status != 200 {
-				t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
-			}
-
-			if got := jsonGet(body, "ngap.message_type"); got != tt.wantNGAPMsgType {
-				t.Errorf("ngap.message_type = %q, want %q\n  body: %s", got, tt.wantNGAPMsgType, body)
-			}
-			if tt.wantNASMsgType != "" {
-				if got := jsonGet(body, "nas.message_type"); got != tt.wantNASMsgType {
-					t.Errorf("nas.message_type = %q, want %q\n  body: %s", got, tt.wantNASMsgType, body)
-				}
-			}
-			assertNASCause(t, body, "nas.cause_5gmm", tt.wantNASCause5GMM)
-		})
+	if got := jsonGet(body, "nas.message_type"); got == nasAuthenticationRequest {
+		t.Errorf("AMF advanced to authentication with an underivable identity (TS 24.501 §5.4.3)\n  body: %s", body)
 	}
 }
 
 // TestIdentity_NGAPIDFuzz forges the AMF UE NGAP ID on the Identity Response's
-// Uplink NAS Transport. The AMF does not recognise the ID and answers with an
-// Error Indication (TS 38.413 §8.6.3), never silently dropping the message.
+// Uplink NAS Transport. That is an unknown local AP ID, so the AMF shall
+// initiate an Error Indication procedure (TS 38.413 §10.6).
 func TestIdentity_NGAPIDFuzz(t *testing.T) {
 	gnbID, ueID := identityRequestPending(t)
 

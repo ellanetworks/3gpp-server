@@ -37,9 +37,10 @@ func securityModePending(t *testing.T) (string, string) {
 }
 
 // TestSecurityModeReject sends a Security Mode Reject (#23 UE security
-// capabilities mismatch). Per TS 24.501 §5.4.2.5 the AMF aborts the ongoing
-// registration; it must not complete it. The procedure is torn down via a UE
-// Context Release Command.
+// capabilities mismatch). Per TS 24.501 §5.4.2.5 the AMF shall abort the
+// ongoing registration — so it must not complete it. The spec does not mandate
+// a specific abort message, so we accept either form of abort (UE Context
+// Release Command, or a Registration Reject) and require it not be accepted.
 func TestSecurityModeReject(t *testing.T) {
 	gnbID, ueID := securityModePending(t)
 
@@ -49,17 +50,20 @@ func TestSecurityModeReject(t *testing.T) {
 		t.Fatalf("HTTP %d, want 200\n  body: %s", status, resp)
 	}
 
-	if got := jsonGet(resp, "ngap.message_type"); got != ngapUEContextReleaseCommand {
-		t.Errorf("ngap.message_type = %q, want UEContextReleaseCommand (procedure aborted, TS 24.501 §5.4.2.5)\n  body: %s", got, resp)
-	}
-	if got := jsonGet(resp, "nas.message_type"); got == nasRegistrationAccept {
+	ngapMsg := jsonGet(resp, "ngap.message_type")
+	nasMsg := jsonGet(resp, "nas.message_type")
+
+	if nasMsg == nasRegistrationAccept {
 		t.Errorf("AMF completed registration after a Security Mode Reject (TS 24.501 §5.4.2.5)\n  body: %s", resp)
+	}
+	if ngapMsg != ngapUEContextReleaseCommand && nasMsg != nasRegistrationReject {
+		t.Errorf("AMF did not abort the procedure after a Security Mode Reject (ngap=%q nas=%q, TS 24.501 §5.4.2.5)\n  body: %s", ngapMsg, nasMsg, resp)
 	}
 }
 
 // TestSecurityModeReject_NGAPIDFuzz forges the AMF UE NGAP ID on the Security
-// Mode Reject's Uplink NAS Transport. The AMF does not recognise the ID and
-// answers with an Error Indication (TS 38.413 §8.6.3).
+// Mode Reject's Uplink NAS Transport. That is an unknown local AP ID, so the
+// AMF shall initiate an Error Indication procedure (TS 38.413 §10.6).
 func TestSecurityModeReject_NGAPIDFuzz(t *testing.T) {
 	gnbID, ueID := securityModePending(t)
 
