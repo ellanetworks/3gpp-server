@@ -74,6 +74,10 @@ type NASRequest struct {
 
 	// Follow-On Request indicator (FOR bit)
 	FollowOnRequest *uint8 `json:"follow_on_request,omitempty"`
+
+	// Cause5GMM is the 5GMM cause sent in a UE-originated reject/failure
+	// (Authentication Failure, Security Mode Reject), TS 24.501 §9.11.3.2.
+	Cause5GMM *uint8 `json:"cause_5gmm,omitempty"`
 }
 
 type SNSSAIJSON struct {

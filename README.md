@@ -249,13 +249,13 @@ to allow fully granular control over every IE without this escape hatch.
 | Authentication Request | — | ✅ |
 | Authentication Response | ✅ | 🟡 |
 | Authentication Reject | — | 🟡 |
-| Authentication Failure | ❌ | ❌ |
+| Authentication Failure | ✅ | — |
 | Authentication Result | — | 🟡 |
 | Identity Request | — | ✅ |
 | Identity Response | ✅ | 🟡 |
 | Security Mode Command | — | ✅ |
 | Security Mode Complete | ✅ | 🟡 |
-| Security Mode Reject | ❌ | 🟡 |
+| Security Mode Reject | ✅ | 🟡 |
 | 5GMM Status | ❌ | ✅ |
 | Notification | — | ❌ |
 | Notification Response | ❌ | ❌ |

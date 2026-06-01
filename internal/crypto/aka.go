@@ -59,6 +59,33 @@ func ComputeResStar(k, opc, sqn, supi, snn string, rand, autn []byte) (*AKAResul
 	}, nil
 }
 
+// ComputeAUTS derives the re-synchronisation token AUTS (TS 33.102 §6.3.5)
+// from the UE's credentials and the RAND from the Authentication Request. It is
+// returned in an Authentication Failure with 5GMM cause #21 "synch failure".
+func ComputeAUTS(k, opc, sqn string, rand []byte) ([]byte, error) {
+	opcBytes, err := hex.DecodeString(opc)
+	if err != nil {
+		return nil, fmt.Errorf("decode OPc: %v", err)
+	}
+
+	kBytes, err := hex.DecodeString(k)
+	if err != nil {
+		return nil, fmt.Errorf("decode K: %v", err)
+	}
+
+	sqnBytes, err := hex.DecodeString(sqn)
+	if err != nil {
+		return nil, fmt.Errorf("decode SQN: %v", err)
+	}
+
+	auts, err := milenage.GenerateAUTS(opcBytes, kBytes, rand, sqnBytes)
+	if err != nil {
+		return nil, fmt.Errorf("generate AUTS: %v", err)
+	}
+
+	return auts, nil
+}
+
 func computeResStar(key []byte, snName string, rand, res []byte) ([]byte, error) {
 	FC := ueauth.FC_FOR_RES_STAR_XRES_STAR_DERIVATION
 	kdfVal, err := ueauth.GetKDFValue(key, FC,

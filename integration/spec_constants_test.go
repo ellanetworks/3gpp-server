@@ -15,8 +15,13 @@ import (
 
 // 5GMM cause values — TS 24.501 §9.11.3.2, Table 9.11.3.2.1.
 const (
-	cause5GMMPayloadWasNotForwarded   = 90
-	cause5GMMProtocolErrorUnspecified = 111
+	cause5GMMMACFailure                      = 20
+	cause5GMMSynchFailure                    = 21
+	cause5GMMUESecurityCapabilitiesMismatch  = 23
+	cause5GMMNon5GAuthenticationUnacceptable = 26
+	cause5GMMngKSIAlreadyInUse               = 71
+	cause5GMMPayloadWasNotForwarded          = 90
+	cause5GMMProtocolErrorUnspecified        = 111
 )
 
 // 5GSM cause values — TS 24.501 §9.11.4.2, Table 9.11.4.2.1.

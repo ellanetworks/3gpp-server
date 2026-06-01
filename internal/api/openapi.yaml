@@ -486,7 +486,7 @@ components:
         message_type:
           type: string
           description: NAS message to send.
-          enum: [registration_request, authentication_response, security_mode_complete, registration_complete, pdu_session_establishment_request, deregistration_request, ue_context_release_request, service_request, identity_response, pdu_session_release_request, pdu_session_release_complete]
+          enum: [registration_request, authentication_response, security_mode_complete, registration_complete, pdu_session_establishment_request, deregistration_request, ue_context_release_request, service_request, identity_response, pdu_session_release_request, pdu_session_release_complete, authentication_failure, security_mode_reject]
         raw_nas_pdu:
           type: string
           description: |

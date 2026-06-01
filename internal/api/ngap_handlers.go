@@ -14,6 +14,7 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/store"
 	"github.com/ellanetworks/3gpp-server/internal/transport"
 	gonas "github.com/free5gc/nas"
+	"github.com/free5gc/nas/nasMessage"
 	"github.com/free5gc/nas/nasType"
 )
 
@@ -68,6 +69,10 @@ func (h *Handler) SendNGAP(w http.ResponseWriter, r *http.Request) {
 		handlePDUSessionReleaseRequest(w, r, gnb, ue, t, &req)
 	case "pdu_session_release_complete":
 		handlePDUSessionReleaseComplete(w, r, gnb, ue, t, &req)
+	case "authentication_failure":
+		handleAuthenticationFailure(w, r, gnb, ue, t, &req)
+	case "security_mode_reject":
+		handleSecurityModeReject(w, r, gnb, ue, t, &req)
 	default:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unsupported message_type: %s", req.MessageType))
 	}
@@ -690,6 +695,84 @@ func handlePDUSessionReleaseComplete(w http.ResponseWriter, r *http.Request, gnb
 	writeJSON(w, http.StatusOK, SendNGAPResponse{})
 }
 
+// handleAuthenticationFailure sends an AUTHENTICATION FAILURE in response to an
+// Authentication Request (TS 24.501 §5.4.1.3.6). The 5GMM cause defaults to #20
+// "MAC failure"; for #21 "synch failure" a valid AUTS is computed from the UE's
+// credentials and the last received RAND.
+func handleAuthenticationFailure(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
+	var nasPDU []byte
+
+	if req.RawNASPDU != nil {
+		raw, err := hex.DecodeString(*req.RawNASPDU)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("decode raw_nas_pdu: %v", err))
+			return
+		}
+
+		nasPDU = raw
+	} else {
+		cause := uint8(nasMessage.Cause5GMMMACFailure)
+		if req.Cause5GMM != nil {
+			cause = *req.Cause5GMM
+		}
+
+		var auts []byte
+
+		if cause == nasMessage.Cause5GMMSynchFailure {
+			a, err := crypto.ComputeAUTS(ue.K, ue.OPc, ue.Sqn, ue.LastRAND)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, fmt.Sprintf("compute AUTS: %v", err))
+				return
+			}
+
+			auts = a
+		}
+
+		pdu, err := nasCodec.BuildAuthenticationFailure(cause, auts)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("build AuthenticationFailure: %v", err))
+			return
+		}
+
+		nasPDU = pdu
+	}
+
+	sendUplinkAndWait(w, r, gnb, ue, t, req, nasPDU, "DownlinkNASTransport", "ErrorIndication")
+}
+
+// handleSecurityModeReject sends a SECURITY MODE REJECT in response to a
+// Security Mode Command (TS 24.501 §5.4.2.5). The 5GMM cause defaults to #23
+// "UE security capabilities mismatch". The message uses the security context in
+// use before the SMC procedure (none for initial registration), i.e. plain.
+func handleSecurityModeReject(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
+	var nasPDU []byte
+
+	if req.RawNASPDU != nil {
+		raw, err := hex.DecodeString(*req.RawNASPDU)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("decode raw_nas_pdu: %v", err))
+			return
+		}
+
+		nasPDU = raw
+	} else {
+		cause := uint8(nasMessage.Cause5GMMUESecurityCapabilitiesMismatch)
+		if req.Cause5GMM != nil {
+			cause = *req.Cause5GMM
+		}
+
+		pdu, err := nasCodec.BuildSecurityModeReject(cause)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("build SecurityModeReject: %v", err))
+			return
+		}
+
+		nasPDU = pdu
+	}
+
+	sendUplinkAndWait(w, r, gnb, ue, t, req, nasPDU, "UEContextReleaseCommand", "DownlinkNASTransport", "ErrorIndication")
+}
+
 // fiveGSTMSIFromGUTI derives the 5G-S-TMSI IE (for the Initial UE Message)
 // from a stored GUTI. The AMF Set ID is a 10-bit field and the AMF Pointer a
 // 6-bit field; both are left-aligned into their octets per the NGAP BitString
@@ -960,6 +1043,13 @@ func sendRawAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GnBContex
 	if ngapResp.MessageType == "PDUSessionResourceReleaseCommand" {
 		if relResp, berr := ngap.BuildPDUSessionResourceReleaseResponse(ue.AmfUeNgapID, ue.RanUeNgapID); berr == nil {
 			_ = t.Send(relResp, false)
+		}
+	}
+
+	// A gNB answers a UE Context Release Command with a Release Complete.
+	if ngapResp.MessageType == "UEContextReleaseCommand" {
+		if relComplete, berr := ngap.BuildUEContextReleaseComplete(ue.AmfUeNgapID, ue.RanUeNgapID); berr == nil {
+			_ = t.Send(relComplete, false)
 		}
 	}
 
