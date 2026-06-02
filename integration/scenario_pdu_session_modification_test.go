@@ -1,12 +1,9 @@
 //go:build integration
 
 // UE-requested PDU Session Modification (TS 23.502 §4.3.3.2, TS 24.501 §6.4.2).
-// The UE sends a PDU SESSION MODIFICATION REQUEST on an active PDU session; per
-// §6.4.2.3/§6.4.2.4 the network must answer with a PDU Session Modification
-// Command (accepted) or a Modification Reject (not accepted) — or a 5GSM STATUS
-// for a PTI error (§7.3.1). The only case where the network may stay silent is a
-// reserved PTI (§7.3.1 d). Rejecting is compliant; silently dropping a valid
-// request is not.
+// The UE cannot set its own QoS — authorized QoS is network-determined — so the
+// network answers a PDU SESSION MODIFICATION REQUEST with a Modification Reject
+// (§6.4.2.4).
 
 package integration_test
 
@@ -14,12 +11,9 @@ import (
 	"testing"
 )
 
-// TestPDUSessionModification_Rejected reproduces the procedure on an active
-// session. The UE cannot set its own QoS — authorized QoS is network-determined
-// — so the network must answer with a PDU Session Modification Reject carrying a
-// 5GSM cause (TS 24.501 §6.4.2.4), delivered in a Downlink NAS Transport. A
-// timeout (no downlink) would mean the request was silently dropped, which is
-// non-compliant.
+// TestPDUSessionModification_Rejected drives the procedure on an active session
+// and asserts a PDU Session Modification Reject with a 5GSM cause (TS 24.501
+// §6.4.2.4), delivered in a Downlink NAS Transport.
 func TestPDUSessionModification_Rejected(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := establishRegisteredUE(t, gnbID) // registered UE with an active PDU session
@@ -28,7 +22,7 @@ func TestPDUSessionModification_Rejected(t *testing.T) {
 		`{"message_type":"pdu_session_modification_request"}`)
 
 	if status == 504 {
-		t.Fatalf("no response to a UE-requested PDU Session Modification Request — TS 24.501 §6.4.2.4 requires a Modification Reject (silently dropping it is non-compliant)\n  body: %s", body)
+		t.Fatalf("got no response (HTTP 504); TS 24.501 §6.4.2.4 requires a Modification Reject\n  body: %s", body)
 	}
 
 	if status != 200 {
@@ -48,9 +42,8 @@ func TestPDUSessionModification_Rejected(t *testing.T) {
 
 // TestPDUSessionModification_NoActiveSession sends a Modification Request for a
 // PDU session that has no active context (the UE is registered but never
-// established one). The network must still respond — e.g. a 5GSM STATUS with
-// cause #43 "invalid PDU session identity" (TS 24.501 §6.4.2.4 / §7.3) — rather
-// than silently drop the request.
+// established one). The network responds with a rejection — e.g. a 5GSM STATUS
+// with cause #43 "invalid PDU session identity" (TS 24.501 §6.4.2.4 / §7.3).
 func TestPDUSessionModification_NoActiveSession(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -60,7 +53,7 @@ func TestPDUSessionModification_NoActiveSession(t *testing.T) {
 		`{"message_type":"pdu_session_modification_request"}`)
 
 	if status == 504 {
-		t.Fatalf("no response to a PDU Session Modification Request for an inactive PDU session — TS 24.501 §6.4.2.4/§7.3 require a response (e.g. 5GSM STATUS cause #43); silently dropping it is non-compliant\n  body: %s", body)
+		t.Fatalf("got no response (HTTP 504); TS 24.501 §6.4.2.4/§7.3 require a response (e.g. 5GSM STATUS cause #43)\n  body: %s", body)
 	}
 
 	if status != 200 {
