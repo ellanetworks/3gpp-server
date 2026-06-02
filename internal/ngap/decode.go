@@ -208,6 +208,19 @@ func decodeHandoverRequest(msg *ngapType.HandoverRequest, resp *NGAPResponse) {
 				}
 				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value), PDUSessionIDs: ids})
 			}
+		case ngapType.ProtocolIEIDUEAggregateMaximumBitRate:
+			if ambr := ie.Value.UEAggregateMaximumBitRate; ambr != nil {
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value),
+					UEAggregateMaxBitRate: &UEAggregateMaxBitRateJSON{
+						DL: ambr.UEAggregateMaximumBitRateDL.Value,
+						UL: ambr.UEAggregateMaximumBitRateUL.Value,
+					}})
+			}
+		case ngapType.ProtocolIEIDSecurityContext:
+			if sc := ie.Value.SecurityContext; sc != nil {
+				ncc := sc.NextHopChainingCount.Value
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value), NextHopChainingCount: &ncc})
+			}
 		}
 	}
 }

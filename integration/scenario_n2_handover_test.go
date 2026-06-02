@@ -173,8 +173,60 @@ func assertCarriesPDUSessions(t *testing.T, body []byte, want []int64, context s
 	}
 }
 
-// runN2HandoverFlow drives the full N2 handover signalling flow (TS 38.413 §8.4)
-// between two gNBs, using the given PDU session establishment request body.
+// ngapAMBR returns the UE Aggregate Maximum Bit Rate (DL, UL bps) surfaced in
+// the response, if present.
+func ngapAMBR(body []byte) (dl, ul int64, ok bool) {
+	var top struct {
+		NGAP struct {
+			IEs []struct {
+				AMBR *struct {
+					DL int64 `json:"dl"`
+					UL int64 `json:"ul"`
+				} `json:"ue_aggregate_max_bit_rate"`
+			} `json:"ies"`
+		} `json:"ngap"`
+	}
+
+	if err := json.Unmarshal(body, &top); err != nil {
+		return 0, 0, false
+	}
+
+	for _, ie := range top.NGAP.IEs {
+		if ie.AMBR != nil {
+			return ie.AMBR.DL, ie.AMBR.UL, true
+		}
+	}
+
+	return 0, 0, false
+}
+
+// ngapHasSecurityContext reports whether the response carries a Security Context
+// (surfaced via its Next Hop Chaining Count).
+func ngapHasSecurityContext(body []byte) bool {
+	var top struct {
+		NGAP struct {
+			IEs []struct {
+				NCC *int64 `json:"next_hop_chaining_count"`
+			} `json:"ies"`
+		} `json:"ngap"`
+	}
+
+	if err := json.Unmarshal(body, &top); err != nil {
+		return false
+	}
+
+	for _, ie := range top.NGAP.IEs {
+		if ie.NCC != nil {
+			return true
+		}
+	}
+
+	return false
+}
+
+// runN2HandoverFlow drives the full N2 handover signalling flow (TS 38.413 §8.4,
+// TS 23.502 §4.9.1.3) between two gNBs, using the given PDU session
+// establishment request body.
 func runN2HandoverFlow(t *testing.T, establishBody string) {
 	t.Helper()
 
@@ -202,8 +254,19 @@ func runN2HandoverFlow(t *testing.T, establishBody string) {
 		t.Fatalf("ngap.message_type = %q, want HandoverRequest (TS 38.413 §8.4.2.2)\n  body: %s", got, hoReq)
 	}
 
-	// The AMF must ask the target to set up the UE's PDU session (§9.2.3.1).
+	// The AMF must ask the target to set up the UE's PDU session, and include
+	// the UE AMBR and Security Context — all mandatory IEs of HANDOVER REQUEST
+	// (TS 38.413 §9.2.3.1; the Security Context carries the NH/NCC the target
+	// derives K_gNB from, TS 33.501 §6.9).
 	assertCarriesPDUSession(t, hoReq, 1, "HandoverRequest")
+
+	if dl, ul, ok := ngapAMBR(hoReq); !ok || dl == 0 || ul == 0 {
+		t.Errorf("HandoverRequest UE AMBR missing or zero: dl=%d ul=%d present=%v\n  body: %s", dl, ul, ok, hoReq)
+	}
+
+	if !ngapHasSecurityContext(hoReq) {
+		t.Errorf("HandoverRequest missing Security Context (mandatory, TS 38.413 §9.2.3.1)\n  body: %s", hoReq)
+	}
 
 	targetAmfID, ok := ngapFirstAmfUeNgapID(hoReq)
 	if !ok {

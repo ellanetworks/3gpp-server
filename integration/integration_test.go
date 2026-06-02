@@ -36,6 +36,14 @@ func TestMain(m *testing.M) {
 		log.Fatalf("Subscriber creation failed: %v", err)
 	}
 
+	// Extra subscribers, for scenarios needing several distinct UEs (e.g. a
+	// victim and an attacker on different gNBs, or one UE per sub-case).
+	for _, imsi := range []string{"001010000000002", "001010000000003", "001010000000004", "001010000000005", "001010000000006"} {
+		if err := createSubscriber(token, imsi); err != nil {
+			log.Fatalf("subscriber %s creation failed: %v", imsi, err)
+		}
+	}
+
 	if err := waitForTester(30 * time.Second); err != nil {
 		log.Fatalf("3gpp-server not ready: %v", err)
 	}

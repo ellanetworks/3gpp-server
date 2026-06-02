@@ -233,7 +233,19 @@ func handleHandoverRequestAcknowledge(w http.ResponseWriter, t *transport.SCTPTr
 			teid = 1
 		}
 
-		sessions = append(sessions, ngap.HandoverAdmittedSession{PDUSessionID: ps.ID, DLTeid: teid, DLIP: dlIP})
+		var rawTransfer []byte
+
+		if ps.RawTransfer != nil {
+			decoded, err := hex.DecodeString(*ps.RawTransfer)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, fmt.Sprintf("decode raw_transfer: %v", err))
+				return
+			}
+
+			rawTransfer = decoded
+		}
+
+		sessions = append(sessions, ngap.HandoverAdmittedSession{PDUSessionID: ps.ID, DLTeid: teid, DLIP: dlIP, RawTransfer: rawTransfer})
 	}
 
 	encoded, err := ngap.BuildHandoverRequestAcknowledge(*req.AmfUeNgapID, *req.RanUeNgapID, sessions, req.FailedPDUSessions)

@@ -241,6 +241,9 @@ paths:
                       id: { type: integer }
                       dl_teid: { type: integer }
                       dl_ip: { type: string }
+                      raw_transfer:
+                        type: string
+                        description: "Hex transfer that replaces the built one verbatim, for crafting malformed admitted transfers."
                 failed_pdu_sessions:
                   type: array
                   items:

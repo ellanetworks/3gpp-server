@@ -56,6 +56,10 @@ type IE struct {
 	// ReleasePDUSessionIDs are the PDU sessions a Handover Command tells the
 	// source to release (those the target did not admit).
 	ReleasePDUSessionIDs []int64 `json:"release_pdu_session_ids,omitempty"`
+
+	// NextHopChainingCount from a Handover Request's Security Context IE; its
+	// presence confirms the AMF passed the security context to the target.
+	NextHopChainingCount *int64 `json:"next_hop_chaining_count,omitempty"`
 }
 
 type GlobalRANNodeIDJSON struct {

@@ -71,11 +71,13 @@ type MigrateUERequest struct {
 }
 
 // HandoverPDUSession is an admitted PDU session in a Handover Request
-// Acknowledge, carrying the target gNB's downlink GTP tunnel.
+// Acknowledge, carrying the target gNB's downlink GTP tunnel. RawTransfer (hex)
+// overrides the built transfer verbatim, for crafting malformed transfers.
 type HandoverPDUSession struct {
-	ID     int64  `json:"id"`
-	DLTeid uint32 `json:"dl_teid,omitempty"`
-	DLIP   string `json:"dl_ip,omitempty"`
+	ID          int64   `json:"id"`
+	DLTeid      uint32  `json:"dl_teid,omitempty"`
+	DLIP        string  `json:"dl_ip,omitempty"`
+	RawTransfer *string `json:"raw_transfer,omitempty"`
 }
 
 // AwaitRequest waits for an unsolicited downlink NGAP message (one the core

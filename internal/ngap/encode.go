@@ -793,11 +793,13 @@ func BuildNGReset(connections []NGResetConnection) ([]byte, error) {
 }
 
 // HandoverAdmittedSession is a PDU session admitted by the target gNB in a
-// Handover Request Acknowledge, with its downlink GTP tunnel.
+// Handover Request Acknowledge, with its downlink GTP tunnel. RawTransfer, when
+// set, replaces the built transfer verbatim — for crafting malformed transfers.
 type HandoverAdmittedSession struct {
 	PDUSessionID int64
 	DLTeid       uint32
 	DLIP         string
+	RawTransfer  []byte
 }
 
 // BuildHandoverRequired builds a HANDOVER REQUIRED (TS 38.413 §8.4.1) sent by
@@ -924,9 +926,14 @@ func BuildHandoverRequestAcknowledge(amfUeNgapID, ranUeNgapID int64, sessions []
 
 	admitted := &ngapType.PDUSessionResourceAdmittedList{}
 	for _, s := range sessions {
-		transfer, err := buildHandoverRequestAcknowledgeTransfer(s.DLTeid, s.DLIP)
-		if err != nil {
-			return nil, err
+		transfer := s.RawTransfer
+		if transfer == nil {
+			var err error
+
+			transfer, err = buildHandoverRequestAcknowledgeTransfer(s.DLTeid, s.DLIP)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		admitted.List = append(admitted.List, ngapType.PDUSessionResourceAdmittedItem{
