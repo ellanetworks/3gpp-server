@@ -617,7 +617,7 @@ components:
           description: Override UE Context Request in InitialUEMessage. Set to -1 to omit entirely.
         amf_ue_ngap_id_override:
           type: integer
-          description: Override AMF UE NGAP ID in UplinkNASTransport messages.
+          description: Override the AMF UE NGAP ID in UE-associated NGAP messages (e.g. UplinkNASTransport, handover_required). Use a stale/unknown value to exercise TS 38.413 §10.6.
         ran_ue_ngap_id_override:
           type: integer
           description: Override RAN UE NGAP ID in the NGAP wrapper.
@@ -633,6 +633,11 @@ components:
         target_gnb_id:
           type: string
           description: "Target gNB identity (hex) for handover_required (TS 38.413 §8.4.1). The resulting Handover Command arrives asynchronously — await it on the source gNB."
+        pdu_session_ids:
+          type: array
+          items:
+            type: integer
+          description: "PDU sessions to hand over in handover_required. Defaults to the UE's session; set to non-existent IDs to exercise abnormal cases."
         switch_off:
           type: integer
           description: "Deregistration switch-off flag (TS 24.501 §9.11.3.20). Default 1 (switch off, no accept). 0 = normal de-registration (AMF replies with Deregistration Accept)."

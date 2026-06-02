@@ -125,7 +125,7 @@ to allow fully granular control over every IE without these escape hatches.
 |---|:---:|:---:|
 | Handover Required | ✅ | — |
 | Handover Command | — | ✅ |
-| Handover Preparation Failure | ❌ | ❌ |
+| Handover Preparation Failure | — | ✅ |
 | Handover Request | — | ✅ |
 | Handover Request Acknowledge | ✅ | — |
 | Handover Failure | ❌ | ❌ |

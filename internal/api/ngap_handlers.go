@@ -177,8 +177,23 @@ func handleHandoverRequired(w http.ResponseWriter, r *http.Request, gnb *store.G
 
 	pduSessionID := pduSessionIDForRelease(ue)
 
-	encoded, err := ngap.BuildHandoverRequired(ue.AmfUeNgapID, ue.RanUeNgapID, *req.TargetGnbID,
-		gnb.MCC, gnb.MNC, gnb.TAC, []int64{int64(pduSessionID)})
+	amfUeNgapID := ue.AmfUeNgapID
+	if req.AmfUeNgapIDOverride != nil {
+		amfUeNgapID = *req.AmfUeNgapIDOverride
+	}
+
+	ranUeNgapID := ue.RanUeNgapID
+	if req.RanUeNgapIDOverride != nil {
+		ranUeNgapID = *req.RanUeNgapIDOverride
+	}
+
+	pduSessionIDs := []int64{int64(pduSessionID)}
+	if len(req.PDUSessionIDs) > 0 {
+		pduSessionIDs = req.PDUSessionIDs
+	}
+
+	encoded, err := ngap.BuildHandoverRequired(amfUeNgapID, ranUeNgapID, *req.TargetGnbID,
+		gnb.MCC, gnb.MNC, gnb.TAC, pduSessionIDs)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build HandoverRequired: %v", err))
 		return

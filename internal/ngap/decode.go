@@ -53,8 +53,8 @@ func decodeSuccessfulOutcome(so *ngapType.SuccessfulOutcome, resp *NGAPResponse)
 	}
 }
 
-// decodeHandoverCommand surfaces the AMF/RAN UE NGAP IDs of the source-side UE
-// association in a Handover Command (TS 38.413 §9.2.3.2).
+// decodeHandoverCommand surfaces the source-side AMF/RAN UE NGAP IDs and the
+// list of PDU sessions the AMF confirms for handover (TS 38.413 §9.2.3.2).
 func decodeHandoverCommand(msg *ngapType.HandoverCommand, resp *NGAPResponse) {
 	if msg == nil {
 		return
@@ -71,6 +71,14 @@ func decodeHandoverCommand(msg *ngapType.HandoverCommand, resp *NGAPResponse) {
 			if ie.Value.RANUENGAPID != nil {
 				v := ie.Value.RANUENGAPID.Value
 				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value), RanUeNgapID: &v})
+			}
+		case ngapType.ProtocolIEIDPDUSessionResourceHandoverList:
+			if list := ie.Value.PDUSessionResourceHandoverList; list != nil {
+				ids := make([]int64, 0, len(list.List))
+				for _, item := range list.List {
+					ids = append(ids, item.PDUSessionID.Value)
+				}
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value), PDUSessionIDs: ids})
 			}
 		}
 	}
@@ -115,6 +123,40 @@ func decodeUnsuccessfulOutcome(uo *ngapType.UnsuccessfulOutcome, resp *NGAPRespo
 	switch uo.Value.Present {
 	case ngapType.UnsuccessfulOutcomePresentNGSetupFailure:
 		decodeNGSetupFailure(uo.Value.NGSetupFailure, resp)
+	case ngapType.UnsuccessfulOutcomePresentHandoverPreparationFailure:
+		decodeHandoverPreparationFailure(uo.Value.HandoverPreparationFailure, resp)
+	}
+}
+
+// decodeHandoverPreparationFailure surfaces the source-side AMF/RAN UE NGAP IDs
+// and the Cause the AMF reports when handover preparation fails (TS 38.413
+// §9.2.3.3).
+func decodeHandoverPreparationFailure(msg *ngapType.HandoverPreparationFailure, resp *NGAPResponse) {
+	if msg == nil {
+		return
+	}
+
+	for _, ie := range msg.ProtocolIEs.List {
+		decoded := IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value)}
+
+		switch ie.Id.Value {
+		case ngapType.ProtocolIEIDAMFUENGAPID:
+			if ie.Value.AMFUENGAPID != nil {
+				v := ie.Value.AMFUENGAPID.Value
+				decoded.AmfUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDRANUENGAPID:
+			if ie.Value.RANUENGAPID != nil {
+				v := ie.Value.RANUENGAPID.Value
+				decoded.RanUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDCause:
+			if ie.Value.Cause != nil {
+				decoded.Cause = decodeCause(ie.Value.Cause)
+			}
+		}
+
+		resp.IEs = append(resp.IEs, decoded)
 	}
 }
 
@@ -136,21 +178,28 @@ func decodeInitiatingMessage(im *ngapType.InitiatingMessage, resp *NGAPResponse)
 }
 
 // decodeHandoverRequest surfaces the AMF UE NGAP ID the AMF assigned for the
-// target side of an N2 handover (TS 38.413 §9.2.3.1); the target gNB echoes it
-// in the Handover Request Acknowledge.
+// target side of an N2 handover (the target gNB echoes it in the acknowledge)
+// and the PDU sessions to be set up (TS 38.413 §9.2.3.1).
 func decodeHandoverRequest(msg *ngapType.HandoverRequest, resp *NGAPResponse) {
 	if msg == nil {
 		return
 	}
 
 	for _, ie := range msg.ProtocolIEs.List {
-		if ie.Id.Value == ngapType.ProtocolIEIDAMFUENGAPID && ie.Value.AMFUENGAPID != nil {
-			v := ie.Value.AMFUENGAPID.Value
-			resp.IEs = append(resp.IEs, IE{
-				ID:          ie.Id.Value,
-				Criticality: criticalityToString(ie.Criticality.Value),
-				AmfUeNgapID: &v,
-			})
+		switch ie.Id.Value {
+		case ngapType.ProtocolIEIDAMFUENGAPID:
+			if ie.Value.AMFUENGAPID != nil {
+				v := ie.Value.AMFUENGAPID.Value
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value), AmfUeNgapID: &v})
+			}
+		case ngapType.ProtocolIEIDPDUSessionResourceSetupListHOReq:
+			if list := ie.Value.PDUSessionResourceSetupListHOReq; list != nil {
+				ids := make([]int64, 0, len(list.List))
+				for _, item := range list.List {
+					ids = append(ids, item.PDUSessionID.Value)
+				}
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value), PDUSessionIDs: ids})
+			}
 		}
 	}
 }
@@ -605,6 +654,8 @@ func getUnsuccessfulOutcomeName(msgType int) string {
 	switch msgType {
 	case ngapType.UnsuccessfulOutcomePresentNGSetupFailure:
 		return "NGSetupFailure"
+	case ngapType.UnsuccessfulOutcomePresentHandoverPreparationFailure:
+		return "HandoverPreparationFailure"
 	case ngapType.UnsuccessfulOutcomePresentPathSwitchRequestFailure:
 		return "PathSwitchRequestFailure"
 	case ngapType.UnsuccessfulOutcomePresentInitialContextSetupFailure:

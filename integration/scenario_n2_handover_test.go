@@ -85,6 +85,40 @@ func ngapFirstAmfUeNgapID(body []byte) (int64, bool) {
 	return 0, false
 }
 
+// ngapPDUSessionIDs collects the PDU session IDs surfaced across the response's
+// NGAP IE list (e.g. a handover PDU-session list).
+func ngapPDUSessionIDs(body []byte) []int64 {
+	var top struct {
+		NGAP struct {
+			IEs []struct {
+				PDUSessionIDs []int64 `json:"pdu_session_ids"`
+			} `json:"ies"`
+		} `json:"ngap"`
+	}
+
+	if err := json.Unmarshal(body, &top); err != nil {
+		return nil
+	}
+
+	var ids []int64
+	for _, ie := range top.NGAP.IEs {
+		ids = append(ids, ie.PDUSessionIDs...)
+	}
+
+	return ids
+}
+
+// assertCarriesPDUSession fails unless the message lists exactly the one
+// expected PDU session.
+func assertCarriesPDUSession(t *testing.T, body []byte, want int64, context string) {
+	t.Helper()
+
+	ids := ngapPDUSessionIDs(body)
+	if len(ids) != 1 || ids[0] != want {
+		t.Errorf("%s: PDU session list = %v, want [%d]\n  body: %s", context, ids, want, body)
+	}
+}
+
 // runN2HandoverFlow drives the full N2 handover signalling flow (TS 38.413 §8.4)
 // between two gNBs, using the given PDU session establishment request body.
 func runN2HandoverFlow(t *testing.T, establishBody string) {
@@ -114,6 +148,9 @@ func runN2HandoverFlow(t *testing.T, establishBody string) {
 		t.Fatalf("ngap.message_type = %q, want HandoverRequest (TS 38.413 §8.4.2.2)\n  body: %s", got, hoReq)
 	}
 
+	// The AMF must ask the target to set up the UE's PDU session (§9.2.3.1).
+	assertCarriesPDUSession(t, hoReq, 1, "HandoverRequest")
+
 	targetAmfID, ok := ngapFirstAmfUeNgapID(hoReq)
 	if !ok {
 		t.Fatalf("HandoverRequest missing AMF UE NGAP ID\n  body: %s", hoReq)
@@ -134,6 +171,9 @@ func runN2HandoverFlow(t *testing.T, establishBody string) {
 	if got := jsonGet(hoCmd, "ngap.message_type"); got != ngapHandoverCommand {
 		t.Fatalf("ngap.message_type = %q, want HandoverCommand (TS 38.413 §8.4.1.2)\n  body: %s", got, hoCmd)
 	}
+
+	// The command must confirm the same PDU session for handover (§9.2.3.2).
+	assertCarriesPDUSession(t, hoCmd, 1, "HandoverCommand")
 
 	// Step 5: target gNB → AMF: Handover Notify (§8.4.3) — UE has arrived.
 	status, body = doRequest(t, "POST", "/gnb/"+targetGNB+"/ngap",

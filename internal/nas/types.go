@@ -81,6 +81,11 @@ type NASRequest struct {
 
 	// TargetGnbID is the target gNB identity (hex) for a Handover Required.
 	TargetGnbID *string `json:"target_gnb_id,omitempty"`
+
+	// PDUSessionIDs lists the PDU sessions a Handover Required asks to hand
+	// over. When empty the UE's configured session is used; set it to reference
+	// other (e.g. non-existent) sessions for abnormal-case testing.
+	PDUSessionIDs []int64 `json:"pdu_session_ids,omitempty"`
 }
 
 type SNSSAIJSON struct {

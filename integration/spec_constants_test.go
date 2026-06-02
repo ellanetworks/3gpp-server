@@ -70,6 +70,7 @@ const (
 	ngapNGResetAcknowledge               = "NGResetAcknowledge"
 	ngapHandoverRequest                  = "HandoverRequest"
 	ngapHandoverCommand                  = "HandoverCommand"
+	ngapHandoverPreparationFailure       = "HandoverPreparationFailure"
 )
 
 // NAS message-type names as decoded by the server (internal/nas/decode.go),
