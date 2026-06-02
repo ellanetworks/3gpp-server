@@ -59,6 +59,10 @@ type SendGnBNGAPRequest struct {
 	// FailedPDUSessions are PDU sessions the target reports as failed-to-setup
 	// in a Handover Request Acknowledge (for partial-admission testing).
 	FailedPDUSessions []int64 `json:"failed_pdu_sessions,omitempty"`
+
+	// Cause is the radio-network Cause (TS 38.413 §9.3.1.2) a handover_failure
+	// carries. Defaults to ho-failure-in-target-5GC-ngran-node-or-target-system.
+	Cause *int64 `json:"cause,omitempty"`
 }
 
 // MigrateUERequest moves a UE's context to another gNB's association, modelling

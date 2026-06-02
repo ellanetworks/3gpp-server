@@ -50,6 +50,36 @@ func decodeSuccessfulOutcome(so *ngapType.SuccessfulOutcome, resp *NGAPResponse)
 		decodeNGResetAcknowledge(so.Value.NGResetAcknowledge, resp)
 	case ngapType.SuccessfulOutcomePresentHandoverCommand:
 		decodeHandoverCommand(so.Value.HandoverCommand, resp)
+	case ngapType.SuccessfulOutcomePresentHandoverCancelAcknowledge:
+		decodeHandoverCancelAcknowledge(so.Value.HandoverCancelAcknowledge, resp)
+	}
+}
+
+// decodeHandoverCancelAcknowledge surfaces the AMF/RAN UE NGAP IDs the AMF
+// echoes when acknowledging a source-initiated Handover Cancel (TS 38.413
+// §9.2.3.12).
+func decodeHandoverCancelAcknowledge(msg *ngapType.HandoverCancelAcknowledge, resp *NGAPResponse) {
+	if msg == nil {
+		return
+	}
+
+	for _, ie := range msg.ProtocolIEs.List {
+		decoded := IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value)}
+
+		switch ie.Id.Value {
+		case ngapType.ProtocolIEIDAMFUENGAPID:
+			if ie.Value.AMFUENGAPID != nil {
+				v := ie.Value.AMFUENGAPID.Value
+				decoded.AmfUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDRANUENGAPID:
+			if ie.Value.RANUENGAPID != nil {
+				v := ie.Value.RANUENGAPID.Value
+				decoded.RanUeNgapID = &v
+			}
+		}
+
+		resp.IEs = append(resp.IEs, decoded)
 	}
 }
 
@@ -658,6 +688,8 @@ func getSuccessfulOutcomeName(msgType int) string {
 		return "NGResetAcknowledge"
 	case ngapType.SuccessfulOutcomePresentHandoverCommand:
 		return "HandoverCommand"
+	case ngapType.SuccessfulOutcomePresentHandoverCancelAcknowledge:
+		return "HandoverCancelAcknowledge"
 	case ngapType.SuccessfulOutcomePresentInitialContextSetupResponse:
 		return "InitialContextSetupResponse"
 	case ngapType.SuccessfulOutcomePresentPDUSessionResourceSetupResponse:

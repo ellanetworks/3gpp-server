@@ -128,11 +128,11 @@ to allow fully granular control over every IE without these escape hatches.
 | Handover Preparation Failure | — | ✅ |
 | Handover Request | — | ✅ |
 | Handover Request Acknowledge | ✅ | — |
-| Handover Failure | ❌ | ❌ |
+| Handover Failure | ✅ | — |
 | Handover Notify | ✅ | — |
 | Handover Success | ❌ | ❌ |
-| Handover Cancel | ❌ | ❌ |
-| Handover Cancel Acknowledge | ❌ | ❌ |
+| Handover Cancel | ✅ | — |
+| Handover Cancel Acknowledge | — | ✅ |
 | Path Switch Request | ❌ | ❌ |
 | Path Switch Request Acknowledge | — | 🟡 |
 | Path Switch Request Failure | — | 🟡 |

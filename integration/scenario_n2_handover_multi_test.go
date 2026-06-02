@@ -114,8 +114,9 @@ func TestN2HandoverPartialAdmission(t *testing.T) {
 
 // TestN2HandoverMobilityRegistrationUpdate completes an N2 handover, then has
 // the UE perform a Mobility Registration Update on the target over its existing
-// connection (TS 23.502 §4.9.1.3). The AMF must accept it with a Registration
-// Accept (TS 24.501 §5.5.1.3), reusing the migrated security context.
+// connection — the Registration Procedure of TS 23.502 §4.9.1.3.3 step 12. The
+// AMF must accept it with a Registration Accept (TS 24.501 §5.5.1.3), reusing
+// the migrated security context.
 func TestN2HandoverMobilityRegistrationUpdate(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "000015", "ho-mru-src")
 	targetGNB := createGnBWithID(t, "000016", "ho-mru-tgt")

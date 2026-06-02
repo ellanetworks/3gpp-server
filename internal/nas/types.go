@@ -87,6 +87,10 @@ type NASRequest struct {
 	// other (e.g. non-existent) sessions for abnormal-case testing.
 	PDUSessionIDs []int64 `json:"pdu_session_ids,omitempty"`
 
+	// HandoverCancelCause is the radio-network Cause (TS 38.413 §9.3.1.2) a
+	// handover_cancel carries. Defaults to handover-cancelled.
+	HandoverCancelCause *int64 `json:"handover_cancel_cause,omitempty"`
+
 	// PDUSessionIDOverride sets which PDU session a pdu_session_establishment_request
 	// establishes, so a UE can hold more than one session.
 	PDUSessionIDOverride *uint8 `json:"pdu_session_id,omitempty"`

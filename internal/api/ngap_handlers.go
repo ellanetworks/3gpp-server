@@ -75,6 +75,8 @@ func (h *Handler) SendNGAP(w http.ResponseWriter, r *http.Request) {
 		handleSecurityModeReject(w, r, gnb, ue, t, &req)
 	case "handover_required":
 		handleHandoverRequired(w, r, gnb, ue, t, &req)
+	case "handover_cancel":
+		handleHandoverCancel(w, r, gnb, ue, t, &req)
 	default:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unsupported message_type: %s", req.MessageType))
 	}
@@ -114,6 +116,8 @@ func (h *Handler) SendGnBNGAP(w http.ResponseWriter, r *http.Request) {
 		handleNGReset(w, r, gnb, t, &req)
 	case "handover_request_acknowledge":
 		handleHandoverRequestAcknowledge(w, t, &req)
+	case "handover_failure":
+		handleHandoverFailure(w, t, &req)
 	case "handover_notify":
 		handleHandoverNotify(w, gnb, t, &req)
 	default:
@@ -207,6 +211,47 @@ func handleHandoverRequired(w http.ResponseWriter, r *http.Request, gnb *store.G
 	writeJSON(w, http.StatusOK, SendNGAPResponse{})
 }
 
+// handleHandoverCancel sends a HANDOVER CANCEL for the UE (TS 38.413 §8.4.5) and
+// returns the AMF's Handover Cancel Acknowledge (or Error Indication).
+func handleHandoverCancel(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
+	amfUeNgapID := ue.AmfUeNgapID
+	if req.AmfUeNgapIDOverride != nil {
+		amfUeNgapID = *req.AmfUeNgapIDOverride
+	}
+
+	ranUeNgapID := ue.RanUeNgapID
+	if req.RanUeNgapIDOverride != nil {
+		ranUeNgapID = *req.RanUeNgapIDOverride
+	}
+
+	cause := ngap.CauseRadioNetworkHandoverCancelled
+	if req.HandoverCancelCause != nil {
+		cause = *req.HandoverCancelCause
+	}
+
+	encoded, err := ngap.BuildHandoverCancel(amfUeNgapID, ranUeNgapID, cause)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build HandoverCancel: %v", err))
+		return
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	ngapResp, err := t.WaitForMessage(ctx, "HandoverCancelAcknowledge", "ErrorIndication")
+	if err != nil {
+		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for HandoverCancelAcknowledge: %v", err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
+}
+
 // handleHandoverRequestAcknowledge sends a HANDOVER REQUEST ACKNOWLEDGE from the
 // target gNB (TS 38.413 §8.4.2). Send-only.
 func handleHandoverRequestAcknowledge(w http.ResponseWriter, t *transport.SCTPTransport, req *SendGnBNGAPRequest) {
@@ -273,6 +318,34 @@ func handleHandoverNotify(w http.ResponseWriter, gnb *store.GnBContext, t *trans
 	encoded, err := ngap.BuildHandoverNotify(*req.AmfUeNgapID, *req.RanUeNgapID, gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build HandoverNotify: %v", err))
+		return
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{})
+}
+
+// handleHandoverFailure sends a HANDOVER FAILURE from the target gNB rejecting a
+// handover (TS 38.413 §8.4.2.3). Send-only: the AMF's Handover Preparation
+// Failure (or Error Indication) arrives asynchronously.
+func handleHandoverFailure(w http.ResponseWriter, t *transport.SCTPTransport, req *SendGnBNGAPRequest) {
+	if req.AmfUeNgapID == nil {
+		writeError(w, http.StatusBadRequest, "amf_ue_ngap_id is required for handover_failure")
+		return
+	}
+
+	cause := ngap.CauseRadioNetworkHoFailureInTarget
+	if req.Cause != nil {
+		cause = *req.Cause
+	}
+
+	encoded, err := ngap.BuildHandoverFailure(*req.AmfUeNgapID, cause)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build HandoverFailure: %v", err))
 		return
 	}
 

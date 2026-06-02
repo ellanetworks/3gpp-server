@@ -224,9 +224,12 @@ func ngapHasSecurityContext(body []byte) bool {
 	return false
 }
 
-// runN2HandoverFlow drives the full N2 handover signalling flow (TS 38.413 §8.4,
-// TS 23.502 §4.9.1.3) between two gNBs, using the given PDU session
-// establishment request body.
+// runN2HandoverFlow drives the inter-NG-RAN N2 handover signalling flow between
+// two gNBs. The message order follows TS 23.502 §4.9.1.3: preparation §4.9.1.3.2
+// (Handover Required step 1 → Handover Request step 9 → Handover Request
+// Acknowledge step 10) and execution §4.9.1.3.3 (Handover Command step 1 →
+// Handover Notify step 5 → UE Context Release Command step 14a). The given body
+// establishes the PDU session that is handed over.
 func runN2HandoverFlow(t *testing.T, establishBody string) {
 	t.Helper()
 
@@ -241,14 +244,14 @@ func runN2HandoverFlow(t *testing.T, establishBody string) {
 		t.Fatalf("pdu_session_establishment_request: HTTP %d\n  body: %s", status, body)
 	}
 
-	// Step 1: source gNB → AMF: Handover Required (target = gNB 000002).
+	// Step 1: source gNB → AMF: Handover Required (TS 23.502 §4.9.1.3.2 step 1).
 	status, body = doRequest(t, "POST", "/gnb/"+sourceGNB+"/ue/"+ueID+"/ngap",
 		`{"message_type":"handover_required","target_gnb_id":"000002"}`)
 	if status != 200 {
 		t.Fatalf("handover_required: HTTP %d\n  body: %s", status, body)
 	}
 
-	// Step 2: AMF → target gNB: Handover Request (§8.4.2.2).
+	// Step 2: AMF → target gNB: Handover Request (TS 23.502 §4.9.1.3.2 step 9; TS 38.413 §8.4.2.2).
 	hoReq := awaitNGAP(t, targetGNB, ngapHandoverRequest)
 	if got := jsonGet(hoReq, "ngap.message_type"); got != ngapHandoverRequest {
 		t.Fatalf("ngap.message_type = %q, want HandoverRequest (TS 38.413 §8.4.2.2)\n  body: %s", got, hoReq)
@@ -273,8 +276,8 @@ func runN2HandoverFlow(t *testing.T, establishBody string) {
 		t.Fatalf("HandoverRequest missing AMF UE NGAP ID\n  body: %s", hoReq)
 	}
 
-	// Step 3: target gNB → AMF: Handover Request Acknowledge (§8.4.2.2). The
-	// target assigns its own RAN UE NGAP ID and admits the PDU session.
+	// Step 3: target gNB → AMF: Handover Request Acknowledge (TS 23.502 §4.9.1.3.2
+	// step 10; TS 38.413 §8.4.2.2). The target assigns its RAN UE NGAP ID and admits the session.
 	const targetRanUeNgapID = 100
 	status, body = doRequest(t, "POST", "/gnb/"+targetGNB+"/ngap",
 		fmt.Sprintf(`{"message_type":"handover_request_acknowledge","amf_ue_ngap_id":%d,"ran_ue_ngap_id":%d,"pdu_sessions":[{"id":1,"dl_teid":9000,"dl_ip":"10.3.0.3"}]}`,
@@ -283,7 +286,7 @@ func runN2HandoverFlow(t *testing.T, establishBody string) {
 		t.Fatalf("handover_request_acknowledge: HTTP %d\n  body: %s", status, body)
 	}
 
-	// Step 4: AMF → source gNB: Handover Command (§8.4.1.2).
+	// Step 4: AMF → source gNB: Handover Command (TS 23.502 §4.9.1.3.3 step 1; TS 38.413 §8.4.1.2).
 	hoCmd := awaitNGAP(t, sourceGNB, ngapHandoverCommand)
 	if got := jsonGet(hoCmd, "ngap.message_type"); got != ngapHandoverCommand {
 		t.Fatalf("ngap.message_type = %q, want HandoverCommand (TS 38.413 §8.4.1.2)\n  body: %s", got, hoCmd)
@@ -292,7 +295,7 @@ func runN2HandoverFlow(t *testing.T, establishBody string) {
 	// The command must confirm the same PDU session for handover (§9.2.3.2).
 	assertCarriesPDUSession(t, hoCmd, 1, "HandoverCommand")
 
-	// Step 5: target gNB → AMF: Handover Notify (§8.4.3) — UE has arrived.
+	// Step 5: target gNB → AMF: Handover Notify (TS 23.502 §4.9.1.3.3 step 5; TS 38.413 §8.4.3) — UE has arrived.
 	status, body = doRequest(t, "POST", "/gnb/"+targetGNB+"/ngap",
 		fmt.Sprintf(`{"message_type":"handover_notify","amf_ue_ngap_id":%d,"ran_ue_ngap_id":%d}`,
 			targetAmfID, targetRanUeNgapID))
@@ -300,8 +303,8 @@ func runN2HandoverFlow(t *testing.T, establishBody string) {
 		t.Fatalf("handover_notify: HTTP %d\n  body: %s", status, body)
 	}
 
-	// Step 6: AMF → source gNB: UE Context Release Command — once the handover
-	// completes the AMF releases the source's resources (TS 23.502 §4.9.1.3).
+	// Step 6: AMF → source gNB: UE Context Release Command — after Notify the AMF
+	// releases the source's resources (TS 23.502 §4.9.1.3.3 step 14a).
 	rel := awaitNGAP(t, sourceGNB, ngapUEContextReleaseCommand)
 	if got := jsonGet(rel, "ngap.message_type"); got != ngapUEContextReleaseCommand {
 		t.Errorf("ngap.message_type = %q, want UEContextReleaseCommand (source released after handover)\n  body: %s", got, rel)

@@ -209,7 +209,7 @@ paths:
               properties:
                 message_type:
                   type: string
-                  enum: [ng_reset, handover_request_acknowledge, handover_notify]
+                  enum: [ng_reset, handover_request_acknowledge, handover_failure, handover_notify]
                 raw_ngap_pdu:
                   type: string
                   description: "Hex NGAP PDU sent verbatim (overrides message_type). Craft any message, valid or not."
@@ -229,6 +229,9 @@ paths:
                 amf_ue_ngap_id:
                   type: integer
                   description: "Handover: AMF UE NGAP ID identifying the UE association."
+                cause:
+                  type: integer
+                  description: "Radio-network Cause for handover_failure (TS 38.413 §9.3.1.2). Defaults to ho-failure-in-target-5GC."
                 ran_ue_ngap_id:
                   type: integer
                   description: "Handover: target-assigned RAN UE NGAP ID."
@@ -644,7 +647,7 @@ components:
         message_type:
           type: string
           description: NAS message to send.
-          enum: [registration_request, authentication_response, security_mode_complete, registration_complete, pdu_session_establishment_request, deregistration_request, ue_context_release_request, service_request, identity_response, pdu_session_release_request, pdu_session_release_complete, authentication_failure, security_mode_reject, handover_required]
+          enum: [registration_request, authentication_response, security_mode_complete, registration_complete, pdu_session_establishment_request, deregistration_request, ue_context_release_request, service_request, identity_response, pdu_session_release_request, pdu_session_release_complete, authentication_failure, security_mode_reject, handover_required, handover_cancel]
         raw_nas_pdu:
           type: string
           description: |
@@ -683,6 +686,9 @@ components:
         pdu_session_id:
           type: integer
           description: "Which PDU session a pdu_session_establishment_request establishes, so a UE can hold more than one."
+        handover_cancel_cause:
+          type: integer
+          description: "Radio-network Cause for handover_cancel (TS 38.413 §9.3.1.2). Defaults to handover-cancelled."
         existing_connection:
           type: boolean
           description: "Send a registration_request over the existing UE-associated connection (Uplink NAS Transport) instead of an Initial UE Message — e.g. a Mobility Registration Update after an N2 handover."

@@ -1028,6 +1028,90 @@ func buildHandoverRequestAcknowledgeTransfer(teid uint32, ip string) ([]byte, er
 	return buf, nil
 }
 
+// CauseRadioNetworkHandoverCancelled is the radio-network Cause value
+// "handover-cancelled" (TS 38.413 §9.3.1.2).
+const CauseRadioNetworkHandoverCancelled int64 = 5
+
+// CauseRadioNetworkHoFailureInTarget is the radio-network Cause value
+// "ho-failure-in-target-5GC-ngran-node-or-target-system" (TS 38.413 §9.3.1.2).
+const CauseRadioNetworkHoFailureInTarget int64 = 7
+
+// BuildHandoverFailure builds a HANDOVER FAILURE (TS 38.413 §8.4.2.3) sent by
+// the target gNB when it cannot admit a handover. It carries the AMF UE NGAP ID
+// and a radio-network Cause (§9.2.3.6).
+func BuildHandoverFailure(amfUeNgapID, causeRadioNetwork int64) ([]byte, error) {
+	pdu := ngapType.NGAPPDU{}
+	pdu.Present = ngapType.NGAPPDUPresentUnsuccessfulOutcome
+	pdu.UnsuccessfulOutcome = new(ngapType.UnsuccessfulOutcome)
+
+	uo := pdu.UnsuccessfulOutcome
+	uo.ProcedureCode.Value = ngapType.ProcedureCodeHandoverResourceAllocation
+	uo.Criticality.Value = ngapType.CriticalityPresentReject
+	uo.Value.Present = ngapType.UnsuccessfulOutcomePresentHandoverFailure
+	uo.Value.HandoverFailure = new(ngapType.HandoverFailure)
+
+	ies := &uo.Value.HandoverFailure.ProtocolIEs
+
+	add := func(id int64, crit aper.Enumerated, present int) *ngapType.HandoverFailureIEsValue {
+		ie := ngapType.HandoverFailureIEs{}
+		ie.Id.Value = id
+		ie.Criticality.Value = crit
+		ie.Value.Present = present
+		ies.List = append(ies.List, ie)
+
+		return &ies.List[len(ies.List)-1].Value
+	}
+
+	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentIgnore,
+		ngapType.HandoverFailureIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: amfUeNgapID}
+	add(ngapType.ProtocolIEIDCause, ngapType.CriticalityPresentIgnore,
+		ngapType.HandoverFailureIEsPresentCause).Cause = &ngapType.Cause{
+		Present:      ngapType.CausePresentRadioNetwork,
+		RadioNetwork: &ngapType.CauseRadioNetwork{Value: aper.Enumerated(causeRadioNetwork)},
+	}
+
+	return ngap.Encoder(pdu)
+}
+
+// BuildHandoverCancel builds a HANDOVER CANCEL (TS 38.413 §8.4.5) sent by the
+// source gNB to abort an ongoing or already-prepared handover. The Cause is a
+// radio-network value (TS 38.413 §9.3.1.2).
+func BuildHandoverCancel(amfUeNgapID, ranUeNgapID, causeRadioNetwork int64) ([]byte, error) {
+	pdu := ngapType.NGAPPDU{}
+	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
+	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
+
+	im := pdu.InitiatingMessage
+	im.ProcedureCode.Value = ngapType.ProcedureCodeHandoverCancel
+	im.Criticality.Value = ngapType.CriticalityPresentReject
+	im.Value.Present = ngapType.InitiatingMessagePresentHandoverCancel
+	im.Value.HandoverCancel = new(ngapType.HandoverCancel)
+
+	ies := &im.Value.HandoverCancel.ProtocolIEs
+
+	add := func(id int64, crit aper.Enumerated, present int) *ngapType.HandoverCancelIEsValue {
+		ie := ngapType.HandoverCancelIEs{}
+		ie.Id.Value = id
+		ie.Criticality.Value = crit
+		ie.Value.Present = present
+		ies.List = append(ies.List, ie)
+
+		return &ies.List[len(ies.List)-1].Value
+	}
+
+	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentReject,
+		ngapType.HandoverCancelIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: amfUeNgapID}
+	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentReject,
+		ngapType.HandoverCancelIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
+	add(ngapType.ProtocolIEIDCause, ngapType.CriticalityPresentIgnore,
+		ngapType.HandoverCancelIEsPresentCause).Cause = &ngapType.Cause{
+		Present:      ngapType.CausePresentRadioNetwork,
+		RadioNetwork: &ngapType.CauseRadioNetwork{Value: aper.Enumerated(causeRadioNetwork)},
+	}
+
+	return ngap.Encoder(pdu)
+}
+
 // BuildHandoverNotify builds a HANDOVER NOTIFY (TS 38.413 §8.4.3) sent by the
 // target gNB once the UE has arrived.
 func BuildHandoverNotify(amfUeNgapID, ranUeNgapID int64, mcc, mnc, tac, gnbID string) ([]byte, error) {
