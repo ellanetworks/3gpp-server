@@ -137,6 +137,31 @@ func BuildPDUSessionReleaseRequest(pduSessionID, pti uint8) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
+// BuildPDUSessionModificationRequest builds a UE-requested PDU SESSION
+// MODIFICATION REQUEST (TS 24.501 §8.3.7) carrying only its mandatory IEs. The
+// PTI is UE-allocated; the network echoes it in the resulting Modification
+// Command or Reject (TS 24.501 §6.4.2.3/§6.4.2.4).
+func BuildPDUSessionModificationRequest(pduSessionID, pti uint8) ([]byte, error) {
+	m := gonas.NewMessage()
+	m.GsmMessage = gonas.NewGsmMessage()
+	m.GsmHeader.SetMessageType(gonas.MsgTypePDUSessionModificationRequest)
+
+	req := nasMessage.NewPDUSessionModificationRequest(0)
+	req.SetExtendedProtocolDiscriminator(nasMessage.Epd5GSSessionManagementMessage)
+	req.SetMessageType(gonas.MsgTypePDUSessionModificationRequest)
+	req.SetPDUSessionID(pduSessionID)
+	req.SetPTI(pti)
+
+	m.PDUSessionModificationRequest = req
+
+	data := new(bytes.Buffer)
+	if err := m.GsmMessageEncode(data); err != nil {
+		return nil, fmt.Errorf("GSM encode PDUSessionModificationRequest: %w", err)
+	}
+
+	return data.Bytes(), nil
+}
+
 // BuildPDUSessionReleaseComplete builds a PDU SESSION RELEASE COMPLETE
 // (TS 24.501 §8.3.10), acknowledging a Release Command. The PTI matches the one
 // the network used in the command.

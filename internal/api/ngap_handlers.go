@@ -67,6 +67,8 @@ func (h *Handler) SendNGAP(w http.ResponseWriter, r *http.Request) {
 		handleIdentityResponse(w, r, gnb, ue, t, &req)
 	case "pdu_session_release_request":
 		handlePDUSessionReleaseRequest(w, r, gnb, ue, t, &req)
+	case "pdu_session_modification_request":
+		handlePDUSessionModificationRequest(w, r, gnb, ue, t, &req)
 	case "pdu_session_release_complete":
 		handlePDUSessionReleaseComplete(w, r, gnb, ue, t, &req)
 	case "authentication_failure":
@@ -1130,6 +1132,49 @@ func handlePDUSessionReleaseRequest(w http.ResponseWriter, r *http.Request, gnb 
 	}
 
 	sendUplinkAndWait(w, r, gnb, ue, t, req, secured, "PDUSessionResourceReleaseCommand", "DownlinkNASTransport", "ErrorIndication")
+}
+
+// handlePDUSessionModificationRequest sends a UE-requested PDU SESSION
+// MODIFICATION REQUEST (TS 24.501 §6.4.2) on an existing PDU session. Per
+// §6.4.2.3/§6.4.2.4 the network answers with a Modification Command or a
+// Modification Reject (or a 5GSM STATUS for a PTI error, TS 24.501 §7.3.1) — it
+// must not silently drop the request.
+func handlePDUSessionModificationRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
+	pduSessionID := pduSessionIDForRelease(ue)
+
+	var inner []byte
+
+	if req.RawNASPDU != nil {
+		raw, err := hex.DecodeString(*req.RawNASPDU)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("decode raw_nas_pdu: %v", err))
+			return
+		}
+
+		inner = raw
+	} else {
+		modReq, err := nasCodec.BuildPDUSessionModificationRequest(pduSessionID, 0x01)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("build PDUSessionModificationRequest: %v", err))
+			return
+		}
+
+		inner = modReq
+	}
+
+	ulNas, err := nasCodec.BuildULNASTransportExisting(pduSessionID, inner)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build ULNASTransport: %v", err))
+		return
+	}
+
+	secured, err := nasCodec.EncodeNasPduWithSecurity(ue, ulNas, gonas.SecurityHeaderTypeIntegrityProtectedAndCiphered)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NAS security encode: %v", err))
+		return
+	}
+
+	sendUplinkAndWait(w, r, gnb, ue, t, req, secured, "PDUSessionResourceModifyRequest", "DownlinkNASTransport", "ErrorIndication")
 }
 
 // handlePDUSessionReleaseComplete sends a PDU SESSION RELEASE COMPLETE

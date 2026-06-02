@@ -28,6 +28,7 @@ const (
 // 5GSM cause values — TS 24.501 §9.11.4.2, Table 9.11.4.2.1.
 const (
 	cause5GSMUnknownPDUSessionType                     = 28
+	cause5GSMRequestRejectedUnspecified                = 31
 	cause5GSMMessageTypeNotCompatibleWithProtocolState = 98
 	cause5GSMProtocolErrorUnspecified                  = 111
 )
@@ -63,6 +64,7 @@ const (
 	ngapErrorIndication                  = "ErrorIndication"
 	ngapInitialContextSetupRequest       = "InitialContextSetupRequest"
 	ngapPDUSessionResourceSetupRequest   = "PDUSessionResourceSetupRequest"
+	ngapPDUSessionResourceModifyRequest  = "PDUSessionResourceModifyRequest"
 	ngapUEContextReleaseCommand          = "UEContextReleaseCommand"
 	ngapPDUSessionResourceReleaseCommand = "PDUSessionResourceReleaseCommand"
 	ngapNGSetupResponse                  = "NGSetupResponse"
@@ -90,6 +92,7 @@ const (
 	nasServiceReject                 = "service_reject"
 	nasPDUSessionEstablishmentAccept = "pdu_session_establishment_accept"
 	nasPDUSessionEstablishmentReject = "pdu_session_establishment_reject"
+	nasPDUSessionModificationReject  = "pdu_session_modification_reject"
 )
 
 // NGAP Cause, Misc group — TS 38.413 §9.3.1.2.
