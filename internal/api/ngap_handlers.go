@@ -73,6 +73,8 @@ func (h *Handler) SendNGAP(w http.ResponseWriter, r *http.Request) {
 		handleAuthenticationFailure(w, r, gnb, ue, t, &req)
 	case "security_mode_reject":
 		handleSecurityModeReject(w, r, gnb, ue, t, &req)
+	case "handover_required":
+		handleHandoverRequired(w, r, gnb, ue, t, &req)
 	default:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unsupported message_type: %s", req.MessageType))
 	}
@@ -101,12 +103,195 @@ func (h *Handler) SendGnBNGAP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// raw_ngap_pdu bypasses message_type entirely.
+	if req.RawNGAPPDU != nil {
+		handleRawNGAP(w, r, t, &req)
+		return
+	}
+
 	switch req.MessageType {
 	case "ng_reset":
 		handleNGReset(w, r, gnb, t, &req)
+	case "handover_request_acknowledge":
+		handleHandoverRequestAcknowledge(w, t, &req)
+	case "handover_notify":
+		handleHandoverNotify(w, gnb, t, &req)
 	default:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unsupported message_type: %s", req.MessageType))
 	}
+}
+
+// AwaitGnBMessage waits for an unsolicited downlink NGAP message to arrive on
+// the gNB's N2 association (e.g. Handover Request on a target gNB, or Handover
+// Command / UE Context Release Command on a source gNB).
+func (h *Handler) AwaitGnBMessage(w http.ResponseWriter, r *http.Request) {
+	gnbID := r.PathValue("gnb_id")
+
+	if _, err := h.Store.GetGnB(gnbID); err != nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("gnb not found: %v", err))
+		return
+	}
+
+	t, ok := h.Transports[gnbID]
+	if !ok {
+		writeError(w, http.StatusBadRequest, "gnb has no active SCTP transport")
+		return
+	}
+
+	var req AwaitRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
+		return
+	}
+
+	if len(req.MessageTypes) == 0 {
+		writeError(w, http.StatusBadRequest, "message_types is required")
+		return
+	}
+
+	timeout := 5 * time.Second
+	if req.TimeoutMs > 0 {
+		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	defer cancel()
+
+	ngapResp, err := t.WaitForMessage(ctx, req.MessageTypes...)
+	if err != nil {
+		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for %v: %v", req.MessageTypes, err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
+}
+
+// handleHandoverRequired sends a HANDOVER REQUIRED for the UE toward the target
+// gNB (TS 38.413 §8.4.1). Send-only: the resulting Handover Command arrives
+// asynchronously (await it on the source gNB).
+func handleHandoverRequired(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
+	if req.TargetGnbID == nil {
+		writeError(w, http.StatusBadRequest, "target_gnb_id is required for handover_required")
+		return
+	}
+
+	pduSessionID := pduSessionIDForRelease(ue)
+
+	encoded, err := ngap.BuildHandoverRequired(ue.AmfUeNgapID, ue.RanUeNgapID, *req.TargetGnbID,
+		gnb.MCC, gnb.MNC, gnb.TAC, []int64{int64(pduSessionID)})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build HandoverRequired: %v", err))
+		return
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{})
+}
+
+// handleHandoverRequestAcknowledge sends a HANDOVER REQUEST ACKNOWLEDGE from the
+// target gNB (TS 38.413 §8.4.2). Send-only.
+func handleHandoverRequestAcknowledge(w http.ResponseWriter, t *transport.SCTPTransport, req *SendGnBNGAPRequest) {
+	if req.AmfUeNgapID == nil || req.RanUeNgapID == nil {
+		writeError(w, http.StatusBadRequest, "amf_ue_ngap_id and ran_ue_ngap_id are required")
+		return
+	}
+
+	if len(req.PDUSessions) == 0 {
+		writeError(w, http.StatusBadRequest, "pdu_sessions is required for handover_request_acknowledge")
+		return
+	}
+
+	var sessions []ngap.HandoverAdmittedSession
+
+	for _, ps := range req.PDUSessions {
+		dlIP := ps.DLIP
+		if dlIP == "" {
+			dlIP = "127.0.0.1"
+		}
+
+		teid := ps.DLTeid
+		if teid == 0 {
+			teid = 1
+		}
+
+		sessions = append(sessions, ngap.HandoverAdmittedSession{PDUSessionID: ps.ID, DLTeid: teid, DLIP: dlIP})
+	}
+
+	encoded, err := ngap.BuildHandoverRequestAcknowledge(*req.AmfUeNgapID, *req.RanUeNgapID, sessions)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build HandoverRequestAcknowledge: %v", err))
+		return
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{})
+}
+
+// handleHandoverNotify sends a HANDOVER NOTIFY from the target gNB once the UE
+// has arrived (TS 38.413 §8.4.3). Send-only.
+func handleHandoverNotify(w http.ResponseWriter, gnb *store.GnBContext, t *transport.SCTPTransport, req *SendGnBNGAPRequest) {
+	if req.AmfUeNgapID == nil || req.RanUeNgapID == nil {
+		writeError(w, http.StatusBadRequest, "amf_ue_ngap_id and ran_ue_ngap_id are required")
+		return
+	}
+
+	encoded, err := ngap.BuildHandoverNotify(*req.AmfUeNgapID, *req.RanUeNgapID, gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build HandoverNotify: %v", err))
+		return
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{})
+}
+
+// handleRawNGAP writes the caller-supplied PDU onto the N2 association verbatim.
+// With wait_for it returns the first matching downlink message; otherwise it is
+// fire-and-forget.
+func handleRawNGAP(w http.ResponseWriter, r *http.Request, t *transport.SCTPTransport, req *SendGnBNGAPRequest) {
+	pdu, err := hex.DecodeString(*req.RawNGAPPDU)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("decode raw_ngap_pdu: %v", err))
+		return
+	}
+
+	if err := t.Send(pdu, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
+		return
+	}
+
+	if len(req.WaitFor) == 0 {
+		writeJSON(w, http.StatusOK, SendNGAPResponse{})
+		return
+	}
+
+	timeout := 5 * time.Second
+	if req.TimeoutMs > 0 {
+		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	defer cancel()
+
+	ngapResp, err := t.WaitForMessage(ctx, req.WaitFor...)
+	if err != nil {
+		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for %v: %v", req.WaitFor, err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
 }
 
 // handleNGReset sends an NG RESET (TS 38.413 §8.7.4) initiated by the gNB: a
@@ -467,7 +652,9 @@ func handlePDUSessionEstablishmentRequest(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	pduSetupResp, err := ngap.BuildPDUSessionResourceSetupResponse(ue.AmfUeNgapID, ue.RanUeNgapID)
+	// The N3 endpoint is synthesised — 3gpp-server does not run a user plane.
+	pduSetupResp, err := ngap.BuildPDUSessionResourceSetupResponse(
+		ue.AmfUeNgapID, ue.RanUeNgapID, int64(pduSessionID), uint32(ue.RanUeNgapID), "10.3.0.3")
 	if err == nil {
 		_ = t.Send(pduSetupResp, false)
 	}
@@ -854,7 +1041,7 @@ func fiveGSTMSIFromGUTI(guti *nasType.GUTI5G) *ngap.FiveGSTMSIFromGUTI {
 		return nil
 	}
 
-	setID := guti.GetAMFSetID() // 10-bit value, right-aligned
+	setID := guti.GetAMFSetID()     // 10-bit value, right-aligned
 	pointer := guti.GetAMFPointer() // 6-bit value, right-aligned
 	tmsi := guti.GetTMSI5G()
 

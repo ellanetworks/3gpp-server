@@ -1,8 +1,10 @@
 package ngap
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"net/netip"
 
 	"github.com/free5gc/aper"
 	"github.com/free5gc/ngap"
@@ -477,7 +479,10 @@ type FiveGSTMSIFromGUTI struct {
 // BuildNGSetupRequestFromStore builds the IE-level NGAPMessage for an
 // NGSetupRequest using stored gNB context values. This is the convenience
 // path — the caller can override any IE afterward.
-func BuildNGSetupRequestFromStore(mcc, mnc, tac, gnbID, name string, sst int32, sd string, slices []struct{ SST int32; SD string }) *NGAPMessage {
+func BuildNGSetupRequestFromStore(mcc, mnc, tac, gnbID, name string, sst int32, sd string, slices []struct {
+	SST int32
+	SD  string
+}) *NGAPMessage {
 	plmnID, _ := GetMccAndMncInOctets(mcc, mnc)
 	plmnHex := hex.EncodeToString(plmnID)
 
@@ -541,8 +546,8 @@ func BuildNGSetupRequestFromStore(mcc, mnc, tac, gnbID, name string, sst int32, 
 				},
 			},
 			{
-				ID:              ngapType.ProtocolIEIDDefaultPagingDRX,
-				Criticality:     "ignore",
+				ID:               ngapType.ProtocolIEIDDefaultPagingDRX,
+				Criticality:      "ignore",
 				DefaultPagingDRX: &pagingDRX,
 			},
 		},
@@ -627,7 +632,48 @@ func BuildUplinkNASTransport(amfUeNgapID, ranUeNgapID int64, nasPDU []byte, mcc,
 	return ngap.Encoder(pdu)
 }
 
-func BuildPDUSessionResourceSetupResponse(amfUeNgapID, ranUeNgapID int64) ([]byte, error) {
+// buildPDUSessionResourceSetupResponseTransfer encodes the gNB's downlink GTP
+// tunnel for an admitted PDU session (TS 38.413 §9.3.4.10), reported in the
+// PDU Session Resource Setup Response.
+func buildPDUSessionResourceSetupResponseTransfer(teid uint32, ip string) ([]byte, error) {
+	addr, err := netip.ParseAddr(ip)
+	if err != nil {
+		return nil, fmt.Errorf("parse DL IP %q: %w", ip, err)
+	}
+
+	var ipBytes []byte
+	if addr.Is4() {
+		v4 := addr.As4()
+		ipBytes = v4[:]
+	} else {
+		v6 := addr.As16()
+		ipBytes = v6[:]
+	}
+
+	teidBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(teidBytes, teid)
+
+	transfer := ngapType.PDUSessionResourceSetupResponseTransfer{}
+	qos := &transfer.DLQosFlowPerTNLInformation
+	qos.UPTransportLayerInformation.Present = ngapType.UPTransportLayerInformationPresentGTPTunnel
+	qos.UPTransportLayerInformation.GTPTunnel = &ngapType.GTPTunnel{
+		TransportLayerAddress: ngapType.TransportLayerAddress{
+			Value: aper.BitString{Bytes: ipBytes, BitLength: uint64(len(ipBytes) * 8)},
+		},
+		GTPTEID: ngapType.GTPTEID{Value: teidBytes},
+	}
+	qos.AssociatedQosFlowList.List = append(qos.AssociatedQosFlowList.List,
+		ngapType.AssociatedQosFlowItem{QosFlowIdentifier: ngapType.QosFlowIdentifier{Value: 1}})
+
+	buf, err := aper.MarshalWithParams(transfer, "valueExt")
+	if err != nil {
+		return nil, fmt.Errorf("marshal PDUSessionResourceSetupResponseTransfer: %w", err)
+	}
+
+	return buf, nil
+}
+
+func BuildPDUSessionResourceSetupResponse(amfUeNgapID, ranUeNgapID, pduSessionID int64, dlTeid uint32, dlIP string) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome
 	pdu.SuccessfulOutcome = new(ngapType.SuccessfulOutcome)
@@ -655,6 +701,26 @@ func BuildPDUSessionResourceSetupResponse(amfUeNgapID, ranUeNgapID int64) ([]byt
 	ranIE.Value.RANUENGAPID = new(ngapType.RANUENGAPID)
 	ranIE.Value.RANUENGAPID.Value = ranUeNgapID
 	ies.List = append(ies.List, ranIE)
+
+	// Downlink GTP tunnel for the admitted PDU session (TS 38.413 §9.2.1.2).
+	transfer, err := buildPDUSessionResourceSetupResponseTransfer(dlTeid, dlIP)
+	if err != nil {
+		return nil, err
+	}
+
+	suIE := ngapType.PDUSessionResourceSetupResponseIEs{}
+	suIE.Id.Value = ngapType.ProtocolIEIDPDUSessionResourceSetupListSURes
+	suIE.Criticality.Value = ngapType.CriticalityPresentIgnore
+	suIE.Value.Present = ngapType.PDUSessionResourceSetupResponseIEsPresentPDUSessionResourceSetupListSURes
+	suIE.Value.PDUSessionResourceSetupListSURes = new(ngapType.PDUSessionResourceSetupListSURes)
+	suIE.Value.PDUSessionResourceSetupListSURes.List = append(
+		suIE.Value.PDUSessionResourceSetupListSURes.List,
+		ngapType.PDUSessionResourceSetupItemSURes{
+			PDUSessionID:                            ngapType.PDUSessionID{Value: pduSessionID},
+			PDUSessionResourceSetupResponseTransfer: transfer,
+		},
+	)
+	ies.List = append(ies.List, suIE)
 
 	return ngap.Encoder(pdu)
 }
@@ -722,6 +788,253 @@ func BuildNGReset(connections []NGResetConnection) ([]byte, error) {
 	}
 
 	ies.List = append(ies.List, rtIE)
+
+	return ngap.Encoder(pdu)
+}
+
+// HandoverAdmittedSession is a PDU session admitted by the target gNB in a
+// Handover Request Acknowledge, with its downlink GTP tunnel.
+type HandoverAdmittedSession struct {
+	PDUSessionID int64
+	DLTeid       uint32
+	DLIP         string
+}
+
+// BuildHandoverRequired builds a HANDOVER REQUIRED (TS 38.413 §8.4.1) sent by
+// the source gNB. The source-to-target container and per-session transfer are
+// opaque to the AMF, so placeholders suffice.
+func BuildHandoverRequired(amfUeNgapID, ranUeNgapID int64, targetGnbID, mcc, mnc, tac string, pduSessionIDs []int64) ([]byte, error) {
+	pdu := ngapType.NGAPPDU{}
+	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
+	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
+
+	im := pdu.InitiatingMessage
+	im.ProcedureCode.Value = ngapType.ProcedureCodeHandoverPreparation
+	im.Criticality.Value = ngapType.CriticalityPresentReject
+	im.Value.Present = ngapType.InitiatingMessagePresentHandoverRequired
+	im.Value.HandoverRequired = new(ngapType.HandoverRequired)
+
+	ies := &im.Value.HandoverRequired.ProtocolIEs
+
+	add := func(id int64, crit aper.Enumerated, present int) *ngapType.HandoverRequiredIEsValue {
+		ie := ngapType.HandoverRequiredIEs{}
+		ie.Id.Value = id
+		ie.Criticality.Value = crit
+		ie.Value.Present = present
+		ies.List = append(ies.List, ie)
+		return &ies.List[len(ies.List)-1].Value
+	}
+
+	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentReject,
+		ngapType.HandoverRequiredIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: amfUeNgapID}
+
+	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentReject,
+		ngapType.HandoverRequiredIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
+
+	add(ngapType.ProtocolIEIDHandoverType, ngapType.CriticalityPresentReject,
+		ngapType.HandoverRequiredIEsPresentHandoverType).HandoverType = &ngapType.HandoverType{Value: ngapType.HandoverTypePresentIntra5gs}
+
+	add(ngapType.ProtocolIEIDCause, ngapType.CriticalityPresentIgnore,
+		ngapType.HandoverRequiredIEsPresentCause).Cause = &ngapType.Cause{
+		Present:      ngapType.CausePresentRadioNetwork,
+		RadioNetwork: &ngapType.CauseRadioNetwork{Value: ngapType.CauseRadioNetworkPresentHandoverDesirableForRadioReason},
+	}
+
+	plmnID, err := GetMccAndMncInOctets(mcc, mnc)
+	if err != nil {
+		return nil, fmt.Errorf("target PLMN: %w", err)
+	}
+
+	tacBytes, err := GetTacInBytes(tac)
+	if err != nil {
+		return nil, fmt.Errorf("target TAC: %w", err)
+	}
+
+	gnbIDBits := ngapConvert.HexToBitString(targetGnbID, 24)
+	add(ngapType.ProtocolIEIDTargetID, ngapType.CriticalityPresentReject,
+		ngapType.HandoverRequiredIEsPresentTargetID).TargetID = &ngapType.TargetID{
+		Present: ngapType.TargetIDPresentTargetRANNodeID,
+		TargetRANNodeID: &ngapType.TargetRANNodeID{
+			GlobalRANNodeID: ngapType.GlobalRANNodeID{
+				Present: ngapType.GlobalRANNodeIDPresentGlobalGNBID,
+				GlobalGNBID: &ngapType.GlobalGNBID{
+					PLMNIdentity: ngapType.PLMNIdentity{Value: plmnID},
+					GNBID:        ngapType.GNBID{Present: ngapType.GNBIDPresentGNBID, GNBID: &gnbIDBits},
+				},
+			},
+			SelectedTAI: ngapType.TAI{
+				PLMNIdentity: ngapType.PLMNIdentity{Value: plmnID},
+				TAC:          ngapType.TAC{Value: tacBytes},
+			},
+		},
+	}
+
+	transfer, err := aper.MarshalWithParams(ngapType.HandoverRequiredTransfer{}, "valueExt")
+	if err != nil {
+		return nil, fmt.Errorf("marshal HandoverRequiredTransfer: %w", err)
+	}
+
+	list := &ngapType.PDUSessionResourceListHORqd{}
+	for _, id := range pduSessionIDs {
+		list.List = append(list.List, ngapType.PDUSessionResourceItemHORqd{
+			PDUSessionID:             ngapType.PDUSessionID{Value: id},
+			HandoverRequiredTransfer: transfer,
+		})
+	}
+
+	add(ngapType.ProtocolIEIDPDUSessionResourceListHORqd, ngapType.CriticalityPresentReject,
+		ngapType.HandoverRequiredIEsPresentPDUSessionResourceListHORqd).PDUSessionResourceListHORqd = list
+
+	add(ngapType.ProtocolIEIDSourceToTargetTransparentContainer, ngapType.CriticalityPresentReject,
+		ngapType.HandoverRequiredIEsPresentSourceToTargetTransparentContainer).SourceToTargetTransparentContainer =
+		&ngapType.SourceToTargetTransparentContainer{Value: []byte{0x00}}
+
+	return ngap.Encoder(pdu)
+}
+
+// BuildHandoverRequestAcknowledge builds a HANDOVER REQUEST ACKNOWLEDGE
+// (TS 38.413 §8.4.2) sent by the target gNB.
+func BuildHandoverRequestAcknowledge(amfUeNgapID, ranUeNgapID int64, sessions []HandoverAdmittedSession) ([]byte, error) {
+	pdu := ngapType.NGAPPDU{}
+	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome
+	pdu.SuccessfulOutcome = new(ngapType.SuccessfulOutcome)
+
+	so := pdu.SuccessfulOutcome
+	so.ProcedureCode.Value = ngapType.ProcedureCodeHandoverResourceAllocation
+	so.Criticality.Value = ngapType.CriticalityPresentReject
+	so.Value.Present = ngapType.SuccessfulOutcomePresentHandoverRequestAcknowledge
+	so.Value.HandoverRequestAcknowledge = new(ngapType.HandoverRequestAcknowledge)
+
+	ies := &so.Value.HandoverRequestAcknowledge.ProtocolIEs
+
+	add := func(id int64, crit aper.Enumerated, present int) *ngapType.HandoverRequestAcknowledgeIEsValue {
+		ie := ngapType.HandoverRequestAcknowledgeIEs{}
+		ie.Id.Value = id
+		ie.Criticality.Value = crit
+		ie.Value.Present = present
+		ies.List = append(ies.List, ie)
+		return &ies.List[len(ies.List)-1].Value
+	}
+
+	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentIgnore,
+		ngapType.HandoverRequestAcknowledgeIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: amfUeNgapID}
+
+	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentIgnore,
+		ngapType.HandoverRequestAcknowledgeIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
+
+	admitted := &ngapType.PDUSessionResourceAdmittedList{}
+	for _, s := range sessions {
+		transfer, err := buildHandoverRequestAcknowledgeTransfer(s.DLTeid, s.DLIP)
+		if err != nil {
+			return nil, err
+		}
+
+		admitted.List = append(admitted.List, ngapType.PDUSessionResourceAdmittedItem{
+			PDUSessionID:                       ngapType.PDUSessionID{Value: s.PDUSessionID},
+			HandoverRequestAcknowledgeTransfer: transfer,
+		})
+	}
+
+	add(ngapType.ProtocolIEIDPDUSessionResourceAdmittedList, ngapType.CriticalityPresentIgnore,
+		ngapType.HandoverRequestAcknowledgeIEsPresentPDUSessionResourceAdmittedList).PDUSessionResourceAdmittedList = admitted
+
+	add(ngapType.ProtocolIEIDTargetToSourceTransparentContainer, ngapType.CriticalityPresentReject,
+		ngapType.HandoverRequestAcknowledgeIEsPresentTargetToSourceTransparentContainer).TargetToSourceTransparentContainer =
+		&ngapType.TargetToSourceTransparentContainer{Value: []byte{0x00}}
+
+	return ngap.Encoder(pdu)
+}
+
+func buildHandoverRequestAcknowledgeTransfer(teid uint32, ip string) ([]byte, error) {
+	addr, err := netip.ParseAddr(ip)
+	if err != nil {
+		return nil, fmt.Errorf("parse DL IP %q: %w", ip, err)
+	}
+
+	var ipBytes []byte
+	if addr.Is4() {
+		v4 := addr.As4()
+		ipBytes = v4[:]
+	} else {
+		v6 := addr.As16()
+		ipBytes = v6[:]
+	}
+
+	teidBytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(teidBytes, teid)
+
+	transfer := ngapType.HandoverRequestAcknowledgeTransfer{}
+	transfer.DLNGUUPTNLInformation.Present = ngapType.UPTransportLayerInformationPresentGTPTunnel
+	transfer.DLNGUUPTNLInformation.GTPTunnel = &ngapType.GTPTunnel{
+		TransportLayerAddress: ngapType.TransportLayerAddress{
+			Value: aper.BitString{Bytes: ipBytes, BitLength: uint64(len(ipBytes) * 8)},
+		},
+		GTPTEID: ngapType.GTPTEID{Value: teidBytes},
+	}
+	transfer.QosFlowSetupResponseList.List = append(transfer.QosFlowSetupResponseList.List,
+		ngapType.QosFlowItemWithDataForwarding{QosFlowIdentifier: ngapType.QosFlowIdentifier{Value: 1}})
+
+	buf, err := aper.MarshalWithParams(transfer, "valueExt")
+	if err != nil {
+		return nil, fmt.Errorf("marshal HandoverRequestAcknowledgeTransfer: %w", err)
+	}
+
+	return buf, nil
+}
+
+// BuildHandoverNotify builds a HANDOVER NOTIFY (TS 38.413 §8.4.3) sent by the
+// target gNB once the UE has arrived.
+func BuildHandoverNotify(amfUeNgapID, ranUeNgapID int64, mcc, mnc, tac, gnbID string) ([]byte, error) {
+	pdu := ngapType.NGAPPDU{}
+	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
+	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
+
+	im := pdu.InitiatingMessage
+	im.ProcedureCode.Value = ngapType.ProcedureCodeHandoverNotification
+	im.Criticality.Value = ngapType.CriticalityPresentIgnore
+	im.Value.Present = ngapType.InitiatingMessagePresentHandoverNotify
+	im.Value.HandoverNotify = new(ngapType.HandoverNotify)
+
+	ies := &im.Value.HandoverNotify.ProtocolIEs
+
+	add := func(id int64, crit aper.Enumerated, present int) *ngapType.HandoverNotifyIEsValue {
+		ie := ngapType.HandoverNotifyIEs{}
+		ie.Id.Value = id
+		ie.Criticality.Value = crit
+		ie.Value.Present = present
+		ies.List = append(ies.List, ie)
+		return &ies.List[len(ies.List)-1].Value
+	}
+
+	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentReject,
+		ngapType.HandoverNotifyIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: amfUeNgapID}
+
+	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentReject,
+		ngapType.HandoverNotifyIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
+
+	plmnID, err := GetMccAndMncInOctets(mcc, mnc)
+	if err != nil {
+		return nil, fmt.Errorf("PLMN: %w", err)
+	}
+
+	tacBytes, err := GetTacInBytes(tac)
+	if err != nil {
+		return nil, fmt.Errorf("TAC: %w", err)
+	}
+
+	nrCellID, err := GetNRCellIdentity(gnbID)
+	if err != nil {
+		return nil, fmt.Errorf("NRCellIdentity: %w", err)
+	}
+
+	add(ngapType.ProtocolIEIDUserLocationInformation, ngapType.CriticalityPresentIgnore,
+		ngapType.HandoverNotifyIEsPresentUserLocationInformation).UserLocationInformation = &ngapType.UserLocationInformation{
+		Present: ngapType.UserLocationInformationPresentUserLocationInformationNR,
+		UserLocationInformationNR: &ngapType.UserLocationInformationNR{
+			NRCGI: ngapType.NRCGI{PLMNIdentity: ngapType.PLMNIdentity{Value: plmnID}, NRCellIdentity: nrCellID},
+			TAI:   ngapType.TAI{PLMNIdentity: ngapType.PLMNIdentity{Value: plmnID}, TAC: ngapType.TAC{Value: tacBytes}},
+		},
+	}
 
 	return ngap.Encoder(pdu)
 }

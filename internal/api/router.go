@@ -12,6 +12,7 @@ func NewRouter(h *Handler) *http.ServeMux {
 	mux.HandleFunc("DELETE /gnb/{gnb_id}", h.DeleteGnB)
 
 	mux.HandleFunc("POST /gnb/{gnb_id}/ngap", h.SendGnBNGAP)
+	mux.HandleFunc("POST /gnb/{gnb_id}/await", h.AwaitGnBMessage)
 
 	mux.HandleFunc("POST /gnb/{gnb_id}/ue", h.CreateUE)
 	mux.HandleFunc("GET /gnb/{gnb_id}/ue/{ue_id}", h.GetUE)

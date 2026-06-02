@@ -185,22 +185,62 @@ paths:
           `reset_ue_ids` it resets the whole NG interface; with `reset_ue_ids`
           it resets only those UEs' associations (partOfNG-Interface). The AMF
           answers with NG RESET ACKNOWLEDGE.
+        - `handover_request_acknowledge` — Target-gNB HANDOVER REQUEST
+          ACKNOWLEDGE (TS 38.413 §8.4.2), admitting the listed `pdu_sessions`
+          with their downlink GTP tunnels. Send-only.
+        - `handover_notify` — Target-gNB HANDOVER NOTIFY once the UE has
+          arrived (TS 38.413 §8.4.3). Send-only.
+
+        ## Raw escape hatch
+
+        `raw_ngap_pdu` (hex) is the universal primitive: when set,
+        `message_type` is ignored and the bytes are written verbatim onto the
+        N2 association with no encoding or validation — letting a test craft any
+        NGAP PDU at all (well-formed, malformed, out-of-sequence, or garbage) to
+        probe how the core reacts. With `wait_for` the call blocks for one of
+        those downlink message types and returns it; otherwise it is
+        fire-and-forget.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [message_type]
               properties:
                 message_type:
                   type: string
-                  enum: [ng_reset]
+                  enum: [ng_reset, handover_request_acknowledge, handover_notify]
+                raw_ngap_pdu:
+                  type: string
+                  description: "Hex NGAP PDU sent verbatim (overrides message_type). Craft any message, valid or not."
+                wait_for:
+                  type: array
+                  items:
+                    type: string
+                  description: "With raw_ngap_pdu: downlink NGAP message types to block for. Empty = fire-and-forget."
+                timeout_ms:
+                  type: integer
+                  description: "With raw_ngap_pdu + wait_for: how long to wait. Default 5000."
                 reset_ue_ids:
                   type: array
                   items:
                     type: string
                   description: "UE IDs whose NG associations to reset (NG Reset). Empty = reset all."
+                amf_ue_ngap_id:
+                  type: integer
+                  description: "Handover: AMF UE NGAP ID identifying the UE association."
+                ran_ue_ngap_id:
+                  type: integer
+                  description: "Handover: target-assigned RAN UE NGAP ID."
+                pdu_sessions:
+                  type: array
+                  description: "Handover Request Acknowledge: admitted PDU sessions with their downlink GTP tunnels."
+                  items:
+                    type: object
+                    properties:
+                      id: { type: integer }
+                      dl_teid: { type: integer }
+                      dl_ip: { type: string }
       responses:
         "200":
           description: Decoded AMF response.
@@ -208,6 +248,42 @@ paths:
           description: gNB not found.
         "504":
           description: No response from the AMF.
+
+  /gnb/{gnb_id}/await:
+    parameters:
+      - $ref: "#/components/parameters/gnb_id"
+    post:
+      operationId: awaitGnBMessage
+      summary: Await an unsolicited downlink NGAP message
+      description: |
+        Blocks until one of the given NGAP message types arrives on the gNB's
+        N2 association, then returns the decoded message. Used for messages the
+        core sends without a directly-triggering uplink — e.g. HANDOVER REQUEST
+        on a target gNB, or HANDOVER COMMAND / UE CONTEXT RELEASE COMMAND on a
+        source gNB during N2 handover.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message_types]
+              properties:
+                message_types:
+                  type: array
+                  items:
+                    type: string
+                  description: "NGAP message types to wait for (first match wins)."
+                timeout_ms:
+                  type: integer
+                  description: "How long to wait. Default 5000."
+      responses:
+        "200":
+          description: Decoded NGAP message.
+        "404":
+          description: gNB not found.
+        "504":
+          description: No matching message arrived before the timeout.
 
   /gnb/{gnb_id}/ue/{ue_id}/ngap:
     parameters:
@@ -526,7 +602,7 @@ components:
         message_type:
           type: string
           description: NAS message to send.
-          enum: [registration_request, authentication_response, security_mode_complete, registration_complete, pdu_session_establishment_request, deregistration_request, ue_context_release_request, service_request, identity_response, pdu_session_release_request, pdu_session_release_complete, authentication_failure, security_mode_reject]
+          enum: [registration_request, authentication_response, security_mode_complete, registration_complete, pdu_session_establishment_request, deregistration_request, ue_context_release_request, service_request, identity_response, pdu_session_release_request, pdu_session_release_complete, authentication_failure, security_mode_reject, handover_required]
         raw_nas_pdu:
           type: string
           description: |
@@ -554,6 +630,9 @@ components:
         service_type:
           type: integer
           description: "Service type for service_request (TS 24.501 §9.11.3.50). Default 1 (data). 0=signalling, 2=mobile-terminated."
+        target_gnb_id:
+          type: string
+          description: "Target gNB identity (hex) for handover_required (TS 38.413 §8.4.1). The resulting Handover Command arrives asynchronously — await it on the source gNB."
         switch_off:
           type: integer
           description: "Deregistration switch-off flag (TS 24.501 §9.11.3.20). Default 1 (switch off, no accept). 0 = normal de-registration (AMF replies with Deregistration Accept)."

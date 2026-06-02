@@ -15,6 +15,7 @@ import (
 
 // 5GMM cause values — TS 24.501 §9.11.3.2, Table 9.11.3.2.1.
 const (
+	cause5GMMUEIdentityCannotBeDerived       = 9
 	cause5GMMMACFailure                      = 20
 	cause5GMMSynchFailure                    = 21
 	cause5GMMUESecurityCapabilitiesMismatch  = 23
@@ -67,6 +68,8 @@ const (
 	ngapNGSetupResponse                  = "NGSetupResponse"
 	ngapNGSetupFailure                   = "NGSetupFailure"
 	ngapNGResetAcknowledge               = "NGResetAcknowledge"
+	ngapHandoverRequest                  = "HandoverRequest"
+	ngapHandoverCommand                  = "HandoverCommand"
 )
 
 // NAS message-type names as decoded by the server (internal/nas/decode.go),

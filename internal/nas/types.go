@@ -78,6 +78,9 @@ type NASRequest struct {
 	// Cause5GMM is the 5GMM cause sent in a UE-originated reject/failure
 	// (Authentication Failure, Security Mode Reject), TS 24.501 §9.11.3.2.
 	Cause5GMM *uint8 `json:"cause_5gmm,omitempty"`
+
+	// TargetGnbID is the target gNB identity (hex) for a Handover Required.
+	TargetGnbID *string `json:"target_gnb_id,omitempty"`
 }
 
 type SNSSAIJSON struct {
