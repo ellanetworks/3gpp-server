@@ -38,8 +38,14 @@ func TestN2HandoverFailureRejection(t *testing.T) {
 		t.Fatalf("handover_failure: HTTP %d\n  body: %s", status, body)
 	}
 
-	if got := jsonGet(awaitNGAP(t, srcGNB, ngapHandoverPreparationFailure), "ngap.message_type"); got != ngapHandoverPreparationFailure {
+	prepFail := awaitNGAP(t, srcGNB, ngapHandoverPreparationFailure)
+	if got := jsonGet(prepFail, "ngap.message_type"); got != ngapHandoverPreparationFailure {
 		t.Errorf("after Handover Failure: source got %q, want HandoverPreparationFailure (TS 38.413 §8.4.1.3)", got)
+	}
+
+	// Cause is a mandatory IE of HANDOVER PREPARATION FAILURE (TS 38.413 §9.2.3.3).
+	if !ngapHasCause(prepFail) {
+		t.Errorf("HandoverPreparationFailure missing mandatory Cause (TS 38.413 §9.2.3.3)\n  body: %s", prepFail)
 	}
 }
 

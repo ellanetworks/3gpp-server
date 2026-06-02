@@ -200,6 +200,31 @@ func ngapAMBR(body []byte) (dl, ul int64, ok bool) {
 	return 0, 0, false
 }
 
+// ngapHasCause reports whether the response carries a Cause IE.
+func ngapHasCause(body []byte) bool {
+	var top struct {
+		NGAP struct {
+			IEs []struct {
+				Cause *struct {
+					Present string `json:"present"`
+				} `json:"cause"`
+			} `json:"ies"`
+		} `json:"ngap"`
+	}
+
+	if err := json.Unmarshal(body, &top); err != nil {
+		return false
+	}
+
+	for _, ie := range top.NGAP.IEs {
+		if ie.Cause != nil && ie.Cause.Present != "" {
+			return true
+		}
+	}
+
+	return false
+}
+
 // ngapHasSecurityContext reports whether the response carries a Security Context
 // (surfaced via its Next Hop Chaining Count).
 func ngapHasSecurityContext(body []byte) bool {
