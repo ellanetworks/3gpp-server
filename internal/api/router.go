@@ -21,6 +21,7 @@ func NewRouter(h *Handler) *http.ServeMux {
 
 	mux.HandleFunc("POST /gnb/{gnb_id}/ue/{ue_id}/migrate", h.MigrateUE)
 	mux.HandleFunc("POST /gnb/{gnb_id}/ue/{ue_id}/ngap", h.SendNGAP)
+	mux.HandleFunc("POST /gnb/{gnb_id}/ue/{ue_id}/await", h.AwaitUEMessage)
 
 	return mux
 }

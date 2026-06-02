@@ -32,13 +32,11 @@ func TestMain(m *testing.M) {
 		log.Fatalf("Ella Core provisioning failed: %v", err)
 	}
 
-	if err := createSubscriber(token, "001010000000001"); err != nil {
-		log.Fatalf("Subscriber creation failed: %v", err)
-	}
-
-	// Extra subscribers, for scenarios needing several distinct UEs (e.g. a
-	// victim and an attacker on different gNBs, or one UE per sub-case).
-	for _, imsi := range []string{"001010000000002", "001010000000003", "001010000000004", "001010000000005", "001010000000006"} {
+	// A pool of distinct subscribers (imsi-00101 + 10-digit MSIN), for scenarios
+	// needing several UEs at once: a victim and an attacker on different gNBs,
+	// one UE per sub-case, or many UEs driving a concurrency/fast-sequence test.
+	for i := 1; i <= numTestSubscribers; i++ {
+		imsi := testSUPI(i)[len("imsi-"):]
 		if err := createSubscriber(token, imsi); err != nil {
 			log.Fatalf("subscriber %s creation failed: %v", imsi, err)
 		}

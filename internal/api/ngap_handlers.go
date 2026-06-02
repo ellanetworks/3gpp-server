@@ -125,6 +125,116 @@ func (h *Handler) SendGnBNGAP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// effectiveRanID and effectiveAmfID return the UE NGAP IDs actually placed on
+// the wire for a send — the request override when present, else the stored
+// value. The downlink response echoes these, so they are the keys to correlate
+// it back to this UE.
+func effectiveRanID(req *SendNGAPRequest, ue *store.UEContext) int64 {
+	if req != nil && req.RanUeNgapIDOverride != nil {
+		return *req.RanUeNgapIDOverride
+	}
+
+	return ue.RanUeNgapID
+}
+
+func effectiveAmfID(req *SendNGAPRequest, ue *store.UEContext) int64 {
+	if req != nil && req.AmfUeNgapIDOverride != nil {
+		return *req.AmfUeNgapIDOverride
+	}
+
+	return ue.AmfUeNgapID
+}
+
+// ueNGAPMatcher matches a downlink NGAP PDU to a specific UE by its NGAP IDs, so
+// concurrent waiters on one gNB association don't consume each other's downlink.
+// The RAN UE NGAP ID is always known for a send (it is mandatory in every
+// UE-associated message), so it is matched exactly — including the legitimate
+// value 0. The AMF UE NGAP ID is a secondary key: it is the AMF's to assign, so
+// amfID of 0 means "not yet known" and is skipped. A PDU carrying no UE NGAP ID
+// (e.g. an association-level Error Indication) matches any waiter.
+func ueNGAPMatcher(ranID, amfID int64) func(*ngap.NGAPResponse) bool {
+	return func(resp *ngap.NGAPResponse) bool {
+		var msgRan, msgAmf *int64
+
+		for i := range resp.IEs {
+			if resp.IEs[i].RanUeNgapID != nil {
+				msgRan = resp.IEs[i].RanUeNgapID
+			}
+
+			if resp.IEs[i].AmfUeNgapID != nil {
+				msgAmf = resp.IEs[i].AmfUeNgapID
+			}
+		}
+
+		if msgRan == nil && msgAmf == nil {
+			return true
+		}
+
+		if msgRan != nil && *msgRan == ranID {
+			return true
+		}
+
+		if msgAmf != nil && amfID != 0 && *msgAmf == amfID {
+			return true
+		}
+
+		return false
+	}
+}
+
+// AwaitUEMessage waits for an unsolicited downlink NGAP message addressed to a
+// specific UE on the gNB's association, letting many UEs share one gNB without
+// claiming each other's downlink.
+func (h *Handler) AwaitUEMessage(w http.ResponseWriter, r *http.Request) {
+	gnbID := r.PathValue("gnb_id")
+	ueID := r.PathValue("ue_id")
+
+	gnb, err := h.Store.GetGnB(gnbID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("gnb not found: %v", err))
+		return
+	}
+
+	ue, ok := gnb.GetUE(ueID)
+	if !ok {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("ue %s not found", ueID))
+		return
+	}
+
+	t, ok := h.Transports[gnbID]
+	if !ok {
+		writeError(w, http.StatusBadRequest, "gnb has no active SCTP transport")
+		return
+	}
+
+	var req AwaitRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
+		return
+	}
+
+	if len(req.MessageTypes) == 0 {
+		writeError(w, http.StatusBadRequest, "message_types is required")
+		return
+	}
+
+	timeout := 5 * time.Second
+	if req.TimeoutMs > 0 {
+		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	defer cancel()
+
+	ngapResp, err := t.WaitForMessageMatching(ctx, ueNGAPMatcher(ue.RanUeNgapID, ue.AmfUeNgapID), req.MessageTypes...)
+	if err != nil {
+		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for %v: %v", req.MessageTypes, err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
+}
+
 // AwaitGnBMessage waits for an unsolicited downlink NGAP message to arrive on
 // the gNB's N2 association (e.g. Handover Request on a target gNB, or Handover
 // Command / UE Context Release Command on a source gNB).
@@ -475,7 +585,7 @@ func handleRegistrationRequest(w http.ResponseWriter, r *http.Request, gnb *stor
 			ue.RanUeNgapID, nasPDU,
 			gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, nil, initialUEOverrides(req),
 		)
-		sendAndWait(w, r, gnb, ue, t, ngapMsg, "DownlinkNASTransport", "InitialContextSetupRequest", "ErrorIndication")
+		sendAndWait(w, r, gnb, ue, t, req, ngapMsg, "DownlinkNASTransport", "InitialContextSetupRequest", "ErrorIndication")
 
 		return
 	}
@@ -530,7 +640,7 @@ func handleRegistrationRequest(w http.ResponseWriter, r *http.Request, gnb *stor
 		ue.RanUeNgapID, nasPDU,
 		gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, nil, initialUEOverrides(req),
 	)
-	sendAndWait(w, r, gnb, ue, t, ngapMsg, "DownlinkNASTransport", "InitialContextSetupRequest", "ErrorIndication")
+	sendAndWait(w, r, gnb, ue, t, req, ngapMsg, "DownlinkNASTransport", "InitialContextSetupRequest", "ErrorIndication")
 }
 
 func handleAuthenticationResponse(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
@@ -750,7 +860,8 @@ func handlePDUSessionEstablishmentRequest(w http.ResponseWriter, r *http.Request
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	ngapResp, err := t.WaitForMessage(ctx, "PDUSessionResourceSetupRequest", "DownlinkNASTransport", "ErrorIndication")
+	ngapResp, err := t.WaitForMessageMatching(ctx, ueNGAPMatcher(effectiveRanID(req, ue), effectiveAmfID(req, ue)),
+		"PDUSessionResourceSetupRequest", "DownlinkNASTransport", "ErrorIndication")
 	if err != nil {
 		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for PDU establishment response: %v", err))
 		return
@@ -837,7 +948,8 @@ func handleDeregistrationRequest(w http.ResponseWriter, r *http.Request, gnb *st
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	ngapResp, err := t.WaitForMessage(ctx, "UEContextReleaseCommand", "DownlinkNASTransport", "ErrorIndication")
+	ngapResp, err := t.WaitForMessageMatching(ctx, ueNGAPMatcher(effectiveRanID(req, ue), effectiveAmfID(req, ue)),
+		"UEContextReleaseCommand", "DownlinkNASTransport", "ErrorIndication")
 	if err != nil {
 		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for response: %v", err))
 		return
@@ -904,7 +1016,8 @@ func handleUEContextReleaseRequest(w http.ResponseWriter, r *http.Request, gnb *
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	ngapResp, err := t.WaitForMessage(ctx, "UEContextReleaseCommand", "ErrorIndication")
+	ngapResp, err := t.WaitForMessageMatching(ctx, ueNGAPMatcher(effectiveRanID(req, ue), effectiveAmfID(req, ue)),
+		"UEContextReleaseCommand", "ErrorIndication")
 	if err != nil {
 		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for response: %v", err))
 		return
@@ -1290,7 +1403,7 @@ func handleServiceRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnB
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	ngapResp, err := t.WaitForMessage(ctx,
+	ngapResp, err := t.WaitForMessageMatching(ctx, ueNGAPMatcher(effectiveRanID(req, ue), effectiveAmfID(req, ue)),
 		"InitialContextSetupRequest", "DownlinkNASTransport", "PDUSessionResourceSetupRequest", "ErrorIndication")
 	if err != nil {
 		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for service request response: %v", err))
@@ -1300,7 +1413,9 @@ func handleServiceRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnB
 	var nasResp *nasCodec.NASResponse
 
 	for _, ie := range ngapResp.IEs {
-		if ie.AmfUeNgapID != nil {
+		// An Error Indication echoes back the AP IDs that were sent (TS 38.413
+		// §10.6); it does not assign one, so it must not overwrite the UE's.
+		if ie.AmfUeNgapID != nil && ngapResp.MessageType != "ErrorIndication" {
 			ue.AmfUeNgapID = *ie.AmfUeNgapID
 			gnb.UpdateNGAPIDs(ue.RanUeNgapID, *ie.AmfUeNgapID)
 		}
@@ -1329,14 +1444,14 @@ func handleServiceRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnB
 	})
 }
 
-func sendAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, ngapMsg *ngap.NGAPMessage, waitFor ...string) {
+func sendAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest, ngapMsg *ngap.NGAPMessage, waitFor ...string) {
 	encoded, err := ngap.Encode(ngapMsg)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NGAP encode: %v", err))
 		return
 	}
 
-	sendRawAndWait(w, r, gnb, ue, t, encoded, waitFor...)
+	sendRawAndWait(w, r, gnb, ue, t, req, encoded, waitFor...)
 }
 
 func sendUplinkAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest, nasPDU []byte, waitFor ...string) {
@@ -1349,10 +1464,10 @@ func sendUplinkAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GnBCon
 		return
 	}
 
-	sendRawAndWait(w, r, gnb, ue, t, encoded, waitFor...)
+	sendRawAndWait(w, r, gnb, ue, t, req, encoded, waitFor...)
 }
 
-func sendRawAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, encoded []byte, waitFor ...string) {
+func sendRawAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest, encoded []byte, waitFor ...string) {
 	if err := t.Send(encoded, false); err != nil {
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
 		return
@@ -1361,7 +1476,7 @@ func sendRawAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GnBContex
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	ngapResp, err := t.WaitForMessage(ctx, waitFor...)
+	ngapResp, err := t.WaitForMessageMatching(ctx, ueNGAPMatcher(effectiveRanID(req, ue), effectiveAmfID(req, ue)), waitFor...)
 	if err != nil {
 		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for response: %v", err))
 		return
@@ -1370,7 +1485,9 @@ func sendRawAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GnBContex
 	var nasResp *nasCodec.NASResponse
 
 	for _, ie := range ngapResp.IEs {
-		if ie.AmfUeNgapID != nil {
+		// An Error Indication echoes back the AP IDs that were sent (TS 38.413
+		// §10.6); it does not assign one, so it must not overwrite the UE's.
+		if ie.AmfUeNgapID != nil && ngapResp.MessageType != "ErrorIndication" {
 			ue.AmfUeNgapID = *ie.AmfUeNgapID
 			gnb.UpdateNGAPIDs(ue.RanUeNgapID, *ie.AmfUeNgapID)
 		}

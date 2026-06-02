@@ -6,6 +6,34 @@ import (
 	"testing"
 )
 
+// TestPDUSessionEstablishment_NGAPIDFuzz sends a PDU Session Establishment
+// Request on an established connection with a wrong UE NGAP ID and expects a
+// spec-compliant Error Indication (TS 38.413 §10.6, §8.7.5.2).
+func TestPDUSessionEstablishment_NGAPIDFuzz(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+	}{
+		{"unknown AMF UE NGAP ID", `{"message_type":"pdu_session_establishment_request","amf_ue_ngap_id_override":99999}`},
+		{"inconsistent RAN UE NGAP ID", `{"message_type":"pdu_session_establishment_request","ran_ue_ngap_id_override":99999}`},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gnbID := mustCreateGnB(t)
+			ueID := mustCreateUE(t, gnbID)
+			doRegistrationFlow(t, gnbID, ueID)
+
+			status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap", tc.body)
+			if status != 200 {
+				t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
+			}
+
+			assertSpecCompliantErrorIndication(t, body)
+		})
+	}
+}
+
 // TestPDUSessionEstablishment_Fuzz drives the PDU session establishment endpoint
 // with both well-formed and malformed top-level NAS payloads. When raw_nas_pdu
 // is supplied, the 3gpp-server sends those bytes as the NAS PDU IE of an

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"slices"
 	"sync"
 	"sync/atomic"
 
@@ -22,8 +23,8 @@ type SCTPTransport struct {
 	closed atomic.Bool
 
 	mu     sync.Mutex
+	cond   *sync.Cond // broadcast when a frame is buffered or a waiter must re-check
 	frames map[string][]*ngapCodec.NGAPResponse
-	notify chan struct{}
 }
 
 func Dial(localAddr, remoteAddr string) (*SCTPTransport, error) {
@@ -54,8 +55,8 @@ func Dial(localAddr, remoteAddr string) (*SCTPTransport, error) {
 	t := &SCTPTransport{
 		conn:   conn,
 		frames: make(map[string][]*ngapCodec.NGAPResponse),
-		notify: make(chan struct{}, 1),
 	}
+	t.cond = sync.NewCond(&t.mu)
 
 	go t.runReceiver()
 
@@ -93,12 +94,8 @@ func (t *SCTPTransport) runReceiver() {
 
 		t.mu.Lock()
 		t.frames[resp.MessageType] = append(t.frames[resp.MessageType], resp)
+		t.cond.Broadcast()
 		t.mu.Unlock()
-
-		select {
-		case t.notify <- struct{}{}:
-		default:
-		}
 	}
 }
 
@@ -127,32 +124,57 @@ func (t *SCTPTransport) Send(data []byte, nonUE bool) error {
 	return nil
 }
 
+// WaitForMessage returns the next buffered downlink of one of messageTypes,
+// blocking until one arrives or ctx expires.
 func (t *SCTPTransport) WaitForMessage(ctx context.Context, messageTypes ...string) (*ngapCodec.NGAPResponse, error) {
-	for {
-		t.mu.Lock()
+	return t.WaitForMessageMatching(ctx, nil, messageTypes...)
+}
 
+// WaitForMessageMatching returns the next buffered downlink of one of
+// messageTypes for which match returns true (a nil match accepts any). It lets
+// several concurrent waiters on one association each claim the frame for their
+// own UE without consuming another UE's downlink.
+func (t *SCTPTransport) WaitForMessageMatching(ctx context.Context, match func(*ngapCodec.NGAPResponse) bool, messageTypes ...string) (*ngapCodec.NGAPResponse, error) {
+	// Wake blocked waiters when ctx expires so they observe the deadline; the
+	// receiver only broadcasts on new frames.
+	stop := make(chan struct{})
+	defer close(stop)
+
+	go func() {
+		select {
+		case <-ctx.Done():
+			t.mu.Lock()
+			t.cond.Broadcast()
+			t.mu.Unlock()
+		case <-stop:
+		}
+	}()
+
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	for {
 		for _, msgType := range messageTypes {
-			if frames, ok := t.frames[msgType]; ok && len(frames) > 0 {
-				resp := frames[0]
-				if len(frames) == 1 {
-					delete(t.frames, msgType)
-				} else {
-					t.frames[msgType] = frames[1:]
+			frames := t.frames[msgType]
+			for i, resp := range frames {
+				if match != nil && !match(resp) {
+					continue
 				}
 
-				t.mu.Unlock()
+				t.frames[msgType] = slices.Delete(frames, i, i+1)
+				if len(t.frames[msgType]) == 0 {
+					delete(t.frames, msgType)
+				}
 
 				return resp, nil
 			}
 		}
 
-		t.mu.Unlock()
-
-		select {
-		case <-t.notify:
-		case <-ctx.Done():
+		if ctx.Err() != nil {
 			return nil, fmt.Errorf("timeout waiting for %v", messageTypes)
 		}
+
+		t.cond.Wait()
 	}
 }
 

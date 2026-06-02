@@ -330,6 +330,43 @@ paths:
         "404":
           description: gNB, UE, or target gNB not found.
 
+  /gnb/{gnb_id}/ue/{ue_id}/await:
+    parameters:
+      - $ref: "#/components/parameters/gnb_id"
+      - $ref: "#/components/parameters/ue_id"
+    post:
+      operationId: awaitUEMessage
+      summary: Await an unsolicited downlink NGAP message for a specific UE
+      description: |
+        Like the gNB-level await, but only returns a downlink PDU addressed to
+        this UE (matched by its RAN/AMF UE NGAP ID). This lets many UEs share one
+        gNB association without consuming each other's downlink — needed for
+        concurrency and fast-sequence scenarios. A PDU that carries no UE NGAP ID
+        (e.g. an association-level Error Indication) matches any waiter.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message_types]
+              properties:
+                message_types:
+                  type: array
+                  items:
+                    type: string
+                  description: "NGAP message types to wait for (first match wins)."
+                timeout_ms:
+                  type: integer
+                  description: "How long to wait. Default 5000."
+      responses:
+        "200":
+          description: Decoded NGAP message addressed to the UE.
+        "404":
+          description: gNB or UE not found.
+        "504":
+          description: No matching message arrived before the timeout.
+
   /gnb/{gnb_id}/ue/{ue_id}/ngap:
     parameters:
       - $ref: "#/components/parameters/gnb_id"
