@@ -122,15 +122,16 @@ func TestRegistrationComplete_NGAPIDFuzz(t *testing.T) {
 		wantNGAPMsgType string
 	}{
 		{
-			name:     "AMF UE NGAP ID = 0",
-			body:     `{"message_type":"registration_complete","amf_ue_ngap_id_override":0}`,
-			wantHTTP: 200,
-			// AMF accepts (treats as unknown context + processes)
+			name:            "AMF UE NGAP ID = 0",
+			body:            `{"message_type":"registration_complete","amf_ue_ngap_id_override":0}`,
+			wantHTTP:        200,
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
-			name:     "AMF UE NGAP ID = nonexistent",
-			body:     `{"message_type":"registration_complete","amf_ue_ngap_id_override":99999}`,
-			wantHTTP: 200,
+			name:            "AMF UE NGAP ID = nonexistent",
+			body:            `{"message_type":"registration_complete","amf_ue_ngap_id_override":99999}`,
+			wantHTTP:        200,
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
 			name:            "RAN UE NGAP ID = 0",
@@ -146,9 +147,10 @@ func TestRegistrationComplete_NGAPIDFuzz(t *testing.T) {
 			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
-			name:     "AMF UE NGAP ID = max valid 40-bit",
-			body:     `{"message_type":"registration_complete","amf_ue_ngap_id_override":1099511627775}`,
-			wantHTTP: 200,
+			name:            "AMF UE NGAP ID = max valid 40-bit",
+			body:            `{"message_type":"registration_complete","amf_ue_ngap_id_override":1099511627775}`,
+			wantHTTP:        200,
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 	}
 
@@ -176,6 +178,10 @@ func TestRegistrationComplete_NGAPIDFuzz(t *testing.T) {
 			if tt.wantNGAPMsgType != "" {
 				if got := jsonGet(body, "ngap.message_type"); got != tt.wantNGAPMsgType {
 					t.Errorf("ngap.message_type = %q, want %q\n  body: %s", got, tt.wantNGAPMsgType, body)
+				}
+
+				if tt.wantNGAPMsgType == ngapErrorIndication {
+					assertSpecCompliantErrorIndication(t, body)
 				}
 			}
 		})

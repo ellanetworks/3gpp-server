@@ -70,6 +70,10 @@ func TestUplinkNASTransport_NGAPIDFuzz(t *testing.T) {
 			if got := jsonGet(body, "ngap.message_type"); got != tt.wantNGAPMsgType {
 				t.Errorf("ngap.message_type = %q, want %q\n  body: %s", got, tt.wantNGAPMsgType, body)
 			}
+
+			if tt.wantNGAPMsgType == ngapErrorIndication {
+				assertSpecCompliantErrorIndication(t, body)
+			}
 		})
 	}
 }

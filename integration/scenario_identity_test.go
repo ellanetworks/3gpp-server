@@ -83,7 +83,5 @@ func TestIdentity_NGAPIDFuzz(t *testing.T) {
 		t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
 	}
 
-	if got := jsonGet(body, "ngap.message_type"); got != ngapErrorIndication {
-		t.Errorf("ngap.message_type = %q, want ErrorIndication\n  body: %s", got, body)
-	}
+	assertSpecCompliantErrorIndication(t, body)
 }

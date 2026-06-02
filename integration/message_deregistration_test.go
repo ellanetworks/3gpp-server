@@ -82,15 +82,17 @@ func TestDeregistration_Fuzz(t *testing.T) {
 			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
-			// NGAP-level: stale AMF UE NGAP ID — AMF context not found
-			name:     "NGAP override: AMF UE NGAP ID = 0",
-			body:     `{"message_type":"deregistration_request","amf_ue_ngap_id_override":0}`,
-			wantHTTP: 200,
+			// NGAP-level: stale AMF UE NGAP ID — unknown local AP ID (TS 38.413 §10.6)
+			name:            "NGAP override: AMF UE NGAP ID = 0",
+			body:            `{"message_type":"deregistration_request","amf_ue_ngap_id_override":0}`,
+			wantHTTP:        200,
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
-			name:     "NGAP override: RAN UE NGAP ID = 999999",
-			body:     `{"message_type":"deregistration_request","ran_ue_ngap_id_override":999999}`,
-			wantHTTP: 200,
+			name:            "NGAP override: RAN UE NGAP ID = 999999",
+			body:            `{"message_type":"deregistration_request","ran_ue_ngap_id_override":999999}`,
+			wantHTTP:        200,
+			wantNGAPMsgType: ngapErrorIndication,
 		},
 	}
 
@@ -120,6 +122,10 @@ func TestDeregistration_Fuzz(t *testing.T) {
 			if tt.wantNGAPMsgType != "" {
 				if ngapMsgType != tt.wantNGAPMsgType {
 					t.Errorf("ngap.message_type = %q, want %q\n  body: %s", ngapMsgType, tt.wantNGAPMsgType, body)
+				}
+
+				if tt.wantNGAPMsgType == ngapErrorIndication {
+					assertSpecCompliantErrorIndication(t, body)
 				}
 			}
 

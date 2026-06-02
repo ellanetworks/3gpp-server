@@ -6,6 +6,32 @@ import (
 	"testing"
 )
 
+// TestSecurityModeComplete_NGAPIDFuzz sends a Security Mode Complete on an
+// established connection with a wrong UE NGAP ID and expects a spec-compliant
+// Error Indication (TS 38.413 §10.6, §8.7.5.2).
+func TestSecurityModeComplete_NGAPIDFuzz(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+	}{
+		{"unknown AMF UE NGAP ID", `{"message_type":"security_mode_complete","amf_ue_ngap_id_override":99999}`},
+		{"inconsistent RAN UE NGAP ID", `{"message_type":"security_mode_complete","ran_ue_ngap_id_override":99999}`},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gnbID, ueID := securityModePending(t)
+
+			status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap", tc.body)
+			if status != 200 {
+				t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
+			}
+
+			assertSpecCompliantErrorIndication(t, body)
+		})
+	}
+}
+
 func TestSecurityModeComplete_Fuzz(t *testing.T) {
 	tests := []struct {
 		name            string

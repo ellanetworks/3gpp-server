@@ -212,6 +212,44 @@ func decodeInitiatingMessage(im *ngapType.InitiatingMessage, resp *NGAPResponse)
 		decodePDUSessionResourceReleaseCommand(im.Value.PDUSessionResourceReleaseCommand, resp)
 	case ngapType.InitiatingMessagePresentHandoverRequest:
 		decodeHandoverRequest(im.Value.HandoverRequest, resp)
+	case ngapType.InitiatingMessagePresentErrorIndication:
+		decodeErrorIndication(im.Value.ErrorIndication, resp)
+	}
+}
+
+// decodeErrorIndication surfaces the IEs of an ERROR INDICATION (TS 38.413
+// §9.2.1.3): the echoed AMF/RAN UE NGAP IDs and the Cause or Criticality
+// Diagnostics, so callers can verify §8.7.5.2 compliance.
+func decodeErrorIndication(msg *ngapType.ErrorIndication, resp *NGAPResponse) {
+	if msg == nil {
+		return
+	}
+
+	for _, ie := range msg.ProtocolIEs.List {
+		decoded := IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value)}
+
+		switch ie.Id.Value {
+		case ngapType.ProtocolIEIDAMFUENGAPID:
+			if ie.Value.AMFUENGAPID != nil {
+				v := ie.Value.AMFUENGAPID.Value
+				decoded.AmfUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDRANUENGAPID:
+			if ie.Value.RANUENGAPID != nil {
+				v := ie.Value.RANUENGAPID.Value
+				decoded.RanUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDCause:
+			if ie.Value.Cause != nil {
+				decoded.Cause = decodeCause(ie.Value.Cause)
+			}
+		case ngapType.ProtocolIEIDCriticalityDiagnostics:
+			if ie.Value.CriticalityDiagnostics != nil {
+				decoded.CriticalityDiagnostics = decodeCriticalityDiagnostics(ie.Value.CriticalityDiagnostics)
+			}
+		}
+
+		resp.IEs = append(resp.IEs, decoded)
 	}
 }
 
