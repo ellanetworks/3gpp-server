@@ -179,3 +179,54 @@ func (h *Handler) DeleteUE(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// MigrateUE moves a UE's context to another gNB's association, modelling the UE
+// arriving at the target gNB after an N2 handover. The UE keeps its security
+// context; its RAN/AMF UE NGAP IDs become the ones used on the target.
+func (h *Handler) MigrateUE(w http.ResponseWriter, r *http.Request) {
+	gnbID := r.PathValue("gnb_id")
+	ueID := r.PathValue("ue_id")
+
+	src, err := h.Store.GetGnB(gnbID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("gnb not found: %v", err))
+		return
+	}
+
+	ue, ok := src.GetUE(ueID)
+	if !ok {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("ue %s not found", ueID))
+		return
+	}
+
+	var req MigrateUERequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
+		return
+	}
+
+	target, err := h.Store.GetGnB(req.TargetGnbID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("target gnb not found: %v", err))
+		return
+	}
+
+	if req.RanUeNgapID != nil {
+		ue.RanUeNgapID = *req.RanUeNgapID
+	}
+
+	if req.AmfUeNgapID != nil {
+		ue.AmfUeNgapID = *req.AmfUeNgapID
+	}
+
+	src.DeleteUE(ueID)
+	target.CreateUE(ue)
+	target.UpdateNGAPIDs(ue.RanUeNgapID, ue.AmfUeNgapID)
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ue_id":          ue.ID,
+		"gnb_id":         req.TargetGnbID,
+		"ran_ue_ngap_id": ue.RanUeNgapID,
+		"amf_ue_ngap_id": ue.AmfUeNgapID,
+	})
+}

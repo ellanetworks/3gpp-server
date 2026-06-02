@@ -236,7 +236,7 @@ func handleHandoverRequestAcknowledge(w http.ResponseWriter, t *transport.SCTPTr
 		sessions = append(sessions, ngap.HandoverAdmittedSession{PDUSessionID: ps.ID, DLTeid: teid, DLIP: dlIP})
 	}
 
-	encoded, err := ngap.BuildHandoverRequestAcknowledge(*req.AmfUeNgapID, *req.RanUeNgapID, sessions)
+	encoded, err := ngap.BuildHandoverRequestAcknowledge(*req.AmfUeNgapID, *req.RanUeNgapID, sessions, req.FailedPDUSessions)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build HandoverRequestAcknowledge: %v", err))
 		return
@@ -381,6 +381,11 @@ func handleRegistrationRequest(w http.ResponseWriter, r *http.Request, gnb *stor
 			return
 		}
 
+		if req.ExistingConnection {
+			sendUplinkAndWait(w, r, gnb, ue, t, req, nasPDU, "DownlinkNASTransport", "ErrorIndication")
+			return
+		}
+
 		ngapMsg := ngap.BuildInitialUEMessageFromState(
 			ue.RanUeNgapID, nasPDU,
 			gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, nil, initialUEOverrides(req),
@@ -426,6 +431,14 @@ func handleRegistrationRequest(w http.ResponseWriter, r *http.Request, gnb *stor
 			writeError(w, http.StatusInternalServerError, fmt.Sprintf("NAS security encode: %v", err))
 			return
 		}
+	}
+
+	// After an N2 handover the UE is CM-CONNECTED on the target, so a Mobility
+	// Registration Update travels on the existing UE-associated connection
+	// (Uplink NAS Transport), not a new Initial UE Message.
+	if req.ExistingConnection {
+		sendUplinkAndWait(w, r, gnb, ue, t, req, nasPDU, "DownlinkNASTransport", "ErrorIndication")
+		return
 	}
 
 	ngapMsg := ngap.BuildInitialUEMessageFromState(
@@ -575,6 +588,10 @@ func handleRegistrationComplete(w http.ResponseWriter, r *http.Request, gnb *sto
 
 func handlePDUSessionEstablishmentRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
 	pduSessionID := ue.PDUSessionID
+	if req.PDUSessionIDOverride != nil {
+		pduSessionID = *req.PDUSessionIDOverride
+	}
+
 	if pduSessionID == 0 {
 		pduSessionID = 1
 	}
@@ -668,8 +685,10 @@ func handlePDUSessionEstablishmentRequest(w http.ResponseWriter, r *http.Request
 	}
 
 	// The N3 endpoint is synthesised — 3gpp-server does not run a user plane.
+	// The DL TEID is made unique per session so multiple sessions don't collide.
+	dlTeid := uint32(ue.RanUeNgapID)<<8 | uint32(pduSessionID)
 	pduSetupResp, err := ngap.BuildPDUSessionResourceSetupResponse(
-		ue.AmfUeNgapID, ue.RanUeNgapID, int64(pduSessionID), uint32(ue.RanUeNgapID), "10.3.0.3")
+		ue.AmfUeNgapID, ue.RanUeNgapID, int64(pduSessionID), dlTeid, "10.3.0.3")
 	if err == nil {
 		_ = t.Send(pduSetupResp, false)
 	}

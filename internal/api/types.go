@@ -55,6 +55,19 @@ type SendGnBNGAPRequest struct {
 	AmfUeNgapID *int64               `json:"amf_ue_ngap_id,omitempty"`
 	RanUeNgapID *int64               `json:"ran_ue_ngap_id,omitempty"`
 	PDUSessions []HandoverPDUSession `json:"pdu_sessions,omitempty"`
+
+	// FailedPDUSessions are PDU sessions the target reports as failed-to-setup
+	// in a Handover Request Acknowledge (for partial-admission testing).
+	FailedPDUSessions []int64 `json:"failed_pdu_sessions,omitempty"`
+}
+
+// MigrateUERequest moves a UE's context to another gNB's association, modelling
+// the UE arriving at the target after an N2 handover. The RAN/AMF UE NGAP IDs
+// become the ones in use on the target.
+type MigrateUERequest struct {
+	TargetGnbID string `json:"target_gnb_id"`
+	RanUeNgapID *int64 `json:"ran_ue_ngap_id,omitempty"`
+	AmfUeNgapID *int64 `json:"amf_ue_ngap_id,omitempty"`
 }
 
 // HandoverPDUSession is an admitted PDU session in a Handover Request

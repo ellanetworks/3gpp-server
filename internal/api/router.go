@@ -19,6 +19,7 @@ func NewRouter(h *Handler) *http.ServeMux {
 	mux.HandleFunc("PATCH /gnb/{gnb_id}/ue/{ue_id}", h.PatchUE)
 	mux.HandleFunc("DELETE /gnb/{gnb_id}/ue/{ue_id}", h.DeleteUE)
 
+	mux.HandleFunc("POST /gnb/{gnb_id}/ue/{ue_id}/migrate", h.MigrateUE)
 	mux.HandleFunc("POST /gnb/{gnb_id}/ue/{ue_id}/ngap", h.SendNGAP)
 
 	return mux

@@ -86,6 +86,16 @@ type NASRequest struct {
 	// over. When empty the UE's configured session is used; set it to reference
 	// other (e.g. non-existent) sessions for abnormal-case testing.
 	PDUSessionIDs []int64 `json:"pdu_session_ids,omitempty"`
+
+	// PDUSessionIDOverride sets which PDU session a pdu_session_establishment_request
+	// establishes, so a UE can hold more than one session.
+	PDUSessionIDOverride *uint8 `json:"pdu_session_id,omitempty"`
+
+	// ExistingConnection sends a registration_request over the UE's existing
+	// UE-associated connection (Uplink NAS Transport) instead of an Initial UE
+	// Message — used for a Mobility Registration Update after an N2 handover,
+	// when the UE is already CM-CONNECTED on the target.
+	ExistingConnection bool `json:"existing_connection,omitempty"`
 }
 
 type SNSSAIJSON struct {

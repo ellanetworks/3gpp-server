@@ -52,6 +52,10 @@ type IE struct {
 	// PDU session IDs carried by a handover PDU-session list (e.g. the setup
 	// list in a Handover Request, the handover list in a Handover Command).
 	PDUSessionIDs []int64 `json:"pdu_session_ids,omitempty"`
+
+	// ReleasePDUSessionIDs are the PDU sessions a Handover Command tells the
+	// source to release (those the target did not admit).
+	ReleasePDUSessionIDs []int64 `json:"release_pdu_session_ids,omitempty"`
 }
 
 type GlobalRANNodeIDJSON struct {

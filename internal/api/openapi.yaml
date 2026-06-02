@@ -241,6 +241,11 @@ paths:
                       id: { type: integer }
                       dl_teid: { type: integer }
                       dl_ip: { type: string }
+                failed_pdu_sessions:
+                  type: array
+                  items:
+                    type: integer
+                  description: "Handover Request Acknowledge: PDU sessions the target reports as failed-to-setup (partial admission)."
       responses:
         "200":
           description: Decoded AMF response.
@@ -284,6 +289,40 @@ paths:
           description: gNB not found.
         "504":
           description: No matching message arrived before the timeout.
+
+  /gnb/{gnb_id}/ue/{ue_id}/migrate:
+    parameters:
+      - $ref: "#/components/parameters/gnb_id"
+      - $ref: "#/components/parameters/ue_id"
+    post:
+      operationId: migrateUE
+      summary: Move a UE's context to another gNB
+      description: |
+        Moves a UE's context (including its security context) from this gNB's
+        association to another gNB's, modelling the UE arriving at the target
+        after an N2 handover. The RAN/AMF UE NGAP IDs become the ones in use on
+        the target, so subsequent UE-associated messages can be sent there.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_gnb_id]
+              properties:
+                target_gnb_id:
+                  type: string
+                ran_ue_ngap_id:
+                  type: integer
+                  description: "RAN UE NGAP ID the UE uses on the target."
+                amf_ue_ngap_id:
+                  type: integer
+                  description: "AMF UE NGAP ID in use on the target connection."
+      responses:
+        "200":
+          description: UE moved.
+        "404":
+          description: gNB, UE, or target gNB not found.
 
   /gnb/{gnb_id}/ue/{ue_id}/ngap:
     parameters:
@@ -638,6 +677,12 @@ components:
           items:
             type: integer
           description: "PDU sessions to hand over in handover_required. Defaults to the UE's session; set to non-existent IDs to exercise abnormal cases."
+        pdu_session_id:
+          type: integer
+          description: "Which PDU session a pdu_session_establishment_request establishes, so a UE can hold more than one."
+        existing_connection:
+          type: boolean
+          description: "Send a registration_request over the existing UE-associated connection (Uplink NAS Transport) instead of an Initial UE Message — e.g. a Mobility Registration Update after an N2 handover."
         switch_off:
           type: integer
           description: "Deregistration switch-off flag (TS 24.501 §9.11.3.20). Default 1 (switch off, no accept). 0 = normal de-registration (AMF replies with Deregistration Accept)."

@@ -108,14 +108,68 @@ func ngapPDUSessionIDs(body []byte) []int64 {
 	return ids
 }
 
+// ngapReleasePDUSessionIDs collects the PDU session IDs a Handover Command
+// tells the source to release.
+func ngapReleasePDUSessionIDs(body []byte) []int64 {
+	var top struct {
+		NGAP struct {
+			IEs []struct {
+				ReleasePDUSessionIDs []int64 `json:"release_pdu_session_ids"`
+			} `json:"ies"`
+		} `json:"ngap"`
+	}
+
+	if err := json.Unmarshal(body, &top); err != nil {
+		return nil
+	}
+
+	var ids []int64
+	for _, ie := range top.NGAP.IEs {
+		ids = append(ids, ie.ReleasePDUSessionIDs...)
+	}
+
+	return ids
+}
+
+// sameInt64Set reports whether two slices contain the same set of IDs,
+// regardless of order.
+func sameInt64Set(a, b []int64) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	seen := make(map[int64]int, len(a))
+	for _, v := range a {
+		seen[v]++
+	}
+
+	for _, v := range b {
+		seen[v]--
+	}
+
+	for _, n := range seen {
+		if n != 0 {
+			return false
+		}
+	}
+
+	return true
+}
+
 // assertCarriesPDUSession fails unless the message lists exactly the one
 // expected PDU session.
 func assertCarriesPDUSession(t *testing.T, body []byte, want int64, context string) {
 	t.Helper()
+	assertCarriesPDUSessions(t, body, []int64{want}, context)
+}
 
-	ids := ngapPDUSessionIDs(body)
-	if len(ids) != 1 || ids[0] != want {
-		t.Errorf("%s: PDU session list = %v, want [%d]\n  body: %s", context, ids, want, body)
+// assertCarriesPDUSessions fails unless the message's PDU session list is
+// exactly the expected set.
+func assertCarriesPDUSessions(t *testing.T, body []byte, want []int64, context string) {
+	t.Helper()
+
+	if ids := ngapPDUSessionIDs(body); !sameInt64Set(ids, want) {
+		t.Errorf("%s: PDU session list = %v, want %v\n  body: %s", context, ids, want, body)
 	}
 }
 

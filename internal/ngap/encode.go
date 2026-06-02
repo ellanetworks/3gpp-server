@@ -894,7 +894,7 @@ func BuildHandoverRequired(amfUeNgapID, ranUeNgapID int64, targetGnbID, mcc, mnc
 
 // BuildHandoverRequestAcknowledge builds a HANDOVER REQUEST ACKNOWLEDGE
 // (TS 38.413 §8.4.2) sent by the target gNB.
-func BuildHandoverRequestAcknowledge(amfUeNgapID, ranUeNgapID int64, sessions []HandoverAdmittedSession) ([]byte, error) {
+func BuildHandoverRequestAcknowledge(amfUeNgapID, ranUeNgapID int64, sessions []HandoverAdmittedSession, failed []int64) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome
 	pdu.SuccessfulOutcome = new(ngapType.SuccessfulOutcome)
@@ -938,11 +938,50 @@ func BuildHandoverRequestAcknowledge(amfUeNgapID, ranUeNgapID int64, sessions []
 	add(ngapType.ProtocolIEIDPDUSessionResourceAdmittedList, ngapType.CriticalityPresentIgnore,
 		ngapType.HandoverRequestAcknowledgeIEsPresentPDUSessionResourceAdmittedList).PDUSessionResourceAdmittedList = admitted
 
+	// Report the non-admitted PDU sessions in the failed-to-setup list
+	// (TS 38.413 §8.4.2.2).
+	if len(failed) > 0 {
+		unsuccessful, err := buildHandoverResourceAllocationUnsuccessfulTransfer()
+		if err != nil {
+			return nil, err
+		}
+
+		failedList := &ngapType.PDUSessionResourceFailedToSetupListHOAck{}
+		for _, id := range failed {
+			failedList.List = append(failedList.List, ngapType.PDUSessionResourceFailedToSetupItemHOAck{
+				PDUSessionID: ngapType.PDUSessionID{Value: id},
+				HandoverResourceAllocationUnsuccessfulTransfer: unsuccessful,
+			})
+		}
+
+		add(ngapType.ProtocolIEIDPDUSessionResourceFailedToSetupListHOAck, ngapType.CriticalityPresentIgnore,
+			ngapType.HandoverRequestAcknowledgeIEsPresentPDUSessionResourceFailedToSetupListHOAck).PDUSessionResourceFailedToSetupListHOAck = failedList
+	}
+
 	add(ngapType.ProtocolIEIDTargetToSourceTransparentContainer, ngapType.CriticalityPresentReject,
 		ngapType.HandoverRequestAcknowledgeIEsPresentTargetToSourceTransparentContainer).TargetToSourceTransparentContainer =
 		&ngapType.TargetToSourceTransparentContainer{Value: []byte{0x00}}
 
 	return ngap.Encoder(pdu)
+}
+
+// buildHandoverResourceAllocationUnsuccessfulTransfer encodes the per-session
+// failure transfer carried for each non-admitted PDU session (TS 38.413
+// §9.3.4.16).
+func buildHandoverResourceAllocationUnsuccessfulTransfer() ([]byte, error) {
+	transfer := ngapType.HandoverResourceAllocationUnsuccessfulTransfer{
+		Cause: ngapType.Cause{
+			Present:      ngapType.CausePresentRadioNetwork,
+			RadioNetwork: &ngapType.CauseRadioNetwork{Value: ngapType.CauseRadioNetworkPresentRadioResourcesNotAvailable},
+		},
+	}
+
+	buf, err := aper.MarshalWithParams(transfer, "valueExt")
+	if err != nil {
+		return nil, fmt.Errorf("marshal HandoverResourceAllocationUnsuccessfulTransfer: %w", err)
+	}
+
+	return buf, nil
 }
 
 func buildHandoverRequestAcknowledgeTransfer(teid uint32, ip string) ([]byte, error) {

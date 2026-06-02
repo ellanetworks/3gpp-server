@@ -80,6 +80,14 @@ func decodeHandoverCommand(msg *ngapType.HandoverCommand, resp *NGAPResponse) {
 				}
 				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value), PDUSessionIDs: ids})
 			}
+		case ngapType.ProtocolIEIDPDUSessionResourceToReleaseListHOCmd:
+			if list := ie.Value.PDUSessionResourceToReleaseListHOCmd; list != nil {
+				ids := make([]int64, 0, len(list.List))
+				for _, item := range list.List {
+					ids = append(ids, item.PDUSessionID.Value)
+				}
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value), ReleasePDUSessionIDs: ids})
+			}
 		}
 	}
 }
