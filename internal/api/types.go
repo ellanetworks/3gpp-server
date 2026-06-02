@@ -1,8 +1,8 @@
 package api
 
 import (
-	"github.com/ellanetworks/3gpp-server/internal/ngap"
 	nasTypes "github.com/ellanetworks/3gpp-server/internal/nas"
+	"github.com/ellanetworks/3gpp-server/internal/ngap"
 )
 
 type CreateGnBRequest struct {
@@ -37,10 +37,59 @@ type CreateGnBResponse struct {
 type SendGnBNGAPRequest struct {
 	MessageType string `json:"message_type"`
 
+	// RawNGAPPDU, when set, is written verbatim onto the N2 association with no
+	// encoding or validation, and message_type is ignored — letting a test send
+	// any NGAP PDU, well-formed or not. WaitFor lists downlink message types to
+	// block for (empty = fire-and-forget); TimeoutMs bounds that wait.
+	RawNGAPPDU *string  `json:"raw_ngap_pdu,omitempty"`
+	WaitFor    []string `json:"wait_for,omitempty"`
+	TimeoutMs  int      `json:"timeout_ms,omitempty"`
+
 	// NG Reset: when ResetUEIDs is empty the whole NG interface is reset
 	// (ResetType nG-Interface); otherwise only the listed UEs' associations are
 	// reset (ResetType partOfNG-Interface).
 	ResetUEIDs []string `json:"reset_ue_ids,omitempty"`
+
+	// Handover (target gNB side): the AMF/RAN UE NGAP IDs identifying the UE
+	// association, and the admitted PDU sessions for Handover Request Acknowledge.
+	AmfUeNgapID *int64               `json:"amf_ue_ngap_id,omitempty"`
+	RanUeNgapID *int64               `json:"ran_ue_ngap_id,omitempty"`
+	PDUSessions []HandoverPDUSession `json:"pdu_sessions,omitempty"`
+
+	// FailedPDUSessions are PDU sessions the target reports as failed-to-setup
+	// in a Handover Request Acknowledge (for partial-admission testing).
+	FailedPDUSessions []int64 `json:"failed_pdu_sessions,omitempty"`
+
+	// Cause is the radio-network Cause (TS 38.413 §9.3.1.2) a handover_failure
+	// carries. Defaults to ho-failure-in-target-5GC-ngran-node-or-target-system.
+	Cause *int64 `json:"cause,omitempty"`
+}
+
+// MigrateUERequest moves a UE's context to another gNB's association, modelling
+// the UE arriving at the target after an N2 handover. The RAN/AMF UE NGAP IDs
+// become the ones in use on the target.
+type MigrateUERequest struct {
+	TargetGnbID string `json:"target_gnb_id"`
+	RanUeNgapID *int64 `json:"ran_ue_ngap_id,omitempty"`
+	AmfUeNgapID *int64 `json:"amf_ue_ngap_id,omitempty"`
+}
+
+// HandoverPDUSession is an admitted PDU session in a Handover Request
+// Acknowledge, carrying the target gNB's downlink GTP tunnel. RawTransfer (hex)
+// overrides the built transfer verbatim, for crafting malformed transfers.
+type HandoverPDUSession struct {
+	ID          int64   `json:"id"`
+	DLTeid      uint32  `json:"dl_teid,omitempty"`
+	DLIP        string  `json:"dl_ip,omitempty"`
+	RawTransfer *string `json:"raw_transfer,omitempty"`
+}
+
+// AwaitRequest waits for an unsolicited downlink NGAP message (one the core
+// sends without a triggering uplink, e.g. Handover Request, Handover Command,
+// UE Context Release Command) to arrive on the gNB's N2 association.
+type AwaitRequest struct {
+	MessageTypes []string `json:"message_types"`
+	TimeoutMs    int      `json:"timeout_ms,omitempty"`
 }
 
 type GnBStateResponse struct {
@@ -101,20 +150,20 @@ type UEStateResponse struct {
 }
 
 type PatchUERequest struct {
-	K                *string `json:"k,omitempty"`
-	OPc              *string `json:"opc,omitempty"`
-	Amf              *string `json:"amf,omitempty"`
-	Sqn              *string `json:"sqn,omitempty"`
-	AmfUeNgapID      *int64  `json:"amf_ue_ngap_id,omitempty"`
-	DNN              *string `json:"dnn,omitempty"`
-	SST              *int32  `json:"sst,omitempty"`
-	SD               *string `json:"sd,omitempty"`
-	IMEISV           *string `json:"imeisv,omitempty"`
+	K           *string `json:"k,omitempty"`
+	OPc         *string `json:"opc,omitempty"`
+	Amf         *string `json:"amf,omitempty"`
+	Sqn         *string `json:"sqn,omitempty"`
+	AmfUeNgapID *int64  `json:"amf_ue_ngap_id,omitempty"`
+	DNN         *string `json:"dnn,omitempty"`
+	SST         *int32  `json:"sst,omitempty"`
+	SD          *string `json:"sd,omitempty"`
+	IMEISV      *string `json:"imeisv,omitempty"`
 }
 
 type SendNGAPRequest = nasTypes.NASRequest
 
 type SendNGAPResponse struct {
-	NGAP *ngap.NGAPResponse   `json:"ngap"`
+	NGAP *ngap.NGAPResponse    `json:"ngap"`
 	NAS  *nasTypes.NASResponse `json:"nas,omitempty"`
 }

@@ -29,8 +29,16 @@ cannot be set through the structured request fields. To send these — or any
 fully arbitrary or deliberately malformed message — use the `raw_nas_pdu`
 override, which puts caller-supplied bytes directly into the NAS PDU.
 
+At the NGAP layer the equivalent escape hatch is `raw_ngap_pdu` on
+`POST /gnb/{gnb_id}/ngap`: caller-supplied bytes are written verbatim onto the
+N2 association with no encoding or validation, so a test can craft any NGAP PDU
+at all — well-formed, malformed, out-of-sequence, or pure garbage — to probe
+how the core reacts (it must respond appropriately and never crash). With
+`wait_for` the call returns the resulting downlink message; otherwise it is
+fire-and-forget.
+
 We may drop the free5gc dependency in the future and build messages directly,
-to allow fully granular control over every IE without this escape hatch.
+to allow fully granular control over every IE without these escape hatches.
 
 ### NGAP (TS 38.413)
 
@@ -115,16 +123,16 @@ to allow fully granular control over every IE without this escape hatch.
 
 | Message | Send | Decode |
 |---|:---:|:---:|
-| Handover Required | ❌ | ❌ |
-| Handover Command | ❌ | ❌ |
-| Handover Preparation Failure | ❌ | ❌ |
-| Handover Request | ❌ | ❌ |
-| Handover Request Acknowledge | ❌ | ❌ |
-| Handover Failure | ❌ | ❌ |
-| Handover Notify | ❌ | ❌ |
+| Handover Required | ✅ | — |
+| Handover Command | — | ✅ |
+| Handover Preparation Failure | — | ✅ |
+| Handover Request | — | ✅ |
+| Handover Request Acknowledge | ✅ | — |
+| Handover Failure | ✅ | — |
+| Handover Notify | ✅ | — |
 | Handover Success | ❌ | ❌ |
-| Handover Cancel | ❌ | ❌ |
-| Handover Cancel Acknowledge | ❌ | ❌ |
+| Handover Cancel | ✅ | — |
+| Handover Cancel Acknowledge | — | ✅ |
 | Path Switch Request | ❌ | ❌ |
 | Path Switch Request Acknowledge | — | 🟡 |
 | Path Switch Request Failure | — | 🟡 |

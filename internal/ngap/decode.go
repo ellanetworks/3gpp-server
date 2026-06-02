@@ -48,6 +48,77 @@ func decodeSuccessfulOutcome(so *ngapType.SuccessfulOutcome, resp *NGAPResponse)
 		decodeNGSetupResponse(so.Value.NGSetupResponse, resp)
 	case ngapType.SuccessfulOutcomePresentNGResetAcknowledge:
 		decodeNGResetAcknowledge(so.Value.NGResetAcknowledge, resp)
+	case ngapType.SuccessfulOutcomePresentHandoverCommand:
+		decodeHandoverCommand(so.Value.HandoverCommand, resp)
+	case ngapType.SuccessfulOutcomePresentHandoverCancelAcknowledge:
+		decodeHandoverCancelAcknowledge(so.Value.HandoverCancelAcknowledge, resp)
+	}
+}
+
+// decodeHandoverCancelAcknowledge surfaces the AMF/RAN UE NGAP IDs the AMF
+// echoes when acknowledging a source-initiated Handover Cancel (TS 38.413
+// §9.2.3.12).
+func decodeHandoverCancelAcknowledge(msg *ngapType.HandoverCancelAcknowledge, resp *NGAPResponse) {
+	if msg == nil {
+		return
+	}
+
+	for _, ie := range msg.ProtocolIEs.List {
+		decoded := IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value)}
+
+		switch ie.Id.Value {
+		case ngapType.ProtocolIEIDAMFUENGAPID:
+			if ie.Value.AMFUENGAPID != nil {
+				v := ie.Value.AMFUENGAPID.Value
+				decoded.AmfUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDRANUENGAPID:
+			if ie.Value.RANUENGAPID != nil {
+				v := ie.Value.RANUENGAPID.Value
+				decoded.RanUeNgapID = &v
+			}
+		}
+
+		resp.IEs = append(resp.IEs, decoded)
+	}
+}
+
+// decodeHandoverCommand surfaces the source-side AMF/RAN UE NGAP IDs and the
+// list of PDU sessions the AMF confirms for handover (TS 38.413 §9.2.3.2).
+func decodeHandoverCommand(msg *ngapType.HandoverCommand, resp *NGAPResponse) {
+	if msg == nil {
+		return
+	}
+
+	for _, ie := range msg.ProtocolIEs.List {
+		switch ie.Id.Value {
+		case ngapType.ProtocolIEIDAMFUENGAPID:
+			if ie.Value.AMFUENGAPID != nil {
+				v := ie.Value.AMFUENGAPID.Value
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value), AmfUeNgapID: &v})
+			}
+		case ngapType.ProtocolIEIDRANUENGAPID:
+			if ie.Value.RANUENGAPID != nil {
+				v := ie.Value.RANUENGAPID.Value
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value), RanUeNgapID: &v})
+			}
+		case ngapType.ProtocolIEIDPDUSessionResourceHandoverList:
+			if list := ie.Value.PDUSessionResourceHandoverList; list != nil {
+				ids := make([]int64, 0, len(list.List))
+				for _, item := range list.List {
+					ids = append(ids, item.PDUSessionID.Value)
+				}
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value), PDUSessionIDs: ids})
+			}
+		case ngapType.ProtocolIEIDPDUSessionResourceToReleaseListHOCmd:
+			if list := ie.Value.PDUSessionResourceToReleaseListHOCmd; list != nil {
+				ids := make([]int64, 0, len(list.List))
+				for _, item := range list.List {
+					ids = append(ids, item.PDUSessionID.Value)
+				}
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value), ReleasePDUSessionIDs: ids})
+			}
+		}
 	}
 }
 
@@ -90,6 +161,40 @@ func decodeUnsuccessfulOutcome(uo *ngapType.UnsuccessfulOutcome, resp *NGAPRespo
 	switch uo.Value.Present {
 	case ngapType.UnsuccessfulOutcomePresentNGSetupFailure:
 		decodeNGSetupFailure(uo.Value.NGSetupFailure, resp)
+	case ngapType.UnsuccessfulOutcomePresentHandoverPreparationFailure:
+		decodeHandoverPreparationFailure(uo.Value.HandoverPreparationFailure, resp)
+	}
+}
+
+// decodeHandoverPreparationFailure surfaces the source-side AMF/RAN UE NGAP IDs
+// and the Cause the AMF reports when handover preparation fails (TS 38.413
+// §9.2.3.3).
+func decodeHandoverPreparationFailure(msg *ngapType.HandoverPreparationFailure, resp *NGAPResponse) {
+	if msg == nil {
+		return
+	}
+
+	for _, ie := range msg.ProtocolIEs.List {
+		decoded := IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value)}
+
+		switch ie.Id.Value {
+		case ngapType.ProtocolIEIDAMFUENGAPID:
+			if ie.Value.AMFUENGAPID != nil {
+				v := ie.Value.AMFUENGAPID.Value
+				decoded.AmfUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDRANUENGAPID:
+			if ie.Value.RANUENGAPID != nil {
+				v := ie.Value.RANUENGAPID.Value
+				decoded.RanUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDCause:
+			if ie.Value.Cause != nil {
+				decoded.Cause = decodeCause(ie.Value.Cause)
+			}
+		}
+
+		resp.IEs = append(resp.IEs, decoded)
 	}
 }
 
@@ -105,6 +210,48 @@ func decodeInitiatingMessage(im *ngapType.InitiatingMessage, resp *NGAPResponse)
 		decodeUEContextReleaseCommand(im.Value.UEContextReleaseCommand, resp)
 	case ngapType.InitiatingMessagePresentPDUSessionResourceReleaseCommand:
 		decodePDUSessionResourceReleaseCommand(im.Value.PDUSessionResourceReleaseCommand, resp)
+	case ngapType.InitiatingMessagePresentHandoverRequest:
+		decodeHandoverRequest(im.Value.HandoverRequest, resp)
+	}
+}
+
+// decodeHandoverRequest surfaces the AMF UE NGAP ID the AMF assigned for the
+// target side of an N2 handover (the target gNB echoes it in the acknowledge)
+// and the PDU sessions to be set up (TS 38.413 §9.2.3.1).
+func decodeHandoverRequest(msg *ngapType.HandoverRequest, resp *NGAPResponse) {
+	if msg == nil {
+		return
+	}
+
+	for _, ie := range msg.ProtocolIEs.List {
+		switch ie.Id.Value {
+		case ngapType.ProtocolIEIDAMFUENGAPID:
+			if ie.Value.AMFUENGAPID != nil {
+				v := ie.Value.AMFUENGAPID.Value
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value), AmfUeNgapID: &v})
+			}
+		case ngapType.ProtocolIEIDPDUSessionResourceSetupListHOReq:
+			if list := ie.Value.PDUSessionResourceSetupListHOReq; list != nil {
+				ids := make([]int64, 0, len(list.List))
+				for _, item := range list.List {
+					ids = append(ids, item.PDUSessionID.Value)
+				}
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value), PDUSessionIDs: ids})
+			}
+		case ngapType.ProtocolIEIDUEAggregateMaximumBitRate:
+			if ambr := ie.Value.UEAggregateMaximumBitRate; ambr != nil {
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value),
+					UEAggregateMaxBitRate: &UEAggregateMaxBitRateJSON{
+						DL: ambr.UEAggregateMaximumBitRateDL.Value,
+						UL: ambr.UEAggregateMaximumBitRateUL.Value,
+					}})
+			}
+		case ngapType.ProtocolIEIDSecurityContext:
+			if sc := ie.Value.SecurityContext; sc != nil {
+				ncc := sc.NextHopChainingCount.Value
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value), NextHopChainingCount: &ncc})
+			}
+		}
 	}
 }
 
@@ -512,6 +659,8 @@ func getInitiatingMessageName(msgType int) string {
 		return "PDUSessionResourceSetupRequest"
 	case ngapType.InitiatingMessagePresentPDUSessionResourceReleaseCommand:
 		return "PDUSessionResourceReleaseCommand"
+	case ngapType.InitiatingMessagePresentHandoverRequest:
+		return "HandoverRequest"
 	case ngapType.InitiatingMessagePresentUEContextReleaseCommand:
 		return "UEContextReleaseCommand"
 	case ngapType.InitiatingMessagePresentPaging:
@@ -537,6 +686,10 @@ func getSuccessfulOutcomeName(msgType int) string {
 		return "NGSetupResponse"
 	case ngapType.SuccessfulOutcomePresentNGResetAcknowledge:
 		return "NGResetAcknowledge"
+	case ngapType.SuccessfulOutcomePresentHandoverCommand:
+		return "HandoverCommand"
+	case ngapType.SuccessfulOutcomePresentHandoverCancelAcknowledge:
+		return "HandoverCancelAcknowledge"
 	case ngapType.SuccessfulOutcomePresentInitialContextSetupResponse:
 		return "InitialContextSetupResponse"
 	case ngapType.SuccessfulOutcomePresentPDUSessionResourceSetupResponse:
@@ -554,6 +707,8 @@ func getUnsuccessfulOutcomeName(msgType int) string {
 	switch msgType {
 	case ngapType.UnsuccessfulOutcomePresentNGSetupFailure:
 		return "NGSetupFailure"
+	case ngapType.UnsuccessfulOutcomePresentHandoverPreparationFailure:
+		return "HandoverPreparationFailure"
 	case ngapType.UnsuccessfulOutcomePresentPathSwitchRequestFailure:
 		return "PathSwitchRequestFailure"
 	case ngapType.UnsuccessfulOutcomePresentInitialContextSetupFailure:
