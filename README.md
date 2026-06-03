@@ -94,7 +94,7 @@ to allow fully granular control over every IE without these escape hatches.
 |---|:---:|:---:|
 | PDU Session Resource Setup Request | — | ✅ |
 | PDU Session Resource Setup Response | ✅ | 🟡 |
-| PDU Session Resource Modify Request | ❌ | ❌ |
+| PDU Session Resource Modify Request | ❌ | ✅ |
 | PDU Session Resource Modify Response | ❌ | ❌ |
 | PDU Session Resource Modify Indication | ❌ | ❌ |
 | PDU Session Resource Modify Confirm | ❌ | ❌ |
