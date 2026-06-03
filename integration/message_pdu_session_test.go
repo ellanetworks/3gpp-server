@@ -34,6 +34,52 @@ func TestPDUSessionEstablishment_NGAPIDFuzz(t *testing.T) {
 	}
 }
 
+// TestPDUSessionEstablishment_ReservedPDUSessionID sends an establishment request
+// with a reserved PDU session identity value (16 is outside the 1-15 range). Per
+// TS 24.501 §7.3.2 c) the AMF returns the message in a Downlink NAS Transport
+// with 5GMM cause #90 "payload was not forwarded".
+func TestPDUSessionEstablishment_ReservedPDUSessionID(t *testing.T) {
+	gnbID := mustCreateGnB(t)
+	ueID := mustCreateUE(t, gnbID)
+	doRegistrationFlow(t, gnbID, ueID)
+
+	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+		`{"message_type":"pdu_session_establishment_request","pdu_session_id":16}`)
+
+	if status == 504 {
+		t.Fatalf("got no response (HTTP 504); TS 24.501 §7.3.2 c) requires a Downlink NAS Transport with 5GMM cause #90\n  body: %s", body)
+	}
+
+	if status != 200 {
+		t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
+	}
+
+	if got := jsonGet(body, "ngap.message_type"); got != ngapDownlinkNASTransport {
+		t.Fatalf("ngap.message_type = %q, want DownlinkNASTransport\n  body: %s", got, body)
+	}
+
+	assertNASCause(t, body, "nas.cause_5gmm", cause5GMMPayloadWasNotForwarded)
+}
+
+// TestPDUSessionEstablishment_DuplicateReestablishes sends a second
+// establishment request for an already-active PDU session. Per TS 24.501
+// §5.4.5.2.5 item 12 the AMF locally releases it and re-establishes, so the gNB
+// receives a fresh PDU Session Resource Setup Request.
+func TestPDUSessionEstablishment_DuplicateReestablishes(t *testing.T) {
+	gnbID := mustCreateGnB(t)
+	ueID := establishRegisteredUE(t, gnbID) // registered UE with an active PDU session
+
+	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+		`{"message_type":"pdu_session_establishment_request"}`)
+	if status != 200 {
+		t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
+	}
+
+	if got := jsonGet(body, "ngap.message_type"); got != ngapPDUSessionResourceSetupRequest {
+		t.Errorf("duplicate establishment ngap.message_type = %q, want PDUSessionResourceSetupRequest (TS 24.501 §5.4.5.2.5 item 12)\n  body: %s", got, body)
+	}
+}
+
 // TestPDUSessionEstablishment_Fuzz drives the PDU session establishment endpoint
 // with both well-formed and malformed top-level NAS payloads. When raw_nas_pdu
 // is supplied, the 3gpp-server sends those bytes as the NAS PDU IE of an

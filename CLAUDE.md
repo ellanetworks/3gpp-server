@@ -51,3 +51,14 @@ The spec at `internal/api/openapi.yaml` is embedded at compile time and served a
 - TS 38.413 (NGAP): `ts_138413v180500p.pdf`
 - TS 24.501 (NAS 5GS): `ts_124501v170701p.pdf`
 - Implementation plan: `PLAN.md`
+
+## Code comments
+
+Default to **no comment** — prefer precise names and obvious structure; rewrite unclear code before commenting it. When one is unavoidable:
+
+- Explain *why*, never *what*; concise and precise.
+- Present state only — no prior/alternative/future implementations, no "was a bug".
+- No caller or flow narration; comment the code in front of you.
+- Anchor rationale to the spec (e.g. `TS 24.501 §6.4.2.4`); keep it true; no commented-out code or `TODO`s.
+
+Applies to doc/inline comments, test names, and failure messages (state expected vs. actual, don't editorialize). Banned: "rather than", "instead of", "no longer", "used to", "previously", "now (does/responds)", "would mean", "silently drop(ped)".

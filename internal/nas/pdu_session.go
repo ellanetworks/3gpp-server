@@ -14,6 +14,8 @@ import (
 type PDUSessionEstablishmentRequestOpts struct {
 	PDUSessionID   uint8
 	PDUSessionType uint8
+	PTI            uint8
+	AlwaysOn       bool
 	DNN            string
 	SST            int32
 	SD             string
@@ -28,7 +30,7 @@ func BuildPDUSessionEstablishmentRequest(opts *PDUSessionEstablishmentRequestOpt
 	req.SetExtendedProtocolDiscriminator(nasMessage.Epd5GSSessionManagementMessage)
 	req.SetMessageType(gonas.MsgTypePDUSessionEstablishmentRequest)
 	req.SetPDUSessionID(opts.PDUSessionID)
-	req.SetPTI(0x01)
+	req.SetPTI(opts.PTI)
 	req.SetMaximumDataRatePerUEForUserPlaneIntegrityProtectionForDownLink(0xff)
 	req.SetMaximumDataRatePerUEForUserPlaneIntegrityProtectionForUpLink(0xff)
 
@@ -39,6 +41,11 @@ func BuildPDUSessionEstablishmentRequest(opts *PDUSessionEstablishmentRequestOpt
 
 	req.PDUSessionType = nasType.NewPDUSessionType(nasMessage.PDUSessionEstablishmentRequestPDUSessionTypeType)
 	req.SetPDUSessionTypeValue(pduSessionType)
+
+	if opts.AlwaysOn {
+		req.AlwaysonPDUSessionRequested = nasType.NewAlwaysonPDUSessionRequested(nasMessage.PDUSessionEstablishmentRequestAlwaysonPDUSessionRequestedType)
+		req.SetAPSR(1)
+	}
 
 	req.ExtendedProtocolConfigurationOptions = nasType.NewExtendedProtocolConfigurationOptions(nasMessage.PDUSessionEstablishmentRequestExtendedProtocolConfigurationOptionsType)
 	pco := nasConvert.NewProtocolConfigurationOptions()
@@ -137,6 +144,31 @@ func BuildPDUSessionReleaseRequest(pduSessionID, pti uint8) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
+// BuildPDUSessionModificationRequest builds a UE-requested PDU SESSION
+// MODIFICATION REQUEST (TS 24.501 §8.3.7) carrying only its mandatory IEs. The
+// PTI is UE-allocated; the network echoes it in the resulting Modification
+// Command or Reject (TS 24.501 §6.4.2.3/§6.4.2.4).
+func BuildPDUSessionModificationRequest(pduSessionID, pti uint8) ([]byte, error) {
+	m := gonas.NewMessage()
+	m.GsmMessage = gonas.NewGsmMessage()
+	m.GsmHeader.SetMessageType(gonas.MsgTypePDUSessionModificationRequest)
+
+	req := nasMessage.NewPDUSessionModificationRequest(0)
+	req.SetExtendedProtocolDiscriminator(nasMessage.Epd5GSSessionManagementMessage)
+	req.SetMessageType(gonas.MsgTypePDUSessionModificationRequest)
+	req.SetPDUSessionID(pduSessionID)
+	req.SetPTI(pti)
+
+	m.PDUSessionModificationRequest = req
+
+	data := new(bytes.Buffer)
+	if err := m.GsmMessageEncode(data); err != nil {
+		return nil, fmt.Errorf("GSM encode PDUSessionModificationRequest: %w", err)
+	}
+
+	return data.Bytes(), nil
+}
+
 // BuildPDUSessionReleaseComplete builds a PDU SESSION RELEASE COMPLETE
 // (TS 24.501 §8.3.10), acknowledging a Release Command. The PTI matches the one
 // the network used in the command.
@@ -161,12 +193,85 @@ func BuildPDUSessionReleaseComplete(pduSessionID, pti uint8) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
+// BuildPDUSessionModificationComplete builds a PDU SESSION MODIFICATION
+// COMPLETE (TS 24.501 §8.3.5), acknowledging a network-requested Modification
+// Command. The PTI matches the one the network used in the command.
+func BuildPDUSessionModificationComplete(pduSessionID, pti uint8) ([]byte, error) {
+	m := gonas.NewMessage()
+	m.GsmMessage = gonas.NewGsmMessage()
+	m.GsmHeader.SetMessageType(gonas.MsgTypePDUSessionModificationComplete)
+
+	cmp := nasMessage.NewPDUSessionModificationComplete(0)
+	cmp.SetExtendedProtocolDiscriminator(nasMessage.Epd5GSSessionManagementMessage)
+	cmp.SetMessageType(gonas.MsgTypePDUSessionModificationComplete)
+	cmp.SetPDUSessionID(pduSessionID)
+	cmp.SetPTI(pti)
+
+	m.PDUSessionModificationComplete = cmp
+
+	data := new(bytes.Buffer)
+	if err := m.GsmMessageEncode(data); err != nil {
+		return nil, fmt.Errorf("GSM encode PDUSessionModificationComplete: %w", err)
+	}
+
+	return data.Bytes(), nil
+}
+
+// BuildPDUSessionModificationCommandReject builds a PDU SESSION MODIFICATION
+// COMMAND REJECT (TS 24.501 §8.3.6), rejecting a network-requested Modification
+// Command. The PTI matches the command being rejected.
+func BuildPDUSessionModificationCommandReject(pduSessionID, pti, cause uint8) ([]byte, error) {
+	m := gonas.NewMessage()
+	m.GsmMessage = gonas.NewGsmMessage()
+	m.GsmHeader.SetMessageType(gonas.MsgTypePDUSessionModificationCommandReject)
+
+	rej := nasMessage.NewPDUSessionModificationCommandReject(0)
+	rej.SetExtendedProtocolDiscriminator(nasMessage.Epd5GSSessionManagementMessage)
+	rej.SetMessageType(gonas.MsgTypePDUSessionModificationCommandReject)
+	rej.SetPDUSessionID(pduSessionID)
+	rej.SetPTI(pti)
+	rej.SetCauseValue(cause)
+
+	m.PDUSessionModificationCommandReject = rej
+
+	data := new(bytes.Buffer)
+	if err := m.GsmMessageEncode(data); err != nil {
+		return nil, fmt.Errorf("GSM encode PDUSessionModificationCommandReject: %w", err)
+	}
+
+	return data.Bytes(), nil
+}
+
+// BuildPDUSessionStatus5GSM builds a 5GSM STATUS (TS 24.501 §8.3.13) reporting
+// an erroneous condition for a PDU session, carrying the given PTI and cause.
+func BuildPDUSessionStatus5GSM(pduSessionID, pti, cause uint8) ([]byte, error) {
+	m := gonas.NewMessage()
+	m.GsmMessage = gonas.NewGsmMessage()
+	m.GsmHeader.SetMessageType(gonas.MsgTypeStatus5GSM)
+
+	st := nasMessage.NewStatus5GSM(0)
+	st.SetExtendedProtocolDiscriminator(nasMessage.Epd5GSSessionManagementMessage)
+	st.SetMessageType(gonas.MsgTypeStatus5GSM)
+	st.SetPDUSessionID(pduSessionID)
+	st.SetPTI(pti)
+	st.SetCauseValue(cause)
+
+	m.Status5GSM = st
+
+	data := new(bytes.Buffer)
+	if err := m.GsmMessageEncode(data); err != nil {
+		return nil, fmt.Errorf("GSM encode Status5GSM: %w", err)
+	}
+
+	return data.Bytes(), nil
+}
+
 // BuildULNASTransportExisting wraps a 5GSM message for an existing PDU session
 // (release, modification) in a UL NAS TRANSPORT. Unlike BuildULNASTransport it
 // omits the Request Type, DNN and S-NSSAI IEs, which are establishment-only;
 // their absence makes the AMF forward the message to the SMF for the existing
 // session rather than treating it as a new/duplicate session (TS 24.501 §8.2.10).
-func BuildULNASTransportExisting(pduSessionID uint8, payloadContainer []byte) ([]byte, error) {
+func BuildULNASTransportExisting(pduSessionID uint8, requestType *uint8, payloadContainer []byte) ([]byte, error) {
 	m := gonas.NewMessage()
 	m.GmmMessage = gonas.NewGmmMessage()
 	m.GmmHeader.SetMessageType(gonas.MsgTypeULNASTransport)
@@ -179,6 +284,12 @@ func BuildULNASTransportExisting(pduSessionID uint8, payloadContainer []byte) ([
 	ul.PduSessionID2Value = new(nasType.PduSessionID2Value)
 	ul.PduSessionID2Value.SetIei(nasMessage.ULNASTransportPduSessionID2ValueType)
 	ul.SetPduSessionID2Value(pduSessionID)
+
+	if requestType != nil {
+		ul.RequestType = new(nasType.RequestType)
+		ul.RequestType.SetIei(nasMessage.ULNASTransportRequestTypeType)
+		ul.SetRequestTypeValue(*requestType)
+	}
 
 	ul.SetPayloadContainerType(nasMessage.PayloadContainerTypeN1SMInfo)
 	ul.PayloadContainer.SetLen(uint16(len(payloadContainer)))
@@ -212,6 +323,29 @@ func DecodePDUSessionEstablishmentAccept(nasResp *NASResponse, gsmMsg *gonas.Gsm
 		nasResp.PDUAddress = hex.EncodeToString(pduAddr[:])
 	case nasMessage.PDUSessionTypeIPv4IPv6:
 		nasResp.PDUAddress = fmt.Sprintf("%d.%d.%d.%d", pduAddr[8], pduAddr[9], pduAddr[10], pduAddr[11])
+	}
+
+	ulAMBR := msg.GetSessionAMBRForUplink()
+	nasResp.SessionAMBRUplink = uint16(ulAMBR[0])<<8 | uint16(ulAMBR[1])
+
+	dlAMBR := msg.GetSessionAMBRForDownlink()
+	nasResp.SessionAMBRDownlink = uint16(dlAMBR[0])<<8 | uint16(dlAMBR[1])
+
+	if ruleLen := msg.AuthorizedQosRules.GetLen(); ruleLen > 0 {
+		nasResp.AuthorizedQoSRules = hex.EncodeToString(msg.AuthorizedQosRules.Buffer[:ruleLen])
+	}
+
+	if msg.AlwaysonPDUSessionIndication != nil {
+		apsi := msg.GetAPSI()
+		nasResp.AlwaysOnIndication = &apsi
+	}
+
+	// The Accept carries a 5GSM cause when the network downgrades the requested
+	// PDU session type (TS 24.501 §6.4.1.3): #50 "IPv4 only allowed" or #51
+	// "IPv6 only allowed".
+	if msg.Cause5GSM != nil {
+		cause := msg.GetCauseValue()
+		nasResp.Cause5GSM = &cause
 	}
 }
 

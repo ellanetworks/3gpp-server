@@ -47,6 +47,27 @@ type NASRequest struct {
 	// the UE's configured PDU session.
 	ServiceType *uint8 `json:"service_type,omitempty"`
 
+	// RequestTypeOverride sets the Request Type IE of the UL NAS Transport
+	// carrying a 5GSM message (TS 24.501 §9.11.3.47): 1=initial request,
+	// 2=existing PDU session, 3=initial emergency, 4=existing emergency,
+	// 5=modification request, 7=reserved. When unset, no Request Type IE is sent.
+	RequestTypeOverride *uint8 `json:"request_type,omitempty"`
+
+	// PTIOverride sets the Procedure Transaction Identity of a 5GSM message
+	// (TS 24.501 §9.6, §7.3.1): 0=unassigned, 1-254=assigned, 255=reserved.
+	// When unset, the builders use an assigned value (1).
+	PTIOverride *uint8 `json:"pti,omitempty"`
+
+	// AlwaysOnRequested adds the Always-on PDU session requested IE to a
+	// pdu_session_establishment_request (TS 24.501 §8.3.1.7), so the network
+	// must answer with an Always-on PDU session indication (§6.4.1).
+	AlwaysOnRequested *bool `json:"always_on_requested,omitempty"`
+
+	// Cause5GSM is the 5GSM cause carried in a UE-originated 5GSM reject or
+	// status message (5GSM STATUS, PDU Session Modification Command Reject),
+	// TS 24.501 §9.11.4.2. Defaults to #111 protocol error, unspecified.
+	Cause5GSMOverride *uint8 `json:"cause_5gsm,omitempty"`
+
 	// RegistrationRequest optional IEs (TS 24.501 §8.2.6)
 	NgKSI                        *uint8       `json:"ng_ksi,omitempty"`
 	MobileIdentityOverride       *string      `json:"mobile_identity_override,omitempty"`
@@ -135,6 +156,15 @@ type NASResponse struct {
 	PDUSessionID   uint8  `json:"pdu_session_id,omitempty"`
 	PDUSessionType uint8  `json:"pdu_session_type,omitempty"`
 	PDUAddress     string `json:"pdu_address,omitempty"`
+
+	// PDU Session Establishment Accept mandatory/conditional IEs (TS 24.501
+	// §8.3.2): Session-AMBR and Authorized QoS rules are mandatory; the
+	// Always-on PDU session indication is included per §6.4.1 when the UE
+	// requested it.
+	SessionAMBRUplink   uint16 `json:"session_ambr_uplink,omitempty"`
+	SessionAMBRDownlink uint16 `json:"session_ambr_downlink,omitempty"`
+	AuthorizedQoSRules  string `json:"authorized_qos_rules,omitempty"`
+	AlwaysOnIndication  *uint8 `json:"always_on_indication,omitempty"`
 
 	// PDU Session Establishment Reject
 	Cause5GSM *uint8 `json:"cause_5gsm,omitempty"`

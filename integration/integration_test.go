@@ -42,6 +42,14 @@ func TestMain(m *testing.M) {
 		}
 	}
 
+	// Extra data networks on the default profile/slice so the same subscribers
+	// can drive PDU-session-type negotiation (IPv6-only and dual-stack alongside
+	// the IPv4-only "internet", TS 24.501 §6.4.1.3) and IP-pool exhaustion (a
+	// tiny /30 pool, §6.4.1.x #26).
+	if err := provisionExtraDataNetworks(token); err != nil {
+		log.Fatalf("data-network provisioning failed: %v", err)
+	}
+
 	if err := waitForTester(30 * time.Second); err != nil {
 		log.Fatalf("3gpp-server not ready: %v", err)
 	}
@@ -146,6 +154,76 @@ func createSubscriber(token, imsi string) error {
 		return fmt.Errorf("create subscriber: HTTP %d: %s", resp.StatusCode, b)
 	}
 	return nil
+}
+
+// provisionExtraDataNetworks creates the data networks (and their default-profile
+// policies) used by the PDU-session-type and IP-exhaustion tests, alongside the
+// IPv4-only "internet" seeded by init:
+//   - internet6:  IPv6-only
+//   - internet46: dual-stack
+//   - exhaust:    IPv4 /30 (exactly 2 allocatable addresses)
+//
+// Idempotent: each resource is created only when not already present (the env
+// persists across runs).
+func provisionExtraDataNetworks(token string) error {
+	dataNetworks := []struct{ name, body string }{
+		{"internet6", `{"name":"internet6","ipv6_pool":"2001:db8:6::/48","dns":"2001:4860:4860::8888","mtu":1400}`},
+		{"internet46", `{"name":"internet46","ipv4_pool":"10.46.0.0/22","ipv6_pool":"2001:db8:46::/48","dns":"8.8.8.8","mtu":1400}`},
+		{"exhaust", `{"name":"exhaust","ipv4_pool":"10.99.0.0/30","dns":"8.8.8.8","mtu":1400}`},
+	}
+	for _, dn := range dataNetworks {
+		if err := ensureProvisioned(token, "/api/v1/networking/data-networks", dn.name, dn.body); err != nil {
+			return err
+		}
+	}
+
+	policies := []struct{ name, body string }{
+		{"internet6-policy", `{"name":"internet6-policy","profile_name":"default","slice_name":"default","data_network_name":"internet6","session_ambr_uplink":"200 Mbps","session_ambr_downlink":"200 Mbps","var5qi":9,"arp":1}`},
+		{"internet46-policy", `{"name":"internet46-policy","profile_name":"default","slice_name":"default","data_network_name":"internet46","session_ambr_uplink":"200 Mbps","session_ambr_downlink":"200 Mbps","var5qi":9,"arp":1}`},
+		{"exhaust-policy", `{"name":"exhaust-policy","profile_name":"default","slice_name":"default","data_network_name":"exhaust","session_ambr_uplink":"200 Mbps","session_ambr_downlink":"200 Mbps","var5qi":9,"arp":1}`},
+	}
+	for _, p := range policies {
+		if err := ensureProvisioned(token, "/api/v1/policies", p.name, p.body); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// ensureProvisioned creates a named resource under collectionPath only if a GET
+// on collectionPath/name does not already find it, keeping TestMain idempotent
+// across the persistent test environment.
+func ensureProvisioned(token, collectionPath, name, body string) error {
+	getReq, _ := http.NewRequest("GET", ellaAPIURL+collectionPath+"/"+name, nil)
+	getReq.Header.Set("Authorization", "Bearer "+token)
+
+	if resp, err := http.DefaultClient.Do(getReq); err == nil {
+		_, _ = io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+
+		if resp.StatusCode == 200 {
+			return nil
+		}
+	}
+
+	postReq, _ := http.NewRequest("POST", ellaAPIURL+collectionPath, strings.NewReader(body))
+	postReq.Header.Set("Content-Type", "application/json")
+	postReq.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(postReq)
+	if err != nil {
+		return fmt.Errorf("POST %s: %v", collectionPath, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 201 || resp.StatusCode == 200 {
+		return nil
+	}
+
+	b, _ := io.ReadAll(resp.Body)
+
+	return fmt.Errorf("POST %s: HTTP %d: %s", collectionPath, resp.StatusCode, b)
 }
 
 func doHTTP(method, url, body string) (*http.Response, error) {

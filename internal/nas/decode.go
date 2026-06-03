@@ -152,6 +152,11 @@ func decodeDLNASTransport(m *gonas.Message, resp *NASResponse) {
 		return
 	}
 
+	if m.DLNASTransport.Cause5GMM != nil {
+		cause := m.DLNASTransport.GetCauseValue()
+		resp.CauseGMM = &cause
+	}
+
 	payload := m.DLNASTransport.GetPayloadContainerContents()
 	if len(payload) == 0 {
 		return
@@ -179,6 +184,16 @@ func decodeDLNASTransport(m *gonas.Message, resp *NASResponse) {
 			cause := inner.PDUSessionReleaseCommand.GetCauseValue()
 			resp.Cause5GSM = &cause
 		}
+	case gonas.MsgTypePDUSessionModificationReject:
+		if inner.PDUSessionModificationReject != nil {
+			cause := inner.PDUSessionModificationReject.GetCauseValue()
+			resp.Cause5GSM = &cause
+		}
+	case gonas.MsgTypeStatus5GSM:
+		if inner.Status5GSM != nil {
+			cause := inner.Status5GSM.GetCauseValue()
+			resp.Cause5GSM = &cause
+		}
 	}
 }
 
@@ -204,6 +219,8 @@ func gsmMessageTypeName(t uint8) string {
 		return "pdu_session_release_command"
 	case gonas.MsgTypePDUSessionReleaseComplete:
 		return "pdu_session_release_complete"
+	case gonas.MsgTypeStatus5GSM:
+		return "5gsm_status"
 	default:
 		return fmt.Sprintf("unknown_gsm(%d)", t)
 	}
