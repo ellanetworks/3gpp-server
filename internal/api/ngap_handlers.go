@@ -71,6 +71,12 @@ func (h *Handler) SendNGAP(w http.ResponseWriter, r *http.Request) {
 		handlePDUSessionModificationRequest(w, r, gnb, ue, t, &req)
 	case "pdu_session_release_complete":
 		handlePDUSessionReleaseComplete(w, r, gnb, ue, t, &req)
+	case "pdu_session_modification_complete":
+		handlePDUSessionModificationComplete(w, r, gnb, ue, t, &req)
+	case "pdu_session_modification_command_reject":
+		handlePDUSessionModificationCommandReject(w, r, gnb, ue, t, &req)
+	case "status_5gsm":
+		handleStatus5GSM(w, r, gnb, ue, t, &req)
 	case "authentication_failure":
 		handleAuthenticationFailure(w, r, gnb, ue, t, &req)
 	case "security_mode_reject":
@@ -234,7 +240,28 @@ func (h *Handler) AwaitUEMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
+	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp, NAS: decodeNASFromNGAP(ue, ngapResp)})
+}
+
+// decodeNASFromNGAP secure-decodes the NAS PDU carried in an NGAP message (e.g.
+// a Downlink NAS Transport), returning nil when the message carries none.
+func decodeNASFromNGAP(ue *store.UEContext, ngapResp *ngap.NGAPResponse) *nasCodec.NASResponse {
+	var nasResp *nasCodec.NASResponse
+
+	for _, ie := range ngapResp.IEs {
+		if ie.NasPDU == nil {
+			continue
+		}
+
+		nasPDUBytes, err := hex.DecodeString(*ie.NasPDU)
+		if err != nil {
+			continue
+		}
+
+		nasResp, _ = nasCodec.DecodeSecuredNAS(ue, nasPDUBytes)
+	}
+
+	return nasResp
 }
 
 // AwaitGnBMessage waits for an unsolicited downlink NGAP message to arrive on
@@ -825,6 +852,8 @@ func handlePDUSessionEstablishmentRequest(w http.ResponseWriter, r *http.Request
 		pduReq, err = nasCodec.BuildPDUSessionEstablishmentRequest(&nasCodec.PDUSessionEstablishmentRequestOpts{
 			PDUSessionID:   pduSessionID,
 			PDUSessionType: pduSessionType,
+			PTI:            ptiFor(req),
+			AlwaysOn:       req.AlwaysOnRequested != nil && *req.AlwaysOnRequested,
 		})
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, fmt.Sprintf("build PDUSessionEstablishmentRequest: %v", err))
@@ -1082,6 +1111,17 @@ func handleIdentityResponse(w http.ResponseWriter, r *http.Request, gnb *store.G
 	sendUplinkAndWait(w, r, gnb, ue, t, req, nasPDU, "DownlinkNASTransport", "InitialContextSetupRequest", "ErrorIndication")
 }
 
+// ptiFor resolves the 5GSM Procedure Transaction Identity for a UE-originated
+// message, defaulting to the assigned value 1 (TS 24.501 §9.6) when the request
+// carries no override.
+func ptiFor(req *SendNGAPRequest) uint8 {
+	if req != nil && req.PTIOverride != nil {
+		return *req.PTIOverride
+	}
+
+	return 0x01
+}
+
 // pduSessionIDForRelease resolves the PDU session ID to release, defaulting to
 // the UE's configured session.
 func pduSessionIDForRelease(ue *store.UEContext) uint8 {
@@ -1110,7 +1150,7 @@ func handlePDUSessionReleaseRequest(w http.ResponseWriter, r *http.Request, gnb 
 
 		inner = raw
 	} else {
-		relReq, err := nasCodec.BuildPDUSessionReleaseRequest(pduSessionID, 0x01)
+		relReq, err := nasCodec.BuildPDUSessionReleaseRequest(pduSessionID, ptiFor(req))
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, fmt.Sprintf("build PDUSessionReleaseRequest: %v", err))
 			return
@@ -1152,7 +1192,7 @@ func handlePDUSessionModificationRequest(w http.ResponseWriter, r *http.Request,
 
 		inner = raw
 	} else {
-		modReq, err := nasCodec.BuildPDUSessionModificationRequest(pduSessionID, 0x01)
+		modReq, err := nasCodec.BuildPDUSessionModificationRequest(pduSessionID, ptiFor(req))
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, fmt.Sprintf("build PDUSessionModificationRequest: %v", err))
 			return
@@ -1192,7 +1232,7 @@ func handlePDUSessionReleaseComplete(w http.ResponseWriter, r *http.Request, gnb
 
 		inner = raw
 	} else {
-		cmp, err := nasCodec.BuildPDUSessionReleaseComplete(pduSessionID, 0x01)
+		cmp, err := nasCodec.BuildPDUSessionReleaseComplete(pduSessionID, ptiFor(req))
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, fmt.Sprintf("build PDUSessionReleaseComplete: %v", err))
 			return
@@ -1228,6 +1268,167 @@ func handlePDUSessionReleaseComplete(w http.ResponseWriter, r *http.Request, gnb
 	}
 
 	writeJSON(w, http.StatusOK, SendNGAPResponse{})
+}
+
+// handlePDUSessionModificationComplete sends a PDU SESSION MODIFICATION
+// COMPLETE (TS 24.501 §6.3.2.3). The network does not answer a well-formed
+// complete, so this is fire-and-forget; a PTI-mismatched complete elicits a
+// 5GSM STATUS (TS 24.501 §7.3.1 a) observable on the UE's await endpoint.
+func handlePDUSessionModificationComplete(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
+	pduSessionID := pduSessionIDForRelease(ue)
+
+	var inner []byte
+
+	if req.RawNASPDU != nil {
+		raw, err := hex.DecodeString(*req.RawNASPDU)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("decode raw_nas_pdu: %v", err))
+			return
+		}
+
+		inner = raw
+	} else {
+		cmp, err := nasCodec.BuildPDUSessionModificationComplete(pduSessionID, ptiFor(req))
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("build PDUSessionModificationComplete: %v", err))
+			return
+		}
+
+		inner = cmp
+	}
+
+	ulNas, err := nasCodec.BuildULNASTransportExisting(pduSessionID, req.RequestTypeOverride, inner)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build ULNASTransport: %v", err))
+		return
+	}
+
+	secured, err := nasCodec.EncodeNasPduWithSecurity(ue, ulNas, gonas.SecurityHeaderTypeIntegrityProtectedAndCiphered)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NAS security encode: %v", err))
+		return
+	}
+
+	encoded, err := ngap.BuildUplinkNASTransport(
+		ue.AmfUeNgapID, ue.RanUeNgapID, secured,
+		gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, uplinkOverrides(req),
+	)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NGAP encode: %v", err))
+		return
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{})
+}
+
+// cause5GSMFor resolves the 5GSM cause for a UE-originated reject/status
+// message, defaulting to #111 "protocol error, unspecified" (TS 24.501
+// §9.11.4.2) when the request carries no override.
+func cause5GSMFor(req *SendNGAPRequest) uint8 {
+	if req != nil && req.Cause5GSMOverride != nil {
+		return *req.Cause5GSMOverride
+	}
+
+	return nasMessage.Cause5GSMProtocolErrorUnspecified
+}
+
+// sendInner5GSM wraps a 5GSM payload in a UL NAS TRANSPORT for an existing PDU
+// session and sends it, fire-and-forget. Any network response (e.g. a 5GSM
+// STATUS for a PTI error) arrives asynchronously and is observed on the UE's
+// await endpoint.
+func sendInner5GSM(w http.ResponseWriter, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest, inner []byte) {
+	pduSessionID := pduSessionIDForRelease(ue)
+
+	ulNas, err := nasCodec.BuildULNASTransportExisting(pduSessionID, req.RequestTypeOverride, inner)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build ULNASTransport: %v", err))
+		return
+	}
+
+	secured, err := nasCodec.EncodeNasPduWithSecurity(ue, ulNas, gonas.SecurityHeaderTypeIntegrityProtectedAndCiphered)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NAS security encode: %v", err))
+		return
+	}
+
+	encoded, err := ngap.BuildUplinkNASTransport(
+		ue.AmfUeNgapID, ue.RanUeNgapID, secured,
+		gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, uplinkOverrides(req),
+	)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NGAP encode: %v", err))
+		return
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{})
+}
+
+// handlePDUSessionModificationCommandReject sends a PDU SESSION MODIFICATION
+// COMMAND REJECT (TS 24.501 §6.3.2.4). A reject whose PTI matches no procedure
+// in use elicits a 5GSM STATUS #47 (TS 24.501 §7.3.1 a) on the UE's await
+// endpoint.
+func handlePDUSessionModificationCommandReject(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
+	pduSessionID := pduSessionIDForRelease(ue)
+
+	var inner []byte
+
+	if req.RawNASPDU != nil {
+		raw, err := hex.DecodeString(*req.RawNASPDU)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("decode raw_nas_pdu: %v", err))
+			return
+		}
+
+		inner = raw
+	} else {
+		rej, err := nasCodec.BuildPDUSessionModificationCommandReject(pduSessionID, ptiFor(req), cause5GSMFor(req))
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("build PDUSessionModificationCommandReject: %v", err))
+			return
+		}
+
+		inner = rej
+	}
+
+	sendInner5GSM(w, gnb, ue, t, req, inner)
+}
+
+// handleStatus5GSM sends a 5GSM STATUS for an existing PDU session (TS 24.501
+// §8.3.13).
+func handleStatus5GSM(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
+	pduSessionID := pduSessionIDForRelease(ue)
+
+	var inner []byte
+
+	if req.RawNASPDU != nil {
+		raw, err := hex.DecodeString(*req.RawNASPDU)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("decode raw_nas_pdu: %v", err))
+			return
+		}
+
+		inner = raw
+	} else {
+		st, err := nasCodec.BuildPDUSessionStatus5GSM(pduSessionID, ptiFor(req), cause5GSMFor(req))
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("build Status5GSM: %v", err))
+			return
+		}
+
+		inner = st
+	}
+
+	sendInner5GSM(w, gnb, ue, t, req, inner)
 }
 
 // handleAuthenticationFailure sends an AUTHENTICATION FAILURE in response to an

@@ -684,7 +684,7 @@ components:
         message_type:
           type: string
           description: NAS message to send.
-          enum: [registration_request, authentication_response, security_mode_complete, registration_complete, pdu_session_establishment_request, deregistration_request, ue_context_release_request, service_request, identity_response, pdu_session_release_request, pdu_session_release_complete, pdu_session_modification_request, authentication_failure, security_mode_reject, handover_required, handover_cancel]
+          enum: [registration_request, authentication_response, security_mode_complete, registration_complete, pdu_session_establishment_request, deregistration_request, ue_context_release_request, service_request, identity_response, pdu_session_release_request, pdu_session_release_complete, pdu_session_modification_request, pdu_session_modification_complete, pdu_session_modification_command_reject, status_5gsm, authentication_failure, security_mode_reject, handover_required, handover_cancel]
         raw_nas_pdu:
           type: string
           description: |
@@ -726,6 +726,15 @@ components:
         request_type:
           type: integer
           description: "Request Type IE of the UL NAS Transport carrying a 5GSM message (TS 24.501 §9.11.3.47): 1=initial request, 2=existing PDU session, 3=initial emergency, 4=existing emergency, 5=modification request, 7=reserved. When unset, no Request Type IE is sent. Applies to the pdu_session_modification_request / pdu_session_release_request endpoints."
+        pti:
+          type: integer
+          description: "Procedure Transaction Identity of a 5GSM message (TS 24.501 §9.6, §7.3.1): 0=unassigned, 1-254=assigned, 255=reserved. When unset, an assigned value (1) is used. Applies to the pdu_session_establishment_request / pdu_session_modification_request / pdu_session_release_request / pdu_session_release_complete / pdu_session_modification_complete / pdu_session_modification_command_reject / status_5gsm endpoints."
+        always_on_requested:
+          type: boolean
+          description: "Add the Always-on PDU session requested IE to a pdu_session_establishment_request (TS 24.501 §8.3.1.7). The network must answer with an Always-on PDU session indication in the Establishment Accept (§6.4.1)."
+        cause_5gsm:
+          type: integer
+          description: "5GSM cause for a UE-originated reject/status message (TS 24.501 §9.11.4.2). Applies to the pdu_session_modification_command_reject / status_5gsm endpoints. Defaults to #111 protocol error, unspecified."
         handover_cancel_cause:
           type: integer
           description: "Radio-network Cause for handover_cancel (TS 38.413 §9.3.1.2). Defaults to handover-cancelled."
