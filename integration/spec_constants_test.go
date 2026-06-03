@@ -28,7 +28,6 @@ const (
 // 5GSM cause values — TS 24.501 §9.11.4.2, Table 9.11.4.2.1.
 const (
 	cause5GSMUnknownPDUSessionType                     = 28
-	cause5GSMRequestRejectedUnspecified                = 31
 	cause5GSMMessageTypeNotCompatibleWithProtocolState = 98
 	cause5GSMProtocolErrorUnspecified                  = 111
 )

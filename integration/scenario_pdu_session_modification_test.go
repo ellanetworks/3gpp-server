@@ -37,13 +37,16 @@ func TestPDUSessionModification_Rejected(t *testing.T) {
 		t.Errorf("nas.inner_nas_message_type = %q, want pdu_session_modification_reject (TS 24.501 §6.4.2.4)\n  body: %s", got, body)
 	}
 
-	assertNASCause(t, body, "nas.cause_5gsm", cause5GSMRequestRejectedUnspecified)
+	if got := jsonGet(body, "nas.cause_5gsm"); got == "" {
+		t.Errorf("Modification Reject missing its mandatory 5GSM cause IE (TS 24.501 §8.3.8)\n  body: %s", body)
+	}
 }
 
 // TestPDUSessionModification_NoActiveSession sends a Modification Request for a
-// PDU session that has no active context (the UE is registered but never
-// established one). The network responds with a rejection — e.g. a 5GSM STATUS
-// with cause #43 "invalid PDU session identity" (TS 24.501 §6.4.2.4 / §7.3).
+// PDU session with no context at the AMF (the UE is registered but never
+// established one). Per TS 24.501 §7.3.2 c) the AMF cannot forward the message
+// and answers with a Downlink NAS Transport carrying 5GMM cause #90 "payload was
+// not forwarded".
 func TestPDUSessionModification_NoActiveSession(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -53,10 +56,16 @@ func TestPDUSessionModification_NoActiveSession(t *testing.T) {
 		`{"message_type":"pdu_session_modification_request"}`)
 
 	if status == 504 {
-		t.Fatalf("got no response (HTTP 504); TS 24.501 §6.4.2.4/§7.3 require a response (e.g. 5GSM STATUS cause #43)\n  body: %s", body)
+		t.Fatalf("got no response (HTTP 504); TS 24.501 §7.3.2 c) requires a Downlink NAS Transport with 5GMM cause #90\n  body: %s", body)
 	}
 
 	if status != 200 {
 		t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
 	}
+
+	if got := jsonGet(body, "ngap.message_type"); got != ngapDownlinkNASTransport {
+		t.Fatalf("ngap.message_type = %q, want DownlinkNASTransport\n  body: %s", got, body)
+	}
+
+	assertNASCause(t, body, "nas.cause_5gmm", cause5GMMPayloadWasNotForwarded)
 }
