@@ -43,9 +43,10 @@ func TestMain(m *testing.M) {
 	}
 
 	// Extra data networks on the default profile/slice so the same subscribers
-	// can drive PDU-session-type negotiation: IPv6-only and dual-stack alongside
-	// the IPv4-only "internet" seeded by init (TS 24.501 §6.4.1.3).
-	if err := provisionTypeNegotiationDNNs(token); err != nil {
+	// can drive PDU-session-type negotiation (IPv6-only and dual-stack alongside
+	// the IPv4-only "internet", TS 24.501 §6.4.1.3) and IP-pool exhaustion (a
+	// tiny /30 pool, §6.4.1.x #26).
+	if err := provisionExtraDataNetworks(token); err != nil {
 		log.Fatalf("data-network provisioning failed: %v", err)
 	}
 
@@ -155,14 +156,20 @@ func createSubscriber(token, imsi string) error {
 	return nil
 }
 
-// provisionTypeNegotiationDNNs creates an IPv6-only and a dual-stack data
-// network, each mapped to the default profile's default slice, so the existing
-// subscribers can request them. Idempotent: each resource is created only when
-// not already present (the env persists across runs).
-func provisionTypeNegotiationDNNs(token string) error {
+// provisionExtraDataNetworks creates the data networks (and their default-profile
+// policies) used by the PDU-session-type and IP-exhaustion tests, alongside the
+// IPv4-only "internet" seeded by init:
+//   - internet6:  IPv6-only
+//   - internet46: dual-stack
+//   - exhaust:    IPv4 /30 (exactly 2 allocatable addresses)
+//
+// Idempotent: each resource is created only when not already present (the env
+// persists across runs).
+func provisionExtraDataNetworks(token string) error {
 	dataNetworks := []struct{ name, body string }{
 		{"internet6", `{"name":"internet6","ipv6_pool":"2001:db8:6::/48","dns":"2001:4860:4860::8888","mtu":1400}`},
 		{"internet46", `{"name":"internet46","ipv4_pool":"10.46.0.0/22","ipv6_pool":"2001:db8:46::/48","dns":"8.8.8.8","mtu":1400}`},
+		{"exhaust", `{"name":"exhaust","ipv4_pool":"10.99.0.0/30","dns":"8.8.8.8","mtu":1400}`},
 	}
 	for _, dn := range dataNetworks {
 		if err := ensureProvisioned(token, "/api/v1/networking/data-networks", dn.name, dn.body); err != nil {
@@ -173,6 +180,7 @@ func provisionTypeNegotiationDNNs(token string) error {
 	policies := []struct{ name, body string }{
 		{"internet6-policy", `{"name":"internet6-policy","profile_name":"default","slice_name":"default","data_network_name":"internet6","session_ambr_uplink":"200 Mbps","session_ambr_downlink":"200 Mbps","var5qi":9,"arp":1}`},
 		{"internet46-policy", `{"name":"internet46-policy","profile_name":"default","slice_name":"default","data_network_name":"internet46","session_ambr_uplink":"200 Mbps","session_ambr_downlink":"200 Mbps","var5qi":9,"arp":1}`},
+		{"exhaust-policy", `{"name":"exhaust-policy","profile_name":"default","slice_name":"default","data_network_name":"exhaust","session_ambr_uplink":"200 Mbps","session_ambr_downlink":"200 Mbps","var5qi":9,"arp":1}`},
 	}
 	for _, p := range policies {
 		if err := ensureProvisioned(token, "/api/v1/policies", p.name, p.body); err != nil {

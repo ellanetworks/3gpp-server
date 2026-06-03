@@ -911,13 +911,18 @@ func handlePDUSessionEstablishmentRequest(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	// The N3 endpoint is synthesised — 3gpp-server does not run a user plane.
-	// The DL TEID is made unique per session so multiple sessions don't collide.
-	dlTeid := uint32(ue.RanUeNgapID)<<8 | uint32(pduSessionID)
-	pduSetupResp, err := ngap.BuildPDUSessionResourceSetupResponse(
-		ue.AmfUeNgapID, ue.RanUeNgapID, int64(pduSessionID), dlTeid, "10.3.0.3")
-	if err == nil {
-		_ = t.Send(pduSetupResp, false)
+	// Acknowledge the radio setup only when the network actually requested it.
+	// A reject or Error Indication establishes no session, so a setup response
+	// would refer to a non-existent PDU session.
+	if ngapResp.MessageType == "PDUSessionResourceSetupRequest" {
+		// The N3 endpoint is synthesised — 3gpp-server does not run a user plane.
+		// The DL TEID is made unique per session so multiple sessions don't collide.
+		dlTeid := uint32(ue.RanUeNgapID)<<8 | uint32(pduSessionID)
+		pduSetupResp, err := ngap.BuildPDUSessionResourceSetupResponse(
+			ue.AmfUeNgapID, ue.RanUeNgapID, int64(pduSessionID), dlTeid, "10.3.0.3")
+		if err == nil {
+			_ = t.Send(pduSetupResp, false)
+		}
 	}
 
 	writeJSON(w, http.StatusOK, SendNGAPResponse{

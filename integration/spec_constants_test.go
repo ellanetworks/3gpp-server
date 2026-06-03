@@ -28,6 +28,7 @@ const (
 // 5GSM cause values — TS 24.501 §9.11.4.2, Table 9.11.4.2.1.
 const (
 	cause5GSMMissingOrUnknownDNN                       = 27
+	cause5GSMInsufficientResources                     = 26
 	cause5GSMUnknownPDUSessionType                     = 28
 	cause5GSMPDUSessionTypeIPv4OnlyAllowed             = 50
 	cause5GSMPDUSessionTypeIPv6OnlyAllowed             = 51
