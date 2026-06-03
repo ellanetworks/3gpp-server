@@ -339,6 +339,14 @@ func DecodePDUSessionEstablishmentAccept(nasResp *NASResponse, gsmMsg *gonas.Gsm
 		apsi := msg.GetAPSI()
 		nasResp.AlwaysOnIndication = &apsi
 	}
+
+	// The Accept carries a 5GSM cause when the network downgrades the requested
+	// PDU session type (TS 24.501 §6.4.1.3): #50 "IPv4 only allowed" or #51
+	// "IPv6 only allowed".
+	if msg.Cause5GSM != nil {
+		cause := msg.GetCauseValue()
+		nasResp.Cause5GSM = &cause
+	}
 }
 
 func DecodePDUSessionEstablishmentReject(nasResp *NASResponse, gsmMsg *gonas.GsmMessage) {

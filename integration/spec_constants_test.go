@@ -29,6 +29,8 @@ const (
 const (
 	cause5GSMMissingOrUnknownDNN                       = 27
 	cause5GSMUnknownPDUSessionType                     = 28
+	cause5GSMPDUSessionTypeIPv4OnlyAllowed             = 50
+	cause5GSMPDUSessionTypeIPv6OnlyAllowed             = 51
 	cause5GSMMissingOrUnknownDNNInASlice               = 70
 	cause5GSMPTIMismatch                               = 47
 	cause5GSMInvalidPTIValue                           = 81
@@ -97,6 +99,15 @@ const (
 	nasPDUSessionEstablishmentReject = "pdu_session_establishment_reject"
 	nasPDUSessionModificationReject  = "pdu_session_modification_reject"
 	nas5GSMStatus                    = "5gsm_status"
+)
+
+// PDU session types — TS 24.501 §9.11.4.11.
+const (
+	pduSessionTypeIPv4         = 1
+	pduSessionTypeIPv6         = 2
+	pduSessionTypeIPv4IPv6     = 3
+	pduSessionTypeUnstructured = 4
+	pduSessionTypeEthernet     = 5
 )
 
 // NGAP Cause, Misc group — TS 38.413 §9.3.1.2.
