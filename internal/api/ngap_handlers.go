@@ -1137,8 +1137,7 @@ func handlePDUSessionReleaseRequest(w http.ResponseWriter, r *http.Request, gnb 
 // handlePDUSessionModificationRequest sends a UE-requested PDU SESSION
 // MODIFICATION REQUEST (TS 24.501 §6.4.2) on an existing PDU session. Per
 // §6.4.2.3/§6.4.2.4 the network answers with a Modification Command or a
-// Modification Reject (or a 5GSM STATUS for a PTI error, TS 24.501 §7.3.1) — it
-// must not silently drop the request.
+// Modification Reject (or a 5GSM STATUS for a PTI error, TS 24.501 §7.3.1)
 func handlePDUSessionModificationRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
 	pduSessionID := pduSessionIDForRelease(ue)
 
