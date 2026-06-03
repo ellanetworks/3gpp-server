@@ -198,6 +198,49 @@ func decodeHandoverPreparationFailure(msg *ngapType.HandoverPreparationFailure, 
 	}
 }
 
+// decodePDUSessionResourceModifyRequest surfaces the AMF/RAN UE NGAP IDs and the
+// per-session NAS PDU of a PDU SESSION RESOURCE MODIFY REQUEST (TS 38.413
+// §9.2.1.5). The PDU Session Modification Command is carried in the NAS PDU of
+// each item in the PDU Session Resource Modify List.
+func decodePDUSessionResourceModifyRequest(msg *ngapType.PDUSessionResourceModifyRequest, resp *NGAPResponse) {
+	if msg == nil {
+		return
+	}
+
+	for _, ie := range msg.ProtocolIEs.List {
+		decoded := IE{
+			ID:          ie.Id.Value,
+			Criticality: criticalityToString(ie.Criticality.Value),
+		}
+
+		switch ie.Id.Value {
+		case ngapType.ProtocolIEIDAMFUENGAPID:
+			if ie.Value.AMFUENGAPID != nil {
+				v := ie.Value.AMFUENGAPID.Value
+				decoded.AmfUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDRANUENGAPID:
+			if ie.Value.RANUENGAPID != nil {
+				v := ie.Value.RANUENGAPID.Value
+				decoded.RanUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDPDUSessionResourceModifyListModReq:
+			if ie.Value.PDUSessionResourceModifyListModReq != nil {
+				for i := range ie.Value.PDUSessionResourceModifyListModReq.List {
+					if nasPDU := ie.Value.PDUSessionResourceModifyListModReq.List[i].NASPDU; nasPDU != nil {
+						s := hex.EncodeToString(nasPDU.Value)
+						decoded.NasPDU = &s
+
+						break
+					}
+				}
+			}
+		}
+
+		resp.IEs = append(resp.IEs, decoded)
+	}
+}
+
 func decodeInitiatingMessage(im *ngapType.InitiatingMessage, resp *NGAPResponse) {
 	switch im.Value.Present {
 	case ngapType.InitiatingMessagePresentDownlinkNASTransport:
@@ -210,6 +253,8 @@ func decodeInitiatingMessage(im *ngapType.InitiatingMessage, resp *NGAPResponse)
 		decodeUEContextReleaseCommand(im.Value.UEContextReleaseCommand, resp)
 	case ngapType.InitiatingMessagePresentPDUSessionResourceReleaseCommand:
 		decodePDUSessionResourceReleaseCommand(im.Value.PDUSessionResourceReleaseCommand, resp)
+	case ngapType.InitiatingMessagePresentPDUSessionResourceModifyRequest:
+		decodePDUSessionResourceModifyRequest(im.Value.PDUSessionResourceModifyRequest, resp)
 	case ngapType.InitiatingMessagePresentHandoverRequest:
 		decodeHandoverRequest(im.Value.HandoverRequest, resp)
 	case ngapType.InitiatingMessagePresentErrorIndication:
@@ -697,6 +742,8 @@ func getInitiatingMessageName(msgType int) string {
 		return "PDUSessionResourceSetupRequest"
 	case ngapType.InitiatingMessagePresentPDUSessionResourceReleaseCommand:
 		return "PDUSessionResourceReleaseCommand"
+	case ngapType.InitiatingMessagePresentPDUSessionResourceModifyRequest:
+		return "PDUSessionResourceModifyRequest"
 	case ngapType.InitiatingMessagePresentHandoverRequest:
 		return "HandoverRequest"
 	case ngapType.InitiatingMessagePresentUEContextReleaseCommand:
