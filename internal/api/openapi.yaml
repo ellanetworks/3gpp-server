@@ -723,6 +723,9 @@ components:
         pdu_session_id:
           type: integer
           description: "Which PDU session a pdu_session_establishment_request establishes, so a UE can hold more than one."
+        request_type:
+          type: integer
+          description: "Request Type IE of the UL NAS Transport carrying a 5GSM message (TS 24.501 §9.11.3.47): 1=initial request, 2=existing PDU session, 3=initial emergency, 4=existing emergency, 5=modification request, 7=reserved. When unset, no Request Type IE is sent. Applies to the pdu_session_modification_request / pdu_session_release_request endpoints."
         handover_cancel_cause:
           type: integer
           description: "Radio-network Cause for handover_cancel (TS 38.413 §9.3.1.2). Defaults to handover-cancelled."

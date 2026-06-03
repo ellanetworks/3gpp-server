@@ -47,6 +47,12 @@ type NASRequest struct {
 	// the UE's configured PDU session.
 	ServiceType *uint8 `json:"service_type,omitempty"`
 
+	// RequestTypeOverride sets the Request Type IE of the UL NAS Transport
+	// carrying a 5GSM message (TS 24.501 §9.11.3.47): 1=initial request,
+	// 2=existing PDU session, 3=initial emergency, 4=existing emergency,
+	// 5=modification request, 7=reserved. When unset, no Request Type IE is sent.
+	RequestTypeOverride *uint8 `json:"request_type,omitempty"`
+
 	// RegistrationRequest optional IEs (TS 24.501 §8.2.6)
 	NgKSI                        *uint8       `json:"ng_ksi,omitempty"`
 	MobileIdentityOverride       *string      `json:"mobile_identity_override,omitempty"`

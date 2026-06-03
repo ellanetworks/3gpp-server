@@ -1119,7 +1119,7 @@ func handlePDUSessionReleaseRequest(w http.ResponseWriter, r *http.Request, gnb 
 		inner = relReq
 	}
 
-	ulNas, err := nasCodec.BuildULNASTransportExisting(pduSessionID, inner)
+	ulNas, err := nasCodec.BuildULNASTransportExisting(pduSessionID, req.RequestTypeOverride, inner)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build ULNASTransport: %v", err))
 		return
@@ -1161,7 +1161,7 @@ func handlePDUSessionModificationRequest(w http.ResponseWriter, r *http.Request,
 		inner = modReq
 	}
 
-	ulNas, err := nasCodec.BuildULNASTransportExisting(pduSessionID, inner)
+	ulNas, err := nasCodec.BuildULNASTransportExisting(pduSessionID, req.RequestTypeOverride, inner)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build ULNASTransport: %v", err))
 		return
@@ -1201,7 +1201,7 @@ func handlePDUSessionReleaseComplete(w http.ResponseWriter, r *http.Request, gnb
 		inner = cmp
 	}
 
-	ulNas, err := nasCodec.BuildULNASTransportExisting(pduSessionID, inner)
+	ulNas, err := nasCodec.BuildULNASTransportExisting(pduSessionID, req.RequestTypeOverride, inner)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build ULNASTransport: %v", err))
 		return

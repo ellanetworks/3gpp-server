@@ -191,7 +191,7 @@ func BuildPDUSessionReleaseComplete(pduSessionID, pti uint8) ([]byte, error) {
 // omits the Request Type, DNN and S-NSSAI IEs, which are establishment-only;
 // their absence makes the AMF forward the message to the SMF for the existing
 // session rather than treating it as a new/duplicate session (TS 24.501 §8.2.10).
-func BuildULNASTransportExisting(pduSessionID uint8, payloadContainer []byte) ([]byte, error) {
+func BuildULNASTransportExisting(pduSessionID uint8, requestType *uint8, payloadContainer []byte) ([]byte, error) {
 	m := gonas.NewMessage()
 	m.GmmMessage = gonas.NewGmmMessage()
 	m.GmmHeader.SetMessageType(gonas.MsgTypeULNASTransport)
@@ -204,6 +204,12 @@ func BuildULNASTransportExisting(pduSessionID uint8, payloadContainer []byte) ([
 	ul.PduSessionID2Value = new(nasType.PduSessionID2Value)
 	ul.PduSessionID2Value.SetIei(nasMessage.ULNASTransportPduSessionID2ValueType)
 	ul.SetPduSessionID2Value(pduSessionID)
+
+	if requestType != nil {
+		ul.RequestType = new(nasType.RequestType)
+		ul.RequestType.SetIei(nasMessage.ULNASTransportRequestTypeType)
+		ul.SetRequestTypeValue(*requestType)
+	}
 
 	ul.SetPayloadContainerType(nasMessage.PayloadContainerTypeN1SMInfo)
 	ul.PayloadContainer.SetLen(uint16(len(payloadContainer)))
