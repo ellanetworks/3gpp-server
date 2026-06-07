@@ -223,6 +223,52 @@ func TestPathSwitchRequestAcknowledgeCarriesMandatoryIEs(t *testing.T) {
 	}
 }
 
+// pathSwitchNCC extracts the Next Hop Chaining Count from a Path Switch Request
+// Acknowledge's Security Context IE.
+func pathSwitchNCC(t *testing.T, body []byte) int64 {
+	t.Helper()
+
+	ie := ngapIEByID(body, ieSecurityContext)
+	if ie == nil {
+		t.Fatalf("acknowledge missing Security Context IE\n  body: %s", body)
+	}
+
+	v, ok := ie["next_hop_chaining_count"].(float64)
+	if !ok {
+		t.Fatalf("Security Context IE carries no next_hop_chaining_count\n  body: %s", body)
+	}
+
+	return int64(v)
+}
+
+// TestPathSwitchRequestNCCIncrements — TS 33.501 §6.9.2.3.2: on each PATH SWITCH
+// REQUEST the AMF shall increase its locally kept NCC by one and return the
+// fresh {NH, NCC} in the acknowledge. Two consecutive switches for the same UE
+// must therefore yield NCC values differing by exactly one (mod 8).
+func TestPathSwitchRequestNCCIncrements(t *testing.T) {
+	gnbA := createGnBWithID(t, "000126", "ps-ncc-a")
+	gnbB := createGnBWithID(t, "000127", "ps-ncc-b")
+	gnbC := createGnBWithID(t, "000128", "ps-ncc-c")
+
+	ueID := establishRegisteredUEWithSUPI(t, gnbA, "imsi-001010000000023")
+	amf, _ := ueNGAPIDs(t, gnbA, ueID)
+
+	status, body := sendPathSwitch(t, gnbB,
+		fmt.Sprintf(`"amf_ue_ngap_id":%d,"ran_ue_ngap_id":220,"pdu_sessions":[{"id":1,"dl_teid":2,"dl_ip":"10.3.0.3"}]`, amf))
+	assertPathSwitchType(t, "first path switch", status, body, ngapPathSwitchRequestAcknowledge)
+	ncc1 := pathSwitchNCC(t, body)
+
+	status, body = sendPathSwitch(t, gnbC,
+		fmt.Sprintf(`"amf_ue_ngap_id":%d,"ran_ue_ngap_id":221,"pdu_sessions":[{"id":1,"dl_teid":2,"dl_ip":"10.3.0.3"}]`, amf))
+	assertPathSwitchType(t, "second path switch", status, body, ngapPathSwitchRequestAcknowledge)
+	ncc2 := pathSwitchNCC(t, body)
+
+	if ncc2 != (ncc1+1)%8 {
+		t.Errorf("NCC did not advance by one across path switches: first=%d second=%d, want second=%d (TS 33.501 §6.9.2.3.2)\n  body: %s",
+			ncc1, ncc2, (ncc1+1)%8, body)
+	}
+}
+
 // TestPathSwitchRequestMissingMandatoryIE — §10.3.5: a Path Switch Request
 // missing a mandatory reject-criticality IE leaves the AMF unable to build a
 // Path Switch Request Failure (which itself needs those IEs), so it must

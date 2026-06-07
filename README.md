@@ -59,7 +59,7 @@ to allow fully granular control over every IE without these escape hatches.
 | NG Reset Acknowledge | — | ✅ |
 | Overload Start | ❌ | ❌ |
 | Overload Stop | ❌ | ❌ |
-| Error Indication | ❌ | 🟡 |
+| Error Indication | ❌ | ✅ |
 | AMF Status Indication | ❌ | ❌ |
 | Private Message | ❌ | ❌ |
 
@@ -133,9 +133,9 @@ to allow fully granular control over every IE without these escape hatches.
 | Handover Success | ❌ | ❌ |
 | Handover Cancel | ✅ | — |
 | Handover Cancel Acknowledge | — | ✅ |
-| Path Switch Request | ❌ | ❌ |
-| Path Switch Request Acknowledge | — | 🟡 |
-| Path Switch Request Failure | — | 🟡 |
+| Path Switch Request | ✅ | — |
+| Path Switch Request Acknowledge | — | ✅ |
+| Path Switch Request Failure | — | ✅ |
 | Uplink RAN Status Transfer | ❌ | ❌ |
 | Downlink RAN Status Transfer | ❌ | ❌ |
 | Uplink RAN Early Status Transfer | ❌ | ❌ |
