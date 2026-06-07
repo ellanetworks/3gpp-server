@@ -60,6 +60,21 @@ type IE struct {
 	// NextHopChainingCount from a Handover Request's Security Context IE; its
 	// presence confirms the AMF passed the security context to the target.
 	NextHopChainingCount *int64 `json:"next_hop_chaining_count,omitempty"`
+
+	// UESecurityCapabilities from a Path Switch Request Acknowledge: the AMF's
+	// locally stored UE 5G security capabilities, returned on a mismatch with the
+	// values the target gNB reported (TS 33.501 §6.7.3.1).
+	UESecurityCapabilities *UESecurityCapabilitiesJSON `json:"ue_security_capabilities,omitempty"`
+}
+
+// UESecurityCapabilitiesJSON holds the NR/E-UTRA encryption and integrity
+// algorithm bitmaps of a UE Security Capabilities IE (TS 38.413 §9.3.1.86), each
+// as a hex-encoded big-endian bitmap.
+type UESecurityCapabilitiesJSON struct {
+	NREncryption    string `json:"nr_encryption"`
+	NRIntegrity     string `json:"nr_integrity"`
+	EUTRAEncryption string `json:"eutra_encryption"`
+	EUTRAIntegrity  string `json:"eutra_integrity"`
 }
 
 type GlobalRANNodeIDJSON struct {

@@ -52,6 +52,69 @@ func decodeSuccessfulOutcome(so *ngapType.SuccessfulOutcome, resp *NGAPResponse)
 		decodeHandoverCommand(so.Value.HandoverCommand, resp)
 	case ngapType.SuccessfulOutcomePresentHandoverCancelAcknowledge:
 		decodeHandoverCancelAcknowledge(so.Value.HandoverCancelAcknowledge, resp)
+	case ngapType.SuccessfulOutcomePresentPathSwitchRequestAcknowledge:
+		decodePathSwitchRequestAcknowledge(so.Value.PathSwitchRequestAcknowledge, resp)
+	}
+}
+
+// decodePathSwitchRequestAcknowledge surfaces the AMF/RAN UE NGAP IDs the AMF
+// echoes when it accepts a path switch, plus the UE Security Capabilities IE it
+// returns on a security-capability mismatch (TS 38.413 §9.2.3.9, TS 33.501
+// §6.7.3.1).
+func decodePathSwitchRequestAcknowledge(msg *ngapType.PathSwitchRequestAcknowledge, resp *NGAPResponse) {
+	if msg == nil {
+		return
+	}
+
+	for _, ie := range msg.ProtocolIEs.List {
+		decoded := IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value)}
+
+		switch ie.Id.Value {
+		case ngapType.ProtocolIEIDAMFUENGAPID:
+			if ie.Value.AMFUENGAPID != nil {
+				v := ie.Value.AMFUENGAPID.Value
+				decoded.AmfUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDRANUENGAPID:
+			if ie.Value.RANUENGAPID != nil {
+				v := ie.Value.RANUENGAPID.Value
+				decoded.RanUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDUESecurityCapabilities:
+			if ie.Value.UESecurityCapabilities != nil {
+				decoded.UESecurityCapabilities = decodeUESecurityCapabilities(ie.Value.UESecurityCapabilities)
+			}
+		case ngapType.ProtocolIEIDPDUSessionResourceSwitchedList:
+			if ie.Value.PDUSessionResourceSwitchedList != nil {
+				for _, item := range ie.Value.PDUSessionResourceSwitchedList.List {
+					decoded.PDUSessionIDs = append(decoded.PDUSessionIDs, item.PDUSessionID.Value)
+				}
+			}
+		case ngapType.ProtocolIEIDPDUSessionResourceReleasedListPSAck:
+			if ie.Value.PDUSessionResourceReleasedListPSAck != nil {
+				for _, item := range ie.Value.PDUSessionResourceReleasedListPSAck.List {
+					decoded.ReleasePDUSessionIDs = append(decoded.ReleasePDUSessionIDs, item.PDUSessionID.Value)
+				}
+			}
+		case ngapType.ProtocolIEIDSecurityContext:
+			if ie.Value.SecurityContext != nil {
+				v := ie.Value.SecurityContext.NextHopChainingCount.Value
+				decoded.NextHopChainingCount = &v
+			}
+		}
+
+		resp.IEs = append(resp.IEs, decoded)
+	}
+}
+
+// decodeUESecurityCapabilities hex-encodes the four algorithm bitmaps of a UE
+// Security Capabilities IE (TS 38.413 §9.3.1.86).
+func decodeUESecurityCapabilities(caps *ngapType.UESecurityCapabilities) *UESecurityCapabilitiesJSON {
+	return &UESecurityCapabilitiesJSON{
+		NREncryption:    hex.EncodeToString(caps.NRencryptionAlgorithms.Value.Bytes),
+		NRIntegrity:     hex.EncodeToString(caps.NRintegrityProtectionAlgorithms.Value.Bytes),
+		EUTRAEncryption: hex.EncodeToString(caps.EUTRAencryptionAlgorithms.Value.Bytes),
+		EUTRAIntegrity:  hex.EncodeToString(caps.EUTRAintegrityProtectionAlgorithms.Value.Bytes),
 	}
 }
 
@@ -163,6 +226,42 @@ func decodeUnsuccessfulOutcome(uo *ngapType.UnsuccessfulOutcome, resp *NGAPRespo
 		decodeNGSetupFailure(uo.Value.NGSetupFailure, resp)
 	case ngapType.UnsuccessfulOutcomePresentHandoverPreparationFailure:
 		decodeHandoverPreparationFailure(uo.Value.HandoverPreparationFailure, resp)
+	case ngapType.UnsuccessfulOutcomePresentPathSwitchRequestFailure:
+		decodePathSwitchRequestFailure(uo.Value.PathSwitchRequestFailure, resp)
+	}
+}
+
+// decodePathSwitchRequestFailure surfaces the AMF/RAN UE NGAP IDs and the
+// PDU Session Resource Released List the AMF returns when it rejects a path
+// switch (TS 38.413 §9.2.3.10).
+func decodePathSwitchRequestFailure(msg *ngapType.PathSwitchRequestFailure, resp *NGAPResponse) {
+	if msg == nil {
+		return
+	}
+
+	for _, ie := range msg.ProtocolIEs.List {
+		decoded := IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value)}
+
+		switch ie.Id.Value {
+		case ngapType.ProtocolIEIDAMFUENGAPID:
+			if ie.Value.AMFUENGAPID != nil {
+				v := ie.Value.AMFUENGAPID.Value
+				decoded.AmfUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDRANUENGAPID:
+			if ie.Value.RANUENGAPID != nil {
+				v := ie.Value.RANUENGAPID.Value
+				decoded.RanUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDPDUSessionResourceReleasedListPSFail:
+			if ie.Value.PDUSessionResourceReleasedListPSFail != nil {
+				for _, item := range ie.Value.PDUSessionResourceReleasedListPSFail.List {
+					decoded.ReleasePDUSessionIDs = append(decoded.ReleasePDUSessionIDs, item.PDUSessionID.Value)
+				}
+			}
+		}
+
+		resp.IEs = append(resp.IEs, decoded)
 	}
 }
 

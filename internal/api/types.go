@@ -20,6 +20,12 @@ type CreateGnBRequest struct {
 
 	// Override: if provided, send these IEs instead of auto-building from the fields above.
 	NGSetupIEs []ngap.IE `json:"ng_setup_ies,omitempty"`
+
+	// SkipNGSetup opens the SCTP association but does not send an NG Setup
+	// Request, modelling an NG-RAN node that has not completed NG Setup. The
+	// response carries no ng_setup_response. Used to test that the AMF refuses to
+	// serve NGAP procedures before NG Setup (TS 38.413 §8.7.1.1).
+	SkipNGSetup bool `json:"skip_ng_setup,omitempty"`
 }
 
 type SliceInput struct {
@@ -52,12 +58,26 @@ type SendGnBNGAPRequest struct {
 
 	// Handover (target gNB side): the AMF/RAN UE NGAP IDs identifying the UE
 	// association, and the admitted PDU sessions for Handover Request Acknowledge.
+	// Path Switch Request reuses these: amf_ue_ngap_id is the existing context's
+	// Source AMF UE NGAP ID, ran_ue_ngap_id the new RAN UE NGAP ID, and
+	// pdu_sessions the PDU sessions to switch in the downlink.
 	AmfUeNgapID *int64               `json:"amf_ue_ngap_id,omitempty"`
 	RanUeNgapID *int64               `json:"ran_ue_ngap_id,omitempty"`
 	PDUSessions []HandoverPDUSession `json:"pdu_sessions,omitempty"`
 
-	// FailedPDUSessions are PDU sessions the target reports as failed-to-setup
-	// in a Handover Request Acknowledge (for partial-admission testing).
+	// UESecurityCapabilities are the UE security capabilities a Path Switch
+	// Request reports (TS 38.413 §9.3.1.86). Defaults to NR/E-UTRA NEA1-3/NIA1-3
+	// when omitted.
+	UESecurityCapabilities *UESecurityCapabilitiesInput `json:"ue_security_capabilities,omitempty"`
+
+	// OmitIEs lists protocol IE ids to drop from a built path_switch_request, for
+	// sending a structurally-incomplete message (e.g. missing a mandatory IE) to
+	// probe the AMF's error handling.
+	OmitIEs []int64 `json:"omit_ies,omitempty"`
+
+	// FailedPDUSessions are PDU sessions reported as failed-to-setup in a
+	// Handover Request Acknowledge or Path Switch Request (partial-admission
+	// testing).
 	FailedPDUSessions []int64 `json:"failed_pdu_sessions,omitempty"`
 
 	// Cause is the radio-network Cause (TS 38.413 §9.3.1.2) a handover_failure
@@ -82,6 +102,17 @@ type HandoverPDUSession struct {
 	DLTeid      uint32  `json:"dl_teid,omitempty"`
 	DLIP        string  `json:"dl_ip,omitempty"`
 	RawTransfer *string `json:"raw_transfer,omitempty"`
+}
+
+// UESecurityCapabilitiesInput overrides the UE security capability algorithm
+// bitmaps a Path Switch Request reports. Each field is a 4-hex-digit (16-bit)
+// big-endian bitmap; omitted fields default to NEA1-3 / NIA1-3 (NR) and 0
+// (E-UTRA).
+type UESecurityCapabilitiesInput struct {
+	NREncryption    string `json:"nr_encryption,omitempty"`
+	NRIntegrity     string `json:"nr_integrity,omitempty"`
+	EUTRAEncryption string `json:"eutra_encryption,omitempty"`
+	EUTRAIntegrity  string `json:"eutra_integrity,omitempty"`
 }
 
 // AwaitRequest waits for an unsolicited downlink NGAP message (one the core

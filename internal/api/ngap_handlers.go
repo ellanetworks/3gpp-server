@@ -128,6 +128,8 @@ func (h *Handler) SendGnBNGAP(w http.ResponseWriter, r *http.Request) {
 		handleHandoverFailure(w, t, &req)
 	case "handover_notify":
 		handleHandoverNotify(w, gnb, t, &req)
+	case "path_switch_request":
+		handlePathSwitchRequest(w, r, gnb, t, &req)
 	default:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unsupported message_type: %s", req.MessageType))
 	}
@@ -466,6 +468,136 @@ func handleHandoverNotify(w http.ResponseWriter, gnb *store.GnBContext, t *trans
 	}
 
 	writeJSON(w, http.StatusOK, SendNGAPResponse{})
+}
+
+// handlePathSwitchRequest sends a PATH SWITCH REQUEST on this gNB's association,
+// switching the downlink path of the UE context identified by amf_ue_ngap_id
+// toward the supplied GTP-U tunnels (TS 38.413 §8.4.4). When wait_for is set it
+// blocks for the AMF's response.
+func handlePathSwitchRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, t *transport.SCTPTransport, req *SendGnBNGAPRequest) {
+	if req.AmfUeNgapID == nil || req.RanUeNgapID == nil {
+		writeError(w, http.StatusBadRequest, "amf_ue_ngap_id and ran_ue_ngap_id are required")
+		return
+	}
+
+	if len(req.PDUSessions) == 0 {
+		writeError(w, http.StatusBadRequest, "pdu_sessions is required for path_switch_request")
+		return
+	}
+
+	var sessions []ngap.PathSwitchSession
+
+	for _, ps := range req.PDUSessions {
+		dlIP := ps.DLIP
+		if dlIP == "" {
+			dlIP = "127.0.0.1"
+		}
+
+		teid := ps.DLTeid
+		if teid == 0 {
+			teid = 1
+		}
+
+		var rawTransfer []byte
+
+		if ps.RawTransfer != nil {
+			decoded, err := hex.DecodeString(*ps.RawTransfer)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, fmt.Sprintf("decode raw_transfer: %v", err))
+				return
+			}
+
+			rawTransfer = decoded
+		}
+
+		sessions = append(sessions, ngap.PathSwitchSession{PDUSessionID: ps.ID, DLTeid: teid, DLIP: dlIP, RawTransfer: rawTransfer})
+	}
+
+	secCaps, err := pathSwitchSecurityCapabilities(req.UESecurityCapabilities)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	encoded, err := ngap.BuildPathSwitchRequest(*req.RanUeNgapID, *req.AmfUeNgapID, gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, secCaps, sessions, req.FailedPDUSessions, req.OmitIEs)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build PathSwitchRequest: %v", err))
+		return
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
+		return
+	}
+
+	if len(req.WaitFor) == 0 {
+		writeJSON(w, http.StatusOK, SendNGAPResponse{})
+		return
+	}
+
+	timeout := 5 * time.Second
+	if req.TimeoutMs > 0 {
+		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	defer cancel()
+
+	ngapResp, err := t.WaitForMessage(ctx, req.WaitFor...)
+	if err != nil {
+		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for %v: %v", req.WaitFor, err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
+}
+
+// pathSwitchSecurityCapabilities resolves the UE security capability bitmaps for
+// a Path Switch Request, defaulting NR to NEA1-3 / NIA1-3 and E-UTRA to none.
+func pathSwitchSecurityCapabilities(in *UESecurityCapabilitiesInput) (ngap.UESecurityCapabilities, error) {
+	parse := func(name, s string, def []byte) ([]byte, error) {
+		if s == "" {
+			return def, nil
+		}
+
+		b, err := hex.DecodeString(s)
+		if err != nil {
+			return nil, fmt.Errorf("decode %s security capability %q: %w", name, s, err)
+		}
+
+		if len(b) != 2 {
+			return nil, fmt.Errorf("%s security capability must be 2 bytes, got %d", name, len(b))
+		}
+
+		return b, nil
+	}
+
+	var (
+		caps ngap.UESecurityCapabilities
+		err  error
+	)
+
+	if in == nil {
+		in = &UESecurityCapabilitiesInput{}
+	}
+
+	if caps.NREncryption, err = parse("nr_encryption", in.NREncryption, []byte{0xe0, 0x00}); err != nil {
+		return caps, err
+	}
+
+	if caps.NRIntegrity, err = parse("nr_integrity", in.NRIntegrity, []byte{0xe0, 0x00}); err != nil {
+		return caps, err
+	}
+
+	if caps.EUTRAEncryption, err = parse("eutra_encryption", in.EUTRAEncryption, []byte{0x00, 0x00}); err != nil {
+		return caps, err
+	}
+
+	if caps.EUTRAIntegrity, err = parse("eutra_integrity", in.EUTRAIntegrity, []byte{0x00, 0x00}); err != nil {
+		return caps, err
+	}
+
+	return caps, nil
 }
 
 // handleHandoverFailure sends a HANDOVER FAILURE from the target gNB rejecting a

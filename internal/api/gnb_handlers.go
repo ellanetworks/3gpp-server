@@ -55,6 +55,13 @@ func (h *Handler) CreateGnB(w http.ResponseWriter, r *http.Request) {
 	gnb := h.Store.CreateGnB(req.MCC, req.MNC, req.TAC, req.GnbID, req.Name, req.SST, req.SD, slices)
 	h.Transports[gnb.ID] = t
 
+	// Leave the association without an NG-C interface instance: NG Setup is the
+	// first NGAP procedure on an operational TNL association (TS 38.413 §8.7.1.1).
+	if req.SkipNGSetup {
+		writeJSON(w, http.StatusCreated, CreateGnBResponse{GnBID: gnb.ID})
+		return
+	}
+
 	var msg *ngap.NGAPMessage
 	if len(req.NGSetupIEs) > 0 {
 		msg = &ngap.NGAPMessage{
