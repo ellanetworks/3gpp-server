@@ -19,6 +19,10 @@ import (
 type UplinkRequest struct {
 	PDUSessionID int64 `json:"pdu_session_id,omitempty"`
 
+	// TEID overrides the session's uplink TEID, to exercise the UPF's handling
+	// of a G-PDU for a TEID with no PDR (TS 29.281 §7.3.1).
+	TEID *uint32 `json:"teid,omitempty"`
+
 	ICMPEcho *struct {
 		Dst string `json:"dst"`
 		ID  uint16 `json:"id,omitempty"`
@@ -149,7 +153,12 @@ func (h *Handler) SendUplink(w http.ResponseWriter, r *http.Request) {
 		qfi = 1
 	}
 
-	if err := gt.SendUplink(info.UPFIP, info.ULTeid, qfi, inner); err != nil {
+	ulTeid := info.ULTeid
+	if req.TEID != nil {
+		ulTeid = *req.TEID
+	}
+
+	if err := gt.SendUplink(info.UPFIP, ulTeid, qfi, inner); err != nil {
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("gtp-u send: %v", err))
 		return
 	}
@@ -252,4 +261,36 @@ func (h *Handler) SendGTPUEcho(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{"echo_response": true, "seq": msg.Seq})
+}
+
+// AwaitErrorIndication blocks for a GTP-U Error Indication from the UPF, sent
+// when the UPF receives a G-PDU for a TEID with no context (TS 29.281 §7.3.1).
+func (h *Handler) AwaitErrorIndication(w http.ResponseWriter, r *http.Request) {
+	gnbID := r.PathValue("gnb_id")
+
+	var req struct {
+		TimeoutMs int `json:"timeout_ms,omitempty"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	gt, ok := h.GTPU[gnbID]
+	if !ok {
+		writeError(w, http.StatusBadRequest, "gnb has no GTP-U endpoint (create it with enable_gtpu)")
+		return
+	}
+
+	timeout := 5 * time.Second
+	if req.TimeoutMs > 0 {
+		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	defer cancel()
+
+	if _, err := gt.WaitForControl(ctx, gtpu.MsgErrorIndication); err != nil {
+		writeError(w, http.StatusGatewayTimeout, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"error_indication": true})
 }

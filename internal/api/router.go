@@ -25,6 +25,7 @@ func NewRouter(h *Handler) *http.ServeMux {
 
 	// N3 / GTP-U data plane (requires the gNB to be created with enable_gtpu).
 	mux.HandleFunc("POST /gnb/{gnb_id}/gtpu/echo", h.SendGTPUEcho)
+	mux.HandleFunc("POST /gnb/{gnb_id}/gtpu/error-indication/await", h.AwaitErrorIndication)
 	mux.HandleFunc("GET /gnb/{gnb_id}/ue/{ue_id}/tunnel", h.GetTunnel)
 	mux.HandleFunc("POST /gnb/{gnb_id}/ue/{ue_id}/uplink", h.SendUplink)
 	mux.HandleFunc("POST /gnb/{gnb_id}/ue/{ue_id}/downlink/await", h.AwaitDownlink)

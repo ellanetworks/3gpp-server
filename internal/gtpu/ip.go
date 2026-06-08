@@ -2,6 +2,7 @@ package gtpu
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"net/netip"
 )
@@ -103,6 +104,10 @@ type InnerPacket struct {
 	ICMPID   uint16 `json:"icmp_id,omitempty"`
 	ICMPSeq  uint16 `json:"icmp_seq,omitempty"`
 
+	// UDP fields (when Protocol is UDP).
+	UDPSrcPort uint16 `json:"udp_src_port,omitempty"`
+	UDPDstPort uint16 `json:"udp_dst_port,omitempty"`
+
 	Payload string `json:"payload,omitempty"` // hex of the L4 payload
 }
 
@@ -135,6 +140,12 @@ func ParseIPv4(b []byte) (*InnerPacket, error) {
 			p.ICMPType = l4[0]
 			p.ICMPID = binary.BigEndian.Uint16(l4[4:6])
 			p.ICMPSeq = binary.BigEndian.Uint16(l4[6:8])
+		}
+	case protoUDP:
+		if len(l4) >= 8 {
+			p.UDPSrcPort = binary.BigEndian.Uint16(l4[0:2])
+			p.UDPDstPort = binary.BigEndian.Uint16(l4[2:4])
+			p.Payload = hex.EncodeToString(l4[8:])
 		}
 	}
 

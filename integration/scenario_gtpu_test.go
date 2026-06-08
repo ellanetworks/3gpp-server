@@ -162,3 +162,80 @@ func TestGTPU_ReleaseStopsForwarding(t *testing.T) {
 		t.Fatalf("a downlink arrived after the session was released — the UPF kept forwarding torn-down user plane")
 	}
 }
+
+// udpEchoPort is the port the dn-responder echoes UDP datagrams on (socat).
+const udpEchoPort = 7
+
+// TestGTPU_UDPRoundTrip: a UE uplink UDP datagram to the data network must come
+// back as a decapsulated downlink datagram echoed by the responder — proving the
+// UPF forwards and NATs UDP user-plane traffic, not only ICMP.
+func TestGTPU_UDPRoundTrip(t *testing.T) {
+	gnbID := createGTPUGnB(t, "00ec06", "gtpu-udp")
+	ueID := establishRegisteredUEWithSUPI(t, gnbID, "imsi-001010000000003")
+
+	const payloadHex = "abad1dea"
+
+	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/uplink",
+		fmt.Sprintf(`{"udp":{"dst":%q,"dst_port":%d,"payload_hex":%q}}`, dnResponderIP, udpEchoPort, payloadHex))
+	if status != 200 {
+		t.Fatalf("send udp uplink: HTTP %d\n  body: %s", status, body)
+	}
+
+	status, body = doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/downlink/await", `{"timeout_ms":5000}`)
+	if status != 200 {
+		t.Fatalf("no UDP downlink (HTTP %d) — the UPF did not forward/return UDP user-plane traffic\n  body: %s", status, body)
+	}
+
+	checks := map[string]string{
+		"inner.protocol":     "17", // UDP
+		"inner.src":          dnResponderIP,
+		"inner.udp_src_port": fmt.Sprintf("%d", udpEchoPort),
+		"inner.payload":      payloadHex,
+	}
+	for field, want := range checks {
+		if got := jsonGet(body, field); got != want {
+			t.Errorf("UDP downlink %s = %q, want %q\n  body: %s", field, got, want, body)
+		}
+	}
+}
+
+// badTEID is a non-zero TEID with no PDR at the UPF.
+const badTEID = 0xFFFFFFFE
+
+// TestGTPU_WrongTEID_Dropped: a G-PDU carrying a TEID for which the UPF has no
+// PDR must be discarded, not forwarded (TS 29.281 §7.3.1) — no downlink results.
+func TestGTPU_WrongTEID_Dropped(t *testing.T) {
+	gnbID := createGTPUGnB(t, "00ec07", "gtpu-badteid")
+	ueID := establishRegisteredUEWithSUPI(t, gnbID, "imsi-001010000000004")
+
+	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/uplink",
+		fmt.Sprintf(`{"teid":%d,"icmp_echo":{"dst":%q,"id":777,"seq":1}}`, badTEID, dnResponderIP))
+	if status != 200 {
+		t.Fatalf("send uplink: HTTP %d\n  body: %s", status, body)
+	}
+
+	status, body = doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/downlink/await", `{"timeout_ms":3000}`)
+	if status == 200 {
+		t.Fatalf("a downlink arrived for a G-PDU sent to an unknown TEID — the UPF must discard it (TS 29.281 §7.3.1)\n  body: %s", body)
+	}
+}
+
+// TestGTPU_WrongTEID_ErrorIndication: a G-PDU carrying a non-zero TEID for which
+// the UPF has no PDR must be answered with a GTP-U Error Indication (TS 29.281
+// §7.3.1: the node "shall also return a GTP error indication to the originating
+// node").
+func TestGTPU_WrongTEID_ErrorIndication(t *testing.T) {
+	gnbID := createGTPUGnB(t, "00ec08", "gtpu-errind")
+	ueID := establishRegisteredUEWithSUPI(t, gnbID, "imsi-001010000000005")
+
+	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/uplink",
+		fmt.Sprintf(`{"teid":%d,"icmp_echo":{"dst":%q,"id":778,"seq":1}}`, badTEID, dnResponderIP))
+	if status != 200 {
+		t.Fatalf("send uplink: HTTP %d\n  body: %s", status, body)
+	}
+
+	status, body = doRequest(t, "POST", "/gnb/"+gnbID+"/gtpu/error-indication/await", `{"timeout_ms":3000}`)
+	if status != 200 {
+		t.Fatalf("no GTP-U Error Indication for a G-PDU to an unknown TEID (HTTP %d) — the UPF shall return one (TS 29.281 §7.3.1)\n  body: %s", status, body)
+	}
+}
