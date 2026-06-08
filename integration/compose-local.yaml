@@ -51,7 +51,15 @@ services:
   # uplink ping round-trips back as downlink GTP-U for the data-plane tests.
   dn-responder:
     image: alpine:3.20
-    entrypoint: ["sleep", "infinity"]
+    # Reply to ICMP echo (kernel default) and keep the UPF's N6 neighbour entry
+    # for this host resolved with a periodic ping. The UPF resolves N6 next-hops
+    # lazily and loses the first packet to an unresolved one; the keepalive keeps
+    # the data path warm so user-plane tests measure GTP-U forwarding rather than
+    # the UPF's first-packet neighbour resolution.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - "while true; do ping -c1 -W1 10.6.0.2 >/dev/null 2>&1; sleep 2; done"
     restart: unless-stopped
     networks:
       n6:
