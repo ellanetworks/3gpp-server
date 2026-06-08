@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ellanetworks/3gpp-server/internal/crypto"
+	"github.com/ellanetworks/3gpp-server/internal/gtpu"
 	nasCodec "github.com/ellanetworks/3gpp-server/internal/nas"
 	"github.com/ellanetworks/3gpp-server/internal/ngap"
 	"github.com/ellanetworks/3gpp-server/internal/store"
@@ -56,7 +57,7 @@ func (h *Handler) SendNGAP(w http.ResponseWriter, r *http.Request) {
 	case "registration_complete":
 		handleRegistrationComplete(w, r, gnb, ue, t, &req)
 	case "pdu_session_establishment_request":
-		handlePDUSessionEstablishmentRequest(w, r, gnb, ue, t, &req)
+		handlePDUSessionEstablishmentRequest(w, r, gnb, ue, t, h.GTPU[gnbID], &req)
 	case "deregistration_request":
 		handleDeregistrationRequest(w, r, gnb, ue, t, &req)
 	case "ue_context_release_request":
@@ -942,7 +943,34 @@ func handleRegistrationComplete(w http.ResponseWriter, r *http.Request, gnb *sto
 	sendUplinkAndWait(w, r, gnb, ue, t, req, nasPDU, "DownlinkNASTransport", "ErrorIndication", "UEContextReleaseCommand")
 }
 
-func handlePDUSessionEstablishmentRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
+// captureTunnel records the N3 GTP-U tunnel state for a PDU session: the gNB's
+// downlink endpoint, the UPF's uplink tunnel (from the setup request transfer),
+// and the UE's IP (from the establishment accept).
+func captureTunnel(gnb *store.GnBContext, ue *store.UEContext, pduSessionID int64, dlTeid uint32, dlIP string, ngapResp *ngap.NGAPResponse, nasResp *nasCodec.NASResponse) {
+	info := &store.PDUSessionInfo{
+		PDUSessionID: pduSessionID,
+		N3GnbIP:      dlIP,
+		DLTeid:       dlTeid,
+		QFI:          1,
+	}
+
+	for _, ie := range ngapResp.IEs {
+		for _, item := range ie.PDUSessionSetupItems {
+			if item.PDUSessionID == pduSessionID {
+				info.ULTeid = item.ULTeid
+				info.UPFIP = item.UPFN3IP
+			}
+		}
+	}
+
+	if nasResp != nil {
+		info.UEIP = nasResp.PDUAddress
+	}
+
+	gnb.StorePDUSession(ue.RanUeNgapID, info)
+}
+
+func handlePDUSessionEstablishmentRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, gt *gtpu.Endpoint, req *SendNGAPRequest) {
 	pduSessionID := ue.PDUSessionID
 	if req.PDUSessionIDOverride != nil {
 		pduSessionID = *req.PDUSessionIDOverride
@@ -1047,13 +1075,25 @@ func handlePDUSessionEstablishmentRequest(w http.ResponseWriter, r *http.Request
 	// A reject or Error Indication establishes no session, so a setup response
 	// would refer to a non-existent PDU session.
 	if ngapResp.MessageType == "PDUSessionResourceSetupRequest" {
-		// The N3 endpoint is synthesised — 3gpp-server does not run a user plane.
-		// The DL TEID is made unique per session so multiple sessions don't collide.
+		// The DL TEID is made unique per session so multiple sessions don't
+		// collide. The DL IP is the gNB's N3 endpoint: when GTP-U is enabled it is
+		// the real bound address so downlink arrives at our socket; otherwise a
+		// synthesised value (3gpp-server does not run a user plane).
 		dlTeid := uint32(ue.RanUeNgapID)<<8 | uint32(pduSessionID)
+
+		dlIP := "10.3.0.3"
+		if gt != nil {
+			dlIP = gt.LocalIP()
+		}
+
 		pduSetupResp, err := ngap.BuildPDUSessionResourceSetupResponse(
-			ue.AmfUeNgapID, ue.RanUeNgapID, int64(pduSessionID), dlTeid, "10.3.0.3")
+			ue.AmfUeNgapID, ue.RanUeNgapID, int64(pduSessionID), dlTeid, dlIP)
 		if err == nil {
 			_ = t.Send(pduSetupResp, false)
+		}
+
+		if gt != nil {
+			captureTunnel(gnb, ue, int64(pduSessionID), dlTeid, dlIP, ngapResp, nasResp)
 		}
 	}
 

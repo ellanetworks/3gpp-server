@@ -1,13 +1,47 @@
 package ngap
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"net/netip"
 
 	"github.com/free5gc/aper"
 	"github.com/free5gc/ngap"
 	"github.com/free5gc/ngap/ngapType"
 )
+
+// decodeULTunnel APER-decodes a PDU Session Resource Setup Request Transfer
+// (TS 38.413 §9.3.4.1) and returns the UPF's uplink GTP-U tunnel (TEID + N3 IP)
+// from the UL NG-U UP TNL Information IE.
+func decodeULTunnel(transfer []byte) (uint32, string, bool) {
+	var t ngapType.PDUSessionResourceSetupRequestTransfer
+	if err := aper.UnmarshalWithParams(transfer, &t, "valueExt"); err != nil {
+		return 0, "", false
+	}
+
+	for _, ie := range t.ProtocolIEs.List {
+		if ie.Id.Value != ngapType.ProtocolIEIDULNGUUPTNLInformation || ie.Value.ULNGUUPTNLInformation == nil {
+			continue
+		}
+
+		gt := ie.Value.ULNGUUPTNLInformation.GTPTunnel
+		if gt == nil || len(gt.GTPTEID.Value) < 4 {
+			continue
+		}
+
+		teid := binary.BigEndian.Uint32(gt.GTPTEID.Value)
+
+		ip := ""
+		if addr, ok := netip.AddrFromSlice(gt.TransportLayerAddress.Value.Bytes); ok {
+			ip = addr.Unmap().String()
+		}
+
+		return teid, ip, true
+	}
+
+	return 0, "", false
+}
 
 func Decode(data []byte) (*NGAPResponse, error) {
 	pdu, err := ngap.Decoder(data)
@@ -636,6 +670,14 @@ func decodePDUSessionResourceSetupRequest(msg *ngapType.PDUSessionResourceSetupR
 						s := hex.EncodeToString(item.PDUSessionNASPDU.Value)
 						decoded.NasPDU = &s
 					}
+
+					setupItem := PDUSessionSetupItemJSON{PDUSessionID: item.PDUSessionID.Value}
+					if teid, ip, ok := decodeULTunnel(item.PDUSessionResourceSetupRequestTransfer); ok {
+						setupItem.ULTeid = teid
+						setupItem.UPFN3IP = ip
+					}
+
+					decoded.PDUSessionSetupItems = append(decoded.PDUSessionSetupItems, setupItem)
 				}
 			}
 		}

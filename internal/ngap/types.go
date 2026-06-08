@@ -49,6 +49,11 @@ type IE struct {
 	IndexToRFSP             *int64                       `json:"index_to_rfsp,omitempty"`
 	UEAggregateMaxBitRate   *UEAggregateMaxBitRateJSON   `json:"ue_aggregate_max_bit_rate,omitempty"`
 
+	// PDUSessionSetupItems surface, per session in a PDU Session Resource Setup
+	// Request, the UPF's uplink GTP-U tunnel (decoded from the per-session
+	// transfer) so the emulated gNB can terminate the N3 data path.
+	PDUSessionSetupItems []PDUSessionSetupItemJSON `json:"pdu_session_setup_items,omitempty"`
+
 	// PDU session IDs carried by a handover PDU-session list (e.g. the setup
 	// list in a Handover Request, the handover list in a Handover Command).
 	PDUSessionIDs []int64 `json:"pdu_session_ids,omitempty"`
@@ -75,6 +80,14 @@ type UESecurityCapabilitiesJSON struct {
 	NRIntegrity     string `json:"nr_integrity"`
 	EUTRAEncryption string `json:"eutra_encryption"`
 	EUTRAIntegrity  string `json:"eutra_integrity"`
+}
+
+// PDUSessionSetupItemJSON is one session in a PDU Session Resource Setup
+// Request, with the UPF's uplink N3 GTP-U tunnel.
+type PDUSessionSetupItemJSON struct {
+	PDUSessionID int64  `json:"pdu_session_id"`
+	ULTeid       uint32 `json:"ul_teid,omitempty"`
+	UPFN3IP      string `json:"upf_n3_ip,omitempty"`
 }
 
 type GlobalRANNodeIDJSON struct {

@@ -57,6 +57,17 @@ func TestMain(m *testing.M) {
 		log.Fatalf("home network key provisioning failed: %v", err)
 	}
 
+	// An alternate slice/profile and a dedicated subscriber for the
+	// subscription-change reconciliation tests (e.g. moving a UE off the slice
+	// its PDU session runs on — TS 23.501 §5.15.5.2.2).
+	if err := provisionAlternateSlice(token); err != nil {
+		log.Fatalf("alternate slice provisioning failed: %v", err)
+	}
+
+	if err := createSubscriber(token, subscriptionChangeIMSI); err != nil {
+		log.Fatalf("subscription-change subscriber creation failed: %v", err)
+	}
+
 	if err := waitForTester(30 * time.Second); err != nil {
 		log.Fatalf("3gpp-server not ready: %v", err)
 	}
@@ -209,6 +220,33 @@ const (
 	profileAPrivKey = "8e4f3c2a1b0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f"
 	profileBPrivKey = "a1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff00"
 )
+
+// subscriptionChangeIMSI is a dedicated subscriber (outside the shared pool) for
+// the subscription-change reconciliation tests, which mutate its profile. Tests
+// restore it on cleanup so the persistent env stays consistent. The 5G SUPI form
+// is subscriptionChangeSUPI.
+const (
+	subscriptionChangeIMSI = "001010000000100"
+	subscriptionChangeSUPI = "imsi-" + subscriptionChangeIMSI
+)
+
+// provisionAlternateSlice installs a second slice (SST 2) with its own profile
+// and policy, so a subscriber can be moved onto a slice that does not match an
+// existing PDU session. Idempotent across the persistent env.
+func provisionAlternateSlice(token string) error {
+	if err := ensureProvisioned(token, "/api/v1/slices", "alternate",
+		`{"name":"alternate","sst":2,"sd":"abcdef"}`); err != nil {
+		return err
+	}
+
+	if err := ensureProvisioned(token, "/api/v1/profiles", "alternate",
+		`{"name":"alternate","ue_ambr_uplink":"100 Mbps","ue_ambr_downlink":"100 Mbps"}`); err != nil {
+		return err
+	}
+
+	return ensureProvisioned(token, "/api/v1/policies", "alternate",
+		`{"name":"alternate","profile_name":"alternate","slice_name":"alternate","data_network_name":"internet","session_ambr_uplink":"200 Mbps","session_ambr_downlink":"200 Mbps","var5qi":9,"arp":1}`)
+}
 
 // provisionHomeNetworkKeys installs the Profile A (X25519) and Profile B (P-256)
 // home network private keys in the core. Idempotent across the persistent env.

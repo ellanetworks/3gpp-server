@@ -47,6 +47,18 @@ services:
           com.docker.network.endpoint.ifname: n6
         ipv4_address: 10.6.0.2
 
+  # Data network responder on N6: replies to ICMP echo (kernel default) so a UE
+  # uplink ping round-trips back as downlink GTP-U for the data-plane tests.
+  dn-responder:
+    image: alpine:3.20
+    entrypoint: ["sleep", "infinity"]
+    restart: unless-stopped
+    networks:
+      n6:
+        driver_opts:
+          com.docker.network.endpoint.ifname: n6
+        ipv4_address: 10.6.0.10
+
   3gpp-server-tester:
     image: golang:1.26
     entrypoint:

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/ellanetworks/3gpp-server/internal/gtpu"
 	"github.com/ellanetworks/3gpp-server/internal/ngap"
 	"github.com/ellanetworks/3gpp-server/internal/store"
 	"github.com/ellanetworks/3gpp-server/internal/transport"
@@ -14,13 +15,15 @@ import (
 
 type Handler struct {
 	Store      *store.Store
-	Transports map[string]*transport.SCTPTransport // gnb store ID -> transport
+	Transports map[string]*transport.SCTPTransport // gnb store ID -> N2 transport
+	GTPU       map[string]*gtpu.Endpoint           // gnb store ID -> N3 GTP-U endpoint
 }
 
 func NewHandler(s *store.Store) *Handler {
 	return &Handler{
 		Store:      s,
 		Transports: make(map[string]*transport.SCTPTransport),
+		GTPU:       make(map[string]*gtpu.Endpoint),
 	}
 }
 
@@ -54,6 +57,24 @@ func (h *Handler) CreateGnB(w http.ResponseWriter, r *http.Request) {
 
 	gnb := h.Store.CreateGnB(req.MCC, req.MNC, req.TAC, req.GnbID, req.Name, req.SST, req.SD, slices)
 	h.Transports[gnb.ID] = t
+
+	if req.EnableGTPU {
+		n3 := req.GnBN3Address
+		if n3 == "" {
+			n3 = req.GnBN2Address
+		}
+
+		gt, err := gtpu.Listen(n3)
+		if err != nil {
+			_ = t.Close()
+			_ = h.Store.DeleteGnB(gnb.ID)
+			delete(h.Transports, gnb.ID)
+			writeError(w, http.StatusBadGateway, fmt.Sprintf("gtp-u listen on %s failed: %v", n3, err))
+			return
+		}
+
+		h.GTPU[gnb.ID] = gt
+	}
 
 	// Leave the association without an NG-C interface instance: NG Setup is the
 	// first NGAP procedure on an operational TNL association (TS 38.413 §8.7.1.1).
@@ -146,6 +167,11 @@ func (h *Handler) DeleteGnB(w http.ResponseWriter, r *http.Request) {
 	if t, ok := h.Transports[gnbID]; ok {
 		_ = t.Close()
 		delete(h.Transports, gnbID)
+	}
+
+	if gt, ok := h.GTPU[gnbID]; ok {
+		_ = gt.Close()
+		delete(h.GTPU, gnbID)
 	}
 
 	if err := h.Store.DeleteGnB(gnbID); err != nil {
