@@ -195,7 +195,7 @@ func (h *Handler) AwaitDownlink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := map[string]any{"raw_hex": hex.EncodeToString(tpdu)}
-	if inner, err := gtpu.ParseIPv4(tpdu); err == nil {
+	if inner, err := gtpu.ParseInner(tpdu); err == nil {
 		resp["inner"] = inner
 	}
 

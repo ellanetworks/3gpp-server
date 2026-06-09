@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/netip"
 	"time"
 
 	"github.com/ellanetworks/3gpp-server/internal/crypto"
@@ -946,6 +947,17 @@ func handleRegistrationComplete(w http.ResponseWriter, r *http.Request, gnb *sto
 // captureTunnel records the N3 GTP-U tunnel state for a PDU session: the gNB's
 // downlink endpoint, the UPF's uplink tunnel (from the setup request transfer),
 // and the UE's IP (from the establishment accept).
+// firstNonEmpty returns the first non-empty string, or "".
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+
+	return ""
+}
+
 func captureTunnel(gnb *store.GnBContext, ue *store.UEContext, pduSessionID int64, dlTeid uint32, dlIP string, ngapResp *ngap.NGAPResponse, nasResp *nasCodec.NASResponse) {
 	info := &store.PDUSessionInfo{
 		PDUSessionID: pduSessionID,
@@ -954,11 +966,23 @@ func captureTunnel(gnb *store.GnBContext, ue *store.UEContext, pduSessionID int6
 		QFI:          1,
 	}
 
+	// The UPF advertises its N3 endpoint in the gNB's transport family (and may
+	// advertise both); the uplink must use the address matching the gNB's own N3
+	// socket (dlIP).
+	gnbN3IsV6 := false
+	if a, err := netip.ParseAddr(dlIP); err == nil {
+		gnbN3IsV6 = a.Is6()
+	}
+
 	for _, ie := range ngapResp.IEs {
 		for _, item := range ie.PDUSessionSetupItems {
 			if item.PDUSessionID == pduSessionID {
 				info.ULTeid = item.ULTeid
-				info.UPFIP = item.UPFN3IP
+				if gnbN3IsV6 {
+					info.UPFIP = firstNonEmpty(item.UPFN3IPv6, item.UPFN3IP)
+				} else {
+					info.UPFIP = firstNonEmpty(item.UPFN3IP, item.UPFN3IPv6)
+				}
 			}
 		}
 	}

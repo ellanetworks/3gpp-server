@@ -17,21 +17,30 @@ import (
 // ICMP echo.
 const dnResponderIP = "10.6.0.10"
 
-// upfN3IP is the UPF's N3 GTP-U endpoint (the core's data-plane address on the
-// N3 network), the peer for GTP-U path management.
-const upfN3IP = "10.3.0.2"
+// n3Transport selects the IP family of the N3 GTP-U tunnel between the emulated
+// gNB and the UPF. N2/SCTP stays IPv4; only the GTP-U transport varies.
+type n3Transport struct {
+	name  string // subtest label
+	gnbN3 string // the gNB's N3 bind/source address
+	upfN3 string // the UPF's N3 address (GTP-U peer)
+}
 
-// createGTPUGnB creates a gNB that terminates the N3 GTP-U data path. Only one
-// can exist at a time (it binds the N3 GTP-U port), so callers must let cleanup
-// run before the next.
-func createGTPUGnB(t *testing.T, gnbID, name string) string {
+var (
+	n3IPv4 = n3Transport{name: "n3v4", gnbN3: "10.3.0.3", upfN3: "10.3.0.2"}
+	n3IPv6 = n3Transport{name: "n3v6", gnbN3: "fd00:3::3", upfN3: "fd00:3::2"}
+)
+
+// createGTPUGnB creates a gNB that terminates the N3 GTP-U data path over the
+// given transport family. Only one gNB can bind a given N3 address:port, so
+// callers must let cleanup run before reusing the same transport.
+func createGTPUGnB(t *testing.T, gnbID, name string, n3 n3Transport) string {
 	t.Helper()
 
 	body := fmt.Sprintf(`{
-		"amf_address": "10.3.0.2:38412", "gnb_n2_address": "10.3.0.3",
+		"amf_address": "10.3.0.2:38412", "gnb_n2_address": "10.3.0.3", "gnb_n3_address": %q,
 		"mcc": "001", "mnc": "01", "tac": "000001",
 		"gnb_id": %q, "name": %q, "sst": 1, "enable_gtpu": true
-	}`, gnbID, name)
+	}`, n3.gnbN3, gnbID, name)
 
 	status, resp := doRequest(t, "POST", "/gnb", body)
 	if status != 201 {
@@ -53,7 +62,7 @@ func createGTPUGnB(t *testing.T, gnbID, name string) string {
 // the UPF forwards user-plane traffic on the tunnel established over the control
 // plane.
 func TestGTPU_ICMPRoundTrip(t *testing.T) {
-	gnbID := createGTPUGnB(t, "00ec03", "gtpu-rt")
+	gnbID := createGTPUGnB(t, "00ec03", "gtpu-rt", n3IPv4)
 	ueID := establishRegisteredUEWithSUPI(t, gnbID, "imsi-001010000000001")
 
 	// The control plane must have captured the N3 tunnel: the UPF's uplink TEID
@@ -96,20 +105,33 @@ func TestGTPU_ICMPRoundTrip(t *testing.T) {
 
 // TestGTPU_Echo: a GTP-U Echo Request — sequence-number flag set, no extension
 // header, the conformant path-management form — must be answered with an Echo
-// Response. A GTP-U peer "shall be prepared to receive an Echo Request at any
-// time and it shall reply with an Echo Response" (TS 29.281 §7.2.1); a timeout
-// means the UPF dropped a conformant Echo Request.
+// Response over both IPv4 and IPv6 N3 transport. A GTP-U peer "shall be prepared
+// to receive an Echo Request at any time and it shall reply with an Echo
+// Response" (TS 29.281 §7.2.1); a timeout means the UPF dropped a conformant
+// Echo Request.
 func TestGTPU_Echo(t *testing.T) {
-	gnbID := createGTPUGnB(t, "00ec04", "gtpu-echo")
-
-	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/gtpu/echo",
-		fmt.Sprintf(`{"upf_ip":%q,"timeout_ms":5000}`, upfN3IP))
-	if status != 200 {
-		t.Fatalf("no GTP-U Echo Response (HTTP %d) — the UPF did not answer a conformant Echo Request (TS 29.281 §7.2.1)\n  body: %s", status, body)
+	cases := []struct {
+		n3    n3Transport
+		gnbID string
+	}{
+		{n3IPv4, "00ec04"},
+		{n3IPv6, "00ec4a"},
 	}
 
-	if got := jsonGet(body, "echo_response"); got != "true" {
-		t.Errorf("echo_response = %q, want true\n  body: %s", got, body)
+	for _, tc := range cases {
+		t.Run(tc.n3.name, func(t *testing.T) {
+			gnbID := createGTPUGnB(t, tc.gnbID, "gtpu-echo-"+tc.n3.name, tc.n3)
+
+			status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/gtpu/echo",
+				fmt.Sprintf(`{"upf_ip":%q,"timeout_ms":5000}`, tc.n3.upfN3))
+			if status != 200 {
+				t.Fatalf("no GTP-U Echo Response (HTTP %d) over %s — the UPF did not answer a conformant Echo Request (TS 29.281 §7.2.1)\n  body: %s", status, tc.n3.name, body)
+			}
+
+			if got := jsonGet(body, "echo_response"); got != "true" {
+				t.Errorf("echo_response = %q over %s, want true\n  body: %s", got, tc.n3.name, body)
+			}
+		})
 	}
 }
 
@@ -139,7 +161,7 @@ func gtpuAwaitDownlink(t *testing.T, gnbID, ueID, dst string, id, seq int) ([]by
 // §6.3.3), then replays the same uplink and requires no downlink — the UPF must
 // drop it because the forwarding state was torn down.
 func TestGTPU_ReleaseStopsForwarding(t *testing.T) {
-	gnbID := createGTPUGnB(t, "00ec05", "gtpu-rel")
+	gnbID := createGTPUGnB(t, "00ec05", "gtpu-rel", n3IPv4)
 	ueID := establishRegisteredUEWithSUPI(t, gnbID, "imsi-001010000000002")
 
 	const icmpID, icmpSeq = 0x1234, 11
@@ -170,7 +192,7 @@ const udpEchoPort = 7
 // back as a decapsulated downlink datagram echoed by the responder — proving the
 // UPF forwards and NATs UDP user-plane traffic, not only ICMP.
 func TestGTPU_UDPRoundTrip(t *testing.T) {
-	gnbID := createGTPUGnB(t, "00ec06", "gtpu-udp")
+	gnbID := createGTPUGnB(t, "00ec06", "gtpu-udp", n3IPv4)
 	ueID := establishRegisteredUEWithSUPI(t, gnbID, "imsi-001010000000003")
 
 	const payloadHex = "abad1dea"
@@ -205,7 +227,7 @@ const badTEID = 0xFFFFFFFE
 // TestGTPU_WrongTEID_Dropped: a G-PDU carrying a TEID for which the UPF has no
 // PDR must be discarded, not forwarded (TS 29.281 §7.3.1) — no downlink results.
 func TestGTPU_WrongTEID_Dropped(t *testing.T) {
-	gnbID := createGTPUGnB(t, "00ec07", "gtpu-badteid")
+	gnbID := createGTPUGnB(t, "00ec07", "gtpu-badteid", n3IPv4)
 	ueID := establishRegisteredUEWithSUPI(t, gnbID, "imsi-001010000000004")
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/uplink",
@@ -225,7 +247,7 @@ func TestGTPU_WrongTEID_Dropped(t *testing.T) {
 // §7.3.1: the node "shall also return a GTP error indication to the originating
 // node").
 func TestGTPU_WrongTEID_ErrorIndication(t *testing.T) {
-	gnbID := createGTPUGnB(t, "00ec08", "gtpu-errind")
+	gnbID := createGTPUGnB(t, "00ec08", "gtpu-errind", n3IPv4)
 	ueID := establishRegisteredUEWithSUPI(t, gnbID, "imsi-001010000000005")
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/uplink",

@@ -88,6 +88,7 @@ type PDUSessionSetupItemJSON struct {
 	PDUSessionID int64  `json:"pdu_session_id"`
 	ULTeid       uint32 `json:"ul_teid,omitempty"`
 	UPFN3IP      string `json:"upf_n3_ip,omitempty"`
+	UPFN3IPv6    string `json:"upf_n3_ipv6,omitempty"`
 }
 
 type GlobalRANNodeIDJSON struct {

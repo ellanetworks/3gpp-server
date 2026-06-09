@@ -39,37 +39,44 @@ func onesComplementSum(b []byte) uint16 {
 	return ^uint16(sum)
 }
 
-// BuildICMPEcho builds an IPv4 ICMP Echo Request packet from src to dst with the
-// given identifier, sequence, and payload.
+// BuildICMPEcho builds an ICMP/ICMPv6 Echo Request from src to dst, dispatching
+// on the address family.
 func BuildICMPEcho(src, dst netip.Addr, id, seq uint16, payload []byte) ([]byte, error) {
-	if !src.Is4() || !dst.Is4() {
-		return nil, fmt.Errorf("ICMP echo requires IPv4 addresses")
+	switch {
+	case src.Is4() && dst.Is4():
+		icmp := make([]byte, 8+len(payload))
+		icmp[0] = icmpEchoRequest
+		binary.BigEndian.PutUint16(icmp[4:6], id)
+		binary.BigEndian.PutUint16(icmp[6:8], seq)
+		copy(icmp[8:], payload)
+		binary.BigEndian.PutUint16(icmp[2:4], onesComplementSum(icmp))
+
+		return buildIPv4(protoICMP, src, dst, icmp), nil
+	case src.Is6() && dst.Is6():
+		return buildICMPv6Echo(src, dst, id, seq, payload), nil
+	default:
+		return nil, fmt.Errorf("ICMP echo requires matching IPv4 or IPv6 addresses")
 	}
-
-	icmp := make([]byte, 8+len(payload))
-	icmp[0] = icmpEchoRequest
-	binary.BigEndian.PutUint16(icmp[4:6], id)
-	binary.BigEndian.PutUint16(icmp[6:8], seq)
-	copy(icmp[8:], payload)
-	binary.BigEndian.PutUint16(icmp[2:4], onesComplementSum(icmp))
-
-	return buildIPv4(protoICMP, src, dst, icmp), nil
 }
 
-// BuildUDP builds an IPv4 UDP packet from src:srcPort to dst:dstPort.
+// BuildUDP builds a UDP/UDP-over-IPv6 datagram from src:srcPort to dst:dstPort,
+// dispatching on the address family.
 func BuildUDP(src, dst netip.Addr, srcPort, dstPort uint16, payload []byte) ([]byte, error) {
-	if !src.Is4() || !dst.Is4() {
-		return nil, fmt.Errorf("UDP build requires IPv4 addresses")
+	switch {
+	case src.Is4() && dst.Is4():
+		udp := make([]byte, 8+len(payload))
+		binary.BigEndian.PutUint16(udp[0:2], srcPort)
+		binary.BigEndian.PutUint16(udp[2:4], dstPort)
+		binary.BigEndian.PutUint16(udp[4:6], uint16(len(udp)))
+		copy(udp[8:], payload)
+		// UDP checksum is optional over IPv4; leave it zero.
+
+		return buildIPv4(protoUDP, src, dst, udp), nil
+	case src.Is6() && dst.Is6():
+		return buildUDPv6(src, dst, srcPort, dstPort, payload), nil
+	default:
+		return nil, fmt.Errorf("UDP build requires matching IPv4 or IPv6 addresses")
 	}
-
-	udp := make([]byte, 8+len(payload))
-	binary.BigEndian.PutUint16(udp[0:2], srcPort)
-	binary.BigEndian.PutUint16(udp[2:4], dstPort)
-	binary.BigEndian.PutUint16(udp[4:6], uint16(len(udp)))
-	copy(udp[8:], payload)
-	// UDP checksum is optional over IPv4; leave it zero.
-
-	return buildIPv4(protoUDP, src, dst, udp), nil
 }
 
 func buildIPv4(proto uint8, src, dst netip.Addr, l4 []byte) []byte {
@@ -152,7 +159,9 @@ func ParseIPv4(b []byte) (*InnerPacket, error) {
 	return p, nil
 }
 
-// IsICMPEchoReply reports whether the inner packet is an ICMP Echo Reply.
+// IsICMPEchoReply reports whether the inner packet is an ICMP or ICMPv6 Echo
+// Reply.
 func (p *InnerPacket) IsICMPEchoReply() bool {
-	return p.Protocol == protoICMP && p.ICMPType == icmpEchoReply
+	return (p.Protocol == protoICMP && p.ICMPType == icmpEchoReply) ||
+		(p.Protocol == protoICMPv6 && p.ICMPType == icmpv6EchoReply)
 }

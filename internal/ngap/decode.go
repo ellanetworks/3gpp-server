@@ -14,10 +14,10 @@ import (
 // decodeULTunnel APER-decodes a PDU Session Resource Setup Request Transfer
 // (TS 38.413 §9.3.4.1) and returns the UPF's uplink GTP-U tunnel (TEID + N3 IP)
 // from the UL NG-U UP TNL Information IE.
-func decodeULTunnel(transfer []byte) (uint32, string, bool) {
+func decodeULTunnel(transfer []byte) (teid uint32, ipv4, ipv6 string, ok bool) {
 	var t ngapType.PDUSessionResourceSetupRequestTransfer
 	if err := aper.UnmarshalWithParams(transfer, &t, "valueExt"); err != nil {
-		return 0, "", false
+		return 0, "", "", false
 	}
 
 	for _, ie := range t.ProtocolIEs.List {
@@ -30,17 +30,34 @@ func decodeULTunnel(transfer []byte) (uint32, string, bool) {
 			continue
 		}
 
-		teid := binary.BigEndian.Uint32(gt.GTPTEID.Value)
+		teid = binary.BigEndian.Uint32(gt.GTPTEID.Value)
 
-		ip := ""
-		if addr, ok := netip.AddrFromSlice(gt.TransportLayerAddress.Value.Bytes); ok {
-			ip = addr.Unmap().String()
+		// A TransportLayerAddress is 4 octets (IPv4), 16 (IPv6), or 20 octets
+		// for a dual-stack endpoint: the IPv4 address in the first 32 bits and
+		// the IPv6 address in the following 128 bits (TS 38.413).
+		b := gt.TransportLayerAddress.Value.Bytes
+		switch len(b) {
+		case 4:
+			if a, aok := netip.AddrFromSlice(b); aok {
+				ipv4 = a.String()
+			}
+		case 16:
+			if a, aok := netip.AddrFromSlice(b); aok {
+				ipv6 = a.Unmap().String()
+			}
+		case 20:
+			if a, aok := netip.AddrFromSlice(b[0:4]); aok {
+				ipv4 = a.String()
+			}
+			if a, aok := netip.AddrFromSlice(b[4:20]); aok {
+				ipv6 = a.Unmap().String()
+			}
 		}
 
-		return teid, ip, true
+		return teid, ipv4, ipv6, true
 	}
 
-	return 0, "", false
+	return 0, "", "", false
 }
 
 func Decode(data []byte) (*NGAPResponse, error) {
@@ -672,9 +689,10 @@ func decodePDUSessionResourceSetupRequest(msg *ngapType.PDUSessionResourceSetupR
 					}
 
 					setupItem := PDUSessionSetupItemJSON{PDUSessionID: item.PDUSessionID.Value}
-					if teid, ip, ok := decodeULTunnel(item.PDUSessionResourceSetupRequestTransfer); ok {
+					if teid, ipv4, ipv6, ok := decodeULTunnel(item.PDUSessionResourceSetupRequestTransfer); ok {
 						setupItem.ULTeid = teid
-						setupItem.UPFN3IP = ip
+						setupItem.UPFN3IP = ipv4
+						setupItem.UPFN3IPv6 = ipv6
 					}
 
 					decoded.PDUSessionSetupItems = append(decoded.PDUSessionSetupItems, setupItem)
