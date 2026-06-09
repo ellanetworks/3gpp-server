@@ -26,6 +26,12 @@ type CreateGnBRequest struct {
 	// response carries no ng_setup_response. Used to test that the AMF refuses to
 	// serve NGAP procedures before NG Setup (TS 38.413 §8.7.1.1).
 	SkipNGSetup bool `json:"skip_ng_setup,omitempty"`
+
+	// EnableGTPU binds an N3 GTP-U endpoint so the gNB terminates the user-plane
+	// data path. GnBN3Address is the N3 IP it binds and advertises as its
+	// downlink GTP-U endpoint (defaults to gnb_n2_address).
+	EnableGTPU   bool   `json:"enable_gtpu,omitempty"`
+	GnBN3Address string `json:"gnb_n3_address,omitempty"`
 }
 
 type SliceInput struct {

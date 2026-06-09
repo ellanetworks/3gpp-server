@@ -244,7 +244,20 @@ func ParseX25519PublicKey(raw []byte) (*ecdh.PublicKey, error) {
 	return ecdh.X25519().NewPublicKey(raw)
 }
 
+// ParseP256PublicKey accepts a home network public key in either uncompressed
+// SEC1 form (65 bytes, 0x04 prefix) or compressed form (33 bytes, 0x02/0x03
+// prefix). Operators commonly publish the compressed form (it is what Ella Core
+// returns), but crypto/ecdh only accepts uncompressed, so decompress first.
 func ParseP256PublicKey(raw []byte) (*ecdh.PublicKey, error) {
+	if len(raw) == 33 && (raw[0] == 0x02 || raw[0] == 0x03) {
+		x, y := elliptic.UnmarshalCompressed(elliptic.P256(), raw)
+		if x == nil {
+			return nil, fmt.Errorf("invalid compressed P-256 public key")
+		}
+
+		raw = elliptic.Marshal(elliptic.P256(), x, y) //nolint:staticcheck // crypto/ecdh has no compressed-point API
+	}
+
 	return ecdh.P256().NewPublicKey(raw)
 }
 

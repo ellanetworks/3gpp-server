@@ -33,9 +33,31 @@ type SliceConfig struct {
 
 type PDUSessionInfo struct {
 	PDUSessionID int64  `json:"pdu_session_id"`
-	N3GnbIP     string `json:"n3_gnb_ip"`
-	DLTeid      uint32 `json:"dl_teid"`
-	QFI         uint8  `json:"qfi"`
+	N3GnbIP      string `json:"n3_gnb_ip"`
+	DLTeid       uint32 `json:"dl_teid"`
+	QFI          uint8  `json:"qfi"`
+
+	// User-plane (N3 GTP-U) state, populated when the gNB terminates the data
+	// path: the UPF's uplink tunnel (learned from the PDU Session Resource Setup
+	// Request transfer) and the UE's assigned IP (from the Establishment Accept).
+	ULTeid uint32 `json:"ul_teid,omitempty"`
+	UPFIP  string `json:"upf_ip,omitempty"`
+	UEIP   string `json:"ue_ip,omitempty"`
+}
+
+// GetPDUSession returns the stored session state for a UE's PDU session.
+func (g *GnBContext) GetPDUSession(ranUeID, pduSessionID int64) (*PDUSessionInfo, bool) {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	sessions, ok := g.PDUSessions[ranUeID]
+	if !ok {
+		return nil, false
+	}
+
+	info, ok := sessions[pduSessionID]
+
+	return info, ok
 }
 
 type UEAmbrInfo struct {
@@ -125,4 +147,3 @@ func (g *GnBContext) ListUEs() []*UEContext {
 	}
 	return ues
 }
-

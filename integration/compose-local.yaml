@@ -42,10 +42,33 @@ services:
         driver_opts:
           com.docker.network.endpoint.ifname: n3
         ipv4_address: 10.3.0.2
+        ipv6_address: fd00:3::2
       n6:
         driver_opts:
           com.docker.network.endpoint.ifname: n6
         ipv4_address: 10.6.0.2
+
+  # Data network responder on N6: replies to ICMP echo (kernel default) so a UE
+  # uplink ping round-trips back as downlink GTP-U for the data-plane tests.
+  dn-responder:
+    build:
+      context: .
+      dockerfile: Dockerfile.dn-responder
+    # Reply to ICMP echo (kernel default) and UDP echo on port 7 (socat), and
+    # keep the UPF's N6 neighbour entry for this host resolved with a periodic
+    # ping. The UPF resolves N6 next-hops lazily and loses the first packet to an
+    # unresolved one; the keepalive keeps the data path warm so user-plane tests
+    # measure GTP-U forwarding rather than the UPF's first-packet resolution.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - "socat -T5 UDP4-LISTEN:7,fork,reuseaddr EXEC:cat & while true; do ping -c1 -W1 10.6.0.2 >/dev/null 2>&1; sleep 2; done"
+    restart: unless-stopped
+    networks:
+      n6:
+        driver_opts:
+          com.docker.network.endpoint.ifname: n6
+        ipv4_address: 10.6.0.10
 
   3gpp-server-tester:
     image: golang:1.26
@@ -65,13 +88,16 @@ services:
         driver_opts:
           com.docker.network.endpoint.ifname: n3
         ipv4_address: 10.3.0.3
+        ipv6_address: fd00:3::3
 
 networks:
   n3:
     internal: true
+    enable_ipv6: true
     ipam:
       config:
         - subnet: 10.3.0.0/24
+        - subnet: fd00:3::/64
   n6:
     ipam:
       config:

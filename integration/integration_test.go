@@ -50,6 +50,24 @@ func TestMain(m *testing.M) {
 		log.Fatalf("data-network provisioning failed: %v", err)
 	}
 
+	// Home network key pairs so subscribers can register with a SUCI concealed
+	// under ECIES Profile A (X25519) or Profile B (P-256) — TS 33.501 §6.12.2,
+	// Annex C. The core must de-conceal these to recover the SUPI.
+	if err := provisionHomeNetworkKeys(token); err != nil {
+		log.Fatalf("home network key provisioning failed: %v", err)
+	}
+
+	// An alternate slice/profile and a dedicated subscriber for the
+	// subscription-change reconciliation tests (e.g. moving a UE off the slice
+	// its PDU session runs on — TS 23.501 §5.15.5.2.2).
+	if err := provisionAlternateSlice(token); err != nil {
+		log.Fatalf("alternate slice provisioning failed: %v", err)
+	}
+
+	if err := createSubscriber(token, subscriptionChangeIMSI); err != nil {
+		log.Fatalf("subscription-change subscriber creation failed: %v", err)
+	}
+
 	if err := waitForTester(30 * time.Second); err != nil {
 		log.Fatalf("3gpp-server not ready: %v", err)
 	}
@@ -185,6 +203,84 @@ func provisionExtraDataNetworks(token string) error {
 	for _, p := range policies {
 		if err := ensureProvisioned(token, "/api/v1/policies", p.name, p.body); err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+// Home network key pairs used by the SUCI Profile A/B registration tests. The
+// private keys are provisioned in the core; the matching public keys are derived
+// from them in the tests and handed to the emulated UE. The key identifiers are
+// dedicated (10/11) so they do not collide with the absent-key id used by
+// TestRegistrationReject_InvalidHomeNetworkKey.
+const (
+	profileAKeyID   = 10
+	profileBKeyID   = 11
+	profileAPrivKey = "8e4f3c2a1b0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b7c6d5e4f"
+	profileBPrivKey = "a1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff00"
+)
+
+// subscriptionChangeIMSI is a dedicated subscriber (outside the shared pool) for
+// the subscription-change reconciliation tests, which mutate its profile. Tests
+// restore it on cleanup so the persistent env stays consistent. The 5G SUPI form
+// is subscriptionChangeSUPI.
+const (
+	subscriptionChangeIMSI = "001010000000100"
+	subscriptionChangeSUPI = "imsi-" + subscriptionChangeIMSI
+)
+
+// provisionAlternateSlice installs a second slice (SST 2) with its own profile
+// and policy, so a subscriber can be moved onto a slice that does not match an
+// existing PDU session. Idempotent across the persistent env.
+func provisionAlternateSlice(token string) error {
+	if err := ensureProvisioned(token, "/api/v1/slices", "alternate",
+		`{"name":"alternate","sst":2,"sd":"abcdef"}`); err != nil {
+		return err
+	}
+
+	if err := ensureProvisioned(token, "/api/v1/profiles", "alternate",
+		`{"name":"alternate","ue_ambr_uplink":"100 Mbps","ue_ambr_downlink":"100 Mbps"}`); err != nil {
+		return err
+	}
+
+	return ensureProvisioned(token, "/api/v1/policies", "alternate",
+		`{"name":"alternate","profile_name":"alternate","slice_name":"alternate","data_network_name":"internet","session_ambr_uplink":"200 Mbps","session_ambr_downlink":"200 Mbps","var5qi":9,"arp":1}`)
+}
+
+// provisionHomeNetworkKeys installs the Profile A (X25519) and Profile B (P-256)
+// home network private keys in the core. Idempotent across the persistent env.
+func provisionHomeNetworkKeys(token string) error {
+	keys := []struct {
+		id     int
+		scheme string
+		priv   string
+	}{
+		{profileAKeyID, "A", profileAPrivKey},
+		{profileBKeyID, "B", profileBPrivKey},
+	}
+
+	for _, k := range keys {
+		body := fmt.Sprintf(`{"keyIdentifier":%d,"scheme":%q,"privateKey":%q}`, k.id, k.scheme, k.priv)
+
+		req, _ := http.NewRequest("POST", ellaAPIURL+"/api/v1/operator/home-network-keys", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return fmt.Errorf("create home network key %d: %v", k.id, err)
+		}
+
+		b, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		// On a fresh DB the create returns 201. On a persistent env the key
+		// already exists, which the core reports without a stable status code, so
+		// non-success is treated as best-effort and surfaced as a log line — the
+		// SUCI tests fail loudly if the key is in fact missing.
+		if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+			log.Printf("home network key %d not created (HTTP %d: %s) — assuming already provisioned", k.id, resp.StatusCode, b)
 		}
 	}
 

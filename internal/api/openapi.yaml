@@ -387,6 +387,127 @@ paths:
         "504":
           description: No matching message arrived before the timeout.
 
+  /gnb/{gnb_id}/gtpu/echo:
+    parameters:
+      - $ref: "#/components/parameters/gnb_id"
+    post:
+      operationId: sendGTPUEcho
+      summary: Send a GTP-U Echo Request to the UPF (N3 path management)
+      description: |
+        Sends a GTP-U Echo Request (TS 29.281 §7.2.1) from the gNB's N3 endpoint
+        to upf_ip and returns the Echo Response. Requires the gNB to have been
+        created with enable_gtpu.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upf_ip]
+              properties:
+                upf_ip: { type: string, description: "UPF N3 IP to echo." }
+                timeout_ms: { type: integer, description: "How long to wait. Default 5000." }
+      responses:
+        "200": { description: "Echo Response received." }
+        "504": { description: "No Echo Response before the timeout." }
+
+  /gnb/{gnb_id}/gtpu/error-indication/await:
+    parameters:
+      - $ref: "#/components/parameters/gnb_id"
+    post:
+      operationId: awaitErrorIndication
+      summary: Wait for a GTP-U Error Indication from the UPF
+      description: |
+        Blocks for a GTP-U Error Indication, which the UPF must send when it
+        receives a G-PDU for a TEID with no context (TS 29.281 §7.3.1). Requires
+        the gNB to have been created with enable_gtpu.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                timeout_ms: { type: integer, description: "How long to wait. Default 5000." }
+      responses:
+        "200": { description: "Error Indication received." }
+        "504": { description: "No Error Indication before the timeout." }
+
+  /gnb/{gnb_id}/ue/{ue_id}/tunnel:
+    parameters:
+      - $ref: "#/components/parameters/gnb_id"
+      - $ref: "#/components/parameters/ue_id"
+    get:
+      operationId: getTunnel
+      summary: Get the N3 GTP-U tunnel state for a UE's PDU session
+      description: |
+        Returns the captured tunnel: the gNB downlink endpoint (n3_gnb_ip,
+        dl_teid), the UPF uplink tunnel (upf_ip, ul_teid), the UE IP (ue_ip), and
+        the QFI. Populated when the PDU session was established on a GTP-U gNB.
+      responses:
+        "200": { description: "Tunnel state." }
+        "400": { description: "No established N3 tunnel / gNB has no GTP-U endpoint." }
+
+  /gnb/{gnb_id}/ue/{ue_id}/uplink:
+    parameters:
+      - $ref: "#/components/parameters/gnb_id"
+      - $ref: "#/components/parameters/ue_id"
+    post:
+      operationId: sendUplink
+      summary: Send a user-plane uplink packet through the N3 tunnel
+      description: |
+        Builds an inner IP packet sourced from the UE IP and sends it to the UPF
+        as a GTP-U G-PDU (with the uplink PDU Session Container / QFI, TS 38.415).
+        Exactly one of icmp_echo or udp is used.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pdu_session_id: { type: integer, description: "Defaults to the UE's session." }
+                teid: { type: integer, description: "Override the uplink TEID, e.g. to send to a TEID with no PDR (TS 29.281 §7.3.1)." }
+                icmp_echo:
+                  type: object
+                  properties:
+                    dst: { type: string }
+                    id: { type: integer }
+                    seq: { type: integer }
+                udp:
+                  type: object
+                  properties:
+                    dst: { type: string }
+                    dst_port: { type: integer }
+                    src_port: { type: integer }
+                    payload_hex: { type: string }
+      responses:
+        "200": { description: "Packet encapsulated and sent." }
+        "400": { description: "No established N3 tunnel, or invalid request." }
+
+  /gnb/{gnb_id}/ue/{ue_id}/downlink/await:
+    parameters:
+      - $ref: "#/components/parameters/gnb_id"
+      - $ref: "#/components/parameters/ue_id"
+    post:
+      operationId: awaitDownlink
+      summary: Await a downlink user-plane packet on the N3 tunnel
+      description: |
+        Blocks for a downlink G-PDU on the session's DL TEID and returns the
+        decapsulated inner IP packet (parsed fields under `inner`, plus raw_hex).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pdu_session_id: { type: integer }
+                timeout_ms: { type: integer, description: "How long to wait. Default 5000." }
+      responses:
+        "200": { description: "Decapsulated downlink packet." }
+        "504": { description: "No downlink before the timeout." }
+
   /gnb/{gnb_id}/ue/{ue_id}/ngap:
     parameters:
       - $ref: "#/components/parameters/gnb_id"
@@ -538,6 +659,17 @@ components:
             Open the SCTP association without sending an NG Setup Request,
             modelling an NG-RAN node that has not completed NG Setup (TS 38.413
             §8.7.1.1). The response carries no ng_setup_response.
+        enable_gtpu:
+          type: boolean
+          description: >
+            Bind an N3 GTP-U endpoint so the gNB terminates the user-plane data
+            path (send uplink, receive downlink). Only one GTP-U-enabled gNB can
+            exist per N3 IP (it binds the GTP-U port).
+        gnb_n3_address:
+          type: string
+          description: >
+            N3 IP the GTP-U endpoint binds and advertises as its downlink
+            endpoint. Defaults to gnb_n2_address.
 
     SliceInput:
       type: object
