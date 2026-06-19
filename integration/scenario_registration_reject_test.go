@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ella Networks Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 //go:build integration
 
 // Registration Reject (TS 24.501 §5.5.1.2.5): the network rejects an initial

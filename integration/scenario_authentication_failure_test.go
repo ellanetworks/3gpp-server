@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ella Networks Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 //go:build integration
 
 // Authentication Failure (TS 24.501 §5.4.1.3.6 / §5.4.1.3.7): the UE rejects an

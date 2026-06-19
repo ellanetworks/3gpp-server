@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ella Networks Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 //go:build integration
 
 // Tests for the Service Request procedure (TS 24.501 §5.6.1). A registered UE

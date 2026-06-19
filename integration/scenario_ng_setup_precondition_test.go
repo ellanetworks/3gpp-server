@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ella Networks Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 //go:build integration
 
 // NG Setup precondition (TS 38.413 §8.7.1.1): "This procedure shall be the

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ella Networks Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 //go:build integration
 
 // NG Reset (TS 38.413 §8.7.4): the gNB resets the whole NG interface or a

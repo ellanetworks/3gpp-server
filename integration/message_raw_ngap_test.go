@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ella Networks Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 //go:build integration
 
 // Raw-NGAP fuzz coverage: feed the AMF deliberately malformed NGAP PDUs and

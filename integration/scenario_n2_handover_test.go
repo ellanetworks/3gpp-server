@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ella Networks Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 //go:build integration
 
 // N2 handover (inter-gNB without Xn, TS 38.413 §8.4): a registered UE with a

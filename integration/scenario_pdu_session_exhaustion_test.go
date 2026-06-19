@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ella Networks Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 //go:build integration
 
 // IP-pool exhaustion (TS 24.501 §6.4.1.x): when the PDU session cannot be

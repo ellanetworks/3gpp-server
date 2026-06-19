@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ella Networks Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 //go:build integration
 
 // Tests for InitialUEMessage (TS 38.413 §9.2.5.1) and the NAS RegistrationRequest

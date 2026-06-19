@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ella Networks Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 //go:build integration
 
 // UE-requested PDU session release (TS 24.501 §6.3.3): the UE sends a PDU

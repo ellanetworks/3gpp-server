@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ella Networks Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 //go:build integration
 
 // PDU session type negotiation (TS 24.501 §6.4.1.3, §9.11.4.2). The SMF resolves

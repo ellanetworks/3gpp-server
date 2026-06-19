@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ella Networks Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 // Package gtpu implements the minimal GTP-U (TS 29.281) encode/decode and an
 // N3 endpoint so the emulated gNB can terminate the user-plane tunnel: send
 // uplink G-PDUs to the UPF, receive downlink G-PDUs, and exchange path-
