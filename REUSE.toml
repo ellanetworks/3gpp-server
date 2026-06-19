@@ -1,0 +1,12 @@
+version = 1
+
+# Non-source files (build config, CI, docs, fixtures) authored by Ella Networks.
+# Go sources carry their own SPDX headers and are not covered here.
+[[annotations]]
+path = [
+  "**/*.yaml", "**/*.yml", "**/*.json", "**/*.toml", "**/*.md",
+  "go.mod", "go.sum", ".gitignore", "**/Dockerfile*", "**/*.txt",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "Ella Networks Inc."
+SPDX-License-Identifier = "BUSL-1.1"
