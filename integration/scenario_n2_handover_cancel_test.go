@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ella Networks Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 //go:build integration
 
 // Handover Cancellation (TS 38.413 §8.4.5): the source gNB aborts an ongoing or

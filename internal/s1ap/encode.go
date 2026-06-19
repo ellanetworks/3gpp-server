@@ -1,0 +1,65 @@
+// SPDX-FileCopyrightText: Ella Networks Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
+package s1ap
+
+import (
+	"github.com/ellanetworks/core/s1ap"
+)
+
+// BuildS1SetupRequest encodes an S1 Setup Request PDU for the given eNB
+// parameters. With no explicit SupportedTAs it advertises one supported TA whose
+// only broadcast PLMN is the eNB's own PLMN; ENBIDKind defaults to a macro
+// eNB-ID.
+func BuildS1SetupRequest(p *S1SetupRequestParams) ([]byte, error) {
+	enbPLMN, err := encodePLMN(p.MCC, p.MNC)
+	if err != nil {
+		return nil, err
+	}
+
+	tas, err := buildSupportedTAs(p, enbPLMN)
+	if err != nil {
+		return nil, err
+	}
+
+	req := &s1ap.S1SetupRequest{
+		GlobalENBID: s1ap.GlobalENBID{
+			PLMNIdentity: enbPLMN,
+			ENBID:        s1ap.ENBID{Kind: p.ENBIDKind, Value: p.ENBID},
+		},
+		ENBName:          p.ENBName,
+		SupportedTAs:     tas,
+		DefaultPagingDRX: s1ap.PagingDRXv128,
+	}
+
+	return req.Marshal()
+}
+
+func buildSupportedTAs(p *S1SetupRequestParams, enbPLMN s1ap.PLMNIdentity) (s1ap.SupportedTAs, error) {
+	if len(p.SupportedTAs) == 0 {
+		return s1ap.SupportedTAs{{TAC: s1ap.TAC(p.TAC), BroadcastPLMNs: s1ap.BPLMNs{enbPLMN}}}, nil
+	}
+
+	out := make(s1ap.SupportedTAs, 0, len(p.SupportedTAs))
+
+	for _, ta := range p.SupportedTAs {
+		bplmns := s1ap.BPLMNs{}
+
+		if len(ta.BroadcastPLMNs) == 0 {
+			bplmns = append(bplmns, enbPLMN)
+		}
+
+		for _, pl := range ta.BroadcastPLMNs {
+			b, err := encodePLMN(pl.MCC, pl.MNC)
+			if err != nil {
+				return nil, err
+			}
+
+			bplmns = append(bplmns, b)
+		}
+
+		out = append(out, s1ap.SupportedTAItem{TAC: s1ap.TAC(ta.TAC), BroadcastPLMNs: bplmns})
+	}
+
+	return out, nil
+}

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ella Networks Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 package store
 
 import (
@@ -31,24 +34,24 @@ type UEContext struct {
 	PublicKeyID      string `json:"public_key_id"`
 	PublicKeyHex     string `json:"public_key_hex,omitempty"`
 
-	Suci      nasType.MobileIdentity5GS `json:"-"`
-	SuciString string                   `json:"suci"`
+	Suci       nasType.MobileIdentity5GS `json:"-"`
+	SuciString string                    `json:"suci"`
 
 	// NGAP IDs
 	RanUeNgapID int64 `json:"ran_ue_ngap_id"`
 	AmfUeNgapID int64 `json:"amf_ue_ngap_id"`
 
 	// Security
-	UeSecurityCapability *nasType.UESecurityCapability `json:"-"`
-	IntegrityAlg         uint8                         `json:"-"`
-	CipheringAlg         uint8                         `json:"-"`
-	KnasEnc              [16]uint8                     `json:"-"`
-	KnasInt              [16]uint8                     `json:"-"`
-	Kamf                 []byte                        `json:"-"`
-	NgKsi                uint8                         `json:"-"`
-	ULCount              uint32                        `json:"-"`
-	DLCount              uint32                        `json:"-"`
-	SecurityContextAvailable bool                      `json:"-"`
+	UeSecurityCapability     *nasType.UESecurityCapability `json:"-"`
+	IntegrityAlg             uint8                         `json:"-"`
+	CipheringAlg             uint8                         `json:"-"`
+	KnasEnc                  [16]uint8                     `json:"-"`
+	KnasInt                  [16]uint8                     `json:"-"`
+	Kamf                     []byte                        `json:"-"`
+	NgKsi                    uint8                         `json:"-"`
+	ULCount                  uint32                        `json:"-"`
+	DLCount                  uint32                        `json:"-"`
+	SecurityContextAvailable bool                          `json:"-"`
 
 	// Last received AuthenticationRequest parameters
 	LastRAND []byte `json:"-"`

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ella Networks Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 package api
 
 import (
@@ -14,16 +17,18 @@ import (
 )
 
 type Handler struct {
-	Store      *store.Store
-	Transports map[string]*transport.SCTPTransport // gnb store ID -> N2 transport
-	GTPU       map[string]*gtpu.Endpoint           // gnb store ID -> N3 GTP-U endpoint
+	Store          *store.Store
+	Transports     map[string]*transport.SCTPTransport // gnb store ID -> N2 transport
+	GTPU           map[string]*gtpu.Endpoint           // gnb store ID -> N3 GTP-U endpoint
+	S1APTransports map[string]*transport.S1APTransport // enb store ID -> S1-MME transport
 }
 
 func NewHandler(s *store.Store) *Handler {
 	return &Handler{
-		Store:      s,
-		Transports: make(map[string]*transport.SCTPTransport),
-		GTPU:       make(map[string]*gtpu.Endpoint),
+		Store:          s,
+		Transports:     make(map[string]*transport.SCTPTransport),
+		GTPU:           make(map[string]*gtpu.Endpoint),
+		S1APTransports: make(map[string]*transport.S1APTransport),
 	}
 }
 

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ella Networks Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 package nas
 
 // NASRequest is the JSON request for sending a NAS message via the /ngap endpoint.

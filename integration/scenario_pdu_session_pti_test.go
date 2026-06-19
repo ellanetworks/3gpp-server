@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ella Networks Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 //go:build integration
 
 // 5GSM Procedure Transaction Identity error handling (TS 24.501 §7.3.1). The

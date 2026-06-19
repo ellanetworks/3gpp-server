@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ella Networks Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 //go:build integration
 
 // Security Mode Reject (TS 24.501 §5.4.2.5): the UE rejects a Security Mode

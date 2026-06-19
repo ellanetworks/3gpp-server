@@ -1,1 +1,3 @@
 integration/ella-core
+# Local 3GPP spec references and scratch artifacts (not part of the repo)
+*.pdf

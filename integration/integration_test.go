@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ella Networks Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 //go:build integration
 
 package integration_test
@@ -9,6 +12,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -360,11 +364,18 @@ func jsonGet(data []byte, path string) string {
 		return ""
 	}
 	for _, k := range keys {
-		m, ok := current.(map[string]any)
-		if !ok {
+		switch c := current.(type) {
+		case map[string]any:
+			current = c[k]
+		case []any:
+			idx, err := strconv.Atoi(k)
+			if err != nil || idx < 0 || idx >= len(c) {
+				return ""
+			}
+			current = c[idx]
+		default:
 			return ""
 		}
-		current = m[k]
 	}
 	if current == nil {
 		return ""

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Ella Networks Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
 package gtpu
 
 import (
@@ -102,6 +105,13 @@ func (e *Endpoint) sendTo(remoteIP string, data []byte) error {
 // uplink TEID.
 func (e *Endpoint) SendUplink(remoteIP string, ulTeid uint32, qfi uint8, innerIP []byte) error {
 	return e.sendTo(remoteIP, EncodeGPDUWithQFI(ulTeid, qfi, innerIP))
+}
+
+// SendUplinkPlain encapsulates an inner IP packet in a plain G-PDU (no PDU
+// Session Container) and sends it to the S-GW/UPF on its uplink TEID — the form
+// an eNB sends uplink user data on S1-U (4G), which has no QFI.
+func (e *Endpoint) SendUplinkPlain(remoteIP string, ulTeid uint32, innerIP []byte) error {
+	return e.sendTo(remoteIP, EncodeGPDU(ulTeid, innerIP))
 }
 
 // SendEchoRequest sends a GTP-U Echo Request to remoteIP.
