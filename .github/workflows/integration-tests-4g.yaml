@@ -1,0 +1,48 @@
+name: Integration Tests (4G)
+
+permissions:
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+      ella_core_image:
+        description: "Ella Core image to test against (must include 4G support)."
+        type: string
+        required: false
+        default: "ghcr.io/ellanetworks/ella-core:latest"
+
+jobs:
+  integration-4g:
+    runs-on: ubuntu-24.04
+    env:
+      COMPOSE: integration/compose-ci.yaml
+      ELLA_CORE_IMAGE: ${{ inputs.ella_core_image }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Start Ella Core + data-network responder + tester
+        run: docker compose -f "$COMPOSE" up -d
+
+      - name: Build and start 3gpp-server in the tester
+        run: |
+          docker compose -f "$COMPOSE" exec -T 3gpp-server-tester \
+            sh -c 'cd /app && go build -buildvcs=false -o /tmp/3gpp-server ./cmd/3gpp-server/'
+          docker compose -f "$COMPOSE" exec -d 3gpp-server-tester \
+            /tmp/3gpp-server --listen :8080
+
+      - name: Run 4G integration tests
+        run: |
+          docker compose -f "$COMPOSE" exec -T \
+            -e TESTER_URL=http://localhost:8080 \
+            -e ELLA_API_URL=http://10.3.0.2:5002 \
+            3gpp-server-tester \
+            sh -c 'cd /app && go test -tags integration -run "Test4G" -count=1 -timeout 25m ./integration/...'
+
+      - name: Ella Core logs on failure
+        if: failure()
+        run: docker compose -f "$COMPOSE" logs ella-core
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f "$COMPOSE" down -v

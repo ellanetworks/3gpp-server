@@ -48,6 +48,11 @@ func Decode(data []byte) (*S1APResponse, error) {
 			if err := decodeERABReleaseCommand(m.Value, resp); err != nil {
 				return nil, err
 			}
+		case s1ap.ProcERABModify:
+			resp.MessageType = "ERABModifyRequest"
+			if err := decodeERABModifyRequest(m.Value, resp); err != nil {
+				return nil, err
+			}
 		case s1ap.ProcUEContextRelease:
 			resp.MessageType = "UEContextReleaseCommand"
 			if err := decodeUEContextReleaseCommand(m.Value, resp); err != nil {
@@ -56,6 +61,11 @@ func Decode(data []byte) (*S1APResponse, error) {
 		case s1ap.ProcErrorIndication:
 			resp.MessageType = "ErrorIndication"
 			if err := decodeErrorIndication(m.Value, resp); err != nil {
+				return nil, err
+			}
+		case s1ap.ProcPaging:
+			resp.MessageType = "Paging"
+			if err := decodePaging(m.Value, resp); err != nil {
 				return nil, err
 			}
 		}
@@ -169,6 +179,31 @@ func decodeERABReleaseCommand(value []byte, resp *S1APResponse) error {
 	if len(m.NASPDU) > 0 {
 		nas := hex.EncodeToString([]byte(m.NASPDU))
 		resp.NASPDU = &nas
+	}
+
+	return nil
+}
+
+func decodeERABModifyRequest(value []byte, resp *S1APResponse) error {
+	m, err := s1ap.ParseERABModifyRequest(value)
+	if err != nil {
+		return fmt.Errorf("parse ERABModifyRequest: %w", err)
+	}
+
+	setUEIDs(resp, int64(m.MMEUES1APID), int64(m.ENBUES1APID))
+
+	for _, it := range m.ERABToBeModified {
+		resp.ERABModifyItems = append(resp.ERABModifyItems, ERABModifyItemJSON{
+			ERABID:           int(it.ERABID),
+			QCI:              int(it.QoS.QCI),
+			ARPPriorityLevel: int(it.QoS.ARP.PriorityLevel),
+		})
+
+		// The Modify EPS Bearer Context Request rides as the default bearer's NAS-PDU.
+		if len(it.NASPDU) > 0 && resp.NASPDU == nil {
+			nas := hex.EncodeToString([]byte(it.NASPDU))
+			resp.NASPDU = &nas
+		}
 	}
 
 	return nil
@@ -300,6 +335,33 @@ func decodeErrorIndication(value []byte, resp *S1APResponse) error {
 	}
 
 	return nil
+}
+
+func decodePaging(value []byte, resp *S1APResponse) error {
+	m, err := s1ap.ParsePaging(value)
+	if err != nil {
+		return fmt.Errorf("parse Paging: %w", err)
+	}
+
+	resp.Paging = &PagingJSON{
+		MMEC:                 m.STMSI.MMEC,
+		MTMSI:                m.STMSI.MTMSI,
+		UEIdentityIndexValue: m.UEIdentityIndexValue,
+		CNDomain:             cnDomainName(m.CNDomain),
+	}
+
+	return nil
+}
+
+func cnDomainName(d s1ap.CNDomain) string {
+	switch d {
+	case s1ap.CNDomainPS:
+		return "ps"
+	case s1ap.CNDomainCS:
+		return "cs"
+	default:
+		return fmt.Sprintf("CNDomain(%d)", d)
+	}
 }
 
 // transportLayerIP renders an S1AP Transport Layer Address (TS 36.414): 4 octets

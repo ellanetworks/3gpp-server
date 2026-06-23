@@ -144,6 +144,10 @@ func decodeESM(plain []byte, resp *NASResponse) (*NASResponse, error) {
 			pti := int(m.ProcedureTransactionIdentity)
 			resp.EPSBearerIdentity = &ebi
 			resp.BearerPTI = &pti
+
+			if len(m.APNAMBR) > 0 {
+				resp.APNAMBR = hex.EncodeToString(m.APNAMBR)
+			}
 		}
 	default:
 		resp.MessageType = fmt.Sprintf("esm_message_%#x", uint8(mt))
