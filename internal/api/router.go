@@ -24,9 +24,17 @@ func NewRouter(h *Handler) *http.ServeMux {
 	mux.HandleFunc("GET /enb/{enb_id}/ue/{ue_id}", h.GetENBUE)
 	mux.HandleFunc("POST /enb/{enb_id}/ue/{ue_id}/nas", h.SendENBNAS)
 
+	// 4G/LTE: await unsolicited MME-initiated S1AP downlink. The non-UE form
+	// catches a Paging or MME-initiated Reset; the per-UE form catches a
+	// network-initiated Detach Request or EPS bearer modification.
+	mux.HandleFunc("POST /enb/{enb_id}/await", h.AwaitENBMessage)
+	mux.HandleFunc("POST /enb/{enb_id}/ue/{ue_id}/await", h.AwaitENBUEMessage)
+
 	// 4G/LTE: S1-U user plane (requires the eNB created with enable_gtpu).
 	mux.HandleFunc("POST /enb/{enb_id}/ue/{ue_id}/uplink", h.SendENBUplink)
 	mux.HandleFunc("POST /enb/{enb_id}/ue/{ue_id}/downlink/await", h.AwaitENBDownlink)
+	mux.HandleFunc("POST /enb/{enb_id}/gtpu/echo", h.SendENBGTPUEcho)
+	mux.HandleFunc("POST /enb/{enb_id}/gtpu/error-indication/await", h.AwaitENBErrorIndication)
 
 	mux.HandleFunc("POST /gnb/{gnb_id}/ngap", h.SendGnBNGAP)
 	mux.HandleFunc("POST /gnb/{gnb_id}/await", h.AwaitGnBMessage)

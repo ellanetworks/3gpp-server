@@ -81,6 +81,24 @@ type S1APResponse struct {
 	// only when the MME's stored UE security capabilities differ from those the
 	// target eNB reported, so the eNB corrects its context (TS 36.413 §9.1.5.9).
 	ReplayedUESecurityCapabilities *UESecurityCapabilitiesJSON `json:"replayed_ue_security_capabilities,omitempty"`
+
+	// Paging is set on a PAGING message (TS 36.413 §9.1.6), a non-UE-associated
+	// message the MME broadcasts to reach an ECM-IDLE UE.
+	Paging *PagingJSON `json:"paging,omitempty"`
+
+	// ERABModifyItems lists the E-RABs an E-RAB Modify Request reconfigures with
+	// new QoS (TS 36.413 §9.1.3.3); the default bearer's item carries the Modify
+	// EPS Bearer Context Request as the NAS-PDU.
+	ERABModifyItems []ERABModifyItemJSON `json:"erab_modify_items,omitempty"`
+}
+
+// PagingJSON is the decoded PAGING content (TS 36.413 §9.1.6): the paged UE's
+// S-TMSI, the UE identity index (IMSI mod 1024), and the core-network domain.
+type PagingJSON struct {
+	MMEC                 uint8  `json:"mmec"`
+	MTMSI                uint32 `json:"m_tmsi"`
+	UEIdentityIndexValue uint16 `json:"ue_identity_index_value"`
+	CNDomain             string `json:"cn_domain"`
 }
 
 // UESecurityCapabilitiesJSON is the S1AP EPS encryption/integrity algorithm
@@ -103,6 +121,15 @@ type ERABSetupItemJSON struct {
 	ERABID                int    `json:"erab_id"`
 	GTPTEID               uint32 `json:"gtp_teid,omitempty"`
 	TransportLayerAddress string `json:"transport_layer_address,omitempty"`
+}
+
+// ERABModifyItemJSON is one E-RAB an E-RAB Modify Request reconfigures, with its
+// new E-RAB-level QoS (TS 36.413 §9.2.1.15). The default bearer's item carries
+// the Modify EPS Bearer Context Request as the message's NAS-PDU.
+type ERABModifyItemJSON struct {
+	ERABID           int `json:"erab_id"`
+	QCI              int `json:"qci"`
+	ARPPriorityLevel int `json:"arp_priority_level"`
 }
 
 type S1SetupResponseJSON struct {

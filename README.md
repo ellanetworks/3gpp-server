@@ -1,15 +1,24 @@
 # 3gpp-server
 
-Use 3GPP server to test security, performance, and reliability aspects of 5G cores.
+Use 3GPP server to test security, performance, and reliability aspects of 5G and
+4G/LTE cores.
 
-3GPP server exposes an HTTP API that humans and AIs can use to send carefully crafted NGAP and NAS messages to the core.
+3GPP server exposes an HTTP API that humans and AIs can use to send carefully
+crafted NGAP, S1AP, and NAS messages to the core.
 
 ## Message support
 
-The server emulates a gNB (NGAP peer) and a UE (NAS peer). For each message the
-tables below show whether the server can **send** it to the core and whether it
-**decodes** a received instance. The tables enumerate the complete message
-catalogs of TS 38.413 (NGAP) and TS 24.501 (NAS).
+The server emulates two radio/UE roles against the core:
+
+- **5G** — a gNB and a 5G UE, speaking NGAP and NAS-5GS over the N2 interface
+  (`POST /gnb/{gnb_id}/...`).
+- **4G/LTE** — an eNB and an EPS UE, speaking S1AP and NAS-EPS over the S1-MME
+  interface (`POST /enb/{enb_id}/...`).
+
+For each message the tables below show whether the server can **send** it to the
+core and whether it **decodes** a received instance. The tables enumerate the
+complete message catalogs of TS 38.413 (NGAP), TS 36.413 (S1AP), TS 24.501
+(NAS-5GS), and TS 24.301 (NAS-EPS).
 
 Legend:
 
@@ -20,8 +29,9 @@ Legend:
 
 ### Limitations
 
-Structured message building uses [`github.com/free5gc/nas`](https://github.com/free5gc/nas)
-and `github.com/free5gc/ngap`. Those libraries model a fixed set of IEs, so some
+**5G (NGAP / NAS-5GS).** Structured message building uses
+[`github.com/free5gc/nas`](https://github.com/free5gc/nas) and
+`github.com/free5gc/ngap`. Those libraries model a fixed set of IEs, so some
 later-3GPP-release information elements (e.g. the RegistrationRequest extended
 DRX, T3324, UE radio capability ID, requested mapped NSSAI, WUS assistance,
 N5GC indication, NB-N1 mode DRX, UE request type, and paging restriction IEs)
@@ -39,6 +49,15 @@ fire-and-forget.
 
 We may drop the free5gc dependency in the future and build messages directly,
 to allow fully granular control over every IE without these escape hatches.
+
+**4G/LTE (S1AP / NAS-EPS).** The eNB and EPS-UE roles build messages with Ella
+Core's own S1AP and NAS-EPS codecs ([`github.com/ellanetworks/core/s1ap`](https://github.com/ellanetworks/core)
+and `.../nas`), and the EPS-AKA and NAS security context are computed
+independently of the core, so a returned `mac_verified` reflects the MME's
+NAS-MAC checked under the server's own keys. The `raw_nas_pdu` escape hatch is
+available on the EPS NAS path too (e.g. `inject_nas`) for arbitrary or malformed
+NAS, and a raw S1AP PDU can be sent in place of the S1 Setup when creating an
+eNB.
 
 ### NGAP (TS 38.413)
 
@@ -298,4 +317,198 @@ to allow fully granular control over every IE without these escape hatches.
 | Service-Level Authentication Command | — | ❌ |
 | Service-Level Authentication Complete | ❌ | ❌ |
 | Remote UE Report | ❌ | ❌ |
+| Remote UE Report Response | — | ❌ |
+
+### S1AP (TS 36.413)
+
+These are the 4G/LTE messages exchanged by the emulated eNB over S1-MME.
+
+#### Interface management
+
+| Message | Send | Decode |
+|---|:---:|:---:|
+| S1 Setup Request | ✅ | — |
+| S1 Setup Response | — | ✅ |
+| S1 Setup Failure | — | ✅ |
+| eNB Configuration Update | ❌ | ❌ |
+| eNB Configuration Update Acknowledge | ❌ | ❌ |
+| eNB Configuration Update Failure | ❌ | ❌ |
+| MME Configuration Update | ❌ | ❌ |
+| MME Configuration Update Acknowledge | ❌ | ❌ |
+| MME Configuration Update Failure | ❌ | ❌ |
+| Reset | ✅ | 🟡 |
+| Reset Acknowledge | — | ✅ |
+| Error Indication | ❌ | ✅ |
+| Overload Start | ❌ | ❌ |
+| Overload Stop | ❌ | ❌ |
+| eNB Configuration Transfer | ❌ | ❌ |
+| MME Configuration Transfer | ❌ | ❌ |
+| eNB Direct Information Transfer | ❌ | ❌ |
+| MME Direct Information Transfer | ❌ | ❌ |
+| Private Message | ❌ | ❌ |
+
+#### UE context management
+
+| Message | Send | Decode |
+|---|:---:|:---:|
+| Initial Context Setup Request | — | ✅ |
+| Initial Context Setup Response | ✅ | — |
+| Initial Context Setup Failure | ❌ | ❌ |
+| UE Context Release Request | ✅ | — |
+| UE Context Release Command | — | ✅ |
+| UE Context Release Complete | ✅ | — |
+| UE Context Modification Request | ❌ | ❌ |
+| UE Context Modification Response | ❌ | ❌ |
+| UE Context Modification Failure | ❌ | ❌ |
+| UE Context Modification Indication | ❌ | ❌ |
+| UE Context Modification Confirm | ❌ | ❌ |
+| Connection Establishment Indication | ❌ | ❌ |
+| UE Context Suspend Request | ❌ | ❌ |
+| UE Context Suspend Response | ❌ | ❌ |
+| UE Context Resume Request | ❌ | ❌ |
+| UE Context Resume Response | ❌ | ❌ |
+| UE Context Resume Failure | ❌ | ❌ |
+
+#### E-RAB management
+
+| Message | Send | Decode |
+|---|:---:|:---:|
+| E-RAB Setup Request | — | ✅ |
+| E-RAB Setup Response | ✅ | — |
+| E-RAB Modify Request | ❌ | ❌ |
+| E-RAB Modify Response | ❌ | ❌ |
+| E-RAB Modification Indication | ❌ | ❌ |
+| E-RAB Modification Confirm | ❌ | ❌ |
+| E-RAB Release Command | — | ✅ |
+| E-RAB Release Response | ✅ | — |
+| E-RAB Release Indication | ❌ | ❌ |
+
+#### NAS transport
+
+| Message | Send | Decode |
+|---|:---:|:---:|
+| Initial UE Message | ✅ | — |
+| Downlink NAS Transport | — | ✅ |
+| Uplink NAS Transport | ✅ | — |
+| NAS Non Delivery Indication | ❌ | ❌ |
+| Reroute NAS Request | ❌ | ❌ |
+
+#### Paging
+
+| Message | Send | Decode |
+|---|:---:|:---:|
+| Paging | — | 🟡 |
+
+#### Mobility and handover
+
+| Message | Send | Decode |
+|---|:---:|:---:|
+| Handover Required | ❌ | — |
+| Handover Command | — | ❌ |
+| Handover Preparation Failure | — | ❌ |
+| Handover Request | — | ❌ |
+| Handover Request Acknowledge | ❌ | — |
+| Handover Failure | ❌ | — |
+| Handover Notify | ❌ | — |
+| Handover Cancel | ❌ | — |
+| Handover Cancel Acknowledge | — | ❌ |
+| eNB Status Transfer | ❌ | — |
+| MME Status Transfer | — | ❌ |
+| Path Switch Request | ✅ | — |
+| Path Switch Request Acknowledge | — | ✅ |
+| Path Switch Request Failure | — | ✅ |
+
+#### UE radio capability
+
+| Message | Send | Decode |
+|---|:---:|:---:|
+| UE Capability Info Indication | ✅ | — |
+| UE Radio Capability Match Request | — | ❌ |
+| UE Radio Capability Match Response | ❌ | — |
+
+#### Trace, location, warning, and other transport
+
+| Message | Send | Decode |
+|---|:---:|:---:|
+| Trace Start | — | ❌ |
+| Trace Failure Indication | ❌ | — |
+| Deactivate Trace | — | ❌ |
+| Cell Traffic Trace | ❌ | — |
+| Location Reporting Control | — | ❌ |
+| Location Reporting Failure Indication | ❌ | — |
+| Location Report | ❌ | — |
+| Write-Replace Warning Request | — | ❌ |
+| Write-Replace Warning Response | ❌ | — |
+| Kill Request | — | ❌ |
+| Kill Response | ❌ | — |
+| PWS Restart Indication | ❌ | — |
+| PWS Failure Indication | ❌ | — |
+| Downlink / Uplink UE-Associated LPPa Transport | ❌ | ❌ |
+| Downlink / Uplink Non-UE-Associated LPPa Transport | ❌ | ❌ |
+| Downlink / Uplink S1 CDMA2000 Tunnelling | ❌ | ❌ |
+
+### NAS — EMM (TS 24.301 §8.2 / Table 9.8.1)
+
+| Message | Send | Decode |
+|---|:---:|:---:|
+| Attach Request | ✅ | — |
+| Attach Accept | — | ✅ |
+| Attach Complete | ✅ | — |
+| Attach Reject | — | ✅ |
+| Detach Request (UE originating) | ✅ | — |
+| Detach Request (network) | — | 🟡 |
+| Detach Accept | — | ✅ |
+| GUTI Reallocation Command | — | ❌ |
+| GUTI Reallocation Complete | ❌ | — |
+| Authentication Request | — | ✅ |
+| Authentication Response | ✅ | — |
+| Authentication Reject | — | ✅ |
+| Authentication Failure | ✅ | — |
+| Identity Request | — | ✅ |
+| Identity Response | ✅ | — |
+| Security Mode Command | — | ✅ |
+| Security Mode Complete | ✅ | — |
+| Security Mode Reject | ✅ | — |
+| Service Request | ✅ | — |
+| Extended Service Request | ❌ | — |
+| Service Reject | — | ✅ |
+| Service Accept | — | ❌ |
+| Tracking Area Update Request | ✅ | — |
+| Tracking Area Update Accept | — | ✅ |
+| Tracking Area Update Complete | ✅ | — |
+| Tracking Area Update Reject | — | ✅ |
+| EMM Information | — | ❌ |
+| EMM Status | ❌ | ✅ |
+| Downlink NAS Transport (generic) | — | ❌ |
+| Uplink NAS Transport (generic) | ❌ | — |
+| CS Service Notification | — | ❌ |
+
+### NAS — ESM (TS 24.301 §8.3 / Table 9.8.2)
+
+| Message | Send | Decode |
+|---|:---:|:---:|
+| PDN Connectivity Request | ✅ | — |
+| PDN Connectivity Reject | — | ✅ |
+| PDN Disconnect Request | ✅ | — |
+| PDN Disconnect Reject | — | ✅ |
+| Activate Default EPS Bearer Context Request | — | ✅ |
+| Activate Default EPS Bearer Context Accept | ✅ | — |
+| Activate Default EPS Bearer Context Reject | ❌ | — |
+| Activate Dedicated EPS Bearer Context Request | — | ❌ |
+| Activate Dedicated EPS Bearer Context Accept | ❌ | — |
+| Activate Dedicated EPS Bearer Context Reject | ❌ | — |
+| Modify EPS Bearer Context Request | — | 🟡 |
+| Modify EPS Bearer Context Accept | ❌ | — |
+| Modify EPS Bearer Context Reject | ❌ | — |
+| Deactivate EPS Bearer Context Request | — | ✅ |
+| Deactivate EPS Bearer Context Accept | ✅ | — |
+| Bearer Resource Allocation Request | ❌ | — |
+| Bearer Resource Allocation Reject | — | ❌ |
+| Bearer Resource Modification Request | ❌ | — |
+| Bearer Resource Modification Reject | — | ❌ |
+| ESM Information Request | — | ❌ |
+| ESM Information Response | ❌ | — |
+| ESM Status | ❌ | ❌ |
+| Notification | — | ❌ |
+| Remote UE Report | ❌ | — |
 | Remote UE Report Response | — | ❌ |

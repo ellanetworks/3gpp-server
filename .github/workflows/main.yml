@@ -23,3 +23,7 @@ jobs:
     uses: ./.github/workflows/go-lint.yaml
   license-headers:
     uses: ./.github/workflows/license-headers.yaml
+  integration-tests-4g:
+    uses: ./.github/workflows/integration-tests-4g.yaml
+  integration-tests-5g:
+    uses: ./.github/workflows/integration-tests-5g.yaml

@@ -211,6 +211,88 @@ paths:
         "502":
           $ref: "#/components/responses/BadGateway"
 
+  /enb/{enb_id}/await:
+    parameters:
+      - $ref: "#/components/parameters/enb_id"
+    post:
+      operationId: awaitENBMessage
+      summary: Await an unsolicited non-UE-associated S1AP message
+      description: |
+        Blocks for an unsolicited non-UE-associated S1AP message on the eNB's
+        S1-MME association — e.g. a PAGING the MME broadcasts to reach an
+        ECM-IDLE UE (TS 36.413 §9.1.6), or an MME-initiated Reset.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message_types]
+              properties:
+                message_types:
+                  type: array
+                  items:
+                    type: string
+                  description: "S1AP message types to wait for (first match wins)."
+                timeout_ms:
+                  type: integer
+                  description: "How long to wait. Default 5000."
+      responses:
+        "200":
+          description: Decoded S1AP message.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendENBNASResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "504":
+          $ref: "#/components/responses/GatewayTimeout"
+
+  /enb/{enb_id}/ue/{ue_id}/await:
+    parameters:
+      - $ref: "#/components/parameters/enb_id"
+      - $ref: "#/components/parameters/ue_id"
+    post:
+      operationId: awaitENBUEMessage
+      summary: Await an unsolicited UE-associated downlink S1AP message
+      description: |
+        Blocks for an unsolicited UE-associated downlink S1AP message addressed to
+        this UE — e.g. a network-initiated DETACH REQUEST or a Modify EPS Bearer
+        Context Request — matched by the UE's S1AP ID pair so concurrent waiters on
+        one eNB association do not consume each other's downlink.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message_types]
+              properties:
+                message_types:
+                  type: array
+                  items:
+                    type: string
+                  description: "S1AP message types to wait for (first match wins)."
+                timeout_ms:
+                  type: integer
+                  description: "How long to wait. Default 5000."
+      responses:
+        "200":
+          description: Decoded S1AP message.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendENBNASResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "504":
+          $ref: "#/components/responses/GatewayTimeout"
+
   /enb/{enb_id}/ue/{ue_id}/uplink:
     parameters:
       - $ref: "#/components/parameters/enb_id"
@@ -245,6 +327,52 @@ paths:
           $ref: "#/components/responses/NotFound"
         "504":
           $ref: "#/components/responses/GatewayTimeout"
+
+  /enb/{enb_id}/gtpu/echo:
+    parameters:
+      - $ref: "#/components/parameters/enb_id"
+    post:
+      operationId: sendENBGTPUEcho
+      summary: Send a GTP-U Echo Request to the S-GW/UPF (S1-U path management)
+      description: |
+        Sends a GTP-U Echo Request (TS 29.281 §7.2.1) from the eNB's S1-U endpoint
+        to upf_ip and returns the Echo Response. Requires the eNB to have been
+        created with enable_gtpu.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [upf_ip]
+              properties:
+                upf_ip: { type: string, description: "S-GW/UPF S1-U IP to echo." }
+                timeout_ms: { type: integer, description: "How long to wait. Default 5000." }
+      responses:
+        "200": { description: "Echo Response received." }
+        "504": { description: "No Echo Response before the timeout." }
+
+  /enb/{enb_id}/gtpu/error-indication/await:
+    parameters:
+      - $ref: "#/components/parameters/enb_id"
+    post:
+      operationId: awaitENBErrorIndication
+      summary: Wait for a GTP-U Error Indication from the S-GW/UPF
+      description: |
+        Blocks for a GTP-U Error Indication, which the S-GW/UPF must send when it
+        receives a G-PDU on S1-U for a TEID with no context (TS 29.281 §7.3.1).
+        Requires the eNB to have been created with enable_gtpu.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                timeout_ms: { type: integer, description: "How long to wait. Default 5000." }
+      responses:
+        "200": { description: "Error Indication received." }
+        "504": { description: "No Error Indication before the timeout." }
 
   /gnb/{gnb_id}/ue:
     parameters:

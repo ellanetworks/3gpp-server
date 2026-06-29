@@ -43,6 +43,10 @@ type NASResponse struct {
 
 	// Tracking Area Update Accept (TS 24.301 §8.2.26)
 	EPSUpdateResult *int `json:"eps_update_result,omitempty"`
+
+	// APNAMBR is the new APN-AMBR value part (hex) the MME sends in a Modify EPS
+	// Bearer Context Request to apply a session-AMBR change (TS 24.301 §9.9.4.2).
+	APNAMBR string `json:"apn_ambr,omitempty"`
 }
 
 // GUTIJSON is an assigned GUTI (TS 24.301 §9.9.3.12).

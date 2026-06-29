@@ -116,6 +116,91 @@ func (h *Handler) SendENBUplink(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"sent_bytes": len(inner)})
 }
 
+// SendENBGTPUEcho sends a GTP-U Echo Request to the S-GW/UPF on S1-U and returns
+// its Echo Response (TS 29.281 §7.2.1).
+func (h *Handler) SendENBGTPUEcho(w http.ResponseWriter, r *http.Request) {
+	enb, err := h.Store.GetENB(r.PathValue("enb_id"))
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	gt, ok := h.GTPU[enb.ID]
+	if !ok {
+		writeError(w, http.StatusBadRequest, "eNB has no GTP-U endpoint (create it with enable_gtpu)")
+		return
+	}
+
+	var req struct {
+		UPFIP     string `json:"upf_ip"`
+		TimeoutMs int    `json:"timeout_ms,omitempty"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	if req.UPFIP == "" {
+		writeError(w, http.StatusBadRequest, "upf_ip is required")
+		return
+	}
+
+	if err := gt.SendEchoRequest(req.UPFIP, 1); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("gtp-u echo send: %v", err))
+		return
+	}
+
+	timeout := 5 * time.Second
+	if req.TimeoutMs > 0 {
+		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	defer cancel()
+
+	msg, err := gt.WaitForControl(ctx, gtpu.MsgEchoResponse)
+	if err != nil {
+		writeError(w, http.StatusGatewayTimeout, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"echo_response": true, "seq": msg.Seq})
+}
+
+// AwaitENBErrorIndication blocks for a GTP-U Error Indication from the S-GW/UPF,
+// sent when it receives a G-PDU on S1-U for a TEID with no context (TS 29.281
+// §7.3.1).
+func (h *Handler) AwaitENBErrorIndication(w http.ResponseWriter, r *http.Request) {
+	enb, err := h.Store.GetENB(r.PathValue("enb_id"))
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	gt, ok := h.GTPU[enb.ID]
+	if !ok {
+		writeError(w, http.StatusBadRequest, "eNB has no GTP-U endpoint (create it with enable_gtpu)")
+		return
+	}
+
+	var req struct {
+		TimeoutMs int `json:"timeout_ms,omitempty"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	timeout := 5 * time.Second
+	if req.TimeoutMs > 0 {
+		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	defer cancel()
+
+	if _, err := gt.WaitForControl(ctx, gtpu.MsgErrorIndication); err != nil {
+		writeError(w, http.StatusGatewayTimeout, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"error_indication": true})
+}
+
 // AwaitENBDownlink blocks for a downlink T-PDU on the default bearer's eNB TEID
 // and returns the decoded inner packet.
 func (h *Handler) AwaitENBDownlink(w http.ResponseWriter, r *http.Request) {

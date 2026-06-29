@@ -1,0 +1,99 @@
+# CI variant of compose-local.yaml: Ella Core is pulled as a published image
+# (set ELLA_CORE_IMAGE) instead of built from a local checkout. Everything else —
+# the N6 data-network responder, the tester container, and the networks — matches
+# compose-local.yaml so the same integration suite runs unchanged.
+configs:
+  ella_config:
+    content: |
+      logging:
+        system:
+          level: "debug"
+          output: "stdout"
+        audit:
+          output: "stdout"
+      db:
+        path: "core.db"
+      interfaces:
+        n2:
+          address: "10.3.0.2"
+          port: 38412
+        n3:
+          name: "n3"
+        n6:
+          name: "n6"
+        api:
+          address: "10.3.0.2"
+          port: 5002
+      xdp:
+        attach-mode: "generic"
+
+services:
+  ella-core:
+    image: ${ELLA_CORE_IMAGE:-ghcr.io/ellanetworks/ella-core:latest}
+    configs:
+      - source: ella_config
+        target: /core.yaml
+    restart: unless-stopped
+    entrypoint: /bin/core --config /core.yaml
+    privileged: true
+    networks:
+      default:
+        driver_opts:
+          com.docker.network.endpoint.ifname: eth0
+      n3:
+        driver_opts:
+          com.docker.network.endpoint.ifname: n3
+        ipv4_address: 10.3.0.2
+        ipv6_address: fd00:3::2
+      n6:
+        driver_opts:
+          com.docker.network.endpoint.ifname: n6
+        ipv4_address: 10.6.0.2
+
+  dn-responder:
+    build:
+      context: .
+      dockerfile: Dockerfile.dn-responder
+    entrypoint:
+      - /bin/sh
+      - -c
+      - "socat -T5 UDP4-LISTEN:7,fork,reuseaddr EXEC:cat & while true; do ping -c1 -W1 10.6.0.2 >/dev/null 2>&1; sleep 2; done"
+    restart: unless-stopped
+    networks:
+      n6:
+        driver_opts:
+          com.docker.network.endpoint.ifname: n6
+        ipv4_address: 10.6.0.10
+
+  3gpp-server-tester:
+    image: golang:1.26
+    entrypoint:
+      - /bin/sh
+      - -c
+      - "sleep infinity"
+    volumes:
+      - ../:/app
+    working_dir: /app
+    privileged: true
+    networks:
+      default:
+        driver_opts:
+          com.docker.network.endpoint.ifname: eth0
+      n3:
+        driver_opts:
+          com.docker.network.endpoint.ifname: n3
+        ipv4_address: 10.3.0.3
+        ipv6_address: fd00:3::3
+
+networks:
+  n3:
+    internal: true
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 10.3.0.0/24
+        - subnet: fd00:3::/64
+  n6:
+    ipam:
+      config:
+        - subnet: 10.6.0.0/24
