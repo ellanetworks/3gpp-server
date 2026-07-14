@@ -1268,7 +1268,7 @@ components:
       properties:
         message_type:
           type: string
-          enum: [attach_request, authentication_response, authentication_failure, identity_response, security_mode_complete, security_mode_reject, attach_complete, detach_request, release_request, service_request, ue_capability_info, tracking_area_update, path_switch, pdn_connectivity, pdn_disconnect, modify_eps_bearer_context_accept, deactivate_eps_bearer_context_accept, status_esm, reset, inject_nas, handover_required, handover_cancel, enb_status_transfer, error_indication]
+          enum: [attach_request, authentication_response, authentication_failure, identity_response, security_mode_complete, security_mode_reject, attach_complete, detach_request, release_request, service_request, ue_capability_info, tracking_area_update, path_switch, pdn_connectivity, pdn_disconnect, modify_response, modify_eps_bearer_context_accept, deactivate_eps_bearer_context_accept, status_esm, reset, inject_nas, handover_required, handover_cancel, enb_status_transfer, initial_context_setup_failure, error_indication]
         pdn_type:
           type: integer
           description: "Requested PDN type for attach: 1=IPv4, 2=IPv6, 3=IPv4v6 (default 1)."
@@ -1373,11 +1373,20 @@ components:
 
     SendENBS1APRequest:
       type: object
-      required: [message_type]
       properties:
         message_type:
           type: string
           enum: [handover_request_acknowledge, handover_notify, handover_failure]
+        raw_s1ap_pdu:
+          type: string
+          description: When set, hex S1AP PDU written verbatim onto the S1-MME association with no encoding or validation; message_type is ignored. Lets a test send any S1AP PDU, well-formed or not.
+        wait_for:
+          type: array
+          items: { type: string }
+          description: With raw_s1ap_pdu, downlink S1AP message types to block for (empty = fire-and-forget).
+        timeout_ms:
+          type: integer
+          description: With raw_s1ap_pdu + wait_for, how long to wait. Default 5000.
         mme_ue_s1ap_id:
           type: integer
           description: MME UE S1AP ID the MME assigned to the incoming UE (from the Handover Request).

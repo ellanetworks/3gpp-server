@@ -412,6 +412,38 @@ func decodeInitiatingMessage(im *ngapType.InitiatingMessage, resp *NGAPResponse)
 		decodeHandoverRequest(im.Value.HandoverRequest, resp)
 	case ngapType.InitiatingMessagePresentErrorIndication:
 		decodeErrorIndication(im.Value.ErrorIndication, resp)
+	case ngapType.InitiatingMessagePresentPaging:
+		decodePaging(im.Value.Paging, resp)
+	}
+}
+
+// decodePaging surfaces the IEs of a PAGING (TS 38.413 §9.2.4.1), the
+// non-UE-associated message the AMF broadcasts to reach a CM-IDLE UE.
+func decodePaging(msg *ngapType.Paging, resp *NGAPResponse) {
+	if msg == nil {
+		return
+	}
+
+	for _, ie := range msg.ProtocolIEs.List {
+		decoded := IE{
+			ID:          ie.Id.Value,
+			Criticality: criticalityToString(ie.Criticality.Value),
+		}
+
+		if ie.Id.Value == ngapType.ProtocolIEIDUEPagingIdentity &&
+			ie.Value.UEPagingIdentity != nil && ie.Value.UEPagingIdentity.FiveGSTMSI != nil {
+			decoded.FiveGSTMSI = decodeFiveGSTMSI(ie.Value.UEPagingIdentity.FiveGSTMSI)
+		}
+
+		resp.IEs = append(resp.IEs, decoded)
+	}
+}
+
+func decodeFiveGSTMSI(t *ngapType.FiveGSTMSI) *FiveGSTMSIJSON {
+	return &FiveGSTMSIJSON{
+		AMFSetID:   hex.EncodeToString(t.AMFSetID.Value.Bytes),
+		AMFPointer: hex.EncodeToString(t.AMFPointer.Value.Bytes),
+		FiveGTMSI:  hex.EncodeToString(t.FiveGTMSI.Value),
 	}
 }
 

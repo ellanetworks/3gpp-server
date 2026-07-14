@@ -198,6 +198,8 @@ func DecodeSecuredNAS(ue *store.UEContext, message []byte) (*NASResponse, error)
 		decodeAuthenticationRequest(m, resp)
 	case gonas.MsgTypeRegistrationReject:
 		decodeRegistrationReject(m, resp)
+	case gonas.MsgTypeServiceReject:
+		decodeServiceReject(m, resp)
 	case gonas.MsgTypeIdentityRequest:
 		decodeIdentityRequest(m, resp)
 	case gonas.MsgTypeStatus5GMM:

@@ -97,8 +97,8 @@ func runS1HandoverFlow(t *testing.T, sourceENB, targetENB, ueID string) {
 		t.Fatalf("s1ap.message_type = %q, want HandoverCommand (TS 36.413 §8.4.1)\n  body: %s", got, hoCmd)
 	}
 
-	// Source eNB → MME → target eNB: eNB STATUS TRANSFER relayed as MME STATUS
-	// TRANSFER (TS 36.413 §8.4.4; TS 23.401 §5.5.1.2.2 steps 10, 10c).
+	// Source eNB → MME → target eNB: eNB STATUS TRANSFER (TS 36.413 §8.4.6)
+	// relayed as MME STATUS TRANSFER (§8.4.7; TS 23.401 §5.5.1.2.2 steps 10, 10c).
 	status, body = doRequest(t, "POST", "/enb/"+sourceENB+"/ue/"+ueID+"/nas",
 		`{"message_type":"enb_status_transfer"}`)
 	if status != 200 {
@@ -107,7 +107,7 @@ func runS1HandoverFlow(t *testing.T, sourceENB, targetENB, ueID string) {
 
 	mmeStatus := awaitENBS1AP(t, targetENB, `["MMEStatusTransfer"]`)
 	if got := jsonGet(mmeStatus, "s1ap.message_type"); got != "MMEStatusTransfer" {
-		t.Errorf("s1ap.message_type = %q, want MMEStatusTransfer (the MME must relay eNB status, TS 36.413 §8.4.4)\n  body: %s", got, mmeStatus)
+		t.Errorf("s1ap.message_type = %q, want MMEStatusTransfer (the MME must relay eNB status, TS 36.413 §8.4.7)\n  body: %s", got, mmeStatus)
 	}
 
 	// Target eNB → MME: HANDOVER NOTIFY (TS 23.401 §5.5.1.2.2 step 13).

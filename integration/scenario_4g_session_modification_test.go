@@ -38,7 +38,7 @@ func setPolicyAMBR(t *testing.T, token, ul, dl string) {
 
 // Test4GSessionAMBRModification: changing the session-AMBR of an attached UE's
 // policy must reconfigure the bearer in place — the MME sends a Modify EPS Bearer
-// Context Request carrying the new APN-AMBR (TS 24.301 §6.4.2), without
+// Context Request carrying the new APN-AMBR (TS 24.301 §6.4.3), without
 // re-establishing the bearer. The emulated eNB observes it on its UE-associated
 // await.
 func Test4GSessionAMBRModification(t *testing.T) {
@@ -72,11 +72,11 @@ func Test4GSessionAMBRModification(t *testing.T) {
 	status, body2 := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/await",
 		`{"message_types":["DownlinkNASTransport"],"timeout_ms":8000}`)
 	if status != 200 {
-		t.Fatalf("no Downlink NAS Transport after session-AMBR change (HTTP %d) — the MME must modify the bearer (TS 24.301 §6.4.2)\n  body: %s", status, body2)
+		t.Fatalf("no Downlink NAS Transport after session-AMBR change (HTTP %d) — the MME must modify the bearer (TS 24.301 §6.4.3)\n  body: %s", status, body2)
 	}
 
 	if got := jsonGet(body2, "nas.message_type"); got != "modify_eps_bearer_context_request" {
-		t.Fatalf("MME-initiated NAS = %q, want modify_eps_bearer_context_request (TS 24.301 §6.4.2)\n  body: %s", got, body2)
+		t.Fatalf("MME-initiated NAS = %q, want modify_eps_bearer_context_request (TS 24.301 §6.4.3)\n  body: %s", got, body2)
 	}
 
 	// The carried APN-AMBR must encode the new 50 Mbps rate (TS 24.301 §9.9.4.2).
@@ -85,7 +85,7 @@ func Test4GSessionAMBRModification(t *testing.T) {
 		t.Fatalf("Modify EPS Bearer Context Request apn_ambr = %q, want %q (50 Mbps, TS 24.301 §9.9.4.2)\n  body: %s", got, wantAMBR, body2)
 	}
 
-	// The UE accepts the modification (mandatory, TS 24.301 §6.4.2.3); the MME
+	// The UE accepts the modification (mandatory, TS 24.301 §6.4.3.3); the MME
 	// commits it and stops T3486.
 	accept := fmt.Sprintf(`{"message_type":"modify_eps_bearer_context_accept","eps_bearer_identity":%s,"pti":%s}`,
 		jsonGet(body2, "nas.eps_bearer_identity"), jsonGet(body2, "nas.bearer_pti"))

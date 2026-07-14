@@ -164,6 +164,14 @@ type SendENBNASRequest struct {
 type SendENBS1APRequest struct {
 	MessageType string `json:"message_type"`
 
+	// RawS1APPDU, when set, is written verbatim onto the S1-MME association with no
+	// encoding or validation, and message_type is ignored — letting a test send
+	// any S1AP PDU, well-formed or not. WaitFor lists downlink message types to
+	// block for (empty = fire-and-forget); TimeoutMs bounds that wait.
+	RawS1APPDU *string  `json:"raw_s1ap_pdu,omitempty"`
+	WaitFor    []string `json:"wait_for,omitempty"`
+	TimeoutMs  int      `json:"timeout_ms,omitempty"`
+
 	MMEUES1APID *uint32 `json:"mme_ue_s1ap_id,omitempty"`
 	ENBUES1APID *uint32 `json:"enb_ue_s1ap_id,omitempty"`
 

@@ -54,6 +54,8 @@ func Decode(data []byte) (*NASResponse, error) {
 		decodeIdentityRequest(m, resp)
 	case gonas.MsgTypeRegistrationReject:
 		decodeRegistrationReject(m, resp)
+	case gonas.MsgTypeServiceReject:
+		decodeServiceReject(m, resp)
 	case gonas.MsgTypeStatus5GMM:
 		decodeStatus5GMM(m, resp)
 	case gonas.MsgTypeDLNASTransport:
@@ -102,6 +104,14 @@ func decodeRegistrationReject(m *gonas.Message, resp *NASResponse) {
 		return
 	}
 	cause := m.RegistrationReject.GetCauseValue()
+	resp.CauseGMM = &cause
+}
+
+func decodeServiceReject(m *gonas.Message, resp *NASResponse) {
+	if m.ServiceReject == nil {
+		return
+	}
+	cause := m.ServiceReject.GetCauseValue()
 	resp.CauseGMM = &cause
 }
 

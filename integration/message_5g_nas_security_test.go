@@ -34,22 +34,26 @@ func Test5GBadMACSecurityModeComplete(t *testing.T) {
 	doRegistrationFlow(t, freshGnB, mustCreateUE(t, freshGnB))
 }
 
-// Test5GBadMACServiceRequest checks a Service Request whose NAS-MAC is corrupted
-// does not re-establish the connection (TS 24.501 §4.4.4.3).
+// Test5GBadMACServiceRequest checks that a Service Request failing the integrity
+// check is rejected with SERVICE REJECT #9 (TS 24.501 §4.4.4.3): "If a SERVICE
+// REQUEST ... fails the integrity check and the UE has only non-emergency PDU
+// sessions established, the AMF shall send the SERVICE REJECT message with 5GMM
+// cause #9 'UE identity cannot be derived by the network'."
 func Test5GBadMACServiceRequest(t *testing.T) {
 	gnbID, ueID := idleRegisteredUE(t)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
-		`{"message_type":"service_request","corrupt_mac":true}`)
+		`{"message_type":"service_request","corrupt_mac":true,"timeout_ms":3000}`)
+	if status != 200 {
+		t.Fatalf("no reply to a corrupted Service Request (HTTP %d) — the AMF must SERVICE REJECT #9 (TS 24.501 §4.4.4.3)\n  body: %s", status, body)
+	}
 
-	if status == 200 {
-		if got := jsonGet(body, "ngap.message_type"); got == ngapInitialContextSetupRequest {
-			t.Fatalf("AMF re-established on a corrupted Service Request (TS 24.501 §4.4.4.3)\n  body: %s", body)
-		}
+	if got := jsonGet(body, "nas.message_type"); got != nasServiceReject {
+		t.Fatalf("nas.message_type = %q, want service_reject (TS 24.501 §4.4.4.3)\n  body: %s", got, body)
+	}
 
-		if got := jsonGet(body, "nas.message_type"); got == nasServiceAccept {
-			t.Fatalf("AMF accepted a corrupted Service Request\n  body: %s", body)
-		}
+	if got := jsonGet(body, "nas.cause_5gmm"); got != "9" {
+		t.Errorf("service_reject cause_5gmm = %q, want 9 (TS 24.501 §4.4.4.3)\n  body: %s", got, body)
 	}
 }
 
@@ -68,12 +72,21 @@ func Test5GServiceRequestStaleNASCount(t *testing.T) {
 		t.Fatalf("release: HTTP %d\n  body: %s", status, body)
 	}
 
+	// A stale NAS COUNT fails integrity verification (§4.4.3.1: the estimated COUNT
+	// is selected higher than the stored value; §4.4.3.2: a COUNT is accepted only
+	// if integrity verifies), so §4.4.4.3 applies: SERVICE REJECT #9.
 	status, body = doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
 		`{"message_type":"service_request","nas_count":0,"timeout_ms":3000}`)
-	if status == 200 {
-		if got := jsonGet(body, "ngap.message_type"); got == ngapInitialContextSetupRequest {
-			t.Fatalf("AMF re-established on a Service Request with a stale NAS COUNT (TS 24.501 §4.4.3.1)\n  body: %s", body)
-		}
+	if status != 200 {
+		t.Fatalf("no reply to a stale-COUNT Service Request (HTTP %d) — the AMF must SERVICE REJECT #9 (TS 24.501 §4.4.4.3)\n  body: %s", status, body)
+	}
+
+	if got := jsonGet(body, "nas.message_type"); got != nasServiceReject {
+		t.Fatalf("nas.message_type = %q, want service_reject (TS 24.501 §4.4.4.3)\n  body: %s", got, body)
+	}
+
+	if got := jsonGet(body, "nas.cause_5gmm"); got != "9" {
+		t.Errorf("service_reject cause_5gmm = %q, want 9 (TS 24.501 §4.4.4.3)\n  body: %s", got, body)
 	}
 }
 

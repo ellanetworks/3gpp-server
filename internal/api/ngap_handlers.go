@@ -2015,8 +2015,7 @@ func handleUECapabilityInfo(w http.ResponseWriter, r *http.Request, gnb *store.G
 }
 
 // handleErrorIndication sends an ERROR INDICATION for the UE's connection
-// (TS 38.413 §8.7.5); the AMF releases the UE when the AP IDs name a known
-// connection.
+// (TS 38.413 §8.7.5); the AMF's reaction to it is implementation-specific.
 func handleErrorIndication(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
 	encoded, err := ngap.BuildErrorIndication(effectiveAmfID(req, ue), effectiveRanID(req, ue), 0) // radio-network unspecified
 	if err != nil {
