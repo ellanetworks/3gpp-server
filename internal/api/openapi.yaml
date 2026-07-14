@@ -191,7 +191,9 @@ paths:
         procedures (attach_request, authentication_response, identity_response,
         security_mode_complete/reject, attach_complete, service_request,
         tracking_area_update, detach_request, release_request, pdn_connectivity,
-        pdn_disconnect, ue_capability_info, path_switch, reset, inject_nas), and
+        pdn_disconnect, modify_eps_bearer_context_accept,
+        deactivate_eps_bearer_context_accept, status_esm, ue_capability_info,
+        path_switch, reset, inject_nas), and
         the source-eNB side of S1 handover (handover_required, handover_cancel,
         enb_status_transfer — TS 36.413 §8.4). EPS-AKA and NAS keys are computed
         independently, so a returned mac_verified reflects the MME's NAS-MAC
@@ -1233,7 +1235,7 @@ components:
       properties:
         message_type:
           type: string
-          enum: [attach_request, authentication_response, authentication_failure, identity_response, security_mode_complete, security_mode_reject, attach_complete, detach_request, release_request, service_request, ue_capability_info, tracking_area_update, path_switch, pdn_connectivity, pdn_disconnect, reset, inject_nas, handover_required, handover_cancel, enb_status_transfer]
+          enum: [attach_request, authentication_response, authentication_failure, identity_response, security_mode_complete, security_mode_reject, attach_complete, detach_request, release_request, service_request, ue_capability_info, tracking_area_update, path_switch, pdn_connectivity, pdn_disconnect, modify_eps_bearer_context_accept, deactivate_eps_bearer_context_accept, status_esm, reset, inject_nas, handover_required, handover_cancel, enb_status_transfer]
         pdn_type:
           type: integer
           description: "Requested PDN type for attach: 1=IPv4, 2=IPv6, 3=IPv4v6 (default 1)."
@@ -1307,6 +1309,12 @@ components:
         linked_ebi:
           type: integer
           description: On pdn_disconnect, the linked default-bearer identity of the PDN connection to release (TS 24.301 §6.5.2).
+        eps_bearer_identity:
+          type: integer
+          description: On esm_status / modify_eps_bearer_context_accept / deactivate_eps_bearer_context_accept, the bearer the message targets. Defaults to the default bearer.
+        esm_cause:
+          type: integer
+          description: On esm_status (or a modify reject), the ESM cause (TS 24.301 §9.9.4.4); #43 makes the MME deactivate the bearer. Defaults to #111.
         reset_all:
           type: boolean
           description: On reset, reset the whole S1 interface (reset-all) rather than only this UE's connection (TS 36.413 §8.7.1).
