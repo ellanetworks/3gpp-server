@@ -14,7 +14,28 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/store"
 )
 
-func EncodeNasPduWithSecurity(ue *store.UEContext, pdu []byte, securityHeaderType uint8) ([]byte, error) {
+// EncodeOption tweaks the security wrapping of an uplink NAS message for
+// negative testing.
+type EncodeOption func(*encodeOptions)
+
+type encodeOptions struct {
+	corruptMAC    bool
+	countOverride *uint32
+}
+
+// WithCorruptMAC flips a byte of the NAS-MAC so the AMF's integrity check fails;
+// the AMF must discard the message (TS 24.501 §4.4.4.3).
+func WithCorruptMAC() EncodeOption {
+	return func(o *encodeOptions) { o.corruptMAC = true }
+}
+
+// WithNASCountOverride forces the uplink NAS COUNT written into the message,
+// leaving the UE's real counter to advance normally.
+func WithNASCountOverride(count uint32) EncodeOption {
+	return func(o *encodeOptions) { o.countOverride = &count }
+}
+
+func EncodeNasPduWithSecurity(ue *store.UEContext, pdu []byte, securityHeaderType uint8, opts ...EncodeOption) ([]byte, error) {
 	m := gonas.NewMessage()
 	if err := m.PlainNasDecode(&pdu); err != nil {
 		return nil, fmt.Errorf("plain NAS decode: %v", err)
@@ -25,10 +46,15 @@ func EncodeNasPduWithSecurity(ue *store.UEContext, pdu []byte, securityHeaderTyp
 		SecurityHeaderType:    securityHeaderType,
 	}
 
-	return nasEncode(ue, m, securityHeaderType)
+	return nasEncode(ue, m, securityHeaderType, opts...)
 }
 
-func nasEncode(ue *store.UEContext, msg *gonas.Message, securityHeaderType uint8) ([]byte, error) {
+func nasEncode(ue *store.UEContext, msg *gonas.Message, securityHeaderType uint8, opts ...EncodeOption) ([]byte, error) {
+	var o encodeOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+
 	if !ue.SecurityContextAvailable && len(ue.Kamf) == 0 {
 		return nil, fmt.Errorf("no security context available")
 	}
@@ -39,7 +65,12 @@ func nasEncode(ue *store.UEContext, msg *gonas.Message, securityHeaderType uint8
 		ue.DLCount = 0
 	}
 
-	sequenceNumber := uint8(ue.ULCount & 0xff)
+	count := ue.ULCount
+	if o.countOverride != nil {
+		count = *o.countOverride
+	}
+
+	sequenceNumber := uint8(count & 0xff)
 
 	payload, err := msg.PlainNasEncode()
 	if err != nil {
@@ -48,7 +79,7 @@ func nasEncode(ue *store.UEContext, msg *gonas.Message, securityHeaderType uint8
 
 	if securityHeaderType != gonas.SecurityHeaderTypeIntegrityProtected &&
 		securityHeaderType != gonas.SecurityHeaderTypeIntegrityProtectedWithNew5gNasSecurityContext {
-		if err = security.NASEncrypt(ue.CipheringAlg, ue.KnasEnc, ue.ULCount, security.Bearer3GPP,
+		if err = security.NASEncrypt(ue.CipheringAlg, ue.KnasEnc, count, security.Bearer3GPP,
 			security.DirectionUplink, payload); err != nil {
 			return nil, fmt.Errorf("NAS encrypt: %v", err)
 		}
@@ -56,7 +87,7 @@ func nasEncode(ue *store.UEContext, msg *gonas.Message, securityHeaderType uint8
 
 	payload = append([]byte{sequenceNumber}, payload...)
 
-	mac32, err := security.NASMacCalculate(ue.IntegrityAlg, ue.KnasInt, ue.ULCount, security.Bearer3GPP, security.DirectionUplink, payload)
+	mac32, err := security.NASMacCalculate(ue.IntegrityAlg, ue.KnasInt, count, security.Bearer3GPP, security.DirectionUplink, payload)
 	if err != nil {
 		return nil, fmt.Errorf("NAS MAC: %v", err)
 	}
@@ -65,7 +96,13 @@ func nasEncode(ue *store.UEContext, msg *gonas.Message, securityHeaderType uint8
 	msgSecurityHeader := []byte{msg.ProtocolDiscriminator, msg.SecurityHeaderType}
 	payload = append(msgSecurityHeader, payload...)
 
+	// The 5GS security header is 2 octets, so the NAS-MAC's first octet is at index 2.
+	if o.corruptMAC && len(payload) >= 7 {
+		payload[2] ^= 0xff
+	}
+
 	ue.ULCount++
+	ue.LastUplinkNAS = payload
 
 	return payload, nil
 }

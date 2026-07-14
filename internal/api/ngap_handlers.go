@@ -68,6 +68,12 @@ func (h *Handler) SendNGAP(w http.ResponseWriter, r *http.Request) {
 		handleUEContextReleaseRequest(w, r, gnb, ue, t, &req)
 	case "service_request":
 		handleServiceRequest(w, r, gnb, ue, t, &req)
+	case "inject_nas":
+		handleInjectNAS(w, r, gnb, ue, t, &req)
+	case "error_indication":
+		handleErrorIndication(w, r, gnb, ue, t, &req)
+	case "ue_capability_info":
+		handleUECapabilityInfo(w, r, gnb, ue, t, &req)
 	case "identity_response":
 		handleIdentityResponse(w, r, gnb, ue, t, &req)
 	case "pdu_session_release_request":
@@ -722,6 +728,21 @@ func uplinkOverrides(req *SendNGAPRequest) *ngap.UplinkNASTransportOverrides {
 	}
 }
 
+// securityOpts maps the NAS negative-testing knobs on req to security-encode
+// options for a protected uplink message.
+func securityOpts(req *SendNGAPRequest) []nasCodec.EncodeOption {
+	var opts []nasCodec.EncodeOption
+	if req.CorruptMAC {
+		opts = append(opts, nasCodec.WithCorruptMAC())
+	}
+
+	if req.NASCountOverride != nil {
+		opts = append(opts, nasCodec.WithNASCountOverride(*req.NASCountOverride))
+	}
+
+	return opts
+}
+
 func initialUEOverrides(req *SendNGAPRequest) *ngap.InitialUEMessageOverrides {
 	if req.RRCEstablishmentCauseOverride == nil && req.UEContextRequestOverride == nil && req.RanUeNgapIDOverride == nil {
 		return nil
@@ -787,7 +808,7 @@ func handleRegistrationRequest(w http.ResponseWriter, r *http.Request, gnb *stor
 	}
 
 	if secured {
-		nasPDU, err = nasCodec.EncodeNasPduWithSecurity(ue, nasPDU, gonas.SecurityHeaderTypeIntegrityProtected)
+		nasPDU, err = nasCodec.EncodeNasPduWithSecurity(ue, nasPDU, gonas.SecurityHeaderTypeIntegrityProtected, securityOpts(req)...)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, fmt.Sprintf("NAS security encode: %v", err))
 			return
@@ -899,7 +920,7 @@ func handleSecurityModeComplete(w http.ResponseWriter, r *http.Request, gnb *sto
 		}
 
 		nasPDU, err = nasCodec.EncodeNasPduWithSecurity(ue, smcPDU,
-			gonas.SecurityHeaderTypeIntegrityProtectedAndCipheredWithNew5gNasSecurityContext)
+			gonas.SecurityHeaderTypeIntegrityProtectedAndCipheredWithNew5gNasSecurityContext, securityOpts(req)...)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, fmt.Sprintf("NAS security encode: %v", err))
 			return
@@ -1813,7 +1834,7 @@ func handleServiceRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnB
 		// Service Request plain so it still reaches the AMF (which must reject
 		// an unprotected / unknown-UE Service Request).
 		if len(ue.Kamf) > 0 {
-			nasPDU, err = nasCodec.EncodeNasPduWithSecurity(ue, srPDU, gonas.SecurityHeaderTypeIntegrityProtected)
+			nasPDU, err = nasCodec.EncodeNasPduWithSecurity(ue, srPDU, gonas.SecurityHeaderTypeIntegrityProtected, securityOpts(req)...)
 			if err != nil {
 				writeError(w, http.StatusInternalServerError, fmt.Sprintf("NAS security encode: %v", err))
 				return
@@ -1891,6 +1912,119 @@ func handleServiceRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnB
 		NGAP: ngapResp,
 		NAS:  nasResp,
 	})
+}
+
+// handleInjectNAS sends an arbitrary uplink NAS PDU on the UE's existing N2
+// association — a raw PDU or a verbatim replay of the last uplink — with the
+// AMF/RAN UE NGAP IDs optionally forged. The wait is un-matched and tolerant:
+// forged AP-IDs won't echo this UE's IDs, and a discarded replay draws no reply.
+func handleInjectNAS(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
+	var nasPDU []byte
+
+	switch {
+	case req.ReplayLast:
+		if len(ue.LastUplinkNAS) == 0 {
+			writeError(w, http.StatusBadRequest, "no prior uplink to replay")
+			return
+		}
+
+		nasPDU = ue.LastUplinkNAS
+	case req.RawNASPDU != nil:
+		decoded, err := hex.DecodeString(*req.RawNASPDU)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("raw_nas_pdu must be hex: %v", err))
+			return
+		}
+
+		nasPDU = decoded
+	default:
+		writeError(w, http.StatusBadRequest, "inject_nas requires raw_nas_pdu or replay_last")
+		return
+	}
+
+	encoded, err := ngap.BuildUplinkNASTransport(
+		ue.AmfUeNgapID, ue.RanUeNgapID, nasPDU,
+		gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, uplinkOverrides(req),
+	)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build UplinkNASTransport: %v", err))
+		return
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
+		return
+	}
+
+	timeout := 5 * time.Second
+	if req.TimeoutMs > 0 {
+		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	defer cancel()
+
+	ngapResp, err := t.WaitForMessage(ctx, "DownlinkNASTransport", "ErrorIndication", "UEContextReleaseCommand")
+	if err != nil {
+		writeJSON(w, http.StatusOK, SendNGAPResponse{})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
+}
+
+// handleUECapabilityInfo sends a UE RADIO CAPABILITY INFO INDICATION (TS 38.413
+// §8.14.1); the AMF stores the capability and replays it in a later Initial
+// Context Setup Request.
+func handleUECapabilityInfo(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
+	radioCap := []byte{0x01, 0x02, 0x03, 0x04, 0x05}
+
+	if req.UERadioCapability != nil {
+		decoded, err := hex.DecodeString(*req.UERadioCapability)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("ue_radio_capability must be hex: %v", err))
+			return
+		}
+
+		radioCap = decoded
+	}
+
+	encoded, err := ngap.BuildUERadioCapabilityInfoIndication(effectiveAmfID(req, ue), effectiveRanID(req, ue), radioCap)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build UERadioCapabilityInfoIndication: %v", err))
+		return
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
+		return
+	}
+
+	// One-way indication; briefly wait so a forged/inconsistent UE NGAP ID
+	// surfaces as an Error Indication (TS 38.413 §8.7.5.2).
+	ctx, cancel := context.WithTimeout(r.Context(), time.Second)
+	defer cancel()
+
+	ngapResp, err := t.WaitForMessageMatching(ctx, ueNGAPMatcher(effectiveRanID(req, ue), effectiveAmfID(req, ue)), "ErrorIndication")
+	if err != nil {
+		writeJSON(w, http.StatusOK, SendNGAPResponse{})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
+}
+
+// handleErrorIndication sends an ERROR INDICATION for the UE's connection
+// (TS 38.413 §8.7.5); the AMF releases the UE when the AP IDs name a known
+// connection.
+func handleErrorIndication(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
+	encoded, err := ngap.BuildErrorIndication(effectiveAmfID(req, ue), effectiveRanID(req, ue), 0) // radio-network unspecified
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build ErrorIndication: %v", err))
+		return
+	}
+
+	sendRawAndWait(w, r, gnb, ue, t, req, encoded, "UEContextReleaseCommand", "ErrorIndication")
 }
 
 func sendAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest, ngapMsg *ngap.NGAPMessage, waitFor ...string) {

@@ -53,6 +53,10 @@ type UEContext struct {
 	DLCount                  uint32                        `json:"-"`
 	SecurityContextAvailable bool                          `json:"-"`
 
+	// LastUplinkNAS is the most recent secured uplink NAS PDU sent, kept so it
+	// can be replayed to test the AMF's NAS replay protection (TS 24.501 §4.4.3.2).
+	LastUplinkNAS []byte `json:"-"`
+
 	// Last received AuthenticationRequest parameters
 	LastRAND []byte `json:"-"`
 	LastAUTN []byte `json:"-"`

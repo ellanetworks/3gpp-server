@@ -124,6 +124,25 @@ type NASRequest struct {
 	// Message — used for a Mobility Registration Update after an N2 handover,
 	// when the UE is already CM-CONNECTED on the target.
 	ExistingConnection bool `json:"existing_connection,omitempty"`
+
+	// CorruptMAC flips a byte of the NAS-MAC on a security-protected message so
+	// the AMF's integrity check fails; the AMF must discard it (TS 24.501 §4.4.4.3).
+	CorruptMAC bool `json:"corrupt_mac,omitempty"`
+
+	// NASCountOverride forces the uplink NAS COUNT written into a built message
+	// (e.g. a stale value) for replay/robustness tests.
+	NASCountOverride *uint32 `json:"nas_count,omitempty"`
+
+	// ReplayLast, on inject_nas, resends this UE's last uplink NAS PDU verbatim to
+	// test the AMF's NAS replay protection (TS 24.501 §4.4.3.2).
+	ReplayLast bool `json:"replay_last,omitempty"`
+
+	// TimeoutMs bounds how long a send waits for a downlink. Defaults to 5000.
+	TimeoutMs int `json:"timeout_ms,omitempty"`
+
+	// UERadioCapability, on ue_capability_info, is the hex radio capability the
+	// gNB reports; the AMF replays it in a later Initial Context Setup Request.
+	UERadioCapability *string `json:"ue_radio_capability,omitempty"`
 }
 
 type SNSSAIJSON struct {

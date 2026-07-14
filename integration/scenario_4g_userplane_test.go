@@ -62,3 +62,42 @@ func Test4GUserPlane(t *testing.T) {
 		t.Fatalf("downlink inner.icmp_seq = %q, want %d; body: %s", got, icmpSeq, dl)
 	}
 }
+
+// Test4GMultiPDNUserPlane proves an additional PDN connection carries data on its
+// own bearer: an uplink ICMP echo selected by the additional bearer's EBI
+// round-trips on that bearer's distinct S1-U tunnel, not the default bearer's.
+func Test4GMultiPDNUserPlane(t *testing.T) {
+	enbID := createGTPUENB(t, 1, "gtpu-multipdn-enb")
+	ueID := mustCreateENBUE(t, enbID)
+
+	ebi := connectSecondPDN(t, enbID, ueID)
+
+	const icmpID, icmpSeq = 4661, 9
+
+	var dl []byte
+
+	for i := 0; i < 5; i++ {
+		uplink := fmt.Sprintf(`{"ebi":%s,"icmp_echo":{"dst":%q,"id":%d,"seq":%d}}`, ebi, dnResponderIP, icmpID, icmpSeq)
+		if s, b := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/uplink", uplink); s != 200 {
+			t.Fatalf("send uplink on ebi %s: HTTP %d: %s", ebi, s, b)
+		}
+
+		if s, b := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/downlink/await",
+			fmt.Sprintf(`{"ebi":%s,"timeout_ms":2000}`, ebi)); s == 200 {
+			dl = b
+			break
+		}
+	}
+
+	if dl == nil {
+		t.Fatal("no downlink on the additional bearer — the UPF did not forward its user-plane traffic")
+	}
+
+	if got := jsonGet(dl, "inner.icmp_type"); got != "0" {
+		t.Fatalf("downlink inner.icmp_type = %q, want 0 (echo reply); body: %s", got, dl)
+	}
+
+	if got := jsonGet(dl, "inner.icmp_seq"); got != fmt.Sprintf("%d", icmpSeq) {
+		t.Fatalf("downlink inner.icmp_seq = %q, want %d; body: %s", got, icmpSeq, dl)
+	}
+}

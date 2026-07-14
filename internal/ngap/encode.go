@@ -1322,6 +1322,81 @@ func BuildHandoverCancel(amfUeNgapID, ranUeNgapID, causeRadioNetwork int64) ([]b
 	return ngap.Encoder(pdu)
 }
 
+// BuildUERadioCapabilityInfoIndication builds a UE RADIO CAPABILITY INFO
+// INDICATION (TS 38.413 §8.14.1); the AMF stores the capability and replays it
+// in a later Initial Context Setup Request.
+func BuildUERadioCapabilityInfoIndication(amfUeNgapID, ranUeNgapID int64, radioCapability []byte) ([]byte, error) {
+	pdu := ngapType.NGAPPDU{}
+	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
+	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
+
+	im := pdu.InitiatingMessage
+	im.ProcedureCode.Value = ngapType.ProcedureCodeUERadioCapabilityInfoIndication
+	im.Criticality.Value = ngapType.CriticalityPresentIgnore
+	im.Value.Present = ngapType.InitiatingMessagePresentUERadioCapabilityInfoIndication
+	im.Value.UERadioCapabilityInfoIndication = new(ngapType.UERadioCapabilityInfoIndication)
+
+	ies := &im.Value.UERadioCapabilityInfoIndication.ProtocolIEs
+
+	add := func(id int64, crit aper.Enumerated, present int) *ngapType.UERadioCapabilityInfoIndicationIEsValue {
+		ie := ngapType.UERadioCapabilityInfoIndicationIEs{}
+		ie.Id.Value = id
+		ie.Criticality.Value = crit
+		ie.Value.Present = present
+		ies.List = append(ies.List, ie)
+
+		return &ies.List[len(ies.List)-1].Value
+	}
+
+	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentReject,
+		ngapType.UERadioCapabilityInfoIndicationIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: amfUeNgapID}
+	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentReject,
+		ngapType.UERadioCapabilityInfoIndicationIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
+	add(ngapType.ProtocolIEIDUERadioCapability, ngapType.CriticalityPresentIgnore,
+		ngapType.UERadioCapabilityInfoIndicationIEsPresentUERadioCapability).UERadioCapability = &ngapType.UERadioCapability{Value: radioCapability}
+
+	return ngap.Encoder(pdu)
+}
+
+// BuildErrorIndication builds an ERROR INDICATION (TS 38.413 §8.7.5) reporting a
+// protocol error for the UE-associated connection. The Cause is a radio-network
+// value (TS 38.413 §9.3.1.2).
+func BuildErrorIndication(amfUeNgapID, ranUeNgapID, causeRadioNetwork int64) ([]byte, error) {
+	pdu := ngapType.NGAPPDU{}
+	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
+	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
+
+	im := pdu.InitiatingMessage
+	im.ProcedureCode.Value = ngapType.ProcedureCodeErrorIndication
+	im.Criticality.Value = ngapType.CriticalityPresentIgnore
+	im.Value.Present = ngapType.InitiatingMessagePresentErrorIndication
+	im.Value.ErrorIndication = new(ngapType.ErrorIndication)
+
+	ies := &im.Value.ErrorIndication.ProtocolIEs
+
+	add := func(id int64, crit aper.Enumerated, present int) *ngapType.ErrorIndicationIEsValue {
+		ie := ngapType.ErrorIndicationIEs{}
+		ie.Id.Value = id
+		ie.Criticality.Value = crit
+		ie.Value.Present = present
+		ies.List = append(ies.List, ie)
+
+		return &ies.List[len(ies.List)-1].Value
+	}
+
+	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentIgnore,
+		ngapType.ErrorIndicationIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: amfUeNgapID}
+	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentIgnore,
+		ngapType.ErrorIndicationIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
+	add(ngapType.ProtocolIEIDCause, ngapType.CriticalityPresentIgnore,
+		ngapType.ErrorIndicationIEsPresentCause).Cause = &ngapType.Cause{
+		Present:      ngapType.CausePresentRadioNetwork,
+		RadioNetwork: &ngapType.CauseRadioNetwork{Value: aper.Enumerated(causeRadioNetwork)},
+	}
+
+	return ngap.Encoder(pdu)
+}
+
 // BuildHandoverNotify builds a HANDOVER NOTIFY (TS 38.413 §8.4.3) sent by the
 // target gNB once the UE has arrived.
 func BuildHandoverNotify(amfUeNgapID, ranUeNgapID int64, mcc, mnc, tac, gnbID string) ([]byte, error) {

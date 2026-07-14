@@ -52,6 +52,10 @@ type IE struct {
 	IndexToRFSP             *int64                       `json:"index_to_rfsp,omitempty"`
 	UEAggregateMaxBitRate   *UEAggregateMaxBitRateJSON   `json:"ue_aggregate_max_bit_rate,omitempty"`
 
+	// UERadioCapability is the UE radio capability the AMF replays in an Initial
+	// Context Setup Request (hex, TS 38.413 §9.3.1.74).
+	UERadioCapability *string `json:"ue_radio_capability,omitempty"`
+
 	// PDUSessionSetupItems surface, per session in a PDU Session Resource Setup
 	// Request, the UPF's uplink GTP-U tunnel (decoded from the per-session
 	// transfer) so the emulated gNB can terminate the N3 data path.

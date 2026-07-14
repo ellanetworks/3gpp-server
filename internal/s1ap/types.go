@@ -65,6 +65,10 @@ type S1APResponse struct {
 	// Context Setup Request (hex), when present (TS 23.401 §5.11.2).
 	UERadioCapability *string `json:"ue_radio_capability,omitempty"`
 
+	// UEAggregateMaxBitRate is the UE-AMBR the MME sets in an Initial Context
+	// Setup Request (TS 36.413 §9.2.1.20).
+	UEAggregateMaxBitRate *UEAggregateMaxBitRateJSON `json:"ue_aggregate_max_bit_rate,omitempty"`
+
 	// Cause is set on an Error Indication (TS 36.413 §9.1.4.3) and a Path Switch
 	// Request Failure (§9.1.5.10).
 	Cause *CauseJSON `json:"cause,omitempty"`
@@ -103,6 +107,12 @@ type PagingJSON struct {
 	MTMSI                uint32 `json:"m_tmsi"`
 	UEIdentityIndexValue uint16 `json:"ue_identity_index_value"`
 	CNDomain             string `json:"cn_domain"`
+}
+
+// UEAggregateMaxBitRateJSON is the UE Aggregate Maximum Bit Rate (DL, UL bps).
+type UEAggregateMaxBitRateJSON struct {
+	DL int64 `json:"dl"`
+	UL int64 `json:"ul"`
 }
 
 // UESecurityCapabilitiesJSON is the S1AP EPS encryption/integrity algorithm

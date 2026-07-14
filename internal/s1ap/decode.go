@@ -166,6 +166,10 @@ func decodeInitialContextSetupRequest(value []byte, resp *S1APResponse) error {
 	}
 
 	setUEIDs(resp, int64(m.MMEUES1APID), int64(m.ENBUES1APID))
+	resp.UEAggregateMaxBitRate = &UEAggregateMaxBitRateJSON{
+		DL: int64(m.UEAggregateMaximumBitRate.DL),
+		UL: int64(m.UEAggregateMaximumBitRate.UL),
+	}
 
 	for _, it := range m.ERABToBeSetup {
 		item := ERABSetupItemJSON{ERABID: int(it.ERABID), GTPTEID: uint32(it.GTPTEID)}

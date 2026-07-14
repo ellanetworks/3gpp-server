@@ -570,6 +570,11 @@ func decodeInitialContextSetupRequest(msg *ngapType.InitialContextSetupRequest, 
 					decoded.AllowedNSSAI = append(decoded.AllowedNSSAI, nssai)
 				}
 			}
+		case ngapType.ProtocolIEIDUERadioCapability:
+			if ie.Value.UERadioCapability != nil {
+				s := hex.EncodeToString(ie.Value.UERadioCapability.Value)
+				decoded.UERadioCapability = &s
+			}
 		}
 
 		resp.IEs = append(resp.IEs, decoded)

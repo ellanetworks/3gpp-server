@@ -165,6 +165,8 @@ func (h *Handler) SendENBNAS(w http.ResponseWriter, r *http.Request) {
 		resp, herr = h.handoverCancel(ctx, ue, t, &req)
 	case "enb_status_transfer":
 		resp, herr = h.enbStatusTransfer(ue, t, &req)
+	case "error_indication":
+		resp, herr = h.errorIndication(ctx, ue, t, &req)
 	case "pdn_connectivity":
 		resp, herr = h.pdnConnectivity(ctx, enb, ue, t, &req)
 	case "pdn_disconnect":
@@ -1127,6 +1129,23 @@ func esmPTI(req *SendENBNASRequest) uint8 {
 	}
 
 	return 0
+}
+
+// errorIndication sends an ERROR INDICATION for the UE's connection (TS 36.413
+// §8.6.1); the MME releases the UE when the AP IDs name a known connection.
+func (h *Handler) errorIndication(ctx context.Context, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+	encoded, err := s1ap.BuildErrorIndication(sourceMMEID(ue, req), sourceENBID(ue, req), 0) // radio-network unspecified
+	if err != nil {
+		return nil, err
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		return nil, err
+	}
+
+	resp := h.waitDownlinkTolerant(ctx, t, ue, "UEContextReleaseCommand", "ErrorIndication")
+
+	return &SendENBNASResponse{S1AP: resp}, nil
 }
 
 // trackingAreaUpdate sends a (protected) Tracking Area Update Request from a

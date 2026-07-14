@@ -399,9 +399,33 @@ paths:
       operationId: sendENBUplink
       summary: Send S1-U uplink user data
       description: |
-        Encapsulates a crafted inner IP packet (sourced from the UE IP) in a plain
-        S1-U G-PDU and sends it to the S-GW/UPF on the default bearer's uplink TEID.
-        Requires the eNB created with enable_gtpu.
+        Encapsulates a crafted inner IP packet (sourced from the selected bearer's
+        UE IP) in a plain S1-U G-PDU and sends it to the S-GW/UPF on that bearer's
+        uplink TEID. Exactly one of icmp_echo or udp is used. Requires the eNB
+        created with enable_gtpu.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ebi: { type: integer, description: "Bearer to send on; 0 or the default EBI uses the default bearer, else an additional PDN's bearer." }
+                src: { type: string, description: "Override the inner source IP (source-spoofing tests); defaults to the bearer's UE IP." }
+                teid: { type: integer, description: "Override the uplink TEID (invalid-tunnel tests)." }
+                icmp_echo:
+                  type: object
+                  properties:
+                    dst: { type: string }
+                    id: { type: integer }
+                    seq: { type: integer }
+                udp:
+                  type: object
+                  properties:
+                    dst: { type: string }
+                    dst_port: { type: integer }
+                    src_port: { type: integer }
+                    payload_hex: { type: string }
       responses:
         "200":
           description: Sent.
@@ -417,7 +441,16 @@ paths:
     post:
       operationId: awaitENBDownlink
       summary: Await S1-U downlink user data
-      description: Blocks for a downlink T-PDU on the default bearer's eNB TEID and returns the decoded inner packet.
+      description: Blocks for a downlink T-PDU on the selected bearer's eNB TEID and returns the decoded inner packet.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ebi: { type: integer, description: "Bearer to await on; defaults to the default bearer." }
+                timeout_ms: { type: integer, description: "How long to wait. Default 5000." }
       responses:
         "200":
           description: Decoded downlink packet.
@@ -1235,7 +1268,7 @@ components:
       properties:
         message_type:
           type: string
-          enum: [attach_request, authentication_response, authentication_failure, identity_response, security_mode_complete, security_mode_reject, attach_complete, detach_request, release_request, service_request, ue_capability_info, tracking_area_update, path_switch, pdn_connectivity, pdn_disconnect, modify_eps_bearer_context_accept, deactivate_eps_bearer_context_accept, status_esm, reset, inject_nas, handover_required, handover_cancel, enb_status_transfer]
+          enum: [attach_request, authentication_response, authentication_failure, identity_response, security_mode_complete, security_mode_reject, attach_complete, detach_request, release_request, service_request, ue_capability_info, tracking_area_update, path_switch, pdn_connectivity, pdn_disconnect, modify_eps_bearer_context_accept, deactivate_eps_bearer_context_accept, status_esm, reset, inject_nas, handover_required, handover_cancel, enb_status_transfer, error_indication]
         pdn_type:
           type: integer
           description: "Requested PDN type for attach: 1=IPv4, 2=IPv6, 3=IPv4v6 (default 1)."
@@ -1521,7 +1554,7 @@ components:
         message_type:
           type: string
           description: NAS message to send.
-          enum: [registration_request, authentication_response, security_mode_complete, registration_complete, pdu_session_establishment_request, deregistration_request, ue_context_release_request, service_request, identity_response, pdu_session_release_request, pdu_session_release_complete, pdu_session_modification_request, pdu_session_modification_complete, pdu_session_modification_command_reject, status_5gsm, authentication_failure, security_mode_reject, handover_required, handover_cancel]
+          enum: [registration_request, authentication_response, security_mode_complete, registration_complete, pdu_session_establishment_request, deregistration_request, ue_context_release_request, service_request, identity_response, pdu_session_release_request, pdu_session_release_complete, pdu_session_modification_request, pdu_session_modification_complete, pdu_session_modification_command_reject, status_5gsm, authentication_failure, security_mode_reject, handover_required, handover_cancel, inject_nas, ue_capability_info, error_indication]
         raw_nas_pdu:
           type: string
           description: |
@@ -1543,6 +1576,21 @@ components:
         res_star_override:
           type: string
           description: Override RES* in authentication_response (hex, 16 bytes). Skips 5G-AKA computation.
+        corrupt_mac:
+          type: boolean
+          description: On a security-protected message (security_mode_complete/service_request/mobility registration_request), flip a NAS-MAC byte so the AMF's integrity check fails and it discards the message (TS 24.501 §4.4.4.3).
+        nas_count:
+          type: integer
+          description: Force the uplink NAS COUNT written into a built message (e.g. a stale value) for replay/robustness tests; the UE's real counter still advances.
+        replay_last:
+          type: boolean
+          description: On inject_nas, resend this UE's last secured uplink NAS PDU verbatim (NAS replay protection test, TS 24.501 §4.4.3.2).
+        timeout_ms:
+          type: integer
+          description: Bounds how long a send waits for a downlink. Default 5000.
+        ue_radio_capability:
+          type: string
+          description: On ue_capability_info, the hex UE radio capability the gNB reports; the AMF replays it in a later Initial Context Setup Request.
         release_cause:
           type: integer
           description: "Radio-network Cause value for ue_context_release_request (TS 38.413 §9.3.1.2). Default 20 (user-inactivity)."

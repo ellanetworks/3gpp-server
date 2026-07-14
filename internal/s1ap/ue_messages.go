@@ -66,6 +66,20 @@ func BuildUEContextReleaseRequest(mmeUEID, enbUEID uint32, cause uint8) ([]byte,
 	return m.Marshal()
 }
 
+// BuildErrorIndication builds an eNB-originated ERROR INDICATION reporting a
+// protocol error for the UE-associated connection (TS 36.413 §8.6.1).
+func BuildErrorIndication(mmeUEID, enbUEID uint32, cause int) ([]byte, error) {
+	mme := s1ap.MMEUES1APID(mmeUEID)
+	enb := s1ap.ENBUES1APID(enbUEID)
+	c := s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: cause}
+
+	return (&s1ap.ErrorIndication{
+		MMEUES1APID: &mme,
+		ENBUES1APID: &enb,
+		Cause:       &c,
+	}).Marshal()
+}
+
 // BuildUEContextReleaseComplete builds the eNB's acknowledgement of a UE Context
 // Release Command (TS 36.413 §9.1.4.7).
 func BuildUEContextReleaseComplete(mmeUEID, enbUEID uint32) ([]byte, error) {
