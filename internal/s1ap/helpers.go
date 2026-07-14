@@ -5,9 +5,27 @@ package s1ap
 
 import (
 	"fmt"
+	"net"
 
 	"github.com/ellanetworks/core/s1ap"
 )
+
+// parseTransportAddr validates a transport-layer address for the mandatory
+// TransportLayerAddress IE (TS 36.413 §9.2.2.1), returning the 4-byte form for
+// IPv4. An empty or malformed input is an error, keeping a bad address out of
+// an otherwise-valid message.
+func parseTransportAddr(s string) (net.IP, error) {
+	ip := net.ParseIP(s)
+	if ip == nil {
+		return nil, fmt.Errorf("invalid transport layer address %q", s)
+	}
+
+	if v4 := ip.To4(); v4 != nil {
+		return v4, nil
+	}
+
+	return ip, nil
+}
 
 // encodePLMN packs an MCC (3 digits) and MNC (2 or 3 digits) into the 3-octet
 // TBCD PLMN identity of TS 23.003 §2.6. A 2-digit MNC sets the spare nibble to

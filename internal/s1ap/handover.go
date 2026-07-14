@@ -4,8 +4,6 @@
 package s1ap
 
 import (
-	"net"
-
 	"github.com/ellanetworks/core/s1ap"
 )
 
@@ -78,9 +76,9 @@ func BuildHandoverRequestAcknowledge(p HandoverRequestAcknowledgeParams) ([]byte
 	admitted := make([]s1ap.ERABAdmittedItem, 0, len(p.Admitted))
 
 	for _, e := range p.Admitted {
-		addr := net.ParseIP(e.DLAddr)
-		if v4 := addr.To4(); v4 != nil {
-			addr = v4
+		addr, err := parseTransportAddr(e.DLAddr)
+		if err != nil {
+			return nil, err
 		}
 
 		admitted = append(admitted, s1ap.ERABAdmittedItem{

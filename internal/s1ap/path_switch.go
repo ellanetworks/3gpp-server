@@ -4,8 +4,6 @@
 package s1ap
 
 import (
-	"net"
-
 	"github.com/ellanetworks/core/s1ap"
 )
 
@@ -40,9 +38,9 @@ func BuildPathSwitchRequest(p PathSwitchRequestParams) ([]byte, error) {
 		return nil, err
 	}
 
-	addr := net.ParseIP(p.TargetS1UAddr)
-	if v4 := addr.To4(); v4 != nil {
-		addr = v4
+	addr, err := parseTransportAddr(p.TargetS1UAddr)
+	if err != nil {
+		return nil, err
 	}
 
 	item := s1ap.ERABToBeSwitchedDLItem{

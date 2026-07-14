@@ -38,7 +38,7 @@ type IE struct {
 	PLMNSupportList         []PLMNSupportJSON            `json:"plmn_support_list,omitempty"`
 	UERetentionInformation  *int64                       `json:"ue_retention_information,omitempty"`
 	CriticalityDiagnostics  *CriticalityDiagnosticsJSON  `json:"criticality_diagnostics,omitempty"`
-	TimeToWait              *int64                       `json:"time_to_wait,omitempty"`
+	TimeToWait              *string                      `json:"time_to_wait,omitempty"`
 
 	// InitialUEMessage optional IEs (TS 38.413 §9.2.5.1)
 	AMFSetID             *string                `json:"amf_set_id_ie,omitempty"`

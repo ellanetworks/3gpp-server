@@ -6,7 +6,6 @@ package crypto
 import (
 	"bytes"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"regexp"
 
@@ -22,38 +21,42 @@ type AKAResult struct {
 func ComputeResStar(k, opc, sqn, supi, snn string, rand, autn []byte) (*AKAResult, error) {
 	opcBytes, err := hex.DecodeString(opc)
 	if err != nil {
-		return nil, fmt.Errorf("decode OPc: %v", err)
+		return nil, fmt.Errorf("decode OPc: %w", err)
 	}
 
 	kBytes, err := hex.DecodeString(k)
 	if err != nil {
-		return nil, fmt.Errorf("decode K: %v", err)
+		return nil, fmt.Errorf("decode K: %w", err)
 	}
 
 	sqnBytes, err := hex.DecodeString(sqn)
 	if err != nil {
-		return nil, fmt.Errorf("decode SQN: %v", err)
+		return nil, fmt.Errorf("decode SQN: %w", err)
+	}
+
+	if len(autn) < 6 {
+		return nil, fmt.Errorf("AUTN too short: %d octets", len(autn))
 	}
 
 	sqnHn, AK, IK, CK, RES, err := milenage.GenerateKeysWithAUTN(opcBytes, kBytes, rand, autn)
 	if err != nil {
-		return nil, errors.New("milenage MAC failure")
+		return nil, ErrMACFailure
 	}
 
 	if bytes.Compare(sqnBytes, sqnHn) > 0 {
-		return nil, errors.New("sequence number out of range")
+		return nil, ErrSQNOutOfRange
 	}
 
 	key := append(CK, IK...)
 
 	kamf, err := derivateKamf(key, snn, supi, sqnHn, AK)
 	if err != nil {
-		return nil, fmt.Errorf("derive Kamf: %v", err)
+		return nil, fmt.Errorf("derive Kamf: %w", err)
 	}
 
 	resStar, err := computeResStar(key, snn, rand, RES)
 	if err != nil {
-		return nil, fmt.Errorf("derive RES*: %v", err)
+		return nil, fmt.Errorf("derive RES*: %w", err)
 	}
 
 	return &AKAResult{
@@ -68,22 +71,22 @@ func ComputeResStar(k, opc, sqn, supi, snn string, rand, autn []byte) (*AKAResul
 func ComputeAUTS(k, opc, sqn string, rand []byte) ([]byte, error) {
 	opcBytes, err := hex.DecodeString(opc)
 	if err != nil {
-		return nil, fmt.Errorf("decode OPc: %v", err)
+		return nil, fmt.Errorf("decode OPc: %w", err)
 	}
 
 	kBytes, err := hex.DecodeString(k)
 	if err != nil {
-		return nil, fmt.Errorf("decode K: %v", err)
+		return nil, fmt.Errorf("decode K: %w", err)
 	}
 
 	sqnBytes, err := hex.DecodeString(sqn)
 	if err != nil {
-		return nil, fmt.Errorf("decode SQN: %v", err)
+		return nil, fmt.Errorf("decode SQN: %w", err)
 	}
 
 	auts, err := milenage.GenerateAUTS(opcBytes, kBytes, rand, sqnBytes)
 	if err != nil {
-		return nil, fmt.Errorf("generate AUTS: %v", err)
+		return nil, fmt.Errorf("generate AUTS: %w", err)
 	}
 
 	return auts, nil
@@ -112,13 +115,13 @@ func derivateKamf(key []byte, snName, supi string, SQN, AK []byte) ([]byte, erro
 		[]byte(snName), ueauth.KDFLen([]byte(snName)),
 		SQNxorAK, ueauth.KDFLen(SQNxorAK))
 	if err != nil {
-		return nil, fmt.Errorf("derive Kausf: %v", err)
+		return nil, fmt.Errorf("derive Kausf: %w", err)
 	}
 
 	Kseaf, err := ueauth.GetKDFValue(Kausf, ueauth.FC_FOR_KSEAF_DERIVATION,
 		[]byte(snName), ueauth.KDFLen([]byte(snName)))
 	if err != nil {
-		return nil, fmt.Errorf("derive Kseaf: %v", err)
+		return nil, fmt.Errorf("derive Kseaf: %w", err)
 	}
 
 	supiRegexp := regexp.MustCompile(`(?:imsi|supi)-([0-9]{5,15})`)
@@ -134,7 +137,7 @@ func derivateKamf(key []byte, snName, supi string, SQN, AK []byte) ([]byte, erro
 		P0, ueauth.KDFLen(P0),
 		P1, ueauth.KDFLen(P1))
 	if err != nil {
-		return nil, fmt.Errorf("derive Kamf: %v", err)
+		return nil, fmt.Errorf("derive Kamf: %w", err)
 	}
 
 	return Kamf, nil

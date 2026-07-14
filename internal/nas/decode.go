@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	gonas "github.com/free5gc/nas"
+	"github.com/free5gc/nas/nasMessage"
 	"github.com/free5gc/nas/nasType"
 )
 
@@ -38,7 +39,7 @@ func Decode(data []byte) (*NASResponse, error) {
 	}
 
 	if m.GmmMessage == nil {
-		resp.MessageType = "unknown"
+		resp.MessageType = unknownMessageType(m)
 		return resp, nil
 	}
 
@@ -59,10 +60,24 @@ func Decode(data []byte) (*NASResponse, error) {
 	case gonas.MsgTypeStatus5GMM:
 		decodeStatus5GMM(m, resp)
 	case gonas.MsgTypeDLNASTransport:
-		decodeDLNASTransport(m, resp)
+		if err := decodeDLNASTransport(m, resp); err != nil {
+			return nil, err
+		}
 	}
 
 	return resp, nil
+}
+
+// unknownMessageType labels a decoded downlink the dispatch tables do not cover,
+// keeping the numeric 5GS message type (TS 24.501 §9.7) so a malformed downlink
+// stays identifiable. A nil GmmMessage means PlainNasDecode parsed a top-level
+// 5GSM message.
+func unknownMessageType(m *gonas.Message) string {
+	if m.GsmMessage != nil {
+		return fmt.Sprintf("gsm_message_%#x", m.GsmMessage.GetMessageType())
+	}
+
+	return "unknown"
 }
 
 func decodeAuthenticationRequest(m *gonas.Message, resp *NASResponse) {
@@ -160,9 +175,9 @@ func securityHeaderTypeToString(t uint8) string {
 	}
 }
 
-func decodeDLNASTransport(m *gonas.Message, resp *NASResponse) {
+func decodeDLNASTransport(m *gonas.Message, resp *NASResponse) error {
 	if m.DLNASTransport == nil {
-		return
+		return nil
 	}
 
 	if m.DLNASTransport.Cause5GMM != nil {
@@ -172,16 +187,22 @@ func decodeDLNASTransport(m *gonas.Message, resp *NASResponse) {
 
 	payload := m.DLNASTransport.GetPayloadContainerContents()
 	if len(payload) == 0 {
-		return
+		return nil
+	}
+
+	// The payload container holds a 5GSM message only when its type is N1 SM
+	// information (TS 24.501 §9.11.3.40); other container types are not NAS.
+	if m.DLNASTransport.GetPayloadContainerType() != nasMessage.PayloadContainerTypeN1SMInfo {
+		return nil
 	}
 
 	inner := new(gonas.Message)
 	if err := inner.GsmMessageDecode(&payload); err != nil {
-		return
+		return fmt.Errorf("decode DL NAS transport payload: %w", err)
 	}
 
 	if inner.GsmMessage == nil {
-		return
+		return nil
 	}
 
 	innerType := inner.GsmHeader.GetMessageType()
@@ -208,6 +229,8 @@ func decodeDLNASTransport(m *gonas.Message, resp *NASResponse) {
 			resp.Cause5GSM = &cause
 		}
 	}
+
+	return nil
 }
 
 func gsmMessageTypeName(t uint8) string {

@@ -76,17 +76,17 @@ func Decode(data []byte) (*NGAPResponse, error) {
 	switch pdu.Present {
 	case ngapType.NGAPPDUPresentSuccessfulOutcome:
 		resp.PDUType = "successful_outcome"
-		resp.MessageType = getSuccessfulOutcomeName(pdu.SuccessfulOutcome.Value.Present)
+		resp.MessageType = getSuccessfulOutcomeName(pdu.SuccessfulOutcome.Value.Present, pdu.SuccessfulOutcome.ProcedureCode.Value)
 		decodeSuccessfulOutcome(pdu.SuccessfulOutcome, resp)
 
 	case ngapType.NGAPPDUPresentUnsuccessfulOutcome:
 		resp.PDUType = "unsuccessful_outcome"
-		resp.MessageType = getUnsuccessfulOutcomeName(pdu.UnsuccessfulOutcome.Value.Present)
+		resp.MessageType = getUnsuccessfulOutcomeName(pdu.UnsuccessfulOutcome.Value.Present, pdu.UnsuccessfulOutcome.ProcedureCode.Value)
 		decodeUnsuccessfulOutcome(pdu.UnsuccessfulOutcome, resp)
 
 	case ngapType.NGAPPDUPresentInitiatingMessage:
 		resp.PDUType = "initiating_message"
-		resp.MessageType = getInitiatingMessageName(pdu.InitiatingMessage.Value.Present)
+		resp.MessageType = getInitiatingMessageName(pdu.InitiatingMessage.Value.Present, pdu.InitiatingMessage.ProcedureCode.Value)
 		decodeInitiatingMessage(pdu.InitiatingMessage, resp)
 
 	default:
@@ -827,7 +827,7 @@ func decodeNGSetupFailure(msg *ngapType.NGSetupFailure, resp *NGAPResponse) {
 
 		case ngapType.ProtocolIEIDTimeToWait:
 			if ie.Value.TimeToWait != nil {
-				v := int64(ie.Value.TimeToWait.Value)
+				v := timeToWaitName(ie.Value.TimeToWait.Value)
 				decoded.TimeToWait = &v
 			}
 
@@ -931,7 +931,10 @@ func criticalityToString(c aper.Enumerated) string {
 	}
 }
 
-func getInitiatingMessageName(msgType int) string {
+// getInitiatingMessageName labels an initiating message, falling back to the
+// on-wire NGAP procedure code (TS 38.413 §9.3.1.2) for messages this decoder
+// does not specifically handle so the label stays stable and awaitable.
+func getInitiatingMessageName(msgType int, procedureCode int64) string {
 	switch msgType {
 	case ngapType.InitiatingMessagePresentDownlinkNASTransport:
 		return "DownlinkNASTransport"
@@ -960,11 +963,11 @@ func getInitiatingMessageName(msgType int) string {
 	case ngapType.InitiatingMessagePresentUplinkNASTransport:
 		return "UplinkNASTransport"
 	default:
-		return fmt.Sprintf("Unknown(%d)", msgType)
+		return fmt.Sprintf("ProcedureCode(%d)", procedureCode)
 	}
 }
 
-func getSuccessfulOutcomeName(msgType int) string {
+func getSuccessfulOutcomeName(msgType int, procedureCode int64) string {
 	switch msgType {
 	case ngapType.SuccessfulOutcomePresentNGSetupResponse:
 		return "NGSetupResponse"
@@ -983,11 +986,11 @@ func getSuccessfulOutcomeName(msgType int) string {
 	case ngapType.SuccessfulOutcomePresentPathSwitchRequestAcknowledge:
 		return "PathSwitchRequestAcknowledge"
 	default:
-		return fmt.Sprintf("Unknown(%d)", msgType)
+		return fmt.Sprintf("ProcedureCode(%d)", procedureCode)
 	}
 }
 
-func getUnsuccessfulOutcomeName(msgType int) string {
+func getUnsuccessfulOutcomeName(msgType int, procedureCode int64) string {
 	switch msgType {
 	case ngapType.UnsuccessfulOutcomePresentNGSetupFailure:
 		return "NGSetupFailure"
@@ -998,7 +1001,29 @@ func getUnsuccessfulOutcomeName(msgType int) string {
 	case ngapType.UnsuccessfulOutcomePresentInitialContextSetupFailure:
 		return "InitialContextSetupFailure"
 	default:
-		return fmt.Sprintf("Unknown(%d)", msgType)
+		return fmt.Sprintf("ProcedureCode(%d)", procedureCode)
+	}
+}
+
+// timeToWaitName maps the TimeToWait enum (TS 38.413 §9.3.1.53) to its
+// self-describing spec name so an awaiting client reads the wait duration
+// without a lib-internal enum index.
+func timeToWaitName(t aper.Enumerated) string {
+	switch t {
+	case ngapType.TimeToWaitPresentV1s:
+		return "v1s"
+	case ngapType.TimeToWaitPresentV2s:
+		return "v2s"
+	case ngapType.TimeToWaitPresentV5s:
+		return "v5s"
+	case ngapType.TimeToWaitPresentV10s:
+		return "v10s"
+	case ngapType.TimeToWaitPresentV20s:
+		return "v20s"
+	case ngapType.TimeToWaitPresentV60s:
+		return "v60s"
+	default:
+		return fmt.Sprintf("TimeToWait(%d)", t)
 	}
 }
 
@@ -1015,11 +1040,24 @@ func decodeUEContextReleaseCommand(msg *ngapType.UEContextReleaseCommand, resp *
 
 		switch ie.Id.Value {
 		case ngapType.ProtocolIEIDUENGAPIDs:
-			if ie.Value.UENGAPIDs != nil && ie.Value.UENGAPIDs.UENGAPIDPair != nil {
-				amfID := ie.Value.UENGAPIDs.UENGAPIDPair.AMFUENGAPID.Value
-				ranID := ie.Value.UENGAPIDs.UENGAPIDPair.RANUENGAPID.Value
-				decoded.AmfUeNgapID = &amfID
-				decoded.RanUeNgapID = &ranID
+			// UE-NGAP-IDs is a CHOICE (TS 38.413 §9.3.3.19): the UE pair, or a
+			// bare AMF-UE-NGAP-ID. Surface the AMF ID for either so a waiter
+			// keyed on the UE matches.
+			if ids := ie.Value.UENGAPIDs; ids != nil {
+				switch ids.Present {
+				case ngapType.UENGAPIDsPresentUENGAPIDPair:
+					if pair := ids.UENGAPIDPair; pair != nil {
+						amfID := pair.AMFUENGAPID.Value
+						ranID := pair.RANUENGAPID.Value
+						decoded.AmfUeNgapID = &amfID
+						decoded.RanUeNgapID = &ranID
+					}
+				case ngapType.UENGAPIDsPresentAMFUENGAPID:
+					if amf := ids.AMFUENGAPID; amf != nil {
+						amfID := amf.Value
+						decoded.AmfUeNgapID = &amfID
+					}
+				}
 			}
 		case ngapType.ProtocolIEIDCause:
 			if ie.Value.Cause != nil {

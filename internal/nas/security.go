@@ -182,7 +182,7 @@ func DecodeSecuredNAS(ue *store.UEContext, message []byte) (*NASResponse, error)
 	}
 
 	if m.GmmMessage == nil {
-		resp.MessageType = "unknown"
+		resp.MessageType = unknownMessageType(m)
 		return resp, nil
 	}
 
@@ -205,7 +205,9 @@ func DecodeSecuredNAS(ue *store.UEContext, message []byte) (*NASResponse, error)
 	case gonas.MsgTypeStatus5GMM:
 		decodeStatus5GMM(m, resp)
 	case gonas.MsgTypeDLNASTransport:
-		decodeDLNASTransport(m, resp)
+		if err := decodeDLNASTransport(m, resp); err != nil {
+			return nil, err
+		}
 	}
 
 	return resp, nil

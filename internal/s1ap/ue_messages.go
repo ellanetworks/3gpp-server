@@ -4,8 +4,6 @@
 package s1ap
 
 import (
-	"net"
-
 	"github.com/ellanetworks/core/s1ap"
 )
 
@@ -167,9 +165,9 @@ type InitialContextSetupResponseParams struct {
 // BuildInitialContextSetupResponse builds the eNB's Initial Context Setup
 // Response, setting up the single default E-RAB with the eNB's S1-U endpoint.
 func BuildInitialContextSetupResponse(p InitialContextSetupResponseParams) ([]byte, error) {
-	addr := net.ParseIP(p.ENBN3Addr)
-	if v4 := addr.To4(); v4 != nil {
-		addr = v4
+	addr, err := parseTransportAddr(p.ENBN3Addr)
+	if err != nil {
+		return nil, err
 	}
 
 	m := &s1ap.InitialContextSetupResponse{
@@ -201,9 +199,9 @@ func BuildERABReleaseResponse(mmeUEID, enbUEID uint32, erabID uint8) ([]byte, er
 // Request, setting up the additional E-RAB with the eNB's S1-U endpoint
 // (TS 36.413 §9.1.3.2).
 func BuildERABSetupResponse(p InitialContextSetupResponseParams) ([]byte, error) {
-	addr := net.ParseIP(p.ENBN3Addr)
-	if v4 := addr.To4(); v4 != nil {
-		addr = v4
+	addr, err := parseTransportAddr(p.ENBN3Addr)
+	if err != nil {
+		return nil, err
 	}
 
 	m := &s1ap.ERABSetupResponse{
