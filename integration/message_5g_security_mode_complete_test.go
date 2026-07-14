@@ -43,29 +43,34 @@ func Test5GSecurityModeComplete_Fuzz(t *testing.T) {
 		wantNGAPMsgType string
 	}{
 		{
-			name:            "raw NAS: plain SecurityModeComplete (no integrity protection)",
-			body:            `{"message_type":"security_mode_complete","raw_nas_pdu":"7e005e00"}`,
-			wantHTTP:        200,
-			wantNGAPMsgType: ngapDownlinkNASTransport,
-			// AMF should reject — plain NAS when security context is active
+			name: "raw NAS: plain SecurityModeComplete (no integrity protection)",
+			// SECURITY MODE COMPLETE must be integrity protected with the new context and
+			// is not in the TS 24.501 §4.4.4.3 exempt list, so a plain one fails the
+			// integrity requirement and shall be discarded; the AMF keeps T3560 running
+			// and sends nothing. Silent drop is the mandated, secure outcome (504).
+			body:     `{"message_type":"security_mode_complete","raw_nas_pdu":"7e005e00"}`,
+			wantHTTP: 504,
 		},
 		{
-			name:            "raw NAS: integrity header but zeroed MAC",
-			body:            `{"message_type":"security_mode_complete","raw_nas_pdu":"7e04000000000000005e00"}`,
-			wantHTTP:        200,
-			wantNGAPMsgType: ngapDownlinkNASTransport,
+			name: "raw NAS: integrity header but zeroed MAC",
+			// Integrity check fails (zeroed MAC) → discarded per TS 24.501 §4.4.4.3;
+			// the AMF must not act on unauthenticated NAS. Silent drop is correct (504).
+			body:     `{"message_type":"security_mode_complete","raw_nas_pdu":"7e04000000000000005e00"}`,
+			wantHTTP: 504,
 		},
 		{
-			name:            "raw NAS: security header claiming ciphering, plaintext content",
-			body:            `{"message_type":"security_mode_complete","raw_nas_pdu":"7e02000000000000005e00"}`,
-			wantHTTP:        200,
-			wantNGAPMsgType: ngapDownlinkNASTransport,
+			name: "raw NAS: security header claiming ciphering, zeroed MAC",
+			// Claims integrity+ciphering but carries a zeroed MAC → integrity check
+			// fails → discarded per TS 24.501 §4.4.4.3. Silent drop is correct (504).
+			body:     `{"message_type":"security_mode_complete","raw_nas_pdu":"7e02000000000000005e00"}`,
+			wantHTTP: 504,
 		},
 		{
-			name:            "raw NAS: single byte",
-			body:            `{"message_type":"security_mode_complete","raw_nas_pdu":"7e"}`,
-			wantHTTP:        200,
-			wantNGAPMsgType: ngapDownlinkNASTransport,
+			name: "raw NAS: single byte",
+			// Too short to contain a complete message type IE → shall be ignored
+			// (TS 24.501 §7.2.1). Silent drop is the mandated behaviour (504).
+			body:     `{"message_type":"security_mode_complete","raw_nas_pdu":"7e"}`,
+			wantHTTP: 504,
 		},
 		{
 			name:            "raw NAS: empty → ErrorIndication",

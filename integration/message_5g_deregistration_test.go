@@ -79,10 +79,11 @@ func Test5GDeregistration_Fuzz(t *testing.T) {
 			wantHTTP: 200,
 		},
 		{
-			name:            "raw NAS: missing security header (single byte EPD)",
-			body:            `{"message_type":"deregistration_request","raw_nas_pdu":"7e"}`,
-			wantHTTP:        200,
-			wantNGAPMsgType: ngapDownlinkNASTransport,
+			name: "raw NAS: missing security header (single byte EPD)",
+			// Too short to contain a complete message type IE → shall be ignored
+			// (TS 24.501 §7.2.1). Silent drop is the mandated behaviour (504).
+			body:     `{"message_type":"deregistration_request","raw_nas_pdu":"7e"}`,
+			wantHTTP: 504,
 		},
 		{
 			// NGAP-level: stale AMF UE NGAP ID — unknown local AP ID (TS 38.413 §10.6)
