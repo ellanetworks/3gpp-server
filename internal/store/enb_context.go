@@ -61,6 +61,15 @@ func (e *ENBContext) CreateUE(imsi, k, opc, amf, sqn string) *UEEPSContext {
 	return ue
 }
 
+// AdoptUE inserts an existing UE context under this eNB, modelling the UE
+// arriving at a target eNB after an S1 handover. The context keeps its identity,
+// credentials, and EPS NAS security state.
+func (e *ENBContext) AdoptUE(ue *UEEPSContext) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.ues[ue.ID] = ue
+}
+
 func (e *ENBContext) GetUE(ueID string) (*UEEPSContext, bool) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()

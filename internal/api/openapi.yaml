@@ -184,13 +184,18 @@ paths:
       - $ref: "#/components/parameters/ue_id"
     post:
       operationId: sendENBNAS
-      summary: Drive one EPS NAS procedure step
+      summary: Drive one EPS NAS procedure step or a source-eNB S1AP message
       description: |
-        Sends one uplink EPS NAS message from the emulated UE (attach_request,
-        authentication_response, security_mode_complete, attach_complete) over
-        S1AP and returns the MME's reply decoded as JSON. EPS-AKA and NAS keys are
-        computed independently, so a returned mac_verified reflects the MME's
-        NAS-MAC checked under those keys.
+        Sends one uplink message from the emulated UE over S1AP and returns the
+        MME's reply decoded as JSON. message_type selects the message: the EPS NAS
+        procedures (attach_request, authentication_response, identity_response,
+        security_mode_complete/reject, attach_complete, service_request,
+        tracking_area_update, detach_request, release_request, pdn_connectivity,
+        pdn_disconnect, ue_capability_info, path_switch, reset, inject_nas), and
+        the source-eNB side of S1 handover (handover_required, handover_cancel,
+        enb_status_transfer — TS 36.413 §8.4). EPS-AKA and NAS keys are computed
+        independently, so a returned mac_verified reflects the MME's NAS-MAC
+        checked under those keys.
       requestBody:
         required: true
         content:
@@ -208,6 +213,97 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "504":
+          $ref: "#/components/responses/GatewayTimeout"
+
+  /enb/{enb_id}/ue/{ue_id}:
+    parameters:
+      - $ref: "#/components/parameters/enb_id"
+      - $ref: "#/components/parameters/ue_id"
+    get:
+      operationId: getENBUE
+      summary: Get an eNB UE's state
+      description: |
+        Returns the UE's EPS state — its identities, S1AP ID pair, whether the NAS
+        security context is active, the default bearer, and the established PDN
+        connections.
+      responses:
+        "200":
+          description: UE state.
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /enb/{enb_id}/ue/{ue_id}/migrate:
+    parameters:
+      - $ref: "#/components/parameters/enb_id"
+      - $ref: "#/components/parameters/ue_id"
+    post:
+      operationId: migrateENBUE
+      summary: Relocate a UE context to a target eNB after S1 handover
+      description: |
+        Moves the UE context to the target eNB's association, modelling the UE
+        arriving at the target after an S1 handover (TS 23.401 §5.5.1.2). The UE
+        keeps its security context; its S1AP ID pair becomes the target's values.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_enb_id]
+              properties:
+                target_enb_id:
+                  type: string
+                  description: "Store ID of the eNB to move the UE to."
+                mme_ue_s1ap_id:
+                  type: integer
+                  description: "MME UE S1AP ID at the target (from the Handover Request)."
+                enb_ue_s1ap_id:
+                  type: integer
+                  description: "eNB UE S1AP ID the target assigned to the UE."
+      responses:
+        "200":
+          description: UE relocated.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /enb/{enb_id}/s1ap:
+    parameters:
+      - $ref: "#/components/parameters/enb_id"
+    post:
+      operationId: sendENBS1AP
+      summary: Send a non-UE-associated S1AP message (target-eNB side of S1 handover)
+      description: |
+        Sends a non-UE-associated S1AP message on the eNB's S1-MME association —
+        the target-eNB side of S1 handover, where the eNB acts on a UE it does not
+        yet own and addresses it by the S1AP ID pair the MME assigned. message_type
+        selects the message: handover_request_acknowledge, handover_notify, or
+        handover_failure (TS 36.413 §8.4).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendENBS1APRequest"
+      responses:
+        "200":
+          description: Sent (S1AP reply when the message expects one).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendENBNASResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
         "502":
           $ref: "#/components/responses/BadGateway"
 
@@ -876,6 +972,12 @@ components:
         application/json:
           schema:
             $ref: "#/components/schemas/Error"
+    InternalError:
+      description: Failed to build or encode the message.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
     GatewayTimeout:
       description: Timed out waiting for AMF response.
       content:
@@ -1131,7 +1233,7 @@ components:
       properties:
         message_type:
           type: string
-          enum: [attach_request, authentication_response, authentication_failure, identity_response, security_mode_complete, security_mode_reject, attach_complete, detach_request, release_request, service_request, ue_capability_info, tracking_area_update, path_switch, pdn_connectivity, pdn_disconnect, reset, inject_nas]
+          enum: [attach_request, authentication_response, authentication_failure, identity_response, security_mode_complete, security_mode_reject, attach_complete, detach_request, release_request, service_request, ue_capability_info, tracking_area_update, path_switch, pdn_connectivity, pdn_disconnect, reset, inject_nas, handover_required, handover_cancel, enb_status_transfer]
         pdn_type:
           type: integer
           description: "Requested PDN type for attach: 1=IPv4, 2=IPv6, 3=IPv4v6 (default 1)."
@@ -1216,8 +1318,51 @@ components:
           description: >
             EMM cause for an authentication_failure step: 20=MAC failure,
             21=synch failure (AUTS auto-included), 26=non-EPS unacceptable.
+        target_enb_id:
+          type: string
+          description: On handover_required, the store ID of the target eNB (its PLMN and eNB-ID form the Target eNB-ID the MME resolves).
+        handover_cancel_cause:
+          type: integer
+          description: On handover_cancel, override the radio-network Cause (TS 36.413 §9.2.1.3).
+        status_transfer_container:
+          type: string
+          description: On enb_status_transfer, the opaque PDCP status container (hex) relayed to the target eNB.
         timeout_ms:
           type: integer
+
+    SendENBS1APRequest:
+      type: object
+      required: [message_type]
+      properties:
+        message_type:
+          type: string
+          enum: [handover_request_acknowledge, handover_notify, handover_failure]
+        mme_ue_s1ap_id:
+          type: integer
+          description: MME UE S1AP ID the MME assigned to the incoming UE (from the Handover Request).
+        enb_ue_s1ap_id:
+          type: integer
+          description: eNB UE S1AP ID the target eNB assigns the UE; reused across handover_request_acknowledge and handover_notify.
+        admitted_erabs:
+          type: array
+          description: On handover_request_acknowledge, the E-RABs the target admits with their downlink S1-U endpoints.
+          items:
+            type: object
+            required: [id]
+            properties:
+              id: { type: integer, description: "E-RAB ID." }
+              dl_teid: { type: integer, description: "Target eNB downlink TEID (default synthesized)." }
+              dl_ip: { type: string, description: "Target eNB S1-U address (default the eNB's own)." }
+        failed_erabs:
+          type: array
+          items: { type: integer }
+          description: On handover_request_acknowledge, E-RAB IDs the target rejects.
+        cause:
+          type: integer
+          description: On handover_failure, override the radio-network Cause (default ho-failure-in-target).
+        cell_id:
+          type: integer
+          description: On handover_notify, override the E-UTRAN cell identity of the UE's new location (default 1).
 
     SendENBNASResponse:
       type: object

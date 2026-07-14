@@ -23,6 +23,10 @@ func NewRouter(h *Handler) *http.ServeMux {
 	mux.HandleFunc("POST /enb/{enb_id}/ue", h.CreateENBUE)
 	mux.HandleFunc("GET /enb/{enb_id}/ue/{ue_id}", h.GetENBUE)
 	mux.HandleFunc("POST /enb/{enb_id}/ue/{ue_id}/nas", h.SendENBNAS)
+	mux.HandleFunc("POST /enb/{enb_id}/ue/{ue_id}/migrate", h.MigrateENBUE)
+
+	// 4G/LTE: non-UE-associated S1AP send — the target-eNB side of S1 handover.
+	mux.HandleFunc("POST /enb/{enb_id}/s1ap", h.SendENBS1AP)
 
 	// 4G/LTE: await unsolicited MME-initiated S1AP downlink. The non-UE form
 	// catches a Paging or MME-initiated Reset; the per-UE form catches a

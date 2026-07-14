@@ -159,6 +159,12 @@ func (h *Handler) SendENBNAS(w http.ResponseWriter, r *http.Request) {
 		resp, herr = h.ueCapabilityInfo(ctx, enb, ue, t, &req)
 	case "path_switch":
 		resp, herr = h.pathSwitch(ctx, enb, ue, t, &req)
+	case "handover_required":
+		resp, herr = h.handoverRequired(ue, t, &req)
+	case "handover_cancel":
+		resp, herr = h.handoverCancel(ctx, ue, t, &req)
+	case "enb_status_transfer":
+		resp, herr = h.enbStatusTransfer(ue, t, &req)
 	case "pdn_connectivity":
 		resp, herr = h.pdnConnectivity(ctx, enb, ue, t, &req)
 	case "pdn_disconnect":

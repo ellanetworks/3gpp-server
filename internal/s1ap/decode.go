@@ -68,6 +68,16 @@ func Decode(data []byte) (*S1APResponse, error) {
 			if err := decodePaging(m.Value, resp); err != nil {
 				return nil, err
 			}
+		case s1ap.ProcHandoverResourceAllocation:
+			resp.MessageType = "HandoverRequest"
+			if err := decodeHandoverRequest(m.Value, resp); err != nil {
+				return nil, err
+			}
+		case s1ap.ProcMMEStatusTransfer:
+			resp.MessageType = "MMEStatusTransfer"
+			if err := decodeMMEStatusTransfer(m.Value, resp); err != nil {
+				return nil, err
+			}
 		}
 	case *s1ap.SuccessfulOutcome:
 		resp.PDUType = "successful_outcome"
@@ -93,6 +103,16 @@ func Decode(data []byte) (*S1APResponse, error) {
 			if err := decodeResetAcknowledge(m.Value, resp); err != nil {
 				return nil, err
 			}
+		case s1ap.ProcHandoverPreparation:
+			resp.MessageType = "HandoverCommand"
+			if err := decodeHandoverCommand(m.Value, resp); err != nil {
+				return nil, err
+			}
+		case s1ap.ProcHandoverCancel:
+			resp.MessageType = "HandoverCancelAcknowledge"
+			if err := decodeHandoverCancelAcknowledge(m.Value, resp); err != nil {
+				return nil, err
+			}
 		}
 	case *s1ap.UnsuccessfulOutcome:
 		resp.PDUType = "unsuccessful_outcome"
@@ -111,6 +131,11 @@ func Decode(data []byte) (*S1APResponse, error) {
 		case s1ap.ProcPathSwitchRequest:
 			resp.MessageType = "PathSwitchRequestFailure"
 			if err := decodePathSwitchRequestFailure(m.Value, resp); err != nil {
+				return nil, err
+			}
+		case s1ap.ProcHandoverPreparation:
+			resp.MessageType = "HandoverPreparationFailure"
+			if err := decodeHandoverPreparationFailure(m.Value, resp); err != nil {
 				return nil, err
 			}
 		}
@@ -314,6 +339,80 @@ func decodePathSwitchRequestFailure(value []byte, resp *S1APResponse) error {
 	return nil
 }
 
+func decodeHandoverRequest(value []byte, resp *S1APResponse) error {
+	m, err := s1ap.ParseHandoverRequest(value)
+	if err != nil {
+		return fmt.Errorf("parse HandoverRequest: %w", err)
+	}
+
+	mme := int64(m.MMEUES1APID)
+	resp.MMEUES1APID = &mme
+
+	for _, it := range m.ERABToBeSetup {
+		resp.ERABSetupItems = append(resp.ERABSetupItems, ERABSetupItemJSON{
+			ERABID:                int(it.ERABID),
+			GTPTEID:               uint32(it.GTPTEID),
+			TransportLayerAddress: transportLayerIP(it.TransportLayerAddress),
+		})
+	}
+
+	resp.SecurityContext = &SecurityContextJSON{
+		NextHopChainingCount: int(m.SecurityContext.NextHopChainingCount),
+		NextHop:              hex.EncodeToString(m.SecurityContext.NextHopParameter[:]),
+	}
+
+	return nil
+}
+
+func decodeHandoverCommand(value []byte, resp *S1APResponse) error {
+	m, err := s1ap.ParseHandoverCommand(value)
+	if err != nil {
+		return fmt.Errorf("parse HandoverCommand: %w", err)
+	}
+
+	setUEIDs(resp, int64(m.MMEUES1APID), int64(m.ENBUES1APID))
+
+	for _, it := range m.ERABToRelease {
+		resp.ReleasedERABs = append(resp.ReleasedERABs, int(it.ERABID))
+	}
+
+	return nil
+}
+
+func decodeHandoverPreparationFailure(value []byte, resp *S1APResponse) error {
+	m, err := s1ap.ParseHandoverPreparationFailure(value)
+	if err != nil {
+		return fmt.Errorf("parse HandoverPreparationFailure: %w", err)
+	}
+
+	setUEIDs(resp, int64(m.MMEUES1APID), int64(m.ENBUES1APID))
+	resp.Cause = &CauseJSON{Group: causeGroupName(m.Cause.Group), Value: m.Cause.Value}
+
+	return nil
+}
+
+func decodeHandoverCancelAcknowledge(value []byte, resp *S1APResponse) error {
+	m, err := s1ap.ParseHandoverCancelAcknowledge(value)
+	if err != nil {
+		return fmt.Errorf("parse HandoverCancelAcknowledge: %w", err)
+	}
+
+	setUEIDs(resp, int64(m.MMEUES1APID), int64(m.ENBUES1APID))
+
+	return nil
+}
+
+func decodeMMEStatusTransfer(value []byte, resp *S1APResponse) error {
+	m, err := s1ap.ParseMMEStatusTransfer(value)
+	if err != nil {
+		return fmt.Errorf("parse MMEStatusTransfer: %w", err)
+	}
+
+	setUEIDs(resp, int64(m.MMEUES1APID), int64(m.ENBUES1APID))
+
+	return nil
+}
+
 func decodeErrorIndication(value []byte, resp *S1APResponse) error {
 	m, err := s1ap.ParseErrorIndication(value)
 	if err != nil {
@@ -456,6 +555,18 @@ func procedureName(pc s1ap.ProcedureCode) string {
 		return "ERABSetup"
 	case s1ap.ProcERABRelease:
 		return "ERABRelease"
+	case s1ap.ProcHandoverPreparation:
+		return "HandoverPreparation"
+	case s1ap.ProcHandoverResourceAllocation:
+		return "HandoverResourceAllocation"
+	case s1ap.ProcHandoverNotification:
+		return "HandoverNotify"
+	case s1ap.ProcHandoverCancel:
+		return "HandoverCancel"
+	case s1ap.ProcENBStatusTransfer:
+		return "ENBStatusTransfer"
+	case s1ap.ProcMMEStatusTransfer:
+		return "MMEStatusTransfer"
 	default:
 		return fmt.Sprintf("ProcedureCode(%d)", pc)
 	}
