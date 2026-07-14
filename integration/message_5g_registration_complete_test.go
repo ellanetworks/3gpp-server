@@ -48,34 +48,36 @@ func Test5GRegistrationComplete_Fuzz(t *testing.T) {
 		},
 		{
 			name: "raw NAS: plain RegistrationComplete (no security)",
-			// 7E EPD, 00 SHT plain, 43 msg type = RegistrationComplete
-			// TS 24.501 §4.4.4.3 — only specific plain NAS types allowed
-			// when a security context is active; RegistrationComplete is NOT
-			// in the whitelist, so AMF should reject.
-			body:            `{"message_type":"registration_complete","raw_nas_pdu":"7e0043"}`,
-			wantHTTP:        200,
-			wantNGAPMsgType: ngapDownlinkNASTransport,
+			// 7E EPD, 00 SHT plain, 43 msg type = RegistrationComplete. A security
+			// context is active, and RegistrationComplete is not in the TS 24.501
+			// §4.4.4.3 list of messages processed without integrity protection, so the
+			// AMF shall discard it and not process it (keeping T3550 running). No
+			// downlink is the correct, spec-mandated outcome (the tester sees 504).
+			body:     `{"message_type":"registration_complete","raw_nas_pdu":"7e0043"}`,
+			wantHTTP: 504,
 		},
 		{
 			name: "raw NAS: integrity header with zeroed MAC",
-			// 7E 04 (integrity protected, new context) MAC=0000000000 SQN=00 then 7e0043
-			body:            `{"message_type":"registration_complete","raw_nas_pdu":"7e0400000000000000007e0043"}`,
-			wantHTTP:        200,
-			wantNGAPMsgType: ngapDownlinkNASTransport,
+			// 7E 04 (integrity protected, new context) MAC=00000000 SQN=00 then 7e0043.
+			// The integrity check fails; RegistrationComplete is not in the TS 24.501
+			// §4.4.4.3 exempt list, so it shall be discarded (a security measure — the
+			// AMF must not act on unauthenticated NAS). Silent drop is correct (504).
+			body:     `{"message_type":"registration_complete","raw_nas_pdu":"7e0400000000000000007e0043"}`,
+			wantHTTP: 504,
 		},
 		{
-			name: "raw NAS: valid security wrapper but wrong inner message type 0xff",
-			// SHT=02 integrity+cipher, then wrong msg type inside
-			body:            `{"message_type":"registration_complete","raw_nas_pdu":"7e02000000000000007e00ff"}`,
-			wantHTTP:        200,
-			wantNGAPMsgType: ngapDownlinkNASTransport,
+			name: "raw NAS: security wrapper with zeroed MAC, wrong inner message type 0xff",
+			// SHT=02 (integrity+cipher) with a zeroed MAC → integrity check fails →
+			// discarded per TS 24.501 §4.4.4.3 (never reaches inner-type handling).
+			body:     `{"message_type":"registration_complete","raw_nas_pdu":"7e02000000000000007e00ff"}`,
+			wantHTTP: 504,
 		},
 		{
-			name:            "raw NAS: single byte (truncated)",
-			body:            `{"message_type":"registration_complete","raw_nas_pdu":"7e"}`,
-			wantHTTP:        200,
-			wantNGAPMsgType: ngapDownlinkNASTransport,
-			// Truncated → AMF should respond, not silently drop
+			name: "raw NAS: single byte (truncated)",
+			// Too short to contain a complete message type IE → shall be ignored
+			// (TS 24.501 §7.2.1). Silent drop is the mandated behaviour (504).
+			body:     `{"message_type":"registration_complete","raw_nas_pdu":"7e"}`,
+			wantHTTP: 504,
 		},
 	}
 

@@ -78,10 +78,11 @@ func Test5GAuthenticationResponse(t *testing.T) {
 			wantNASMsgType:  nasAuthenticationReject,
 		},
 		{
-			name:            "raw NAS PDU: single byte",
-			body:            `{"message_type":"authentication_response","raw_nas_pdu":"7e"}`,
-			wantHTTP:        200,
-			wantNGAPMsgType: ngapDownlinkNASTransport,
+			name: "raw NAS PDU: single byte",
+			// Too short to contain a complete message type IE → shall be ignored
+			// (TS 24.501 §7.2.1); the AMF keeps T3560 running. Silent drop (504).
+			body:     `{"message_type":"authentication_response","raw_nas_pdu":"7e"}`,
+			wantHTTP: 504,
 		},
 		{
 			name:            "raw NAS PDU: empty → ErrorIndication",

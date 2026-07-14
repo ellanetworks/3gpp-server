@@ -113,17 +113,22 @@ func assertS1SetupRejected(t *testing.T, resp []byte) {
 }
 
 // TestS1SetupHappyVariations checks the MME accepts a range of valid eNB
-// configurations, all yielding an S1 Setup Response.
+// configurations with an S1 Setup Response. An eNB broadcasting a served PLMN
+// but a TAC this MME does not serve is rejected with an S1 Setup Failure: the
+// integration operator serves only TAC 000001, and the MME declines an eNB with
+// no served TAI just as its AMF declines such a gNB on NG Setup (TS 36.413
+// §8.7.3.3).
 func Test4GS1SetupHappyVariations(t *testing.T) {
 	tests := []struct {
-		name string
-		body string
+		name       string
+		body       string
+		wantReject bool
 	}{
-		{"baseline", `"mcc":"001","mnc":"01","tac":"0001","enb_id":1,"name":"enb-baseline"`},
-		{"different eNB ID", `"mcc":"001","mnc":"01","tac":"0001","enb_id":1048575,"name":"enb-max-macro"`},
-		{"different TAC", `"mcc":"001","mnc":"01","tac":"abcd","enb_id":2,"name":"enb-tac"`},
-		{"no name (optional omitted)", `"mcc":"001","mnc":"01","tac":"0001","enb_id":3`},
-		{"long name", `"mcc":"001","mnc":"01","tac":"0001","enb_id":4,"name":"this-is-a-very-long-enb-name-used-for-testing-the-printable-string-bound"`},
+		{name: "baseline", body: `"mcc":"001","mnc":"01","tac":"0001","enb_id":1,"name":"enb-baseline"`},
+		{name: "different eNB ID", body: `"mcc":"001","mnc":"01","tac":"0001","enb_id":1048575,"name":"enb-max-macro"`},
+		{name: "unserved TAC", body: `"mcc":"001","mnc":"01","tac":"abcd","enb_id":2,"name":"enb-tac"`, wantReject: true},
+		{name: "no name (optional omitted)", body: `"mcc":"001","mnc":"01","tac":"0001","enb_id":3`},
+		{name: "long name", body: `"mcc":"001","mnc":"01","tac":"0001","enb_id":4,"name":"this-is-a-very-long-enb-name-used-for-testing-the-printable-string-bound"`},
 	}
 
 	for _, tt := range tests {
@@ -137,6 +142,11 @@ func Test4GS1SetupHappyVariations(t *testing.T) {
 
 			if status != 201 {
 				t.Fatalf("HTTP %d: %s", status, resp)
+			}
+
+			if tt.wantReject {
+				assertS1SetupRejected(t, resp)
+				return
 			}
 
 			assertS1SetupAccepted(t, resp)

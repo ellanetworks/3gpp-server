@@ -101,3 +101,21 @@ func Test4GUserPlanePostRelease(t *testing.T) {
 		t.Fatal("UPF forwarded downlink to a released eNB bearer (should buffer for paging)")
 	}
 }
+
+// Test4GUserPlaneDetachStopsForwarding is the full-teardown counterpart to
+// Test4GUserPlanePostRelease. A normal Detach deactivates the UE's EPS bearer and
+// the S-GW/P-GW release its context (TS 23.401 §5.3.8.2.1), so the UPF must stop
+// forwarding the UE's user plane entirely — not buffer it as it does for an idle
+// S1 release. A replayed uplink that still round-trips means the UPF kept
+// forwarding a torn-down bearer.
+func Test4GUserPlaneDetachStopsForwarding(t *testing.T) {
+	enbID, ueID := gtpuENBAttach(t)
+
+	if got := jsonGet(nasStep(t, enbID, ueID, "detach_request"), "nas.message_type"); got != "detach_accept" {
+		t.Fatalf("detach: nas.message_type = %q, want detach_accept (TS 24.301 §5.5.2.2.2)", got)
+	}
+
+	if uplinkRoundTrips(t, enbID, ueID, nil, 0x103, 4) {
+		t.Fatal("UPF forwarded UE user plane after detach — a torn-down EPS bearer must stop forwarding (TS 23.401 §5.3.8.2.1)")
+	}
+}

@@ -80,9 +80,11 @@ func Test5GUEContextReleaseRequest_AfterPDUSession(t *testing.T) {
 	}
 }
 
-// TestUEContextReleaseRequest_ThenReregister verifies the release truly frees
-// the context: after release the UE re-registers from CM-IDLE and the AMF runs
-// a fresh authentication.
+// TestUEContextReleaseRequest_ThenReregister verifies the release frees only the
+// NG/N2 logical connection: the UE stays RM-REGISTERED and the AMF keeps its
+// context, so returning from CM-IDLE is a Mobility Registration Update that the
+// AMF accepts by reusing the retained 5G NAS security context — no fresh
+// authentication (TS 24.501 §5.5.1.3, TS 23.501 §5.3.2).
 func Test5GUEContextReleaseRequest_ThenReregister(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -98,14 +100,16 @@ func Test5GUEContextReleaseRequest_ThenReregister(t *testing.T) {
 		t.Fatalf("release ngap.message_type = %q, want UEContextReleaseCommand\n  body: %s", got, body)
 	}
 
-	// Re-register: AMF should accept a new connection and start authentication.
+	// Return from CM-IDLE: a Mobility Registration Update on a fresh NG connection,
+	// integrity-protected with the retained security context. The AMF reuses the
+	// context and accepts directly.
 	status, body = doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
-		`{"message_type":"registration_request"}`)
+		`{"message_type":"registration_request","registration_type":2}`)
 	if status != 200 {
 		t.Fatalf("re-register: HTTP %d\n  body: %s", status, body)
 	}
-	if got := jsonGet(body, "nas.message_type"); got != nasAuthenticationRequest {
-		t.Errorf("re-register nas.message_type = %q, want authentication_request\n  body: %s", got, body)
+	if got := jsonGet(body, "nas.message_type"); got != nasRegistrationAccept {
+		t.Errorf("re-register nas.message_type = %q, want registration_accept\n  body: %s", got, body)
 	}
 }
 

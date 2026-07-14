@@ -494,16 +494,18 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
-			name:            "raw NAS: single byte 0x7e (5GMM EPD only)",
-			body:            `{"message_type":"registration_request","raw_nas_pdu":"7e"}`,
-			wantHTTP:        200,
-			wantNGAPMsgType: ngapDownlinkNASTransport,
+			name: "raw NAS: single byte 0x7e (5GMM EPD only)",
+			// Too short to contain a complete message type IE → shall be ignored
+			// (TS 24.501 §7.2.1). Silent drop is the mandated behaviour (504).
+			body:     `{"message_type":"registration_request","raw_nas_pdu":"7e"}`,
+			wantHTTP: 504,
 		},
 		{
-			name:            "raw NAS: two bytes (EPD + security header, no message type)",
-			body:            `{"message_type":"registration_request","raw_nas_pdu":"7e00"}`,
-			wantHTTP:        200,
-			wantNGAPMsgType: ngapDownlinkNASTransport,
+			name: "raw NAS: two bytes (EPD + security header, no message type)",
+			// Still too short to contain a message type IE → shall be ignored
+			// (TS 24.501 §7.2.1). Silent drop is the mandated behaviour (504).
+			body:     `{"message_type":"registration_request","raw_nas_pdu":"7e00"}`,
+			wantHTTP: 504,
 		},
 		{
 			name:            "raw NAS: wrong EPD (not 5GMM)",

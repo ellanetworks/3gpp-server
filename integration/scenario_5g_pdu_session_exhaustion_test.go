@@ -66,9 +66,19 @@ func Test5GPDUSessionEstablishment_IPPoolExhausted(t *testing.T) {
 	// Transience (TS 24.501 §6.2.12): #26 is a temporary condition. Freeing an
 	// address must let a fresh establishment succeed, confirming the shortage was
 	// not permanent and the rejected attempt left the pool consistent.
+	//
+	// A UE-requested release runs as a network-requested release (TS 24.501
+	// §6.4.3.3 → §6.3.3): the SMF frees the address on Release Complete, not on the
+	// bare Release Request, so the UE must finish the handshake before the lease
+	// returns to the pool.
 	if st, rel := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ue1+"/ngap",
 		`{"message_type":"pdu_session_release_request"}`); st != 200 {
 		t.Fatalf("release on ue1: HTTP %d\n  body: %s", st, rel)
+	}
+
+	if st, rel := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ue1+"/ngap",
+		`{"message_type":"pdu_session_release_complete"}`); st != 200 {
+		t.Fatalf("release_complete on ue1: HTTP %d\n  body: %s", st, rel)
 	}
 
 	ue4 := newExhaustUE(t, gnbID, testSUPI(4))
