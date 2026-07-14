@@ -107,7 +107,15 @@ func (h *Handler) CreateGnB(w http.ResponseWriter, r *http.Request) {
 				SD  string
 			}{SST: s.SST, SD: s.SD})
 		}
-		msg = ngap.BuildNGSetupRequestFromStore(req.MCC, req.MNC, req.TAC, req.GnbID, req.Name, req.SST, req.SD, sliceArgs)
+		var berr error
+		msg, berr = ngap.BuildNGSetupRequestFromStore(req.MCC, req.MNC, req.TAC, req.GnbID, req.Name, req.SST, req.SD, sliceArgs)
+		if berr != nil {
+			_ = t.Close()
+			_ = h.Store.DeleteGnB(gnb.ID)
+			delete(h.Transports, gnb.ID)
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("build ng setup: %v", berr))
+			return
+		}
 	}
 
 	encoded, err := ngap.Encode(msg)

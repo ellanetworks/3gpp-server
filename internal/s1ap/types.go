@@ -65,9 +65,17 @@ type S1APResponse struct {
 	// Context Setup Request (hex), when present (TS 23.401 §5.11.2).
 	UERadioCapability *string `json:"ue_radio_capability,omitempty"`
 
+	// UEAggregateMaxBitRate is the UE-AMBR the MME sets in an Initial Context
+	// Setup Request (TS 36.413 §9.2.1.20).
+	UEAggregateMaxBitRate *UEAggregateMaxBitRateJSON `json:"ue_aggregate_max_bit_rate,omitempty"`
+
 	// Cause is set on an Error Indication (TS 36.413 §9.1.4.3) and a Path Switch
 	// Request Failure (§9.1.5.10).
 	Cause *CauseJSON `json:"cause,omitempty"`
+
+	// CriticalityDiagnostics is set on an Error Indication or S1 Setup Failure
+	// carrying one (TS 36.413 §9.2.1.21).
+	CriticalityDiagnostics *CriticalityDiagnosticsJSON `json:"criticality_diagnostics,omitempty"`
 
 	// SecurityContext is set on a Path Switch Request Acknowledge: the {NCC, NH}
 	// the target eNB uses to derive the next K_eNB (TS 33.401 §7.2.8).
@@ -103,6 +111,12 @@ type PagingJSON struct {
 	MTMSI                uint32 `json:"m_tmsi"`
 	UEIdentityIndexValue uint16 `json:"ue_identity_index_value"`
 	CNDomain             string `json:"cn_domain"`
+}
+
+// UEAggregateMaxBitRateJSON is the UE Aggregate Maximum Bit Rate (DL, UL bps).
+type UEAggregateMaxBitRateJSON struct {
+	DL int64 `json:"dl"`
+	UL int64 `json:"ul"`
 }
 
 // UESecurityCapabilitiesJSON is the S1AP EPS encryption/integrity algorithm
@@ -160,6 +174,21 @@ type S1SetupFailureJSON struct {
 type CauseJSON struct {
 	Group string `json:"group"`
 	Value int    `json:"value"`
+}
+
+// CriticalityDiagnosticsJSON reports which IEs or procedure a receiver could not
+// handle (TS 36.413 §9.2.1.21). Field shapes mirror the 5G NGAP decode.
+type CriticalityDiagnosticsJSON struct {
+	ProcedureCode             *int64                        `json:"procedure_code,omitempty"`
+	TriggeringMessage         *string                       `json:"triggering_message,omitempty"`
+	ProcedureCriticality      *string                       `json:"procedure_criticality,omitempty"`
+	IEsCriticalityDiagnostics []IECriticalityDiagnosticJSON `json:"ies_criticality_diagnostics,omitempty"`
+}
+
+type IECriticalityDiagnosticJSON struct {
+	IECriticality string `json:"ie_criticality"`
+	IEID          int64  `json:"ie_id"`
+	TypeOfError   string `json:"type_of_error"`
 }
 
 // ResetConnectionJSON is one UE-associated logical S1 connection in a Reset

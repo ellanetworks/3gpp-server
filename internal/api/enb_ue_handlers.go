@@ -165,6 +165,12 @@ func (h *Handler) SendENBNAS(w http.ResponseWriter, r *http.Request) {
 		resp, herr = h.handoverCancel(ctx, ue, t, &req)
 	case "enb_status_transfer":
 		resp, herr = h.enbStatusTransfer(ue, t, &req)
+	case "error_indication":
+		resp, herr = h.errorIndication(ctx, ue, t, &req)
+	case "initial_context_setup_failure":
+		resp, herr = h.initialContextSetupFailure(ue, t, &req)
+	case "modify_response":
+		resp, herr = h.modifyResponse(ue, t, &req)
 	case "pdn_connectivity":
 		resp, herr = h.pdnConnectivity(ctx, enb, ue, t, &req)
 	case "pdn_disconnect":
@@ -1071,7 +1077,7 @@ func (h *Handler) statusESM(enb *store.ENBContext, ue *store.UEEPSContext, t *tr
 }
 
 // modifyBearerAccept acknowledges a network-initiated bearer modification
-// (TS 24.301 §6.4.2.3).
+// (TS 24.301 §6.4.3.3).
 func (h *Handler) modifyBearerAccept(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	if !ue.SecurityActive {
 		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
@@ -1127,6 +1133,53 @@ func esmPTI(req *SendENBNASRequest) uint8 {
 	}
 
 	return 0
+}
+
+// errorIndication sends an ERROR INDICATION for the UE's connection (TS 36.413
+// §8.7.2); the MME's reaction to it is implementation-specific.
+func (h *Handler) errorIndication(ctx context.Context, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+	encoded, err := s1ap.BuildErrorIndication(sourceMMEID(ue, req), sourceENBID(ue, req), 0) // radio-network unspecified
+	if err != nil {
+		return nil, err
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		return nil, err
+	}
+
+	resp := h.waitDownlinkTolerant(ctx, t, ue, "UEContextReleaseCommand", "ErrorIndication")
+
+	return &SendENBNASResponse{S1AP: resp}, nil
+}
+
+// initialContextSetupFailure replies to an Initial Context Setup Request with a
+// failure (TS 36.413 §8.3.1.4); the MME releases the UE context. Send-only.
+func (h *Handler) initialContextSetupFailure(ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+	encoded, err := s1ap.BuildInitialContextSetupFailure(sourceMMEID(ue, req), sourceENBID(ue, req), 0) // radio-network unspecified
+	if err != nil {
+		return nil, err
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		return nil, err
+	}
+
+	return &SendENBNASResponse{}, nil
+}
+
+// modifyResponse confirms a network-initiated E-RAB modification (TS 36.413
+// §8.2.2). Send-only; the MME completes the procedure on the NAS Modify Accept.
+func (h *Handler) modifyResponse(ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+	encoded, err := s1ap.BuildERABModifyResponse(ue.MMEUES1APID, ue.ENBUES1APID, []uint8{esmBearerID(ue, req)})
+	if err != nil {
+		return nil, err
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		return nil, err
+	}
+
+	return &SendENBNASResponse{}, nil
 }
 
 // trackingAreaUpdate sends a (protected) Tracking Area Update Request from a

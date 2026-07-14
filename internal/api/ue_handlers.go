@@ -214,6 +214,10 @@ func (h *Handler) MigrateUE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Purge the source's per-UE state under its current RAN-UE-NGAP-ID before any
+	// override rekeys the UE, so the source's side-maps are not left orphaned.
+	src.DeleteUE(ueID)
+
 	if req.RanUeNgapID != nil {
 		ue.RanUeNgapID = *req.RanUeNgapID
 	}
@@ -222,7 +226,6 @@ func (h *Handler) MigrateUE(w http.ResponseWriter, r *http.Request) {
 		ue.AmfUeNgapID = *req.AmfUeNgapID
 	}
 
-	src.DeleteUE(ueID)
 	target.CreateUE(ue)
 	target.UpdateNGAPIDs(ue.RanUeNgapID, ue.AmfUeNgapID)
 

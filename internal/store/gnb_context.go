@@ -134,10 +134,17 @@ func (g *GnBContext) GetUE(ueID string) (*UEContext, bool) {
 func (g *GnBContext) DeleteUE(ueID string) bool {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if _, ok := g.UEs[ueID]; !ok {
+
+	ue, ok := g.UEs[ueID]
+	if !ok {
 		return false
 	}
+
 	delete(g.UEs, ueID)
+	delete(g.NGAPIDs, ue.RanUeNgapID)
+	delete(g.PDUSessions, ue.RanUeNgapID)
+	delete(g.UEAmbr, ue.RanUeNgapID)
+
 	return true
 }
 

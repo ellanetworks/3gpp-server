@@ -75,3 +75,45 @@ func Test4GGTPUWrongTEIDErrorIndication(t *testing.T) {
 		t.Fatalf("no GTP-U Error Indication for a G-PDU to an unknown TEID on S1-U (HTTP %d) — the UPF shall return one (TS 29.281 §7.3.1)\n  body: %s", status, body)
 	}
 }
+
+// Test4GGTPU_UDPRoundTrip proves the S1-U data path carries UDP, not only ICMP: a
+// UE uplink UDP datagram to the data-network responder returns as a decapsulated
+// downlink datagram echoed back — the UPF forwards and NATs UDP user-plane traffic.
+func Test4GGTPU_UDPRoundTrip(t *testing.T) {
+	enbID := createGTPUENB(t, 1, "gtpu-udp-enb")
+	ueID := mustCreateENBUE(t, enbID)
+	fullAttach(t, enbID, ueID)
+
+	const payloadHex = "abad1dea"
+
+	// The UPF can lose the first packet while it resolves the N6 next-hop, so retry.
+	var dl []byte
+
+	for i := 0; i < 5; i++ {
+		uplink := fmt.Sprintf(`{"udp":{"dst":%q,"dst_port":%d,"payload_hex":%q}}`, dnResponderIP, udpEchoPort, payloadHex)
+		if s, b := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/uplink", uplink); s != 200 {
+			t.Fatalf("send udp uplink: HTTP %d: %s", s, b)
+		}
+
+		if s, b := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/downlink/await", `{"timeout_ms":2000}`); s == 200 {
+			dl = b
+			break
+		}
+	}
+
+	if dl == nil {
+		t.Fatal("no UDP downlink — the UPF did not forward/return UDP user-plane traffic")
+	}
+
+	checks := map[string]string{
+		"inner.protocol":     "17", // UDP
+		"inner.src":          dnResponderIP,
+		"inner.udp_src_port": fmt.Sprintf("%d", udpEchoPort),
+		"inner.payload":      payloadHex,
+	}
+	for field, want := range checks {
+		if got := jsonGet(dl, field); got != want {
+			t.Errorf("UDP downlink %s = %q, want %q\n  body: %s", field, got, want, dl)
+		}
+	}
+}

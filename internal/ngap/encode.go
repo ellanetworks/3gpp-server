@@ -390,8 +390,12 @@ type InitialUEMessageOverrides struct {
 	RanUeNgapID           *int64
 }
 
-func BuildInitialUEMessageFromState(ranUeNgapID int64, nasPDU []byte, mcc, mnc, tac, gnbID string, guti *FiveGSTMSIFromGUTI, overrides *InitialUEMessageOverrides) *NGAPMessage {
-	plmnID, _ := GetMccAndMncInOctets(mcc, mnc)
+func BuildInitialUEMessageFromState(ranUeNgapID int64, nasPDU []byte, mcc, mnc, tac, gnbID string, guti *FiveGSTMSIFromGUTI, overrides *InitialUEMessageOverrides) (*NGAPMessage, error) {
+	plmnID, err := encodePLMN(mcc, mnc)
+	if err != nil {
+		return nil, fmt.Errorf("PLMN: %w", err)
+	}
+
 	plmnHex := hex.EncodeToString(plmnID)
 	nasPDUHex := hex.EncodeToString(nasPDU)
 
@@ -470,7 +474,7 @@ func BuildInitialUEMessageFromState(ranUeNgapID int64, nasPDU []byte, mcc, mnc, 
 		PDUType:       "initiating_message",
 		Criticality:   "ignore",
 		IEs:           ies,
-	}
+	}, nil
 }
 
 type FiveGSTMSIFromGUTI struct {
@@ -485,8 +489,12 @@ type FiveGSTMSIFromGUTI struct {
 func BuildNGSetupRequestFromStore(mcc, mnc, tac, gnbID, name string, sst int32, sd string, slices []struct {
 	SST int32
 	SD  string
-}) *NGAPMessage {
-	plmnID, _ := GetMccAndMncInOctets(mcc, mnc)
+}) (*NGAPMessage, error) {
+	plmnID, err := encodePLMN(mcc, mnc)
+	if err != nil {
+		return nil, fmt.Errorf("PLMN: %w", err)
+	}
+
 	plmnHex := hex.EncodeToString(plmnID)
 
 	sliceSupport := make([]SliceSupportJSON, 0)
@@ -554,7 +562,7 @@ func BuildNGSetupRequestFromStore(mcc, mnc, tac, gnbID, name string, sst int32, 
 				DefaultPagingDRX: &pagingDRX,
 			},
 		},
-	}
+	}, nil
 }
 
 type UplinkNASTransportOverrides struct {
@@ -570,7 +578,13 @@ func BuildUplinkNASTransport(amfUeNgapID, ranUeNgapID int64, nasPDU []byte, mcc,
 	if overrides != nil && overrides.RanUeNgapID != nil {
 		ranUeNgapID = *overrides.RanUeNgapID
 	}
-	plmnID := GetPLMNIdentity(mcc, mnc)
+	plmnBytes, err := encodePLMN(mcc, mnc)
+	if err != nil {
+		return nil, fmt.Errorf("PLMN: %w", err)
+	}
+
+	plmnID := ngapType.PLMNIdentity{Value: plmnBytes}
+
 	nrCellID, err := GetNRCellIdentity(gnbID)
 	if err != nil {
 		return nil, fmt.Errorf("NRCellIdentity: %w", err)
@@ -845,7 +859,7 @@ func BuildHandoverRequired(amfUeNgapID, ranUeNgapID int64, targetGnbID, mcc, mnc
 		RadioNetwork: &ngapType.CauseRadioNetwork{Value: ngapType.CauseRadioNetworkPresentHandoverDesirableForRadioReason},
 	}
 
-	plmnID, err := GetMccAndMncInOctets(mcc, mnc)
+	plmnID, err := encodePLMN(mcc, mnc)
 	if err != nil {
 		return nil, fmt.Errorf("target PLMN: %w", err)
 	}
@@ -1087,7 +1101,7 @@ func BuildPathSwitchRequest(ranUeNgapID, sourceAmfUeNgapID int64, mcc, mnc, tac,
 	add(ngapType.ProtocolIEIDSourceAMFUENGAPID, ngapType.CriticalityPresentReject,
 		ngapType.PathSwitchRequestIEsPresentSourceAMFUENGAPID).SourceAMFUENGAPID = &ngapType.AMFUENGAPID{Value: sourceAmfUeNgapID}
 
-	plmnID, err := GetMccAndMncInOctets(mcc, mnc)
+	plmnID, err := encodePLMN(mcc, mnc)
 	if err != nil {
 		return nil, fmt.Errorf("PLMN: %w", err)
 	}
@@ -1322,6 +1336,81 @@ func BuildHandoverCancel(amfUeNgapID, ranUeNgapID, causeRadioNetwork int64) ([]b
 	return ngap.Encoder(pdu)
 }
 
+// BuildUERadioCapabilityInfoIndication builds a UE RADIO CAPABILITY INFO
+// INDICATION (TS 38.413 §8.14.1); the AMF stores the capability and replays it
+// in a later Initial Context Setup Request.
+func BuildUERadioCapabilityInfoIndication(amfUeNgapID, ranUeNgapID int64, radioCapability []byte) ([]byte, error) {
+	pdu := ngapType.NGAPPDU{}
+	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
+	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
+
+	im := pdu.InitiatingMessage
+	im.ProcedureCode.Value = ngapType.ProcedureCodeUERadioCapabilityInfoIndication
+	im.Criticality.Value = ngapType.CriticalityPresentIgnore
+	im.Value.Present = ngapType.InitiatingMessagePresentUERadioCapabilityInfoIndication
+	im.Value.UERadioCapabilityInfoIndication = new(ngapType.UERadioCapabilityInfoIndication)
+
+	ies := &im.Value.UERadioCapabilityInfoIndication.ProtocolIEs
+
+	add := func(id int64, crit aper.Enumerated, present int) *ngapType.UERadioCapabilityInfoIndicationIEsValue {
+		ie := ngapType.UERadioCapabilityInfoIndicationIEs{}
+		ie.Id.Value = id
+		ie.Criticality.Value = crit
+		ie.Value.Present = present
+		ies.List = append(ies.List, ie)
+
+		return &ies.List[len(ies.List)-1].Value
+	}
+
+	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentReject,
+		ngapType.UERadioCapabilityInfoIndicationIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: amfUeNgapID}
+	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentReject,
+		ngapType.UERadioCapabilityInfoIndicationIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
+	add(ngapType.ProtocolIEIDUERadioCapability, ngapType.CriticalityPresentIgnore,
+		ngapType.UERadioCapabilityInfoIndicationIEsPresentUERadioCapability).UERadioCapability = &ngapType.UERadioCapability{Value: radioCapability}
+
+	return ngap.Encoder(pdu)
+}
+
+// BuildErrorIndication builds an ERROR INDICATION (TS 38.413 §8.7.5) reporting a
+// protocol error for the UE-associated connection. The Cause is a radio-network
+// value (TS 38.413 §9.3.1.2).
+func BuildErrorIndication(amfUeNgapID, ranUeNgapID, causeRadioNetwork int64) ([]byte, error) {
+	pdu := ngapType.NGAPPDU{}
+	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
+	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
+
+	im := pdu.InitiatingMessage
+	im.ProcedureCode.Value = ngapType.ProcedureCodeErrorIndication
+	im.Criticality.Value = ngapType.CriticalityPresentIgnore
+	im.Value.Present = ngapType.InitiatingMessagePresentErrorIndication
+	im.Value.ErrorIndication = new(ngapType.ErrorIndication)
+
+	ies := &im.Value.ErrorIndication.ProtocolIEs
+
+	add := func(id int64, crit aper.Enumerated, present int) *ngapType.ErrorIndicationIEsValue {
+		ie := ngapType.ErrorIndicationIEs{}
+		ie.Id.Value = id
+		ie.Criticality.Value = crit
+		ie.Value.Present = present
+		ies.List = append(ies.List, ie)
+
+		return &ies.List[len(ies.List)-1].Value
+	}
+
+	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentIgnore,
+		ngapType.ErrorIndicationIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: amfUeNgapID}
+	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentIgnore,
+		ngapType.ErrorIndicationIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
+	add(ngapType.ProtocolIEIDCause, ngapType.CriticalityPresentIgnore,
+		ngapType.ErrorIndicationIEsPresentCause).Cause = &ngapType.Cause{
+		Present:      ngapType.CausePresentRadioNetwork,
+		RadioNetwork: &ngapType.CauseRadioNetwork{Value: aper.Enumerated(causeRadioNetwork)},
+	}
+
+	return ngap.Encoder(pdu)
+}
+
 // BuildHandoverNotify builds a HANDOVER NOTIFY (TS 38.413 §8.4.3) sent by the
 // target gNB once the UE has arrived.
 func BuildHandoverNotify(amfUeNgapID, ranUeNgapID int64, mcc, mnc, tac, gnbID string) ([]byte, error) {
@@ -1352,7 +1441,7 @@ func BuildHandoverNotify(amfUeNgapID, ranUeNgapID int64, mcc, mnc, tac, gnbID st
 	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentReject,
 		ngapType.HandoverNotifyIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
 
-	plmnID, err := GetMccAndMncInOctets(mcc, mnc)
+	plmnID, err := encodePLMN(mcc, mnc)
 	if err != nil {
 		return nil, fmt.Errorf("PLMN: %w", err)
 	}

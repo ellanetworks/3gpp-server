@@ -128,6 +128,10 @@ func Decode(data []byte) (*S1APResponse, error) {
 			}
 
 			resp.S1SetupFailure = mapS1SetupFailure(sf)
+
+			if sf.CriticalityDiagnostics != nil {
+				resp.CriticalityDiagnostics = decodeCriticalityDiagnostics(sf.CriticalityDiagnostics)
+			}
 		case s1ap.ProcPathSwitchRequest:
 			resp.MessageType = "PathSwitchRequestFailure"
 			if err := decodePathSwitchRequestFailure(m.Value, resp); err != nil {
@@ -166,6 +170,10 @@ func decodeInitialContextSetupRequest(value []byte, resp *S1APResponse) error {
 	}
 
 	setUEIDs(resp, int64(m.MMEUES1APID), int64(m.ENBUES1APID))
+	resp.UEAggregateMaxBitRate = &UEAggregateMaxBitRateJSON{
+		DL: int64(m.UEAggregateMaximumBitRate.DL),
+		UL: int64(m.UEAggregateMaximumBitRate.UL),
+	}
 
 	for _, it := range m.ERABToBeSetup {
 		item := ERABSetupItemJSON{ERABID: int(it.ERABID), GTPTEID: uint32(it.GTPTEID)}
@@ -433,6 +441,10 @@ func decodeErrorIndication(value []byte, resp *S1APResponse) error {
 		resp.Cause = &CauseJSON{Group: causeGroupName(m.Cause.Group), Value: m.Cause.Value}
 	}
 
+	if m.CriticalityDiagnostics != nil {
+		resp.CriticalityDiagnostics = decodeCriticalityDiagnostics(m.CriticalityDiagnostics)
+	}
+
 	return nil
 }
 
@@ -569,6 +581,59 @@ func procedureName(pc s1ap.ProcedureCode) string {
 		return "MMEStatusTransfer"
 	default:
 		return fmt.Sprintf("ProcedureCode(%d)", pc)
+	}
+}
+
+func decodeCriticalityDiagnostics(cd *s1ap.CriticalityDiagnostics) *CriticalityDiagnosticsJSON {
+	out := &CriticalityDiagnosticsJSON{}
+
+	if cd.ProcedureCode != nil {
+		v := int64(*cd.ProcedureCode)
+		out.ProcedureCode = &v
+	}
+
+	if cd.TriggeringMessage != nil {
+		s := triggeringMessageName(*cd.TriggeringMessage)
+		out.TriggeringMessage = &s
+	}
+
+	if cd.ProcedureCriticality != nil {
+		s := cd.ProcedureCriticality.String()
+		out.ProcedureCriticality = &s
+	}
+
+	for _, item := range cd.IEsCriticalityDiagnostics {
+		out.IEsCriticalityDiagnostics = append(out.IEsCriticalityDiagnostics, IECriticalityDiagnosticJSON{
+			IECriticality: item.IECriticality.String(),
+			IEID:          int64(item.IEID),
+			TypeOfError:   typeOfErrorName(item.TypeOfError),
+		})
+	}
+
+	return out
+}
+
+func triggeringMessageName(v s1ap.TriggeringMessage) string {
+	switch v {
+	case s1ap.TriggeringInitiatingMessage:
+		return "initiating_message"
+	case s1ap.TriggeringSuccessfulOutcome:
+		return "successful_outcome"
+	case s1ap.TriggeringUnsuccessfulOutcome:
+		return "unsuccessful_outcome"
+	default:
+		return "unknown"
+	}
+}
+
+func typeOfErrorName(v s1ap.TypeOfError) string {
+	switch v {
+	case s1ap.TypeOfErrorNotUnderstood:
+		return "not_understood"
+	case s1ap.TypeOfErrorMissing:
+		return "missing"
+	default:
+		return "unknown"
 	}
 }
 

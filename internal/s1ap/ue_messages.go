@@ -66,6 +66,45 @@ func BuildUEContextReleaseRequest(mmeUEID, enbUEID uint32, cause uint8) ([]byte,
 	return m.Marshal()
 }
 
+// BuildInitialContextSetupFailure builds the eNB's failure reply to an Initial
+// Context Setup Request (TS 36.413 §8.3.1.4).
+func BuildInitialContextSetupFailure(mmeUEID, enbUEID uint32, cause int) ([]byte, error) {
+	return (&s1ap.InitialContextSetupFailure{
+		MMEUES1APID: s1ap.MMEUES1APID(mmeUEID),
+		ENBUES1APID: s1ap.ENBUES1APID(enbUEID),
+		Cause:       s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: cause},
+	}).Marshal()
+}
+
+// BuildERABModifyResponse builds the eNB's response to an E-RAB Modify Request,
+// confirming the reconfigured bearers (TS 36.413 §8.2.2).
+func BuildERABModifyResponse(mmeUEID, enbUEID uint32, modified []uint8) ([]byte, error) {
+	items := make([]s1ap.ERABModifyItemBearerModRes, 0, len(modified))
+	for _, ebi := range modified {
+		items = append(items, s1ap.ERABModifyItemBearerModRes{ERABID: s1ap.ERABID(ebi)})
+	}
+
+	return (&s1ap.ERABModifyResponse{
+		MMEUES1APID: s1ap.MMEUES1APID(mmeUEID),
+		ENBUES1APID: s1ap.ENBUES1APID(enbUEID),
+		ERABModify:  items,
+	}).Marshal()
+}
+
+// BuildErrorIndication builds an eNB-originated ERROR INDICATION reporting a
+// protocol error for the UE-associated connection (TS 36.413 §8.7.2).
+func BuildErrorIndication(mmeUEID, enbUEID uint32, cause int) ([]byte, error) {
+	mme := s1ap.MMEUES1APID(mmeUEID)
+	enb := s1ap.ENBUES1APID(enbUEID)
+	c := s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: cause}
+
+	return (&s1ap.ErrorIndication{
+		MMEUES1APID: &mme,
+		ENBUES1APID: &enb,
+		Cause:       &c,
+	}).Marshal()
+}
+
 // BuildUEContextReleaseComplete builds the eNB's acknowledgement of a UE Context
 // Release Command (TS 36.413 §9.1.4.7).
 func BuildUEContextReleaseComplete(mmeUEID, enbUEID uint32) ([]byte, error) {

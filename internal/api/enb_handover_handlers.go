@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/ellanetworks/3gpp-server/internal/s1ap"
 	"github.com/ellanetworks/3gpp-server/internal/store"
@@ -37,6 +38,12 @@ func (h *Handler) SendENBS1AP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// raw_s1ap_pdu bypasses message_type entirely.
+	if req.RawS1APPDU != nil {
+		h.handleRawS1AP(w, r, t, &req)
+		return
+	}
+
 	var (
 		resp *SendENBNASResponse
 		herr error
@@ -60,6 +67,42 @@ func (h *Handler) SendENBS1AP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// handleRawS1AP writes a verbatim S1AP PDU onto the eNB's S1-MME association and
+// optionally blocks for a downlink of one of req.WaitFor's types.
+func (h *Handler) handleRawS1AP(w http.ResponseWriter, r *http.Request, t *transport.S1APTransport, req *SendENBS1APRequest) {
+	pdu, err := hex.DecodeString(*req.RawS1APPDU)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("decode raw_s1ap_pdu: %v", err))
+		return
+	}
+
+	if err := t.Send(pdu, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
+		return
+	}
+
+	if len(req.WaitFor) == 0 {
+		writeJSON(w, http.StatusOK, SendENBNASResponse{})
+		return
+	}
+
+	timeout := 5 * time.Second
+	if req.TimeoutMs > 0 {
+		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	defer cancel()
+
+	resp, err := t.WaitForMessage(ctx, req.WaitFor...)
+	if err != nil {
+		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for %v: %v", req.WaitFor, err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, SendENBNASResponse{S1AP: resp})
 }
 
 func (h *Handler) handoverRequestAcknowledge(enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBNASResponse, error) {
