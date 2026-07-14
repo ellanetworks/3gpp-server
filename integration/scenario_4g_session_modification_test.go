@@ -84,4 +84,17 @@ func Test4GSessionAMBRModification(t *testing.T) {
 	if got := jsonGet(body2, "nas.apn_ambr"); got != wantAMBR {
 		t.Fatalf("Modify EPS Bearer Context Request apn_ambr = %q, want %q (50 Mbps, TS 24.301 §9.9.4.2)\n  body: %s", got, wantAMBR, body2)
 	}
+
+	// The UE accepts the modification (mandatory, TS 24.301 §6.4.2.3); the MME
+	// commits it and stops T3486.
+	accept := fmt.Sprintf(`{"message_type":"modify_eps_bearer_context_accept","eps_bearer_identity":%s,"pti":%s}`,
+		jsonGet(body2, "nas.eps_bearer_identity"), jsonGet(body2, "nas.bearer_pti"))
+	if s, ab := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas", accept); s != 200 {
+		t.Fatalf("modify accept: HTTP %d\n  body: %s", s, ab)
+	}
+
+	// The UE remains connected after the modification round-trip.
+	if got := jsonGet(nasStep(t, enbID, ueID, "release_request"), "s1ap.message_type"); got != "UEContextReleaseCommand" {
+		t.Errorf("UE not usable after bearer modification; release_request did not yield a UEContextReleaseCommand")
+	}
 }

@@ -149,6 +149,11 @@ func decodeESM(plain []byte, resp *NASResponse) (*NASResponse, error) {
 				resp.APNAMBR = hex.EncodeToString(m.APNAMBR)
 			}
 		}
+	case eps.MsgESMStatus:
+		resp.MessageType = "esm_status"
+		if m, err := eps.ParseESMStatus(plain); err == nil {
+			setESM(resp, int(m.EPSBearerIdentity), int(m.ProcedureTransactionIdentity), &m.ESMCause)
+		}
 	default:
 		resp.MessageType = fmt.Sprintf("esm_message_%#x", uint8(mt))
 	}

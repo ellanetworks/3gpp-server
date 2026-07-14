@@ -169,6 +169,12 @@ func (h *Handler) SendENBNAS(w http.ResponseWriter, r *http.Request) {
 		resp, herr = h.pdnConnectivity(ctx, enb, ue, t, &req)
 	case "pdn_disconnect":
 		resp, herr = h.pdnDisconnect(ctx, enb, ue, t, &req)
+	case "modify_eps_bearer_context_accept":
+		resp, herr = h.modifyBearerAccept(enb, ue, t, &req)
+	case "deactivate_eps_bearer_context_accept":
+		resp, herr = h.deactivateBearerAccept(enb, ue, t, &req)
+	case "status_esm":
+		resp, herr = h.statusESM(enb, ue, t, &req)
 	case "reset":
 		resp, herr = h.reset(ctx, ue, t, &req)
 	case "security_mode_complete":
@@ -1038,6 +1044,89 @@ func (h *Handler) pdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *
 	}
 
 	return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
+}
+
+// esmCauseProtocolErrorUnspec is ESM cause #111 (TS 24.301 §9.9.4.4), the default
+// for a UE-sent esm_status.
+const esmCauseProtocolErrorUnspec uint8 = 111
+
+// statusESM sends an ESM STATUS reporting an ESM protocol error for a bearer
+// (TS 24.301 §6.7). ESM cause #43 makes the MME deactivate the bearer.
+func (h *Handler) statusESM(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+	if !ue.SecurityActive {
+		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
+	}
+
+	cause := esmCauseProtocolErrorUnspec
+	if req.ESMCause != nil {
+		cause = *req.ESMCause
+	}
+
+	esm, err := naseps.BuildESMStatus(esmBearerID(ue, req), esmPTI(req), cause)
+	if err != nil {
+		return nil, err
+	}
+
+	return h.sendESM(enb, ue, t, esm)
+}
+
+// modifyBearerAccept acknowledges a network-initiated bearer modification
+// (TS 24.301 §6.4.2.3).
+func (h *Handler) modifyBearerAccept(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+	if !ue.SecurityActive {
+		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
+	}
+
+	esm, err := naseps.BuildModifyEPSBearerContextAccept(esmBearerID(ue, req), esmPTI(req))
+	if err != nil {
+		return nil, err
+	}
+
+	return h.sendESM(enb, ue, t, esm)
+}
+
+// deactivateBearerAccept acknowledges a network-initiated bearer deactivation
+// (TS 24.301 §6.4.4.3).
+func (h *Handler) deactivateBearerAccept(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+	if !ue.SecurityActive {
+		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
+	}
+
+	esm, err := naseps.BuildDeactivateEPSBearerContextAccept(esmBearerID(ue, req), esmPTI(req))
+	if err != nil {
+		return nil, err
+	}
+
+	return h.sendESM(enb, ue, t, esm)
+}
+
+func (h *Handler) sendESM(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, esm []byte) (*SendENBNASResponse, error) {
+	protected, err := naseps.Protect(esm, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := h.sendUplink(enb, ue, t, protected); err != nil {
+		return nil, err
+	}
+
+	return &SendENBNASResponse{}, nil
+}
+
+func esmBearerID(ue *store.UEEPSContext, req *SendENBNASRequest) uint8 {
+	if req.EPSBearerIdentity != nil {
+		return *req.EPSBearerIdentity
+	}
+
+	return ue.EPSBearerID
+}
+
+func esmPTI(req *SendENBNASRequest) uint8 {
+	if req.PTI != nil {
+		return *req.PTI
+	}
+
+	return 0
 }
 
 // trackingAreaUpdate sends a (protected) Tracking Area Update Request from a

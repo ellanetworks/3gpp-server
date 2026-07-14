@@ -154,6 +154,25 @@ func BuildDeactivateEPSBearerContextAccept(ebi, pti uint8) ([]byte, error) {
 	}).Marshal()
 }
 
+// BuildModifyEPSBearerContextAccept builds the UE's acknowledgement of a
+// network-initiated bearer modification (TS 24.301 §8.3.10).
+func BuildModifyEPSBearerContextAccept(ebi, pti uint8) ([]byte, error) {
+	return (&eps.ModifyEPSBearerContextAccept{
+		EPSBearerIdentity:            ebi,
+		ProcedureTransactionIdentity: pti,
+	}).Marshal()
+}
+
+// BuildESMStatus builds an ESM STATUS reporting an ESM protocol error for a
+// bearer (TS 24.301 §8.3.15).
+func BuildESMStatus(ebi, pti, cause uint8) ([]byte, error) {
+	return (&eps.ESMStatus{
+		EPSBearerIdentity:            ebi,
+		ProcedureTransactionIdentity: pti,
+		ESMCause:                     cause,
+	}).Marshal()
+}
+
 // GUTIParams identifies a GUTI mobile identity (TS 24.301 §9.9.3.12).
 type GUTIParams struct {
 	MCC, MNC   string

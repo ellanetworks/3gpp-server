@@ -125,6 +125,14 @@ type SendENBNASRequest struct {
 	// PDN connection to release (TS 24.301 §6.5.2). Defaults to the default bearer.
 	LinkedEBI *uint8 `json:"linked_ebi,omitempty"`
 
+	// EPSBearerIdentity selects the bearer for a UE-sent ESM message
+	// (esm_status, modify/deactivate accept). Defaults to the default bearer.
+	EPSBearerIdentity *uint8 `json:"eps_bearer_identity,omitempty"`
+
+	// ESMCause is the ESM cause a UE-sent esm_status or modify reject carries
+	// (TS 24.301 §9.9.4.4). Defaults to #111 protocol error, unspecified.
+	ESMCause *uint8 `json:"esm_cause,omitempty"`
+
 	// RESOverride, when set, replaces the computed RES with these hex bytes —
 	// for the wrong-RES authentication tests.
 	RESOverride *string `json:"res_override,omitempty"`

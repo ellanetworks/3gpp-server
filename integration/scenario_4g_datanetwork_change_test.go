@@ -100,4 +100,16 @@ func Test4GDataNetworkChangeReactivatesBearer(t *testing.T) {
 	if got := jsonGet(body2, "nas.esm_cause"); got != "39" {
 		t.Fatalf("deactivate esm_cause = %q, want 39 (reactivation requested, TS 24.301 §9.9.4.4)\n  body: %s", got, body2)
 	}
+
+	// The UE accepts the deactivation (mandatory, TS 24.301 §6.4.4.3); the MME
+	// releases the additional PDN and the UE stays attached.
+	accept := fmt.Sprintf(`{"message_type":"deactivate_eps_bearer_context_accept","eps_bearer_identity":%s,"pti":%s}`,
+		jsonGet(body2, "nas.eps_bearer_identity"), jsonGet(body2, "nas.bearer_pti"))
+	if s, ab := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas", accept); s != 200 {
+		t.Fatalf("deactivate accept: HTTP %d\n  body: %s", s, ab)
+	}
+
+	if got := jsonGet(nasStep(t, enbID, ueID, "release_request"), "s1ap.message_type"); got != "UEContextReleaseCommand" {
+		t.Errorf("UE not usable after PDN deactivation; release_request did not yield a UEContextReleaseCommand")
+	}
 }
