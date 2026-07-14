@@ -315,11 +315,14 @@ func DecodePDUSessionEstablishmentAccept(nasResp *NASResponse, gsmMsg *gonas.Gsm
 
 	msg := gsmMsg.PDUSessionEstablishmentAccept
 
-	nasResp.PDUSessionID = msg.GetPDUSessionID()
-	nasResp.PDUSessionType = msg.SelectedSSCModeAndSelectedPDUSessionType.Octet & 0x07
+	pduSessionID := msg.GetPDUSessionID()
+	nasResp.PDUSessionID = &pduSessionID
+
+	pduSessionType := msg.SelectedSSCModeAndSelectedPDUSessionType.Octet & 0x07
+	nasResp.PDUSessionType = &pduSessionType
 
 	pduAddr := msg.GetPDUAddressInformation()
-	switch nasResp.PDUSessionType {
+	switch pduSessionType {
 	case nasMessage.PDUSessionTypeIPv4:
 		nasResp.PDUAddress = fmt.Sprintf("%d.%d.%d.%d", pduAddr[0], pduAddr[1], pduAddr[2], pduAddr[3])
 	case nasMessage.PDUSessionTypeIPv6:
@@ -329,10 +332,12 @@ func DecodePDUSessionEstablishmentAccept(nasResp *NASResponse, gsmMsg *gonas.Gsm
 	}
 
 	ulAMBR := msg.GetSessionAMBRForUplink()
-	nasResp.SessionAMBRUplink = uint16(ulAMBR[0])<<8 | uint16(ulAMBR[1])
+	ulAMBRValue := uint16(ulAMBR[0])<<8 | uint16(ulAMBR[1])
+	nasResp.SessionAMBRUplink = &ulAMBRValue
 
 	dlAMBR := msg.GetSessionAMBRForDownlink()
-	nasResp.SessionAMBRDownlink = uint16(dlAMBR[0])<<8 | uint16(dlAMBR[1])
+	dlAMBRValue := uint16(dlAMBR[0])<<8 | uint16(dlAMBR[1])
+	nasResp.SessionAMBRDownlink = &dlAMBRValue
 
 	if ruleLen := msg.AuthorizedQosRules.GetLen(); ruleLen > 0 {
 		nasResp.AuthorizedQoSRules = hex.EncodeToString(msg.AuthorizedQosRules.Buffer[:ruleLen])

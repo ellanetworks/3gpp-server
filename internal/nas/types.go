@@ -155,19 +155,20 @@ type NASResponse struct {
 	// IdentityRequest
 	IdentityType *uint8 `json:"identity_type,omitempty"`
 
-	// PDU Session Establishment Accept (TS 24.501 §8.3.2)
-	PDUSessionID   uint8  `json:"pdu_session_id,omitempty"`
-	PDUSessionType uint8  `json:"pdu_session_type,omitempty"`
+	// PDU Session Establishment Accept (TS 24.501 §8.3.2). The numeric IEs are
+	// pointers so a decoded value of 0 is distinct from an absent IE.
+	PDUSessionID   *uint8 `json:"pdu_session_id,omitempty"`
+	PDUSessionType *uint8 `json:"pdu_session_type,omitempty"`
 	PDUAddress     string `json:"pdu_address,omitempty"`
 
 	// PDU Session Establishment Accept mandatory/conditional IEs (TS 24.501
 	// §8.3.2): Session-AMBR and Authorized QoS rules are mandatory; the
 	// Always-on PDU session indication is included per §6.4.1 when the UE
 	// requested it.
-	SessionAMBRUplink   uint16 `json:"session_ambr_uplink,omitempty"`
-	SessionAMBRDownlink uint16 `json:"session_ambr_downlink,omitempty"`
-	AuthorizedQoSRules  string `json:"authorized_qos_rules,omitempty"`
-	AlwaysOnIndication  *uint8 `json:"always_on_indication,omitempty"`
+	SessionAMBRUplink   *uint16 `json:"session_ambr_uplink,omitempty"`
+	SessionAMBRDownlink *uint16 `json:"session_ambr_downlink,omitempty"`
+	AuthorizedQoSRules  string  `json:"authorized_qos_rules,omitempty"`
+	AlwaysOnIndication  *uint8  `json:"always_on_indication,omitempty"`
 
 	// PDU Session Establishment Reject
 	Cause5GSM *uint8 `json:"cause_5gsm,omitempty"`

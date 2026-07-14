@@ -18,6 +18,14 @@ import (
 
 const sctpReadBufferSize = 65535
 
+// ErrSend wraps a failure to write to the SCTP association; ErrTimeout wraps a
+// wait that expired before a matching downlink arrived. Callers classify these
+// to distinguish an upstream transport failure from an internal build error.
+var (
+	ErrSend    = errors.New("sctp send")
+	ErrTimeout = errors.New("timeout waiting for message")
+)
+
 // framed is the SCTP association engine shared by the NGAP and S1AP transports.
 // It buffers decoded downlinks keyed by message type and lets several concurrent
 // waiters on one association each claim the frame for their own UE. T is the
@@ -114,7 +122,7 @@ func (t *framed[T]) runReceiver() {
 
 func (t *framed[T]) Send(data []byte, nonUE bool) error {
 	if t.closed.Load() {
-		return fmt.Errorf("transport is closed")
+		return fmt.Errorf("%w: transport is closed", ErrSend)
 	}
 
 	var streamID uint16
@@ -131,7 +139,7 @@ func (t *framed[T]) Send(data []byte, nonUE bool) error {
 
 	_, err := t.conn.SCTPWrite(data, &info)
 	if err != nil {
-		return fmt.Errorf("sctp write: %w", err)
+		return fmt.Errorf("%w: %v", ErrSend, err)
 	}
 
 	return nil
@@ -184,7 +192,7 @@ func (t *framed[T]) WaitForMessageMatching(ctx context.Context, match func(*T) b
 		}
 
 		if ctx.Err() != nil {
-			return nil, fmt.Errorf("timeout waiting for %v", messageTypes)
+			return nil, fmt.Errorf("%w: %v", ErrTimeout, messageTypes)
 		}
 
 		t.cond.Wait()
