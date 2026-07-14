@@ -339,9 +339,6 @@ func decodePathSwitchRequestFailure(value []byte, resp *S1APResponse) error {
 	return nil
 }
 
-// decodeHandoverRequest decodes the HANDOVER REQUEST the target eNB receives
-// (TS 36.413 §9.1.5.4). It carries the target MME UE S1AP ID, the E-RABs to set
-// up, and the {NCC, NH} the target uses to derive its K_eNB.
 func decodeHandoverRequest(value []byte, resp *S1APResponse) error {
 	m, err := s1ap.ParseHandoverRequest(value)
 	if err != nil {
@@ -367,8 +364,6 @@ func decodeHandoverRequest(value []byte, resp *S1APResponse) error {
 	return nil
 }
 
-// decodeHandoverCommand decodes the HANDOVER COMMAND the source eNB receives
-// (TS 36.413 §9.1.5.2), listing any E-RABs the target did not admit.
 func decodeHandoverCommand(value []byte, resp *S1APResponse) error {
 	m, err := s1ap.ParseHandoverCommand(value)
 	if err != nil {
@@ -384,8 +379,6 @@ func decodeHandoverCommand(value []byte, resp *S1APResponse) error {
 	return nil
 }
 
-// decodeHandoverPreparationFailure decodes the HANDOVER PREPARATION FAILURE the
-// source eNB receives when the MME rejects the handover (TS 36.413 §9.1.5.3).
 func decodeHandoverPreparationFailure(value []byte, resp *S1APResponse) error {
 	m, err := s1ap.ParseHandoverPreparationFailure(value)
 	if err != nil {
@@ -398,8 +391,6 @@ func decodeHandoverPreparationFailure(value []byte, resp *S1APResponse) error {
 	return nil
 }
 
-// decodeHandoverCancelAcknowledge decodes the HANDOVER CANCEL ACKNOWLEDGE the
-// source eNB receives after cancelling a prepared handover (TS 36.413 §9.1.5.6).
 func decodeHandoverCancelAcknowledge(value []byte, resp *S1APResponse) error {
 	m, err := s1ap.ParseHandoverCancelAcknowledge(value)
 	if err != nil {
@@ -411,8 +402,6 @@ func decodeHandoverCancelAcknowledge(value []byte, resp *S1APResponse) error {
 	return nil
 }
 
-// decodeMMEStatusTransfer decodes the MME STATUS TRANSFER the target eNB
-// receives, relaying the source's PDCP status (TS 36.413 §9.1.5.7).
 func decodeMMEStatusTransfer(value []byte, resp *S1APResponse) error {
 	m, err := s1ap.ParseMMEStatusTransfer(value)
 	if err != nil {

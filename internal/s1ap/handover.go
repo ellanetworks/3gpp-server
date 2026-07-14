@@ -9,22 +9,19 @@ import (
 	"github.com/ellanetworks/core/s1ap"
 )
 
-// S1AP radio-network Cause values for the S1 handover procedures (TS 36.413
-// §9.2.1.3), matching the values the MME emits.
+// S1AP CauseRadioNetwork values (TS 36.413 §9.2.1.3).
 const (
 	CauseHandoverDesirableForRadioReasons = 16
 	CauseHandoverCancelled                = 4
 	CauseHOFailureInTarget                = 6
 )
 
-// handoverContainerStub is the opaque source/target eNB transparent container.
-// The MME relays it verbatim between the eNBs (TS 36.413 §8.4), so its content
-// is immaterial to the procedure and a single octet satisfies the mandatory IE.
+// The source/target eNB transparent container is an opaque OCTET STRING at S1AP
+// (TS 36.413 §9.1.5), so one octet satisfies the mandatory IE.
 var handoverContainerStub = s1ap.TransparentContainer{0x00}
 
-// HandoverRequiredParams are the inputs to build a HANDOVER REQUIRED the source
-// eNB sends to start S1 handover preparation toward the target eNB (TS 36.413
-// §8.4.1). The target identity fields are the target eNB's own PLMN/TAC/eNB-ID.
+// HandoverRequiredParams builds a HANDOVER REQUIRED (TS 36.413 §8.4.1). The
+// Target fields are the target eNB's own PLMN, TAC, and eNB-ID.
 type HandoverRequiredParams struct {
 	MMEUES1APID uint32
 	ENBUES1APID uint32
@@ -62,16 +59,13 @@ func BuildHandoverRequired(p HandoverRequiredParams) ([]byte, error) {
 	return m.Marshal()
 }
 
-// HandoverAdmittedERAB is one E-RAB the target eNB admits in a HANDOVER REQUEST
-// ACKNOWLEDGE, with the downlink S1-U endpoint it will receive user data on.
 type HandoverAdmittedERAB struct {
 	ERABID uint8
 	DLTeid uint32
 	DLAddr string
 }
 
-// HandoverRequestAcknowledgeParams are the inputs to build a HANDOVER REQUEST
-// ACKNOWLEDGE the target eNB sends after admitting the incoming UE's bearers
+// HandoverRequestAcknowledgeParams builds a HANDOVER REQUEST ACKNOWLEDGE
 // (TS 36.413 §8.4.2). FailedERABIDs lists bearers the target did not admit.
 type HandoverRequestAcknowledgeParams struct {
 	MMEUES1APID   uint32
@@ -115,8 +109,8 @@ func BuildHandoverRequestAcknowledge(p HandoverRequestAcknowledgeParams) ([]byte
 	return m.Marshal()
 }
 
-// HandoverNotifyParams are the inputs to build a HANDOVER NOTIFY the target eNB
-// sends once the UE has arrived, reporting its new location (TS 36.413 §8.4.3).
+// HandoverNotifyParams builds a HANDOVER NOTIFY reporting the UE's new location
+// (TS 36.413 §8.4.3).
 type HandoverNotifyParams struct {
 	MMEUES1APID uint32
 	ENBUES1APID uint32
@@ -142,8 +136,8 @@ func BuildHandoverNotify(p HandoverNotifyParams) ([]byte, error) {
 	return m.Marshal()
 }
 
-// BuildHandoverCancel builds a HANDOVER CANCEL the source eNB sends to abort a
-// handover it has prepared (TS 36.413 §8.4.5).
+// BuildHandoverCancel builds a HANDOVER CANCEL aborting a prepared handover
+// (TS 36.413 §8.4.5).
 func BuildHandoverCancel(mmeUES1APID, enbUES1APID uint32, cause int) ([]byte, error) {
 	m := &s1ap.HandoverCancel{
 		MMEUES1APID: s1ap.MMEUES1APID(mmeUES1APID),
@@ -154,8 +148,8 @@ func BuildHandoverCancel(mmeUES1APID, enbUES1APID uint32, cause int) ([]byte, er
 	return m.Marshal()
 }
 
-// BuildHandoverFailure builds a HANDOVER FAILURE the target eNB sends when it
-// cannot admit the incoming UE, aborting resource allocation (TS 36.413 §8.4.2).
+// BuildHandoverFailure builds a HANDOVER FAILURE aborting resource allocation
+// at the target eNB (TS 36.413 §8.4.2). It carries no eNB UE S1AP ID (§9.1.5.6).
 func BuildHandoverFailure(mmeUES1APID uint32, cause int) ([]byte, error) {
 	m := &s1ap.HandoverFailure{
 		MMEUES1APID: s1ap.MMEUES1APID(mmeUES1APID),
@@ -165,10 +159,8 @@ func BuildHandoverFailure(mmeUES1APID uint32, cause int) ([]byte, error) {
 	return m.Marshal()
 }
 
-// BuildENBStatusTransfer builds an eNB STATUS TRANSFER the source eNB sends
-// after the Handover Command to relay PDCP status to the target (TS 36.413
-// §8.4.6). The container is opaque to the MME, which relays it as an MME Status
-// Transfer.
+// BuildENBStatusTransfer builds an eNB STATUS TRANSFER relaying PDCP status to
+// the target (TS 36.413 §8.4.6). The container is an opaque OCTET STRING.
 func BuildENBStatusTransfer(mmeUES1APID, enbUES1APID uint32, container []byte) ([]byte, error) {
 	if container == nil {
 		container = []byte{0x00}

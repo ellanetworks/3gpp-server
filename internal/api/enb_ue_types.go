@@ -134,17 +134,16 @@ type SendENBNASRequest struct {
 	// non-EPS authentication unacceptable.
 	Cause *int `json:"cause,omitempty"`
 
-	// TargetENBID, on handover_required, is the store ID of the eNB to hand the UE
-	// over to; its PLMN and eNB-ID form the Target eNB-ID the MME resolves.
+	// TargetENBID, on handover_required, is the store ID of the target eNB; its
+	// PLMN and eNB-ID form the Target eNB-ID the MME resolves.
 	TargetENBID *string `json:"target_enb_id,omitempty"`
 
-	// HandoverCause overrides the radio-network Cause on a handover_required
-	// (default handover-desirable-for-radio-reasons) or handover_cancel (default
-	// handover-cancelled), TS 36.413 §9.2.1.3.
-	HandoverCause *int `json:"handover_cause,omitempty"`
+	// HandoverCancelCause overrides the radio-network Cause on a handover_cancel
+	// (default handover-cancelled, TS 36.413 §9.2.1.3).
+	HandoverCancelCause *int `json:"handover_cancel_cause,omitempty"`
 
 	// StatusTransferContainer, on enb_status_transfer, is the opaque PDCP status
-	// container (hex) relayed to the target eNB (TS 36.413 §9.1.5.7).
+	// container (hex) relayed to the target eNB.
 	StatusTransferContainer *string `json:"status_transfer_container,omitempty"`
 
 	TimeoutMs int `json:"timeout_ms,omitempty"`
@@ -172,8 +171,6 @@ type SendENBS1APRequest struct {
 	// CellID overrides the E-UTRAN cell identity a handover_notify reports as the
 	// UE's new location (TS 36.413 §9.2.1.38). Defaults to 1.
 	CellID *uint32 `json:"cell_id,omitempty"`
-
-	TimeoutMs int `json:"timeout_ms,omitempty"`
 }
 
 // HandoverERAB is one E-RAB the target eNB admits, with the downlink S1-U

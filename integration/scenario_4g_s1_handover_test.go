@@ -16,8 +16,6 @@ import (
 	"testing"
 )
 
-// awaitENBS1AP waits for one of the given downlink S1AP message types on an eNB's
-// non-UE-associated S1 association (e.g. a HANDOVER REQUEST at the target).
 func awaitENBS1AP(t *testing.T, enbID string, messageTypes string) []byte {
 	t.Helper()
 
@@ -30,8 +28,6 @@ func awaitENBS1AP(t *testing.T, enbID string, messageTypes string) []byte {
 	return body
 }
 
-// awaitENBUES1AP waits for one of the given downlink S1AP message types addressed
-// to a specific UE (e.g. a HANDOVER COMMAND at the source).
 func awaitENBUES1AP(t *testing.T, enbID, ueID string, messageTypes string) (int, []byte) {
 	t.Helper()
 
@@ -39,28 +35,32 @@ func awaitENBUES1AP(t *testing.T, enbID, ueID string, messageTypes string) (int,
 		fmt.Sprintf(`{"message_types":%s,"timeout_ms":5000}`, messageTypes))
 }
 
-// targetENBUES1APID is the eNB UE S1AP ID the target eNB assigns to the incoming
-// UE; it must be reused across the Handover Request Acknowledge and Notify so the
-// MME matches the prepared handover (TS 36.413 §8.4.2, §8.4.3).
+// The eNB UE S1AP ID the target assigns to the incoming UE must be reused across
+// the Handover Request Acknowledge and Notify so the MME matches the prepared
+// handover (TS 36.413 §8.4.2, §8.4.3).
 const targetENBUES1APID = 100
 
-// runS1HandoverFlow drives the intra-MME S1 handover signalling between two eNBs.
-// The message order follows TS 23.401 §5.5.1.2: preparation (Handover Required →
-// Handover Request → Handover Request Acknowledge → Handover Command) and
-// execution (Handover Notify → UE Context Release Command).
+// runS1HandoverFlow drives the intra-MME S1 handover signalling between two eNBs,
+// following the message order of TS 23.401 §5.5.1.2.2.
 func runS1HandoverFlow(t *testing.T, sourceENB, targetENB, ueID string) {
 	t.Helper()
 
-	// Step 1: source eNB → MME: HANDOVER REQUIRED (TS 36.413 §8.4.1).
-	status, body := doRequest(t, "POST", "/enb/"+sourceENB+"/ue/"+ueID+"/nas",
-		fmt.Sprintf(`{"message_type":"handover_required","target_enb_id":%q}`, targetENB))
+	// The bearer to be relocated is the one established at attach.
+	status, ueBody := doRequest(t, "GET", "/enb/"+sourceENB+"/ue/"+ueID, "")
 	if status != 200 {
-		t.Fatalf("handover_required: HTTP %d\n  body: %s", status, body)
+		t.Fatalf("get ue: HTTP %d\n  body: %s", status, ueBody)
 	}
 
-	// Step 2: MME → target eNB: HANDOVER REQUEST (TS 36.413 §8.4.2). It must carry
-	// the E-RAB to set up and the {NCC, NH} the target derives K_eNB from
-	// (TS 33.401 §7.2.8).
+	defaultEBI := jsonGet(ueBody, "default_ebi")
+	if defaultEBI == "" {
+		t.Fatalf("UE has no default bearer established\n  body: %s", ueBody)
+	}
+
+	// Source eNB → MME: HANDOVER REQUIRED (TS 36.413 §8.4.1).
+	nasBody(t, sourceENB, ueID, fmt.Sprintf(`{"message_type":"handover_required","target_enb_id":%q}`, targetENB))
+
+	// MME → target eNB: HANDOVER REQUEST. It must carry the same E-RAB established
+	// at attach and the {NCC, NH} the target derives K_eNB from (TS 33.401 §7.2.8).
 	hoReq := awaitENBS1AP(t, targetENB, `["HandoverRequest"]`)
 	if got := jsonGet(hoReq, "s1ap.message_type"); got != "HandoverRequest" {
 		t.Fatalf("s1ap.message_type = %q, want HandoverRequest (TS 36.413 §8.4.2)\n  body: %s", got, hoReq)
@@ -71,25 +71,23 @@ func runS1HandoverFlow(t *testing.T, sourceENB, targetENB, ueID string) {
 		t.Fatalf("HandoverRequest missing MME UE S1AP ID\n  body: %s", hoReq)
 	}
 
-	erabID := jsonGet(hoReq, "s1ap.erab_setup_items.0.erab_id")
-	if erabID == "" {
-		t.Fatalf("HandoverRequest carries no E-RAB to set up (mandatory, TS 36.413 §9.1.5.4)\n  body: %s", hoReq)
+	if got := jsonGet(hoReq, "s1ap.erab_setup_items.0.erab_id"); got != defaultEBI {
+		t.Fatalf("HandoverRequest E-RAB ID = %q, want %q (the bearer established at attach, TS 36.413 §9.1.5.4)\n  body: %s", got, defaultEBI, hoReq)
 	}
 
 	if nh := jsonGet(hoReq, "s1ap.security_context.next_hop"); nh == "" {
 		t.Errorf("HandoverRequest missing Security Context (mandatory, TS 36.413 §9.1.5.4)\n  body: %s", hoReq)
 	}
 
-	// Step 3: target eNB → MME: HANDOVER REQUEST ACKNOWLEDGE (TS 36.413 §8.4.2),
-	// admitting the E-RAB with its downlink S1-U endpoint.
-	status, body = doRequest(t, "POST", "/enb/"+targetENB+"/s1ap",
+	// Target eNB → MME: HANDOVER REQUEST ACKNOWLEDGE, admitting the E-RAB.
+	status, body := doRequest(t, "POST", "/enb/"+targetENB+"/s1ap",
 		fmt.Sprintf(`{"message_type":"handover_request_acknowledge","mme_ue_s1ap_id":%s,"enb_ue_s1ap_id":%d,"admitted_erabs":[{"id":%s,"dl_teid":9000,"dl_ip":"10.3.0.3"}]}`,
-			targetMME, targetENBUES1APID, erabID))
+			targetMME, targetENBUES1APID, defaultEBI))
 	if status != 200 {
 		t.Fatalf("handover_request_acknowledge: HTTP %d\n  body: %s", status, body)
 	}
 
-	// Step 4: MME → source eNB: HANDOVER COMMAND (TS 36.413 §8.4.1).
+	// MME → source eNB: HANDOVER COMMAND.
 	status, hoCmd := awaitENBUES1AP(t, sourceENB, ueID, `["HandoverCommand"]`)
 	if status != 200 {
 		t.Fatalf("await HandoverCommand: HTTP %d\n  body: %s", status, hoCmd)
@@ -99,8 +97,20 @@ func runS1HandoverFlow(t *testing.T, sourceENB, targetENB, ueID string) {
 		t.Fatalf("s1ap.message_type = %q, want HandoverCommand (TS 36.413 §8.4.1)\n  body: %s", got, hoCmd)
 	}
 
-	// Step 5: target eNB → MME: HANDOVER NOTIFY — the UE has arrived (TS 36.413
-	// §8.4.3, TS 23.401 §5.5.1.2.2 step 13).
+	// Source eNB → MME → target eNB: eNB STATUS TRANSFER relayed as MME STATUS
+	// TRANSFER (TS 36.413 §8.4.4; TS 23.401 §5.5.1.2.2 steps 10, 10c).
+	status, body = doRequest(t, "POST", "/enb/"+sourceENB+"/ue/"+ueID+"/nas",
+		`{"message_type":"enb_status_transfer"}`)
+	if status != 200 {
+		t.Fatalf("enb_status_transfer: HTTP %d\n  body: %s", status, body)
+	}
+
+	mmeStatus := awaitENBS1AP(t, targetENB, `["MMEStatusTransfer"]`)
+	if got := jsonGet(mmeStatus, "s1ap.message_type"); got != "MMEStatusTransfer" {
+		t.Errorf("s1ap.message_type = %q, want MMEStatusTransfer (the MME must relay eNB status, TS 36.413 §8.4.4)\n  body: %s", got, mmeStatus)
+	}
+
+	// Target eNB → MME: HANDOVER NOTIFY (TS 23.401 §5.5.1.2.2 step 13).
 	status, body = doRequest(t, "POST", "/enb/"+targetENB+"/s1ap",
 		fmt.Sprintf(`{"message_type":"handover_notify","mme_ue_s1ap_id":%s,"enb_ue_s1ap_id":%d}`,
 			targetMME, targetENBUES1APID))
@@ -108,8 +118,8 @@ func runS1HandoverFlow(t *testing.T, sourceENB, targetENB, ueID string) {
 		t.Fatalf("handover_notify: HTTP %d\n  body: %s", status, body)
 	}
 
-	// Step 6: MME → source eNB: UE CONTEXT RELEASE COMMAND — after Notify the MME
-	// releases the source's resources (TS 23.401 §5.5.1.2.2 step 19).
+	// MME → source eNB: UE CONTEXT RELEASE COMMAND after Notify (TS 23.401
+	// §5.5.1.2.2 step 19).
 	status, rel := awaitENBUES1AP(t, sourceENB, ueID, `["UEContextReleaseCommand"]`)
 	if status != 200 {
 		t.Fatalf("await UEContextReleaseCommand: HTTP %d — source must be released after handover\n  body: %s", status, rel)
@@ -132,8 +142,7 @@ func Test4GS1Handover(t *testing.T) {
 }
 
 // Test4GS1HandoverThenMigrate hands the UE over, then migrates its context to the
-// target eNB and confirms the UE is reachable there — the source no longer holds
-// it (TS 23.401 §5.5.1.2.2).
+// target eNB and confirms the UE is reachable there and absent from the source.
 func Test4GS1HandoverThenMigrate(t *testing.T) {
 	sourceENB := createENBWithID(t, 1, "source-enb")
 	targetENB := createENBWithID(t, 2, "target-enb")
@@ -151,7 +160,7 @@ func Test4GS1HandoverThenMigrate(t *testing.T) {
 		t.Fatalf("migrate: HTTP %d\n  body: %s", status, body)
 	}
 
-	// The UE now lives on the target eNB, not the source.
+	// The UE lives on the target eNB, not the source.
 	if status, _ := doRequest(t, "GET", "/enb/"+targetENB+"/ue/"+ueID, ""); status != 200 {
 		t.Errorf("UE not reachable on the target eNB after migrate (HTTP %d)", status)
 	}
