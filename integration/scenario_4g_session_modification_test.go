@@ -80,7 +80,7 @@ func Test4GSessionAMBRModification(t *testing.T) {
 	}
 
 	// The carried APN-AMBR must encode the new 50 Mbps rate (TS 24.301 §9.9.4.2).
-	wantAMBR := hex.EncodeToString(eps.EncodeAPNAMBR(50_000_000, 50_000_000).Marshal())
+	wantAMBR := hex.EncodeToString(eps.APNAMBRFromBitsPerSecond(50_000_000, 50_000_000).Marshal())
 	if got := jsonGet(body2, "nas.apn_ambr"); got != wantAMBR {
 		t.Fatalf("Modify EPS Bearer Context Request apn_ambr = %q, want %q (50 Mbps, TS 24.301 §9.9.4.2)\n  body: %s", got, wantAMBR, body2)
 	}

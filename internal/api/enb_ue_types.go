@@ -134,7 +134,63 @@ type SendENBNASRequest struct {
 	// non-EPS authentication unacceptable.
 	Cause *int `json:"cause,omitempty"`
 
+	// TargetENBID, on handover_required, is the store ID of the eNB to hand the UE
+	// over to; its PLMN and eNB-ID form the Target eNB-ID the MME resolves.
+	TargetENBID *string `json:"target_enb_id,omitempty"`
+
+	// HandoverCause overrides the radio-network Cause on a handover_required
+	// (default handover-desirable-for-radio-reasons) or handover_cancel (default
+	// handover-cancelled), TS 36.413 §9.2.1.3.
+	HandoverCause *int `json:"handover_cause,omitempty"`
+
+	// StatusTransferContainer, on enb_status_transfer, is the opaque PDCP status
+	// container (hex) relayed to the target eNB (TS 36.413 §9.1.5.7).
+	StatusTransferContainer *string `json:"status_transfer_container,omitempty"`
+
 	TimeoutMs int `json:"timeout_ms,omitempty"`
+}
+
+// SendENBS1APRequest drives a non-UE-associated S1AP message on the eNB's S1-MME
+// association — the target-eNB side of S1 handover. The S1AP ID pair addresses a
+// UE the target eNB does not own; the MME assigned the MME UE S1AP ID and the
+// eNB chooses its own eNB UE S1AP ID.
+type SendENBS1APRequest struct {
+	MessageType string `json:"message_type"`
+
+	MMEUES1APID *uint32 `json:"mme_ue_s1ap_id,omitempty"`
+	ENBUES1APID *uint32 `json:"enb_ue_s1ap_id,omitempty"`
+
+	// Admitted lists the E-RABs the target eNB accepts in a
+	// handover_request_acknowledge; FailedERABs lists those it rejects.
+	Admitted    []HandoverERAB `json:"admitted_erabs,omitempty"`
+	FailedERABs []uint8        `json:"failed_erabs,omitempty"`
+
+	// Cause overrides the radio-network Cause on a handover_failure (default
+	// ho-failure-in-target-EPC-eNB-or-target-system), TS 36.413 §9.2.1.3.
+	Cause *int `json:"cause,omitempty"`
+
+	// CellID overrides the E-UTRAN cell identity a handover_notify reports as the
+	// UE's new location (TS 36.413 §9.2.1.38). Defaults to 1.
+	CellID *uint32 `json:"cell_id,omitempty"`
+
+	TimeoutMs int `json:"timeout_ms,omitempty"`
+}
+
+// HandoverERAB is one E-RAB the target eNB admits, with the downlink S1-U
+// endpoint it will receive user data on. DLIP defaults to the eNB's S1-U
+// address; DLTeid defaults to a synthesized value.
+type HandoverERAB struct {
+	ID     uint8  `json:"id"`
+	DLTeid uint32 `json:"dl_teid,omitempty"`
+	DLIP   string `json:"dl_ip,omitempty"`
+}
+
+// MigrateENBUERequest relocates a UE context to the target eNB after an S1
+// handover, optionally overriding its S1AP ID pair to the target's values.
+type MigrateENBUERequest struct {
+	TargetENBID string  `json:"target_enb_id"`
+	MMEUES1APID *uint32 `json:"mme_ue_s1ap_id,omitempty"`
+	ENBUES1APID *uint32 `json:"enb_ue_s1ap_id,omitempty"`
 }
 
 type SendENBNASResponse struct {

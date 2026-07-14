@@ -5,8 +5,12 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/ellanetworks/core/nas v0.0.0-20260622123405-036df32f710e h1:jyNYRq6qrbza16O3PUED5DLioSo1Dwxjh1bfW7ApJRc=
 github.com/ellanetworks/core/nas v0.0.0-20260622123405-036df32f710e/go.mod h1:ktzKZ8Upk8qNd0K8vncFpAsjJkVB/wTEh2ynDksOq8M=
+github.com/ellanetworks/core/nas v0.0.0-20260714112426-afa52e8faf76 h1:lK52ReL4kt+qSc/nZHWjUtKKWkNH0Msf4ovrCzY2LgA=
+github.com/ellanetworks/core/nas v0.0.0-20260714112426-afa52e8faf76/go.mod h1:ktzKZ8Upk8qNd0K8vncFpAsjJkVB/wTEh2ynDksOq8M=
 github.com/ellanetworks/core/s1ap v0.0.0-20260622123405-036df32f710e h1:OC155nVfgocjGy7xYL9IDdQZNh41Rvkos71XWoruUvc=
 github.com/ellanetworks/core/s1ap v0.0.0-20260622123405-036df32f710e/go.mod h1:/mzl71n4vzPPHBVyomVaGAni2q5kzVdof7OT72xa3/Q=
+github.com/ellanetworks/core/s1ap v0.0.0-20260714112426-afa52e8faf76 h1:v20p1eS/QKucJ56e+N37M2HCl0UxgAvpiLXYOkCo8Hk=
+github.com/ellanetworks/core/s1ap v0.0.0-20260714112426-afa52e8faf76/go.mod h1:/mzl71n4vzPPHBVyomVaGAni2q5kzVdof7OT72xa3/Q=
 github.com/free5gc/aper v1.1.1 h1:O1WHg8J/Ab+TtpYuDjdUkoVv1dpR/K7L1/edP9+OujI=
 github.com/free5gc/aper v1.1.1/go.mod h1:erN7J8emgUvCFydYcPhHtknRfeHocPRJuGldpvXLE5I=
 github.com/free5gc/nas v1.2.3 h1:vMA9NGORw0zr26vQWWSTy8X9HrA+wGxFvwc2g9KqUTw=

@@ -90,6 +90,10 @@ type S1APResponse struct {
 	// new QoS (TS 36.413 §9.1.3.3); the default bearer's item carries the Modify
 	// EPS Bearer Context Request as the NAS-PDU.
 	ERABModifyItems []ERABModifyItemJSON `json:"erab_modify_items,omitempty"`
+
+	// ReleasedERABs lists the E-RAB IDs a Handover Command reports the target did
+	// not admit, so the source releases their PDN connections (TS 36.413 §9.1.5.2).
+	ReleasedERABs []int `json:"released_erabs,omitempty"`
 }
 
 // PagingJSON is the decoded PAGING content (TS 36.413 §9.1.6): the paged UE's

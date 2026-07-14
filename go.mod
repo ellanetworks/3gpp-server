@@ -3,8 +3,8 @@ module github.com/ellanetworks/3gpp-server
 go 1.26.4
 
 require (
-	github.com/ellanetworks/core/nas v0.0.0-20260622123405-036df32f710e
-	github.com/ellanetworks/core/s1ap v0.0.0-20260622123405-036df32f710e
+	github.com/ellanetworks/core/nas v0.0.0-20260714112426-afa52e8faf76
+	github.com/ellanetworks/core/s1ap v0.0.0-20260714112426-afa52e8faf76
 	github.com/free5gc/aper v1.1.1
 	github.com/free5gc/nas v1.2.3
 	github.com/free5gc/ngap v1.1.3
