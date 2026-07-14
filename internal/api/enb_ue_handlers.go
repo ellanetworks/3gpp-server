@@ -177,7 +177,7 @@ func (h *Handler) SendENBNAS(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if herr != nil {
-		writeError(w, http.StatusBadGateway, herr.Error())
+		writeError(w, statusForError(herr), herr.Error())
 		return
 	}
 
@@ -261,7 +261,7 @@ func (h *Handler) attachRequest(ctx context.Context, enb *store.ENBContext, ue *
 func (h *Handler) attachRequestRaw(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, rawHex string) (*SendENBNASResponse, error) {
 	raw, err := hex.DecodeString(rawHex)
 	if err != nil {
-		return nil, fmt.Errorf("raw_nas_pdu must be hex: %w", err)
+		return nil, httpErrorf(http.StatusBadRequest, "raw_nas_pdu must be hex: %v", err)
 	}
 
 	init, err := s1ap.BuildInitialUEMessage(s1ap.InitialUEMessageParams{
@@ -303,7 +303,7 @@ func (h *Handler) authenticationResponse(ctx context.Context, enb *store.ENBCont
 	res := aka.RES
 	if req.RESOverride != nil {
 		if res, err = hex.DecodeString(*req.RESOverride); err != nil {
-			return nil, fmt.Errorf("res_override must be hex: %w", err)
+			return nil, httpErrorf(http.StatusBadRequest, "res_override must be hex: %v", err)
 		}
 	}
 
@@ -414,7 +414,7 @@ func (h *Handler) identityResponse(ctx context.Context, enb *store.ENBContext, u
 
 func (h *Handler) authenticationFailure(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	if req.Cause == nil {
-		return nil, fmt.Errorf("cause is required for authentication_failure")
+		return nil, httpErrorf(http.StatusBadRequest, "cause is required for authentication_failure")
 	}
 
 	cause := uint8(*req.Cause)
@@ -668,7 +668,7 @@ func (h *Handler) ueCapabilityInfo(ctx context.Context, enb *store.ENBContext, u
 	if req.UERadioCapability != "" {
 		b, err := hex.DecodeString(req.UERadioCapability)
 		if err != nil {
-			return nil, fmt.Errorf("ue_radio_capability must be hex: %w", err)
+			return nil, httpErrorf(http.StatusBadRequest, "ue_radio_capability must be hex: %v", err)
 		}
 
 		cap = b
@@ -816,7 +816,7 @@ func (h *Handler) reset(ctx context.Context, ue *store.UEEPSContext, t *transpor
 // and Activate Default Accept — or rejects with a PDN Connectivity Reject.
 func (h *Handler) pdnConnectivity(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	if !ue.SecurityActive {
-		return nil, fmt.Errorf("no NAS security context; complete an attach first")
+		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
 	}
 
 	pti := uint8(5)
@@ -944,7 +944,7 @@ func (h *Handler) acceptAdditionalBearer(enb *store.ENBContext, ue *store.UEEPSC
 // Accept — or rejects with a PDN Disconnect Reject.
 func (h *Handler) pdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	if !ue.SecurityActive {
-		return nil, fmt.Errorf("no NAS security context; complete an attach first")
+		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
 	}
 
 	pti := uint8(6)
@@ -1039,7 +1039,7 @@ func (h *Handler) pdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *
 // Complete when it reallocates the GUTI) or a TAU Reject (TS 24.301 §5.5.3).
 func (h *Handler) trackingAreaUpdate(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	if !ue.SecurityActive {
-		return nil, fmt.Errorf("no NAS security context; complete an attach first")
+		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
 	}
 
 	guti := naseps.GUTIParams{
@@ -1190,7 +1190,7 @@ func (h *Handler) releaseRequest(ctx context.Context, enb *store.ENBContext, ue 
 // (Service Reject, TS 24.301 §5.6.1).
 func (h *Handler) serviceRequest(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	if !ue.SecurityActive {
-		return nil, fmt.Errorf("no NAS security context; complete an attach first")
+		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
 	}
 
 	count := ue.NextUL()
@@ -1265,7 +1265,7 @@ func (h *Handler) serviceRequest(ctx context.Context, enb *store.ENBContext, ue 
 // (TS 24.301 §5.5.2).
 func (h *Handler) detach(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	if !ue.SecurityActive {
-		return nil, fmt.Errorf("no NAS security context; complete an attach first")
+		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
 	}
 
 	guti := naseps.GUTIParams{
@@ -1324,19 +1324,19 @@ func (h *Handler) injectNAS(ctx context.Context, enb *store.ENBContext, ue *stor
 	switch {
 	case req.ReplayLast:
 		if ue.LastUplinkNAS == nil {
-			return nil, fmt.Errorf("no prior uplink to replay")
+			return nil, httpErrorf(http.StatusBadRequest, "no prior uplink to replay")
 		}
 
 		nasPDU = ue.LastUplinkNAS
 	case req.RawNASPDU != nil:
 		b, err := hex.DecodeString(*req.RawNASPDU)
 		if err != nil {
-			return nil, fmt.Errorf("raw_nas_pdu must be hex: %w", err)
+			return nil, httpErrorf(http.StatusBadRequest, "raw_nas_pdu must be hex: %v", err)
 		}
 
 		nasPDU = b
 	default:
-		return nil, fmt.Errorf("inject_nas requires raw_nas_pdu or replay_last")
+		return nil, httpErrorf(http.StatusBadRequest, "inject_nas requires raw_nas_pdu or replay_last")
 	}
 
 	mmeID := ue.MMEUES1APID
