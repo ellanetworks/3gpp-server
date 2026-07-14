@@ -875,6 +875,7 @@ paths:
               properties:
                 pdu_session_id: { type: integer, description: "Defaults to the UE's session." }
                 teid: { type: integer, description: "Override the uplink TEID, e.g. to send to a TEID with no PDR (TS 29.281 §7.3.1)." }
+                src: { type: string, description: "Override the inner source IP (source-spoofing tests); defaults to the session's UE IP." }
                 icmp_echo:
                   type: object
                   properties:

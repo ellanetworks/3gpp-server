@@ -38,6 +38,10 @@ type UplinkRequest struct {
 		SrcPort    uint16 `json:"src_port,omitempty"`
 		PayloadHex string `json:"payload_hex,omitempty"`
 	} `json:"udp,omitempty"`
+
+	// Src overrides the inner source IP (default the session's UE IP) — for
+	// source-spoofing tests.
+	Src *string `json:"src,omitempty"`
 }
 
 // AwaitDownlinkRequest blocks for a downlink T-PDU on a session's DL TEID.
@@ -100,9 +104,14 @@ func (h *Handler) SendUplink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ueIP, err := netip.ParseAddr(info.UEIP)
+	srcIP := info.UEIP
+	if req.Src != nil {
+		srcIP = *req.Src
+	}
+
+	src, err := netip.ParseAddr(srcIP)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("invalid UE IP %q: %v", info.UEIP, err))
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid source IP %q: %v", srcIP, err))
 		return
 	}
 
@@ -116,7 +125,7 @@ func (h *Handler) SendUplink(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		inner, err = gtpu.BuildICMPEcho(ueIP, dst, req.ICMPEcho.ID, req.ICMPEcho.Seq, []byte("3gpp-server"))
+		inner, err = gtpu.BuildICMPEcho(src, dst, req.ICMPEcho.ID, req.ICMPEcho.Seq, []byte("3gpp-server"))
 		if err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
@@ -140,7 +149,7 @@ func (h *Handler) SendUplink(w http.ResponseWriter, r *http.Request) {
 			srcPort = 12345
 		}
 
-		inner, err = gtpu.BuildUDP(ueIP, dst, srcPort, req.UDP.DstPort, payload)
+		inner, err = gtpu.BuildUDP(src, dst, srcPort, req.UDP.DstPort, payload)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
 			return

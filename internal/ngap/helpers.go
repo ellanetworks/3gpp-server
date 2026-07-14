@@ -8,9 +8,7 @@ import (
 	"fmt"
 
 	"github.com/free5gc/aper"
-	"github.com/free5gc/ngap/ngapConvert"
 	"github.com/free5gc/ngap/ngapType"
-	"github.com/free5gc/openapi/models"
 )
 
 func GetTacInBytes(tacStr string) ([]byte, error) {
@@ -33,34 +31,44 @@ func GetSliceInBytes(sst int32, sd string) ([]byte, []byte, error) {
 	return sstBytes, nil, nil
 }
 
-func GetPLMNIdentity(mcc string, mnc string) ngapType.PLMNIdentity {
-	return ngapConvert.PlmnIdToNgap(models.PlmnId{Mcc: mcc, Mnc: mnc})
-}
+// encodePLMN encodes an MCC/MNC pair into the 3-octet BCD PLMN identity
+// (TS 23.003 §2.2 / TS 24.008 §10.5.1.3): octet 1 = MCC2|MCC1, octet 2 =
+// MNC3|MCC3, octet 3 = MNC2|MNC1, with a 2-digit MNC taking the 0xF filler in
+// its third digit. It validates lengths and digits so malformed input yields an
+// error, not a panic or a silently-empty mandatory IE.
+func encodePLMN(mcc, mnc string) ([]byte, error) {
+	if len(mcc) != 3 {
+		return nil, fmt.Errorf("mcc must be 3 digits, got %q", mcc)
+	}
 
-func GetMccAndMncInOctets(mccStr string, mncStr string) ([]byte, error) {
-	mcc := reverse(mccStr)
-	mnc := reverse(mncStr)
+	if len(mnc) != 2 && len(mnc) != 3 {
+		return nil, fmt.Errorf("mnc must be 2 or 3 digits, got %q", mnc)
+	}
 
-	var res string
+	d := make([]int, 0, 6)
+
+	for _, s := range []string{mcc, mnc} {
+		for _, r := range s {
+			if r < '0' || r > '9' {
+				return nil, fmt.Errorf("non-digit in plmn %q%q", mcc, mnc)
+			}
+
+			d = append(d, int(r-'0'))
+		}
+	}
+
+	p := make([]byte, 3)
+	p[0] = byte(d[1]<<4 | d[0])
+
 	if len(mnc) == 2 {
-		res = fmt.Sprintf("%c%cf%c%c%c", mcc[1], mcc[2], mcc[0], mnc[0], mnc[1])
+		p[1] = byte(0xF<<4 | d[2])
 	} else {
-		res = fmt.Sprintf("%c%c%c%c%c%c", mcc[1], mcc[2], mnc[2], mcc[0], mnc[0], mnc[1])
+		p[1] = byte(d[5]<<4 | d[2])
 	}
 
-	resu, err := hex.DecodeString(res)
-	if err != nil {
-		return nil, fmt.Errorf("could not decode mcc/mnc to octets: %v", err)
-	}
-	return resu, nil
-}
+	p[2] = byte(d[4]<<4 | d[3])
 
-func reverse(s string) string {
-	var aux string
-	for _, valor := range s {
-		aux = string(valor) + aux
-	}
-	return aux
+	return p, nil
 }
 
 func GetNRCellIdentity(gnbID string) (ngapType.NRCellIdentity, error) {

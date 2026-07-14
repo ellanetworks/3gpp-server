@@ -768,10 +768,15 @@ func handleRegistrationRequest(w http.ResponseWriter, r *http.Request, gnb *stor
 			return
 		}
 
-		ngapMsg := ngap.BuildInitialUEMessageFromState(
+		ngapMsg, err := ngap.BuildInitialUEMessageFromState(
 			ue.RanUeNgapID, nasPDU,
 			gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, nil, initialUEOverrides(req),
 		)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("build initial ue message: %v", err))
+			return
+		}
+
 		sendAndWait(w, r, gnb, ue, t, req, ngapMsg, "DownlinkNASTransport", "InitialContextSetupRequest", "ErrorIndication")
 
 		return
@@ -823,10 +828,15 @@ func handleRegistrationRequest(w http.ResponseWriter, r *http.Request, gnb *stor
 		return
 	}
 
-	ngapMsg := ngap.BuildInitialUEMessageFromState(
+	ngapMsg, err := ngap.BuildInitialUEMessageFromState(
 		ue.RanUeNgapID, nasPDU,
 		gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, nil, initialUEOverrides(req),
 	)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("build initial ue message: %v", err))
+		return
+	}
+
 	sendAndWait(w, r, gnb, ue, t, req, ngapMsg, "DownlinkNASTransport", "InitialContextSetupRequest", "ErrorIndication")
 }
 
@@ -1854,10 +1864,14 @@ func handleServiceRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnB
 		overrides.RRCEstablishmentCause = &moData
 	}
 
-	ngapMsg := ngap.BuildInitialUEMessageFromState(
+	ngapMsg, err := ngap.BuildInitialUEMessageFromState(
 		ue.RanUeNgapID, nasPDU,
 		gnb.MCC, gnb.MNC, gnb.TAC, gnb.GnbID, fiveGSTMSIFromGUTI(ue.Guti), overrides,
 	)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("build initial ue message: %v", err))
+		return
+	}
 
 	encoded, err := ngap.Encode(ngapMsg)
 	if err != nil {
