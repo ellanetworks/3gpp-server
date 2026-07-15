@@ -9,12 +9,10 @@ import (
 	"testing"
 )
 
-// Test5GUplinkNASTransport_NGAPIDFuzz mutates the AMF UE NGAP ID and RAN UE
-// NGAP ID of an otherwise-valid UplinkNASTransport. Per TS 38.413 §8.7.5.2,
-// when one or both UE NGAP IDs are incorrect the AMF shall respond with
-// ErrorIndication (cause "Unknown local UE NGAP ID" or "Inconsistent remote
-// UE NGAP ID") — never silently treat the message as belonging to a known
-// UE context.
+// Per TS 38.413 §8.7.5.2, when one or both UE NGAP IDs of an otherwise-valid
+// UplinkNASTransport are incorrect the AMF shall respond with ErrorIndication
+// (cause "Unknown local UE NGAP ID" or "Inconsistent remote UE NGAP ID"); it
+// must never attribute the message to a known UE context.
 func Test5GUplinkNASTransport_NGAPIDFuzz(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -22,9 +20,8 @@ func Test5GUplinkNASTransport_NGAPIDFuzz(t *testing.T) {
 		wantNGAPMsgType string
 	}{
 		{
-			// AMF allocates AMF UE NGAP IDs from 1 upwards, so 0 was never
-			// assigned to any UE. The AMF should reject this as an unknown
-			// local UE NGAP ID.
+			// The AMF allocates AMF UE NGAP IDs from 1 upwards, so 0 was never
+			// assigned to any UE.
 			name:            "AMF UE NGAP ID = 0 (never allocated)",
 			body:            `{"message_type":"authentication_response","amf_ue_ngap_id_override":0}`,
 			wantNGAPMsgType: ngapErrorIndication,
@@ -45,9 +42,8 @@ func Test5GUplinkNASTransport_NGAPIDFuzz(t *testing.T) {
 			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
-			// Both AMF and RAN IDs forged to a never-allocated value — the
-			// AMF should still reject (either ID being wrong is sufficient
-			// for ErrorIndication per TS 38.413 §8.7.5.2).
+			// Either ID being wrong is sufficient for ErrorIndication
+			// (TS 38.413 §8.7.5.2).
 			name:            "both AMF and RAN UE NGAP IDs forged",
 			body:            `{"message_type":"authentication_response","amf_ue_ngap_id_override":99999,"ran_ue_ngap_id_override":99999}`,
 			wantNGAPMsgType: ngapErrorIndication,

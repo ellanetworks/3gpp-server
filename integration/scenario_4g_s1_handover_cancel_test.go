@@ -4,8 +4,8 @@
 //go:build integration
 
 // S1 handover cancellation (TS 36.413 §8.4.5): the source eNB aborts a handover
-// it has prepared, and the MME releases the reserved target resources and
-// answers with HANDOVER CANCEL ACKNOWLEDGE. A failure means Ella Core deviates.
+// it has prepared; the MME releases the reserved target resources and answers
+// with HANDOVER CANCEL ACKNOWLEDGE.
 
 package integration_test
 
@@ -14,9 +14,8 @@ import (
 	"testing"
 )
 
-// Test4GS1HandoverCancel checks that after a handover is prepared, a HANDOVER
-// CANCEL from the source is acknowledged and the UE remains served by the source
-// (TS 36.413 §8.4.5).
+// Test4GS1HandoverCancel cancels a prepared handover: the UE must remain served
+// by the source eNB.
 func Test4GS1HandoverCancel(t *testing.T) {
 	sourceENB := createENBWithID(t, 1, "source-enb")
 	targetENB := createENBWithID(t, 2, "target-enb")
@@ -30,17 +29,14 @@ func Test4GS1HandoverCancel(t *testing.T) {
 		t.Fatalf("handover_required: HTTP %d\n  body: %s", status, body)
 	}
 
-	// Wait for the preparation to reach the target before cancelling, so the MME
-	// has a prepared handover to cancel.
+	// The cancel must reach the MME with a prepared handover to cancel.
 	awaitENBS1AP(t, targetENB, `["HandoverRequest"]`)
 
-	// Source eNB → MME: HANDOVER CANCEL. The handler returns the acknowledge.
 	ack := nasBody(t, sourceENB, ueID, `{"message_type":"handover_cancel","timeout_ms":5000}`)
 	if got := jsonGet(ack, "s1ap.message_type"); got != "HandoverCancelAcknowledge" {
 		t.Fatalf("s1ap.message_type = %q, want HandoverCancelAcknowledge (TS 36.413 §8.4.5)\n  body: %s", got, ack)
 	}
 
-	// The UE is still served by the source: a normal release now succeeds.
 	if got := jsonGet(nasStep(t, sourceENB, ueID, "release_request"), "s1ap.message_type"); got != "UEContextReleaseCommand" {
 		t.Errorf("after cancel the source must still serve the UE; release_request did not yield a UEContextReleaseCommand")
 	}

@@ -6,7 +6,7 @@
 // S1 handover cross-association abuse (TS 36.413 §10.6): a rogue eNB must not be
 // able to start a handover of another eNB's UE by forging its S1AP ID pair on its
 // own association. The MME must answer the rogue with an Error Indication and
-// leave the victim's connection intact. A failure means Ella Core deviates.
+// leave the victim's connection intact.
 
 package integration_test
 
@@ -15,12 +15,8 @@ import (
 	"testing"
 )
 
-// Test4GS1HandoverCrossENBHijack checks a rogue eNB cannot hand over another
-// eNB's UE. The attacker sends a HANDOVER REQUIRED carrying the victim's
-// (MME-UE-S1AP-ID, eNB-UE-S1AP-ID) pair on its own association. Because that pair
-// names a UE-associated connection on a different association, the MME must
-// answer the attacker with an Error Indication (TS 36.413 §10.6) and must not
-// disturb the victim.
+// Test4GS1HandoverCrossENBHijack forges the victim's S1AP ID pair in a HANDOVER
+// REQUIRED on the attacker's own association.
 func Test4GS1HandoverCrossENBHijack(t *testing.T) {
 	victimENB := createENBWithID(t, 1, "victim-enb")
 	attackerENB := createENBWithID(t, 2, "attacker-enb")
@@ -40,14 +36,11 @@ func Test4GS1HandoverCrossENBHijack(t *testing.T) {
 		t.Fatalf("handover_required (forged): HTTP %d\n  body: %s", status, body)
 	}
 
-	// The MME must reject the rogue request with an Error Indication on the
-	// attacker's association, not prepare a handover of the victim.
 	ei := awaitENBS1AP(t, attackerENB, `["ErrorIndication","HandoverPreparationFailure"]`)
 	if got := jsonGet(ei, "s1ap.message_type"); got != "ErrorIndication" {
 		t.Errorf("s1ap.message_type = %q, want ErrorIndication for a cross-association handover (TS 36.413 §10.6)\n  body: %s", got, ei)
 	}
 
-	// The victim is untouched: it can still be released normally on its own eNB.
 	if got := jsonGet(nasStep(t, victimENB, victimUE, "release_request"), "s1ap.message_type"); got != "UEContextReleaseCommand" {
 		t.Errorf("the victim UE was disturbed by the rogue handover; a normal release did not yield a UEContextReleaseCommand")
 	}

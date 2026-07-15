@@ -6,9 +6,7 @@
 // Path Switch Request (Xn-handover) procedural conformance: normal operation,
 // partial/total failure, and abnormal inputs (TS 38.413 §8.4.4, §9.2.3.9–10).
 // A path switch is the NGAP side of an Xn handover — the AMF switches a UE
-// context's downlink path to the requesting NG-RAN node. These tests assert the
-// concrete messages and IEs the AMF must produce, and fail if the core does not
-// conform.
+// context's downlink path to the requesting NG-RAN node.
 
 package integration_test
 
@@ -18,9 +16,7 @@ import (
 	"testing"
 )
 
-// sendPathSwitch sends a PATH SWITCH REQUEST built from the given JSON fields
-// (everything between message_type and the wait/timeout), blocking for the AMF's
-// acknowledge, failure, or an error indication.
+// fields is the JSON between message_type and the wait/timeout.
 func sendPathSwitch(t *testing.T, gnbID, fields string) (int, []byte) {
 	t.Helper()
 
@@ -30,8 +26,6 @@ func sendPathSwitch(t *testing.T, gnbID, fields string) (int, []byte) {
 	return doRequest(t, "POST", "/gnb/"+gnbID+"/ngap", body)
 }
 
-// assertPathSwitchType fails unless the path switch produced an HTTP 200 whose
-// decoded NGAP message type matches want.
 func assertPathSwitchType(t *testing.T, ctx string, status int, body []byte, want string) {
 	t.Helper()
 
@@ -45,8 +39,6 @@ func assertPathSwitchType(t *testing.T, ctx string, status int, body []byte, wan
 	}
 }
 
-// ngapReleasedPDUSessionIDs collects the PDU Session IDs carried by a PDU
-// Session Resource Released List across the IEs of an NGAP response.
 func ngapReleasedPDUSessionIDs(body []byte) []int64 {
 	var top struct {
 		NGAP struct {
@@ -68,9 +60,8 @@ func ngapReleasedPDUSessionIDs(body []byte) []int64 {
 	return ids
 }
 
-// Test5GPathSwitchRequestUnknownUEFails — §8.4.4: a path switch whose Source AMF
-// UE NGAP ID matches no UE context must be answered with a Path Switch Request
-// Failure.
+// §8.4.4: a Source AMF UE NGAP ID matching no UE context must be answered with a
+// Path Switch Request Failure.
 func Test5GPathSwitchRequestUnknownUEFails(t *testing.T) {
 	gnb := createGnBWithID(t, "0000e0", "ps-unknown")
 
@@ -79,10 +70,8 @@ func Test5GPathSwitchRequestUnknownUEFails(t *testing.T) {
 	assertPathSwitchType(t, "path switch for unknown AMF UE NGAP ID", status, body, ngapPathSwitchRequestFailure)
 }
 
-// Test5GPathSwitchRequestNoSwitchableSessionFails — §8.4.4.3: if the 5GC fails to
-// switch all requested PDU sessions (here the request names a session the UE
-// does not hold), the AMF must send a Path Switch Request Failure, leaving the
-// UE context intact.
+// §8.4.4.3: when the 5GC can switch none of the requested PDU sessions, the AMF
+// must send a Path Switch Request Failure and leave the UE context intact.
 func Test5GPathSwitchRequestNoSwitchableSessionFails(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "0000e1", "ps-none-src")
 	targetGNB := createGnBWithID(t, "0000e2", "ps-none-tgt")
@@ -97,10 +86,9 @@ func Test5GPathSwitchRequestNoSwitchableSessionFails(t *testing.T) {
 	assertUEStillConnected(t, sourceGNB, ueID)
 }
 
-// Test5GPathSwitchRequestFailureReportsReleasedSessions — §9.2.3.10 / §8.4.4.3:
-// the Path Switch Request Failure must carry a PDU Session Resource Released
-// List naming the PDU session(s) that could not be switched, so the NG-RAN node
-// knows which to release.
+// §9.2.3.10 / §8.4.4.3: the failure must carry a PDU Session Resource Released
+// List naming the sessions that could not be switched, so the NG-RAN node knows
+// which to release.
 func Test5GPathSwitchRequestFailureReportsReleasedSessions(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "0000e3", "ps-rel-src")
 	targetGNB := createGnBWithID(t, "0000e4", "ps-rel-tgt")

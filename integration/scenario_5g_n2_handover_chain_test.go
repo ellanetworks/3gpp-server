@@ -15,10 +15,9 @@ import (
 	"testing"
 )
 
-// handoverHop drives one complete N2 handover of ueID from srcGNB to tgtGNB and
-// migrates the UE onto the target, so the next hop can originate there. tgtGNB
-// is the target's store ID (URL paths, migrate); tgtGnbHex is its NGAP gNB ID
-// (the Handover Required target). It returns the AMF UE NGAP ID on the target.
+// handoverHop migrates the UE onto the target once the handover completes, so
+// the next hop can originate there. tgtGNB is the target's store ID (URL paths,
+// migrate); tgtGnbHex is its NGAP gNB ID (the Handover Required target).
 func handoverHop(t *testing.T, srcGNB, ueID, tgtGNB, tgtGnbHex string) int64 {
 	t.Helper()
 
@@ -61,9 +60,8 @@ func handoverHop(t *testing.T, srcGNB, ueID, tgtGNB, tgtGnbHex string) int64 {
 	return tgtAmf
 }
 
-// assertMobilityRegistrationAccepted confirms a moved UE is still usable by
-// performing a Mobility Registration Update over its current connection and
-// requiring the AMF to accept it (TS 24.501 §5.5.1.3).
+// An accepted Mobility Registration Update (TS 24.501 §5.5.1.3) over the UE's
+// current connection is what proves a moved UE is still usable.
 func assertMobilityRegistrationAccepted(t *testing.T, gnbID, ueID string) {
 	t.Helper()
 
@@ -78,8 +76,7 @@ func assertMobilityRegistrationAccepted(t *testing.T, gnbID, ueID string) {
 	}
 }
 
-// Test5GN2HandoverPingPong hands a UE A->B and straight back B->A, as happens when
-// a UE oscillates at a cell edge.
+// Models a UE oscillating at a cell edge.
 func Test5GN2HandoverPingPong(t *testing.T) {
 	const hexA, hexB = "0000c0", "0000c1"
 	gnbA := createGnBWithID(t, hexA, "ho-pp-a")
@@ -93,8 +90,7 @@ func Test5GN2HandoverPingPong(t *testing.T) {
 	assertMobilityRegistrationAccepted(t, gnbA, ueID)
 }
 
-// Test5GN2HandoverMultiHop walks a UE across three gNBs A->B->C, as it would move
-// across cells.
+// Models a UE moving across three cells, A->B->C.
 func Test5GN2HandoverMultiHop(t *testing.T) {
 	const hexA, hexB, hexC = "0000c2", "0000c3", "0000c4"
 	gnbA := createGnBWithID(t, hexA, "ho-mh-a")
@@ -109,9 +105,8 @@ func Test5GN2HandoverMultiHop(t *testing.T) {
 	assertMobilityRegistrationAccepted(t, gnbC, ueID)
 }
 
-// Test5GN2HandoverConcurrentUEs hands two different UEs over the same gNB pair at
-// once, with both in the preparing state simultaneously. The AMF must keep their
-// contexts isolated (distinct AMF UE NGAP IDs) and complete both.
+// With two UEs preparing over the same gNB pair simultaneously, the AMF must
+// keep their contexts isolated (distinct AMF UE NGAP IDs) and complete both.
 func Test5GN2HandoverConcurrentUEs(t *testing.T) {
 	srcGNB := createGnBWithID(t, "0002f0", "ho-cc-src")
 	tgtHex := "0002f1"
@@ -157,9 +152,9 @@ func Test5GN2HandoverConcurrentUEs(t *testing.T) {
 	}
 }
 
-// Test5GN2HandoverThenIdleThenServiceRequest walks the full connected/idle cycle a
-// UE goes through after moving: handover to a new gNB, release to CM-IDLE there,
-// then a Service Request to come back to CM-CONNECTED (TS 24.501 §5.6.1).
+// Models the connected/idle cycle a UE goes through after moving: handover to a
+// new gNB, release to CM-IDLE there, then a Service Request to come back to
+// CM-CONNECTED (TS 24.501 §5.6.1).
 func Test5GN2HandoverThenIdleThenServiceRequest(t *testing.T) {
 	gnbA := createGnBWithID(t, "000210", "ho-cyc-a")
 	hexB := "000211"
@@ -168,7 +163,6 @@ func Test5GN2HandoverThenIdleThenServiceRequest(t *testing.T) {
 	ueID := establishRegisteredUE(t, gnbA)
 	handoverHop(t, gnbA, ueID, gnbB, hexB)
 
-	// Release to CM-IDLE on the target.
 	status, body := doRequest(t, "POST", "/gnb/"+gnbB+"/ue/"+ueID+"/ngap",
 		`{"message_type":"ue_context_release_request"}`)
 	if status != 200 {
@@ -179,7 +173,6 @@ func Test5GN2HandoverThenIdleThenServiceRequest(t *testing.T) {
 		t.Fatalf("release: ngap.message_type = %q, want UEContextReleaseCommand\n  body: %s", got, body)
 	}
 
-	// Service Request brings the UE back to CM-CONNECTED on the target.
 	status, body = doRequest(t, "POST", "/gnb/"+gnbB+"/ue/"+ueID+"/ngap",
 		`{"message_type":"service_request"}`)
 	if status != 200 {

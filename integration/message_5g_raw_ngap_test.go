@@ -3,8 +3,7 @@
 
 //go:build integration
 
-// Raw-NGAP fuzz coverage: feed the AMF deliberately malformed NGAP PDUs and
-// assert it rejects them without crashing. A crash here is a core defect.
+// Raw-NGAP fuzz coverage: a malformed NGAP PDU must not crash the core.
 
 package integration_test
 
@@ -13,7 +12,6 @@ import (
 	"testing"
 )
 
-// sendRawNGAP writes raw (hex) bytes onto the gNB's N2 association.
 func sendRawNGAP(t *testing.T, gnbID, pduHex string) {
 	t.Helper()
 
@@ -24,8 +22,6 @@ func sendRawNGAP(t *testing.T, gnbID, pduHex string) {
 	}
 }
 
-// Each case feeds the AMF a malformed PDU, then verifies the core still serves
-// by completing a fresh NG Setup. Failure means the malformed input killed it.
 func Test5GRawNGAPMalformedDoesNotCrashCore(t *testing.T) {
 	cases := []struct {
 		name string

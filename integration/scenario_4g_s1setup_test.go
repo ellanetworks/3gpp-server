@@ -3,7 +3,6 @@
 
 //go:build integration
 
-// Scenario tests for 4G/LTE exercise S1AP/NAS-EPS procedures against the MME.
 // S1 Setup is the first procedure on an S1-MME association (TS 36.413 §8.7).
 
 package integration_test
@@ -13,9 +12,6 @@ import (
 	"testing"
 )
 
-// mustCreateENB creates a standard eNB on an allocated eNB ID, completes S1
-// Setup against the MME, and returns the store handle. Registers cleanup. Tests
-// that need a specific S1AP eNB ID call createENBWithID.
 func mustCreateENB(t *testing.T) string {
 	t.Helper()
 
@@ -23,8 +19,7 @@ func mustCreateENB(t *testing.T) string {
 }
 
 func Test4GScenarioS1Setup(t *testing.T) {
-	// The state assertion below reads back this eNB's own S1AP eNB ID, so the
-	// value must be known here.
+	// The state assertion below reads this eNB's own S1AP eNB ID back.
 	stateENBID := claimENBID()
 	enbID := createENBWithID(t, stateENBID, "test-enb")
 

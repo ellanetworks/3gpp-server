@@ -27,8 +27,9 @@ func parseTransportAddr(s string) (net.IP, error) {
 }
 
 // encodePLMN packs an MCC/MNC pair into the 3-octet TBCD PLMN identity
-// (TS 23.003 §2.6): octet 1 = MCC2|MCC1, octet 2 = MNC3|MCC3, octet 3 =
-// MNC2|MNC1. A 2-digit MNC takes the 0xF filler in its third digit.
+// (TS 23.003 §2.2 / TS 24.008 §10.5.1.3): octet 1 = MCC2|MCC1, octet 2 =
+// MNC3|MCC3, octet 3 = MNC2|MNC1. A 2-digit MNC takes the 0xF filler in its
+// third digit.
 func encodePLMN(mcc, mnc string) (s1ap.PLMNIdentity, error) {
 	if len(mcc) != 3 {
 		return s1ap.PLMNIdentity{}, fmt.Errorf("mcc must be 3 digits, got %q", mcc)

@@ -88,8 +88,7 @@ func TestBuildUplinkRANStatusTransfer(t *testing.T) {
 }
 
 // TestDecodeDownlinkRANStatusTransfer checks the decoder surfaces the target's
-// UE NGAP IDs and the relayed container (TS 38.413 §9.2.3.14) so a caller can
-// verify what the AMF handed the target.
+// UE NGAP IDs and the relayed container (TS 38.413 §9.2.3.14).
 func TestDecodeDownlinkRANStatusTransfer(t *testing.T) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage

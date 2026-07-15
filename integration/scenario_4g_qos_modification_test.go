@@ -61,7 +61,7 @@ func Test4GQoSModification(t *testing.T) {
 	ueID := jsonGet(resp, "ue_id")
 	fullAttach(t, enbID, ueID)
 
-	// Trigger: a distinct 5QI/ARP (the policy seeds at 5QI 9, ARP 1).
+	// The policy seeds at 5QI 9, ARP 1.
 	const newVar5qi, newARP = 7, 5
 	setPolicyQoS(t, token, newVar5qi, newARP)
 
@@ -71,7 +71,7 @@ func Test4GQoSModification(t *testing.T) {
 		t.Fatalf("no E-RAB Modify Request after 5QI/ARP change (HTTP %d) — the MME must modify the radio bearer (TS 36.413 §8.2.2)\n  body: %s", status, body2)
 	}
 
-	// The new E-RAB-level QoS must carry the changed 5QI and ARP (TS 36.413 §9.2.1.15).
+	// The E-RAB-level QoS must carry the changed 5QI and ARP (TS 36.413 §9.2.1.15).
 	checks := map[string]string{
 		"s1ap.message_type":                           "ERABModifyRequest",
 		"s1ap.erab_modify_items.0.qci":                fmt.Sprintf("%d", newVar5qi),
@@ -85,9 +85,6 @@ func Test4GQoSModification(t *testing.T) {
 		}
 	}
 
-	// Complete the modification: the eNB confirms the radio reconfiguration with an
-	// E-RAB Modify Response (TS 36.413 §8.2.2) and the UE acknowledges the NAS
-	// procedure with a Modify EPS Bearer Context Accept (TS 24.301 §6.4.3.3).
 	if status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas", `{"message_type":"modify_response"}`); status != 200 {
 		t.Fatalf("modify_response: HTTP %d\n  body: %s", status, resp)
 	}
@@ -96,9 +93,8 @@ func Test4GQoSModification(t *testing.T) {
 		t.Fatalf("modify_eps_bearer_context_accept: HTTP %d\n  body: %s", status, resp)
 	}
 
-	// The bearer survives the in-place modification: an eNB-initiated release still
-	// draws the MME's UE Context Release Command (TS 36.413 §8.3.2), which it would
-	// not if the modification had torn the context down.
+	// A release still drawing a UE Context Release Command (TS 36.413 §8.3.2) proves
+	// the modification kept the UE context standing.
 	status, relResp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas",
 		`{"message_type":"release_request","timeout_ms":5000}`)
 	if status != 200 {

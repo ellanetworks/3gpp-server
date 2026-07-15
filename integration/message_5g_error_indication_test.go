@@ -10,8 +10,6 @@ import (
 	"testing"
 )
 
-// ngapErrorIndicationIDs returns the AMF and RAN UE NGAP IDs carried in the
-// response's IE list (nil when absent).
 func ngapErrorIndicationIDs(body []byte) (amf, ran *int64) {
 	var top struct {
 		NGAP struct {
@@ -47,8 +45,6 @@ type criticalityDiagnosticsJSON struct {
 	ProcedureCriticality *string `json:"procedure_criticality"`
 }
 
-// ngapCriticalityDiagnostics returns the Criticality Diagnostics IE carried in
-// the response's IE list, or nil when absent.
 func ngapCriticalityDiagnostics(body []byte) *criticalityDiagnosticsJSON {
 	var top struct {
 		NGAP struct {
@@ -71,12 +67,12 @@ func ngapCriticalityDiagnostics(body []byte) *criticalityDiagnosticsJSON {
 	return nil
 }
 
-// assertSpecCompliantErrorIndication checks that a response to a UE-associated
-// message carrying a wrong AMF/RAN UE NGAP ID is an Error Indication with the
-// IEs TS 38.413 §10.6 and §8.7.5.2 require: it uses UE-associated signalling
-// (both UE NGAP IDs echoed) and carries a Cause. The exact §10.6 cause
-// (Unknown local / Inconsistent remote UE NGAP ID) is pinned in the core3 unit
-// tests for resolveUE.
+// assertSpecCompliantErrorIndication checks the IEs TS 38.413 §10.6 and
+// §8.7.5.2 require of an Error Indication answering a UE-associated message
+// with a wrong AMF/RAN UE NGAP ID: UE-associated signalling (both UE NGAP IDs
+// echoed) and a Cause. Which of the two §10.6 causes applies (Unknown local or
+// Inconsistent remote UE NGAP ID) depends on the mutated ID, so only the
+// presence of a Cause is asserted.
 func assertSpecCompliantErrorIndication(t *testing.T, body []byte) {
 	t.Helper()
 

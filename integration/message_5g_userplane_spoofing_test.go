@@ -22,13 +22,11 @@ func gnbDrainDownlinks(t *testing.T, gnbID, ueID string) {
 	}
 }
 
-// Test5GUserPlaneSourceSpoofing checks the UPF drops uplink user data whose inner
-// source IP is not the UE's allocated address (UE source anti-spoofing, GSMA
-// security baseline). A rogue UE-A sends traffic with victim UE-B's source IP: if
-// the UPF forwards it, the data-network reply un-NATs to B's address and is
-// delivered to B's tunnel — proving A impersonated B's IP. The UPF must instead
-// drop A's spoofed-source uplink. Mirrors Test4GUserPlaneSourceSpoofing on the N3
-// GTP-U path.
+// The UPF must drop uplink user data whose inner source IP is not the UE's
+// allocated address (UE source anti-spoofing, GSMA security baseline). A rogue
+// UE-A sends traffic with victim UE-B's source IP: if the UPF forwards it, the
+// data-network reply un-NATs to B's address and is delivered to B's tunnel,
+// proving A impersonated B's IP.
 func Test5GUserPlaneSourceSpoofing(t *testing.T) {
 	gnbID := createGTPUGnB(t, "00ec09", "gtpu-spoof", n3IPv4)
 

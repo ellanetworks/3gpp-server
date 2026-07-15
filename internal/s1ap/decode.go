@@ -12,8 +12,8 @@ import (
 )
 
 // Decode decodes a received S1AP PDU into its JSON form. Only the messages the
-// server currently drives are mapped to typed fields; any other PDU is reported
-// by its outcome and procedure code with the raw hex preserved.
+// server drives are mapped to typed fields; any other PDU is reported by its
+// outcome and procedure code with the raw hex preserved.
 func Decode(data []byte) (*S1APResponse, error) {
 	pdu, err := s1ap.Unmarshal(data)
 	if err != nil {
@@ -313,8 +313,7 @@ func decodeUEContextReleaseCommand(value []byte, resp *S1APResponse) error {
 
 	setUnknownIEs(resp, m)
 
-	// The release names the UE by its S1AP ID pair (or a bare MME ID); surface the
-	// eNB ID when present so a waiter can match its UE.
+	// UE-S1AP-IDs is a CHOICE: the ID pair, or a bare MME UE S1AP ID.
 	mme := int64(m.UES1APIDs.MMEUES1APID)
 	resp.MMEUES1APID = &mme
 
@@ -528,8 +527,8 @@ func setUEIDs(resp *S1APResponse, mme, enb int64) {
 	resp.ENBUES1APID = &enb
 }
 
-// unknownIECarrier is a parsed message that reports the ProtocolIEs its type
-// does not model.
+// unknownIECarrier is a parsed message reporting the ProtocolIEs its type does
+// not model.
 type unknownIECarrier interface {
 	UnknownIEs() []s1ap.RawIE
 }
@@ -584,10 +583,9 @@ func mapS1SetupFailure(sf *s1ap.S1SetupFailure) *S1SetupFailureJSON {
 	return out
 }
 
-// procedureName maps an S1AP procedure code to a stable message name so
-// unexpected downlinks get a usable message_type to await on and a readable JSON
-// label. For procedures with distinct outcomes (e.g. S1 Setup) the caller
-// refines the name per outcome.
+// procedureName maps an S1AP procedure code to a stable message name, so an
+// unexpected downlink stays awaitable by message_type. Procedures with distinct
+// outcomes (e.g. S1 Setup) are refined per outcome.
 func procedureName(pc s1ap.ProcedureCode) string {
 	switch pc {
 	case s1ap.ProcS1Setup:

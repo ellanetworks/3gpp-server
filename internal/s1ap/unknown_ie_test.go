@@ -26,8 +26,8 @@ type protocolIEField struct {
 }
 
 // appendIE re-encodes a message body's ProtocolIE-Container with one extra
-// ProtocolIE-Field appended, producing the wire form of an MME that sends an IE
-// the message type does not model.
+// ProtocolIE-Field appended, the wire form of an MME sending an IE the message
+// type does not model.
 func appendIE(t *testing.T, body []byte, id int64, crit s1ap.Criticality, value []byte) []byte {
 	t.Helper()
 
@@ -94,8 +94,6 @@ func appendIE(t *testing.T, body []byte, id int64, crit s1ap.Criticality, value 
 	return w.Bytes()
 }
 
-// handoverCancelAcknowledgeWithIE builds a HANDOVER CANCEL ACKNOWLEDGE PDU
-// carrying one extra ProtocolIE.
 func handoverCancelAcknowledgeWithIE(t *testing.T, id int64, crit s1ap.Criticality, value []byte) []byte {
 	t.Helper()
 
@@ -173,8 +171,6 @@ func TestDecodeReportsUnmodeledIECriticalityReject(t *testing.T) {
 	}
 }
 
-// TestDecodeOmitsUnknownIEsWhenAllModeled checks a message whose every IE is
-// modeled reports no unknown IEs.
 func TestDecodeOmitsUnknownIEsWhenAllModeled(t *testing.T) {
 	ack := &s1ap.HandoverCancelAcknowledge{MMEUES1APID: 1, ENBUES1APID: 2}
 

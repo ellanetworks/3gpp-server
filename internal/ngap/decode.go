@@ -470,8 +470,7 @@ func decodeRANStatusTransferContainer(c *ngapType.RANStatusTransferTransparentCo
 	return out
 }
 
-// decodePaging surfaces the IEs of a PAGING (TS 38.413 §9.2.4.1), the
-// non-UE-associated message the AMF broadcasts to reach a CM-IDLE UE.
+// decodePaging surfaces the IEs of a PAGING (TS 38.413 §9.2.4.1).
 func decodePaging(msg *ngapType.Paging, resp *NGAPResponse) {
 	if msg == nil {
 		return
@@ -502,7 +501,7 @@ func decodeFiveGSTMSI(t *ngapType.FiveGSTMSI) *FiveGSTMSIJSON {
 
 // decodeErrorIndication surfaces the IEs of an ERROR INDICATION (TS 38.413
 // §9.2.1.3): the echoed AMF/RAN UE NGAP IDs and the Cause or Criticality
-// Diagnostics, so callers can verify §8.7.5.2 compliance.
+// Diagnostics §8.7.5.2 requires.
 func decodeErrorIndication(msg *ngapType.ErrorIndication, resp *NGAPResponse) {
 	if msg == nil {
 		return
@@ -536,9 +535,8 @@ func decodeErrorIndication(msg *ngapType.ErrorIndication, resp *NGAPResponse) {
 	}
 }
 
-// decodeHandoverRequest surfaces the AMF UE NGAP ID the AMF assigned for the
-// target side of an N2 handover (the target gNB echoes it in the acknowledge)
-// and the PDU sessions to be set up (TS 38.413 §9.2.3.1).
+// decodeHandoverRequest surfaces the AMF UE NGAP ID assigned for the target side
+// of an N2 handover and the PDU sessions to be set up (TS 38.413 §9.2.3.1).
 func decodeHandoverRequest(msg *ngapType.HandoverRequest, resp *NGAPResponse) {
 	if msg == nil {
 		return
@@ -776,9 +774,8 @@ func decodePDUSessionResourceSetupRequest(msg *ngapType.PDUSessionResourceSetupR
 		case ngapType.ProtocolIEIDPDUSessionResourceSetupListSUReq:
 			if ie.Value.PDUSessionResourceSetupListSUReq != nil {
 				for _, item := range ie.Value.PDUSessionResourceSetupListSUReq.List {
-					// First-wins, as everywhere else a per-item list carries a
-					// NAS-PDU: a later item must not displace the message the
-					// caller is waiting on.
+					// First-wins: a later item must not displace the NAS-PDU
+					// already decoded.
 					if item.PDUSessionNASPDU != nil && decoded.NasPDU == nil {
 						s := hex.EncodeToString(item.PDUSessionNASPDU.Value)
 						decoded.NasPDU = &s
@@ -988,8 +985,8 @@ func criticalityName(c aper.Enumerated) string {
 }
 
 // initiatingMessageName labels an initiating message, falling back to the
-// on-wire NGAP procedure code (TS 38.413 §9.3.1.2) for messages this decoder
-// does not specifically handle so the label stays stable and awaitable.
+// on-wire procedure code for messages this decoder does not model, so the label
+// stays stable and awaitable.
 func initiatingMessageName(msgType int, procedureCode int64) string {
 	switch msgType {
 	case ngapType.InitiatingMessagePresentDownlinkNASTransport:
@@ -1064,8 +1061,8 @@ func unsuccessfulOutcomeName(msgType int, procedureCode int64) string {
 }
 
 // timeToWaitName maps the TimeToWait enum (TS 38.413 §9.3.1.53) to its
-// self-describing spec name so an awaiting client reads the wait duration
-// without a lib-internal enum index.
+// self-describing spec name, so a client reads the back-off duration and not an
+// enum index.
 func timeToWaitName(t aper.Enumerated) string {
 	switch t {
 	case ngapType.TimeToWaitPresentV1s:
@@ -1098,9 +1095,9 @@ func decodeUEContextReleaseCommand(msg *ngapType.UEContextReleaseCommand, resp *
 
 		switch ie.Id.Value {
 		case ngapType.ProtocolIEIDUENGAPIDs:
-			// UE-NGAP-IDs is a CHOICE (TS 38.413 §9.3.3.19): the UE pair, or a
-			// bare AMF-UE-NGAP-ID. Surface the AMF ID for either so a waiter
-			// keyed on the UE matches.
+			// UE-NGAP-IDs is a CHOICE (TS 38.413 §9.3.3.19): the ID pair, or a
+			// bare AMF-UE-NGAP-ID. The AMF ID is surfaced for either, so a
+			// waiter keyed on the UE matches.
 			if ids := ie.Value.UENGAPIDs; ids != nil {
 				switch ids.Present {
 				case ngapType.UENGAPIDsPresentUENGAPIDPair:

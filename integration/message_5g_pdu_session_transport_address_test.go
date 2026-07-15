@@ -20,8 +20,6 @@ type pduSessionSetupItem struct {
 	UPFN3IPv6    string `json:"upf_n3_ipv6"`
 }
 
-// ngapPDUSessionSetupItems returns the PDU Session Resource Setup items carried
-// in the response's IE list.
 func ngapPDUSessionSetupItems(body []byte) []pduSessionSetupItem {
 	var top struct {
 		NGAP struct {
@@ -44,10 +42,10 @@ func ngapPDUSessionSetupItems(body []byte) []pduSessionSetupItem {
 	return nil
 }
 
-// Test5GPDUSessionResourceSetup_TransportLayerAddress checks the UPF N3 endpoint
-// the AMF signals in the PDU Session Resource Setup Request Transfer's UL NG-U
-// UP TNL Information. The Transport Layer Address there is encoded per TS 38.414
-// §5.3: "The Transport Layer Address signalled in NGAP messages is a bit string
+// The UPF N3 endpoint the AMF signals in the PDU Session Resource Setup Request
+// Transfer's UL NG-U UP TNL Information carries a Transport Layer Address
+// encoded per TS 38.414 §5.3: "The Transport Layer Address signalled in NGAP
+// messages is a bit string
 // of a) 32 bits in case of IPv4 address [...]; or b) 128 bits in case of IPv6
 // address [...]; or c) 160 bits if both IPv4 and IPv6 addresses are signalled, in
 // which case the IPv4 address is contained in the first 32 bits."

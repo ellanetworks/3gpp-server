@@ -26,8 +26,8 @@ func guti5GTMSI(t *testing.T, guti string) string {
 	return guti[gutiHexLen-8:]
 }
 
-// registerToAccept drives a fresh UE through an initial registration on gnbID
-// and returns the 5G-GUTI carried in the Registration Accept.
+// registerToAccept returns the 5G-GUTI carried in a fresh UE's Registration
+// Accept.
 func registerToAccept(t *testing.T, gnbID string) string {
 	t.Helper()
 
@@ -63,13 +63,10 @@ func registerToAccept(t *testing.T, gnbID string) string {
 	return guti
 }
 
-// Test5GGUTIReallocation checks the AMF assigns a fresh 5G-GUTI on each initial
-// registration. TS 24.501 §5.5.1.2.4: "The 5G-GUTI reallocation shall be part of
-// the initial registration procedure. During the initial registration procedure,
-// if the AMF has not allocated a new 5G-GUTI by the generic UE configuration
-// update procedure, the AMF shall include in the REGISTRATION ACCEPT message the
-// new assigned 5G-GUTI together with the assigned TAI list." A 5G-TMSI handed
-// out twice is not a new one.
+// TS 24.501 §5.5.1.2.4: "The 5G-GUTI reallocation shall be part of the initial
+// registration procedure. [...] the AMF shall include in the REGISTRATION
+// ACCEPT message the new assigned 5G-GUTI together with the assigned TAI list."
+// A 5G-TMSI handed out twice is not a new one.
 func Test5GGUTIReallocation(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 

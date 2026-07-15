@@ -5,9 +5,8 @@
 
 // S1-based handover (intra-MME, inter-eNB without X2, TS 36.413 §8.4 / TS 23.401
 // §5.5.1.2): an attached UE with a default bearer is handed over from a source
-// eNB to a target eNB through the MME. The flow is driven message-by-message
-// across two S1 associations. Assertions follow the spec; a failure means Ella
-// Core deviates.
+// eNB to a target eNB through the MME, driven message-by-message across two S1
+// associations.
 
 package integration_test
 
@@ -45,7 +44,6 @@ const targetENBUES1APID = 100
 func runS1HandoverFlow(t *testing.T, sourceENB, targetENB, ueID string) {
 	t.Helper()
 
-	// The bearer to be relocated is the one established at attach.
 	status, ueBody := doRequest(t, "GET", "/enb/"+sourceENB+"/ue/"+ueID, "")
 	if status != 200 {
 		t.Fatalf("get ue: HTTP %d\n  body: %s", status, ueBody)
@@ -59,8 +57,8 @@ func runS1HandoverFlow(t *testing.T, sourceENB, targetENB, ueID string) {
 	// Source eNB → MME: HANDOVER REQUIRED (TS 36.413 §8.4.1).
 	nasBody(t, sourceENB, ueID, fmt.Sprintf(`{"message_type":"handover_required","target_enb_id":%q}`, targetENB))
 
-	// MME → target eNB: HANDOVER REQUEST. It must carry the same E-RAB established
-	// at attach and the {NCC, NH} the target derives K_eNB from (TS 33.401 §7.2.8).
+	// MME → target eNB: HANDOVER REQUEST. It must carry the E-RAB established at
+	// attach and the {NCC, NH} the target derives K_eNB from (TS 33.401 §7.2.8).
 	hoReq := awaitENBS1AP(t, targetENB, `["HandoverRequest"]`)
 	if got := jsonGet(hoReq, "s1ap.message_type"); got != "HandoverRequest" {
 		t.Fatalf("s1ap.message_type = %q, want HandoverRequest (TS 36.413 §8.4.2)\n  body: %s", got, hoReq)
@@ -139,7 +137,6 @@ func runS1HandoverFlow(t *testing.T, sourceENB, targetENB, ueID string) {
 	}
 }
 
-// Test4GS1Handover drives the full intra-MME S1 handover flow between two eNBs.
 func Test4GS1Handover(t *testing.T) {
 	sourceENB := createENBWithID(t, 1, "source-enb")
 	targetENB := createENBWithID(t, 2, "target-enb")
@@ -150,8 +147,6 @@ func Test4GS1Handover(t *testing.T) {
 	runS1HandoverFlow(t, sourceENB, targetENB, ueID)
 }
 
-// Test4GS1HandoverThenMigrate hands the UE over, then migrates its context to the
-// target eNB and confirms the UE is reachable there and absent from the source.
 func Test4GS1HandoverThenMigrate(t *testing.T) {
 	sourceENB := createENBWithID(t, 1, "source-enb")
 	targetENB := createENBWithID(t, 2, "target-enb")
@@ -161,15 +156,13 @@ func Test4GS1HandoverThenMigrate(t *testing.T) {
 
 	runS1HandoverFlow(t, sourceENB, targetENB, ueID)
 
-	// The target eNB assigned targetENBUES1APID and the MME its own MME UE S1AP ID;
-	// relocate the UE context so a subsequent uplink originates on the target.
+	// Relocating the UE context makes a subsequent uplink originate on the target.
 	status, body := doRequest(t, "POST", "/enb/"+sourceENB+"/ue/"+ueID+"/migrate",
 		fmt.Sprintf(`{"target_enb_id":%q,"enb_ue_s1ap_id":%d}`, targetENB, targetENBUES1APID))
 	if status != 200 {
 		t.Fatalf("migrate: HTTP %d\n  body: %s", status, body)
 	}
 
-	// The UE lives on the target eNB, not the source.
 	if status, _ := doRequest(t, "GET", "/enb/"+targetENB+"/ue/"+ueID, ""); status != 200 {
 		t.Errorf("UE not reachable on the target eNB after migrate (HTTP %d)", status)
 	}
