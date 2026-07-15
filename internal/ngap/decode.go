@@ -76,17 +76,17 @@ func Decode(data []byte) (*NGAPResponse, error) {
 	switch pdu.Present {
 	case ngapType.NGAPPDUPresentSuccessfulOutcome:
 		resp.PDUType = "successful_outcome"
-		resp.MessageType = getSuccessfulOutcomeName(pdu.SuccessfulOutcome.Value.Present, pdu.SuccessfulOutcome.ProcedureCode.Value)
+		resp.MessageType = successfulOutcomeName(pdu.SuccessfulOutcome.Value.Present, pdu.SuccessfulOutcome.ProcedureCode.Value)
 		decodeSuccessfulOutcome(pdu.SuccessfulOutcome, resp)
 
 	case ngapType.NGAPPDUPresentUnsuccessfulOutcome:
 		resp.PDUType = "unsuccessful_outcome"
-		resp.MessageType = getUnsuccessfulOutcomeName(pdu.UnsuccessfulOutcome.Value.Present, pdu.UnsuccessfulOutcome.ProcedureCode.Value)
+		resp.MessageType = unsuccessfulOutcomeName(pdu.UnsuccessfulOutcome.Value.Present, pdu.UnsuccessfulOutcome.ProcedureCode.Value)
 		decodeUnsuccessfulOutcome(pdu.UnsuccessfulOutcome, resp)
 
 	case ngapType.NGAPPDUPresentInitiatingMessage:
 		resp.PDUType = "initiating_message"
-		resp.MessageType = getInitiatingMessageName(pdu.InitiatingMessage.Value.Present, pdu.InitiatingMessage.ProcedureCode.Value)
+		resp.MessageType = initiatingMessageName(pdu.InitiatingMessage.Value.Present, pdu.InitiatingMessage.ProcedureCode.Value)
 		decodeInitiatingMessage(pdu.InitiatingMessage, resp)
 
 	default:
@@ -121,7 +121,7 @@ func decodePathSwitchRequestAcknowledge(msg *ngapType.PathSwitchRequestAcknowled
 	}
 
 	for _, ie := range msg.ProtocolIEs.List {
-		decoded := IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value)}
+		decoded := IE{ID: ie.Id.Value, Criticality: criticalityName(ie.Criticality.Value)}
 
 		switch ie.Id.Value {
 		case ngapType.ProtocolIEIDAMFUENGAPID:
@@ -181,7 +181,7 @@ func decodeHandoverCancelAcknowledge(msg *ngapType.HandoverCancelAcknowledge, re
 	}
 
 	for _, ie := range msg.ProtocolIEs.List {
-		decoded := IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value)}
+		decoded := IE{ID: ie.Id.Value, Criticality: criticalityName(ie.Criticality.Value)}
 
 		switch ie.Id.Value {
 		case ngapType.ProtocolIEIDAMFUENGAPID:
@@ -212,12 +212,12 @@ func decodeHandoverCommand(msg *ngapType.HandoverCommand, resp *NGAPResponse) {
 		case ngapType.ProtocolIEIDAMFUENGAPID:
 			if ie.Value.AMFUENGAPID != nil {
 				v := ie.Value.AMFUENGAPID.Value
-				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value), AmfUeNgapID: &v})
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityName(ie.Criticality.Value), AmfUeNgapID: &v})
 			}
 		case ngapType.ProtocolIEIDRANUENGAPID:
 			if ie.Value.RANUENGAPID != nil {
 				v := ie.Value.RANUENGAPID.Value
-				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value), RanUeNgapID: &v})
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityName(ie.Criticality.Value), RanUeNgapID: &v})
 			}
 		case ngapType.ProtocolIEIDPDUSessionResourceHandoverList:
 			if list := ie.Value.PDUSessionResourceHandoverList; list != nil {
@@ -225,7 +225,7 @@ func decodeHandoverCommand(msg *ngapType.HandoverCommand, resp *NGAPResponse) {
 				for _, item := range list.List {
 					ids = append(ids, item.PDUSessionID.Value)
 				}
-				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value), PDUSessionIDs: ids})
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityName(ie.Criticality.Value), PDUSessionIDs: ids})
 			}
 		case ngapType.ProtocolIEIDPDUSessionResourceToReleaseListHOCmd:
 			if list := ie.Value.PDUSessionResourceToReleaseListHOCmd; list != nil {
@@ -233,7 +233,7 @@ func decodeHandoverCommand(msg *ngapType.HandoverCommand, resp *NGAPResponse) {
 				for _, item := range list.List {
 					ids = append(ids, item.PDUSessionID.Value)
 				}
-				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value), ReleasePDUSessionIDs: ids})
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityName(ie.Criticality.Value), ReleasePDUSessionIDs: ids})
 			}
 		}
 	}
@@ -256,7 +256,7 @@ func decodeNGResetAcknowledge(msg *ngapType.NGResetAcknowledge, resp *NGAPRespon
 		for _, item := range ie.Value.UEAssociatedLogicalNGConnectionList.List {
 			decoded := IE{
 				ID:          ie.Id.Value,
-				Criticality: criticalityToString(ie.Criticality.Value),
+				Criticality: criticalityName(ie.Criticality.Value),
 			}
 
 			if item.AMFUENGAPID != nil {
@@ -294,7 +294,7 @@ func decodePathSwitchRequestFailure(msg *ngapType.PathSwitchRequestFailure, resp
 	}
 
 	for _, ie := range msg.ProtocolIEs.List {
-		decoded := IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value)}
+		decoded := IE{ID: ie.Id.Value, Criticality: criticalityName(ie.Criticality.Value)}
 
 		switch ie.Id.Value {
 		case ngapType.ProtocolIEIDAMFUENGAPID:
@@ -328,7 +328,7 @@ func decodeHandoverPreparationFailure(msg *ngapType.HandoverPreparationFailure, 
 	}
 
 	for _, ie := range msg.ProtocolIEs.List {
-		decoded := IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value)}
+		decoded := IE{ID: ie.Id.Value, Criticality: criticalityName(ie.Criticality.Value)}
 
 		switch ie.Id.Value {
 		case ngapType.ProtocolIEIDAMFUENGAPID:
@@ -363,7 +363,7 @@ func decodePDUSessionResourceModifyRequest(msg *ngapType.PDUSessionResourceModif
 	for _, ie := range msg.ProtocolIEs.List {
 		decoded := IE{
 			ID:          ie.Id.Value,
-			Criticality: criticalityToString(ie.Criticality.Value),
+			Criticality: criticalityName(ie.Criticality.Value),
 		}
 
 		switch ie.Id.Value {
@@ -426,7 +426,7 @@ func decodeDownlinkRANStatusTransfer(msg *ngapType.DownlinkRANStatusTransfer, re
 	}
 
 	for _, ie := range msg.ProtocolIEs.List {
-		decoded := IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value)}
+		decoded := IE{ID: ie.Id.Value, Criticality: criticalityName(ie.Criticality.Value)}
 
 		switch ie.Id.Value {
 		case ngapType.ProtocolIEIDAMFUENGAPID:
@@ -480,7 +480,7 @@ func decodePaging(msg *ngapType.Paging, resp *NGAPResponse) {
 	for _, ie := range msg.ProtocolIEs.List {
 		decoded := IE{
 			ID:          ie.Id.Value,
-			Criticality: criticalityToString(ie.Criticality.Value),
+			Criticality: criticalityName(ie.Criticality.Value),
 		}
 
 		if ie.Id.Value == ngapType.ProtocolIEIDUEPagingIdentity &&
@@ -509,7 +509,7 @@ func decodeErrorIndication(msg *ngapType.ErrorIndication, resp *NGAPResponse) {
 	}
 
 	for _, ie := range msg.ProtocolIEs.List {
-		decoded := IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value)}
+		decoded := IE{ID: ie.Id.Value, Criticality: criticalityName(ie.Criticality.Value)}
 
 		switch ie.Id.Value {
 		case ngapType.ProtocolIEIDAMFUENGAPID:
@@ -549,7 +549,7 @@ func decodeHandoverRequest(msg *ngapType.HandoverRequest, resp *NGAPResponse) {
 		case ngapType.ProtocolIEIDAMFUENGAPID:
 			if ie.Value.AMFUENGAPID != nil {
 				v := ie.Value.AMFUENGAPID.Value
-				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value), AmfUeNgapID: &v})
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityName(ie.Criticality.Value), AmfUeNgapID: &v})
 			}
 		case ngapType.ProtocolIEIDPDUSessionResourceSetupListHOReq:
 			if list := ie.Value.PDUSessionResourceSetupListHOReq; list != nil {
@@ -557,11 +557,11 @@ func decodeHandoverRequest(msg *ngapType.HandoverRequest, resp *NGAPResponse) {
 				for _, item := range list.List {
 					ids = append(ids, item.PDUSessionID.Value)
 				}
-				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value), PDUSessionIDs: ids})
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityName(ie.Criticality.Value), PDUSessionIDs: ids})
 			}
 		case ngapType.ProtocolIEIDUEAggregateMaximumBitRate:
 			if ambr := ie.Value.UEAggregateMaximumBitRate; ambr != nil {
-				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value),
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityName(ie.Criticality.Value),
 					UEAggregateMaxBitRate: &UEAggregateMaxBitRateJSON{
 						DL: ambr.UEAggregateMaximumBitRateDL.Value,
 						UL: ambr.UEAggregateMaximumBitRateUL.Value,
@@ -570,7 +570,7 @@ func decodeHandoverRequest(msg *ngapType.HandoverRequest, resp *NGAPResponse) {
 		case ngapType.ProtocolIEIDSecurityContext:
 			if sc := ie.Value.SecurityContext; sc != nil {
 				ncc := sc.NextHopChainingCount.Value
-				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value), NextHopChainingCount: &ncc})
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityName(ie.Criticality.Value), NextHopChainingCount: &ncc})
 			}
 		}
 	}
@@ -584,7 +584,7 @@ func decodePDUSessionResourceReleaseCommand(msg *ngapType.PDUSessionResourceRele
 	for _, ie := range msg.ProtocolIEs.List {
 		decoded := IE{
 			ID:          ie.Id.Value,
-			Criticality: criticalityToString(ie.Criticality.Value),
+			Criticality: criticalityName(ie.Criticality.Value),
 		}
 
 		switch ie.Id.Value {
@@ -617,7 +617,7 @@ func decodeInitialContextSetupRequest(msg *ngapType.InitialContextSetupRequest, 
 	for _, ie := range msg.ProtocolIEs.List {
 		decoded := IE{
 			ID:          ie.Id.Value,
-			Criticality: criticalityToString(ie.Criticality.Value),
+			Criticality: criticalityName(ie.Criticality.Value),
 		}
 
 		switch ie.Id.Value {
@@ -673,7 +673,7 @@ func decodeDownlinkNASTransport(msg *ngapType.DownlinkNASTransport, resp *NGAPRe
 	for _, ie := range msg.ProtocolIEs.List {
 		decoded := IE{
 			ID:          ie.Id.Value,
-			Criticality: criticalityToString(ie.Criticality.Value),
+			Criticality: criticalityName(ie.Criticality.Value),
 		}
 
 		switch ie.Id.Value {
@@ -752,7 +752,7 @@ func decodePDUSessionResourceSetupRequest(msg *ngapType.PDUSessionResourceSetupR
 	for _, ie := range msg.ProtocolIEs.List {
 		decoded := IE{
 			ID:          ie.Id.Value,
-			Criticality: criticalityToString(ie.Criticality.Value),
+			Criticality: criticalityName(ie.Criticality.Value),
 		}
 
 		switch ie.Id.Value {
@@ -804,7 +804,7 @@ func decodeNGSetupResponse(msg *ngapType.NGSetupResponse, resp *NGAPResponse) {
 	for _, ie := range msg.ProtocolIEs.List {
 		decoded := IE{
 			ID:          ie.Id.Value,
-			Criticality: criticalityToString(ie.Criticality.Value),
+			Criticality: criticalityName(ie.Criticality.Value),
 		}
 
 		switch ie.Id.Value {
@@ -872,7 +872,7 @@ func decodeNGSetupFailure(msg *ngapType.NGSetupFailure, resp *NGAPResponse) {
 	for _, ie := range msg.ProtocolIEs.List {
 		decoded := IE{
 			ID:          ie.Id.Value,
-			Criticality: criticalityToString(ie.Criticality.Value),
+			Criticality: criticalityName(ie.Criticality.Value),
 		}
 
 		switch ie.Id.Value {
@@ -931,26 +931,26 @@ func decodeCriticalityDiagnostics(cd *ngapType.CriticalityDiagnostics) *Critical
 		out.ProcedureCode = &v
 	}
 	if cd.TriggeringMessage != nil {
-		s := triggeringMessageToString(cd.TriggeringMessage.Value)
+		s := triggeringMessageName(cd.TriggeringMessage.Value)
 		out.TriggeringMessage = &s
 	}
 	if cd.ProcedureCriticality != nil {
-		s := criticalityToString(cd.ProcedureCriticality.Value)
+		s := criticalityName(cd.ProcedureCriticality.Value)
 		out.ProcedureCriticality = &s
 	}
 	if cd.IEsCriticalityDiagnostics != nil {
 		for _, item := range cd.IEsCriticalityDiagnostics.List {
 			out.IEsCriticalityDiagnostics = append(out.IEsCriticalityDiagnostics, IECriticalityDiagnosticJSON{
-				IECriticality: criticalityToString(item.IECriticality.Value),
+				IECriticality: criticalityName(item.IECriticality.Value),
 				IEID:          item.IEID.Value,
-				TypeOfError:   typeOfErrorToString(item.TypeOfError.Value),
+				TypeOfError:   typeOfErrorName(item.TypeOfError.Value),
 			})
 		}
 	}
 	return out
 }
 
-func triggeringMessageToString(v aper.Enumerated) string {
+func triggeringMessageName(v aper.Enumerated) string {
 	switch v {
 	case ngapType.TriggeringMessagePresentInitiatingMessage:
 		return "initiating_message"
@@ -963,7 +963,7 @@ func triggeringMessageToString(v aper.Enumerated) string {
 	}
 }
 
-func typeOfErrorToString(v aper.Enumerated) string {
+func typeOfErrorName(v aper.Enumerated) string {
 	switch v {
 	case ngapType.TypeOfErrorPresentNotUnderstood:
 		return "not_understood"
@@ -974,7 +974,7 @@ func typeOfErrorToString(v aper.Enumerated) string {
 	}
 }
 
-func criticalityToString(c aper.Enumerated) string {
+func criticalityName(c aper.Enumerated) string {
 	switch c {
 	case ngapType.CriticalityPresentReject:
 		return "reject"
@@ -987,10 +987,10 @@ func criticalityToString(c aper.Enumerated) string {
 	}
 }
 
-// getInitiatingMessageName labels an initiating message, falling back to the
+// initiatingMessageName labels an initiating message, falling back to the
 // on-wire NGAP procedure code (TS 38.413 §9.3.1.2) for messages this decoder
 // does not specifically handle so the label stays stable and awaitable.
-func getInitiatingMessageName(msgType int, procedureCode int64) string {
+func initiatingMessageName(msgType int, procedureCode int64) string {
 	switch msgType {
 	case ngapType.InitiatingMessagePresentDownlinkNASTransport:
 		return "DownlinkNASTransport"
@@ -1025,7 +1025,7 @@ func getInitiatingMessageName(msgType int, procedureCode int64) string {
 	}
 }
 
-func getSuccessfulOutcomeName(msgType int, procedureCode int64) string {
+func successfulOutcomeName(msgType int, procedureCode int64) string {
 	switch msgType {
 	case ngapType.SuccessfulOutcomePresentNGSetupResponse:
 		return "NGSetupResponse"
@@ -1048,7 +1048,7 @@ func getSuccessfulOutcomeName(msgType int, procedureCode int64) string {
 	}
 }
 
-func getUnsuccessfulOutcomeName(msgType int, procedureCode int64) string {
+func unsuccessfulOutcomeName(msgType int, procedureCode int64) string {
 	switch msgType {
 	case ngapType.UnsuccessfulOutcomePresentNGSetupFailure:
 		return "NGSetupFailure"
@@ -1093,7 +1093,7 @@ func decodeUEContextReleaseCommand(msg *ngapType.UEContextReleaseCommand, resp *
 	for _, ie := range msg.ProtocolIEs.List {
 		decoded := IE{
 			ID:          ie.Id.Value,
-			Criticality: criticalityToString(ie.Criticality.Value),
+			Criticality: criticalityName(ie.Criticality.Value),
 		}
 
 		switch ie.Id.Value {

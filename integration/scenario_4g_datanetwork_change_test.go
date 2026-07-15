@@ -65,7 +65,7 @@ func Test4GDataNetworkChangeReactivatesBearer(t *testing.T) {
 	t.Cleanup(func() { deleteSubscriber(t, token, dnChangeIMSI) })
 	t.Cleanup(func() { setDataNetworkMTU(t, token, 1400) })
 
-	enbID := createGTPUENB(t, 1, "dn-change-enb")
+	enbID := createGTPUENB(t, claimENBID(), "dn-change-enb")
 
 	body := fmt.Sprintf(`{"imsi":%q,"k":%q,"opc":%q,"amf":"8000","sqn":"000000000020"}`, dnChangeIMSI, testK, testOPc)
 	status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue", body)

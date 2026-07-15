@@ -343,7 +343,7 @@ func runN2HandoverFlow(t *testing.T, establishBody string) {
 	}
 }
 
-// TestN2Handover drives the full N2 handover flow with a spec-faithful PDU
+// Test5GN2Handover drives the full N2 handover flow with a spec-faithful PDU
 // session (the gNB reports its downlink GTP tunnel at setup).
 func Test5GN2Handover(t *testing.T) {
 	runN2HandoverFlow(t, `{"message_type":"pdu_session_establishment_request"}`)

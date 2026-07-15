@@ -17,7 +17,7 @@ import (
 // parse crashes the whole core: each test asserts the core survives by attaching
 // a fresh UE afterward.
 
-// TestEPSMalformedAuthNASNoCrash injects Authentication Response and
+// Test4GMalformedAuthNASNoCrash injects Authentication Response and
 // Authentication Failure NAS messages with missing mandatory IEs while the UE is
 // in the authentication procedure — the 4G analogue of GHSA-55q8-2gwx-29pc
 // (panic on NAS auth messages with missing IEs). The MME must discard them
@@ -43,7 +43,7 @@ func Test4GMalformedAuthNASNoCrash(t *testing.T) {
 	fullAttach(t, enbID, fresh)
 }
 
-// TestEPSShortProtectedNASNoCrash injects security-protected NAS messages shorter
+// Test4GShortProtectedNASNoCrash injects security-protected NAS messages shorter
 // than a full security header (header, 4-octet MAC, sequence) on a UE with an
 // active context — the 4G analogue of GHSA-m9pm-w3gv-c68f (panic on a short
 // integrity-protected NAS payload). The MME must reject them without an
@@ -65,7 +65,7 @@ func Test4GShortProtectedNASNoCrash(t *testing.T) {
 	fullAttach(t, enbID, fresh)
 }
 
-// TestEPSPathSwitchEmptySecCapNoCrash sends a Path Switch Request whose reported
+// Test4GPathSwitchEmptySecCapNoCrash sends a Path Switch Request whose reported
 // UE security capability bitmaps are zero — the 4G analogue of
 // GHSA-j478-p7vq-3347 (panic on empty NR security capability in PathSwitchRequest).
 // The 4G S1AP encoding uses fixed 16-bit bitmaps (not variable bitstrings), so

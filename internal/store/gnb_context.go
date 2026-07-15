@@ -26,7 +26,6 @@ type GnBContext struct {
 
 	NGAPIDs     map[int64]int64
 	PDUSessions map[int64]map[int64]*PDUSessionInfo
-	UEAmbr      map[int64]*UEAmbrInfo
 }
 
 type SliceConfig struct {
@@ -63,11 +62,6 @@ func (g *GnBContext) GetPDUSession(ranUeID, pduSessionID int64) (*PDUSessionInfo
 	return info, ok
 }
 
-type UEAmbrInfo struct {
-	UplinkBps   int64 `json:"uplink_bps"`
-	DownlinkBps int64 `json:"downlink_bps"`
-}
-
 func NewGnBContext(id, mcc, mnc, tac, gnbID, name string, sst int32, sd string, slices []SliceConfig) *GnBContext {
 	return &GnBContext{
 		ID:          id,
@@ -82,7 +76,6 @@ func NewGnBContext(id, mcc, mnc, tac, gnbID, name string, sst int32, sd string, 
 		UEs:         make(map[string]*UEContext),
 		NGAPIDs:     make(map[int64]int64),
 		PDUSessions: make(map[int64]map[int64]*PDUSessionInfo),
-		UEAmbr:      make(map[int64]*UEAmbrInfo),
 	}
 }
 
@@ -112,12 +105,6 @@ func (g *GnBContext) StorePDUSession(ranUeID int64, info *PDUSessionInfo) {
 	g.PDUSessions[ranUeID][info.PDUSessionID] = info
 }
 
-func (g *GnBContext) StoreUEAmbr(ranUeID int64, ambr *UEAmbrInfo) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	g.UEAmbr[ranUeID] = ambr
-}
-
 func (g *GnBContext) CreateUE(ue *UEContext) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -143,17 +130,6 @@ func (g *GnBContext) DeleteUE(ueID string) bool {
 	delete(g.UEs, ueID)
 	delete(g.NGAPIDs, ue.RanUeNgapID)
 	delete(g.PDUSessions, ue.RanUeNgapID)
-	delete(g.UEAmbr, ue.RanUeNgapID)
 
 	return true
-}
-
-func (g *GnBContext) ListUEs() []*UEContext {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-	ues := make([]*UEContext, 0, len(g.UEs))
-	for _, ue := range g.UEs {
-		ues = append(ues, ue)
-	}
-	return ues
 }

@@ -7,7 +7,7 @@ package integration_test
 
 import "testing"
 
-// TestEPSServiceRequestUnknownUE checks the MME refuses a Service Request whose
+// Test4GServiceRequestUnknownUE checks the MME refuses a Service Request whose
 // S-TMSI it never assigned: it must not re-establish, and replies with a Service
 // Reject (TS 24.301 §5.6.1.5).
 func Test4GServiceRequestUnknownUE(t *testing.T) {
@@ -29,7 +29,7 @@ func Test4GServiceRequestUnknownUE(t *testing.T) {
 	}
 }
 
-// TestEPSServiceRequestReplay checks the MME refuses a Service Request carrying a
+// Test4GServiceRequestReplay checks the MME refuses a Service Request carrying a
 // stale uplink NAS COUNT (a replay): it must not re-establish the connection
 // (TS 24.301 §4.4.3.5).
 func Test4GServiceRequestReplay(t *testing.T) {

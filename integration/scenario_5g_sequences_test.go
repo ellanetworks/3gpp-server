@@ -72,7 +72,7 @@ func registerThenIdle(t *testing.T, gnbID, ueID string) {
 	}
 }
 
-// TestRegistration_MobilityUpdate registers a UE, releases it to CM-IDLE, then
+// Test5GRegistration_MobilityUpdate registers a UE, releases it to CM-IDLE, then
 // performs a Mobility Registration Updating procedure (TS 24.501 §5.5.1.3). The
 // integrity-protected request carries the existing security context and omits
 // the optional 5GMM capability IE (re-sent only on change, §5.5.1.3.2), so the
@@ -93,7 +93,7 @@ func Test5GRegistration_MobilityUpdate(t *testing.T) {
 	}
 }
 
-// TestRegistration_PeriodicUpdate mirrors the mobility case for the Periodic
+// Test5GRegistration_PeriodicUpdate mirrors the mobility case for the Periodic
 // Registration Updating procedure (TS 24.501 §5.5.1.3).
 func Test5GRegistration_PeriodicUpdate(t *testing.T) {
 	gnbID := mustCreateGnB(t)
@@ -111,7 +111,7 @@ func Test5GRegistration_PeriodicUpdate(t *testing.T) {
 	}
 }
 
-// TestDeregistration_NonSwitchOff_Accept sends a normal (non-switch-off)
+// Test5GDeregistration_NonSwitchOff_Accept sends a normal (non-switch-off)
 // de-registration. Per TS 24.501 §5.5.2.2 the AMF must reply with a
 // Deregistration Accept before releasing the context.
 func Test5GDeregistration_NonSwitchOff_Accept(t *testing.T) {
@@ -131,7 +131,7 @@ func Test5GDeregistration_NonSwitchOff_Accept(t *testing.T) {
 	}
 }
 
-// TestNGSetup_UnknownPLMN performs NG Setup with a PLMN the AMF does not serve.
+// Test5GNGSetup_UnknownPLMN performs NG Setup with a PLMN the AMF does not serve.
 // Per TS 38.413 §8.7.1.3 the AMF must answer with NG Setup Failure.
 func Test5GNGSetup_UnknownPLMN(t *testing.T) {
 	body := `{
@@ -158,7 +158,7 @@ func Test5GNGSetup_UnknownPLMN(t *testing.T) {
 	assertNGAPCauseMisc(t, resp, "ng_setup_response", causeMiscUnknownPLMNOrSNPN)
 }
 
-// TestRegistration_DuringSecurityMode drives a registration into the Security
+// Test5GRegistration_DuringSecurityMode drives a registration into the Security
 // Mode phase, then sends a fresh Registration Request before completing it.
 // Per TS 24.501 §5.4.2.7(c) the AMF must abort the security mode control
 // procedure and process the new registration (re-running authentication). It

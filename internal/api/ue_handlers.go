@@ -229,10 +229,10 @@ func (h *Handler) MigrateUE(w http.ResponseWriter, r *http.Request) {
 	target.CreateUE(ue)
 	target.UpdateNGAPIDs(ue.RanUeNgapID, ue.AmfUeNgapID)
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"ue_id":          ue.ID,
-		"gnb_id":         req.TargetGnbID,
-		"ran_ue_ngap_id": ue.RanUeNgapID,
-		"amf_ue_ngap_id": ue.AmfUeNgapID,
+	writeJSON(w, http.StatusOK, MigrateUEResponse{
+		UEID:        ue.ID,
+		GnBID:       req.TargetGnbID,
+		RanUeNgapID: ue.RanUeNgapID,
+		AmfUeNgapID: ue.AmfUeNgapID,
 	})
 }

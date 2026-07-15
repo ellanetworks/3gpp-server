@@ -42,7 +42,7 @@ func createGTPUENB(t *testing.T, enbID int, name string) string {
 // shall reply with an Echo Response" (TS 29.281 §7.2.1); a timeout means the UPF
 // dropped a conformant Echo Request.
 func Test4GGTPUEcho(t *testing.T) {
-	enbID := createGTPUENB(t, 1, "gtpu-echo-enb")
+	enbID := createGTPUENB(t, claimENBID(), "gtpu-echo-enb")
 
 	status, body := doRequest(t, "POST", "/enb/"+enbID+"/gtpu/echo",
 		fmt.Sprintf(`{"upf_ip":%q,"timeout_ms":5000}`, s1uUPFIP))
@@ -60,7 +60,7 @@ func Test4GGTPUEcho(t *testing.T) {
 // (TS 29.281 §7.3.1: the node "shall also return a GTP error indication to the
 // originating node").
 func Test4GGTPUWrongTEIDErrorIndication(t *testing.T) {
-	enbID := createGTPUENB(t, 1, "gtpu-errind-enb")
+	enbID := createGTPUENB(t, claimENBID(), "gtpu-errind-enb")
 	ueID := mustCreateENBUE(t, enbID)
 	fullAttach(t, enbID, ueID)
 
@@ -80,28 +80,19 @@ func Test4GGTPUWrongTEIDErrorIndication(t *testing.T) {
 // UE uplink UDP datagram to the data-network responder returns as a decapsulated
 // downlink datagram echoed back — the UPF forwards and NATs UDP user-plane traffic.
 func Test4GGTPU_UDPRoundTrip(t *testing.T) {
-	enbID := createGTPUENB(t, 1, "gtpu-udp-enb")
+	enbID := createGTPUENB(t, claimENBID(), "gtpu-udp-enb")
 	ueID := mustCreateENBUE(t, enbID)
 	fullAttach(t, enbID, ueID)
 
 	const payloadHex = "abad1dea"
 
-	// The UPF can lose the first packet while it resolves the N6 next-hop, so retry.
-	var dl []byte
-
-	for i := 0; i < 5; i++ {
-		uplink := fmt.Sprintf(`{"udp":{"dst":%q,"dst_port":%d,"payload_hex":%q}}`, dnResponderIP, udpEchoPort, payloadHex)
-		if s, b := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/uplink", uplink); s != 200 {
-			t.Fatalf("send udp uplink: HTTP %d: %s", s, b)
-		}
-
-		if s, b := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/downlink/await", `{"timeout_ms":2000}`); s == 200 {
-			dl = b
-			break
-		}
+	uplink := fmt.Sprintf(`{"udp":{"dst":%q,"dst_port":%d,"payload_hex":%q}}`, dnResponderIP, udpEchoPort, payloadHex)
+	if s, b := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/uplink", uplink); s != 200 {
+		t.Fatalf("send udp uplink: HTTP %d: %s", s, b)
 	}
 
-	if dl == nil {
+	s, dl := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/downlink/await", `{"timeout_ms":5000}`)
+	if s != 200 {
 		t.Fatal("no UDP downlink — the UPF did not forward/return UDP user-plane traffic")
 	}
 

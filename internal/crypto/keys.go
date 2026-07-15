@@ -8,6 +8,10 @@ import (
 	"github.com/free5gc/util/ueauth"
 )
 
+// AlgorithmKeyDerivation derives the 128-bit NAS encryption and integrity keys
+// from K_AMF for the selected 5G NEA and NIA algorithm identities and writes them
+// to knasEnc and knasInt (TS 33.501 §A.8). The lower 128 bits of each 256-bit KDF
+// output are taken.
 func AlgorithmKeyDerivation(cipheringAlg uint8, kamf []byte, knasEnc *[16]uint8, integrityAlg uint8, knasInt *[16]uint8) error {
 	P0 := []byte{security.NNASEncAlg}
 	L0 := ueauth.KDFLen(P0)

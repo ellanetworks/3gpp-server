@@ -7,7 +7,7 @@ package integration_test
 
 import "testing"
 
-// TestEPSUEContextRelease drives a normal eNB-initiated S1 release of a
+// Test4GUEContextRelease drives a normal eNB-initiated S1 release of a
 // connected UE: the MME answers the UE Context Release Request with a UE Context
 // Release Command carrying a Cause IE (TS 36.413 §9.1.4.6).
 func Test4GUEContextRelease(t *testing.T) {
@@ -27,7 +27,7 @@ func Test4GUEContextRelease(t *testing.T) {
 	}
 }
 
-// TestEPSUEContextReleaseCommandEchoesCause checks the MME's Release Command
+// Test4GUEContextReleaseCommandEchoesCause checks the MME's Release Command
 // reports the radio-network Cause the eNB requested (TS 36.413 §9.1.4.6).
 func Test4GUEContextReleaseCommandEchoesCause(t *testing.T) {
 	enbID := mustCreateENB(t)
@@ -47,7 +47,7 @@ func Test4GUEContextReleaseCommandEchoesCause(t *testing.T) {
 	}
 }
 
-// TestEPSUEContextReleaseBeforeContext checks the MME rejects a UE Context
+// Test4GUEContextReleaseBeforeContext checks the MME rejects a UE Context
 // Release Request that arrives before any UE context exists (an MME-UE-S1AP-ID
 // it never allocated): per TS 36.413 §10.6 it answers with an Error Indication,
 // never a Release Command for a non-existent UE.
@@ -64,7 +64,7 @@ func Test4GUEContextReleaseBeforeContext(t *testing.T) {
 	assertEPSErrorIndication(t, resp)
 }
 
-// TestEPSUEContextReleaseDoubleRelease checks a second release of an
+// Test4GUEContextReleaseDoubleRelease checks a second release of an
 // already-released UE is rejected: the first release moves the UE to ECM-IDLE
 // (the S1 context and MME-UE-S1AP-ID are gone), so the repeat names an unknown
 // logical connection and the MME answers with an Error Indication (TS 36.413

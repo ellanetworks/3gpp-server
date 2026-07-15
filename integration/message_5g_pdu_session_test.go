@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// TestPDUSessionEstablishment_NGAPIDFuzz sends a PDU Session Establishment
+// Test5GPDUSessionEstablishment_NGAPIDFuzz sends a PDU Session Establishment
 // Request on an established connection with a wrong UE NGAP ID and expects a
 // spec-compliant Error Indication (TS 38.413 §10.6, §8.7.5.2).
 func Test5GPDUSessionEstablishment_NGAPIDFuzz(t *testing.T) {
@@ -37,7 +37,7 @@ func Test5GPDUSessionEstablishment_NGAPIDFuzz(t *testing.T) {
 	}
 }
 
-// TestPDUSessionEstablishment_ReservedPDUSessionID sends an establishment request
+// Test5GPDUSessionEstablishment_ReservedPDUSessionID sends an establishment request
 // with a reserved PDU session identity value (16 is outside the 1-15 range). Per
 // TS 24.501 §7.3.2 c) the AMF returns the message in a Downlink NAS Transport
 // with 5GMM cause #90 "payload was not forwarded".
@@ -64,7 +64,7 @@ func Test5GPDUSessionEstablishment_ReservedPDUSessionID(t *testing.T) {
 	assertNASCause(t, body, "nas.cause_5gmm", cause5GMMPayloadWasNotForwarded)
 }
 
-// TestPDUSessionEstablishment_DuplicateReestablishes sends a second
+// Test5GPDUSessionEstablishment_DuplicateReestablishes sends a second
 // establishment request for an already-active PDU session. Per TS 24.501
 // §5.4.5.2.5 item 12 the AMF locally releases it and re-establishes, so the gNB
 // receives a fresh PDU Session Resource Setup Request.
@@ -83,7 +83,7 @@ func Test5GPDUSessionEstablishment_DuplicateReestablishes(t *testing.T) {
 	}
 }
 
-// TestPDUSessionEstablishment_Fuzz drives the PDU session establishment endpoint
+// Test5GPDUSessionEstablishment_Fuzz drives the PDU session establishment endpoint
 // with both well-formed and malformed top-level NAS payloads. When raw_nas_pdu
 // is supplied, the 3gpp-server sends those bytes as the NAS PDU IE of an
 // UplinkNASTransport (rather than wrapping them in a UL NAS TRANSPORT payload
@@ -174,7 +174,7 @@ func Test5GPDUSessionEstablishment_Fuzz(t *testing.T) {
 	}
 }
 
-// TestPDUSessionEstablishment_InnerSMFuzz drives the AMF→SMF SM-payload path
+// Test5GPDUSessionEstablishment_InnerSMFuzz drives the AMF→SMF SM-payload path
 // with a malformed *inner* SM payload while keeping the outer UL NAS Transport
 // correctly built and security-wrapped. Unlike raw_nas_pdu (which bypasses
 // security and is rejected at the AMF 5GMM layer), inner_sm_payload exercises
@@ -278,7 +278,7 @@ func Test5GPDUSessionEstablishment_InnerSMFuzz(t *testing.T) {
 	}
 }
 
-// TestPDUSessionEstablishment_InnerSMRequestIEFuzz drives a well-formed
+// Test5GPDUSessionEstablishment_InnerSMRequestIEFuzz drives a well-formed
 // PDU SESSION ESTABLISHMENT REQUEST through the AMF→SMF path with various
 // edge-case IE values per TS 24.501 §8.3.1 / §9.6. These exercise the SMF
 // decoder and SM context allocation under unusual input.

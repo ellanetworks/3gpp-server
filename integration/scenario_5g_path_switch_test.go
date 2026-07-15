@@ -68,7 +68,7 @@ func ngapReleasedPDUSessionIDs(body []byte) []int64 {
 	return ids
 }
 
-// TestPathSwitchRequestUnknownUEFails — §8.4.4: a path switch whose Source AMF
+// Test5GPathSwitchRequestUnknownUEFails — §8.4.4: a path switch whose Source AMF
 // UE NGAP ID matches no UE context must be answered with a Path Switch Request
 // Failure.
 func Test5GPathSwitchRequestUnknownUEFails(t *testing.T) {
@@ -79,7 +79,7 @@ func Test5GPathSwitchRequestUnknownUEFails(t *testing.T) {
 	assertPathSwitchType(t, "path switch for unknown AMF UE NGAP ID", status, body, ngapPathSwitchRequestFailure)
 }
 
-// TestPathSwitchRequestNoSwitchableSessionFails — §8.4.4.3: if the 5GC fails to
+// Test5GPathSwitchRequestNoSwitchableSessionFails — §8.4.4.3: if the 5GC fails to
 // switch all requested PDU sessions (here the request names a session the UE
 // does not hold), the AMF must send a Path Switch Request Failure, leaving the
 // UE context intact.
@@ -97,7 +97,7 @@ func Test5GPathSwitchRequestNoSwitchableSessionFails(t *testing.T) {
 	assertUEStillConnected(t, sourceGNB, ueID)
 }
 
-// TestPathSwitchRequestFailureReportsReleasedSessions — §9.2.3.10 / §8.4.4.3:
+// Test5GPathSwitchRequestFailureReportsReleasedSessions — §9.2.3.10 / §8.4.4.3:
 // the Path Switch Request Failure must carry a PDU Session Resource Released
 // List naming the PDU session(s) that could not be switched, so the NG-RAN node
 // knows which to release.
@@ -119,7 +119,7 @@ func Test5GPathSwitchRequestFailureReportsReleasedSessions(t *testing.T) {
 	}
 }
 
-// TestPathSwitchRequestMultipleSessions — §8.4.4.2: a path switch listing
+// Test5GPathSwitchRequestMultipleSessions — §8.4.4.2: a path switch listing
 // several held PDU sessions switches all of them and acknowledges, with each
 // session present in the PDU Session Resource Switched List.
 func Test5GPathSwitchRequestMultipleSessions(t *testing.T) {
@@ -137,7 +137,7 @@ func Test5GPathSwitchRequestMultipleSessions(t *testing.T) {
 	assertCarriesPDUSessions(t, body, []int64{1, 2}, "PathSwitchRequestAcknowledge switched list")
 }
 
-// TestPathSwitchRequestPartialSuccess — §8.4.4.3: a path switch is acknowledged
+// Test5GPathSwitchRequestPartialSuccess — §8.4.4.3: a path switch is acknowledged
 // (not failed) as long as at least one PDU session switches; the unswitchable
 // session is simply absent from the switched list.
 func Test5GPathSwitchRequestPartialSuccess(t *testing.T) {
@@ -154,7 +154,7 @@ func Test5GPathSwitchRequestPartialSuccess(t *testing.T) {
 	assertCarriesPDUSessions(t, body, []int64{1}, "PathSwitchRequestAcknowledge switched list (only the held session)")
 }
 
-// TestPathSwitchRequestFailedToSetupList — §9.2.3.8: a path switch may carry a
+// Test5GPathSwitchRequestFailedToSetupList — §9.2.3.8: a path switch may carry a
 // PDU Session Resource Failed to Setup List for sessions the target could not
 // set up; the AMF still acknowledges the sessions that did switch.
 func Test5GPathSwitchRequestFailedToSetupList(t *testing.T) {
@@ -172,7 +172,7 @@ func Test5GPathSwitchRequestFailedToSetupList(t *testing.T) {
 	assertCarriesPDUSessions(t, body, []int64{1}, "PathSwitchRequestAcknowledge switched list")
 }
 
-// TestPathSwitchRequestInvalidPDUSessionIDFails: a path switch naming a PDU
+// Test5GPathSwitchRequestInvalidPDUSessionIDFails: a path switch naming a PDU
 // Session ID outside the valid NAS range (1..15, TS 24.007) cannot switch any
 // session, so the AMF must fail it (§8.4.4.3).
 func Test5GPathSwitchRequestInvalidPDUSessionIDFails(t *testing.T) {
@@ -199,7 +199,7 @@ const (
 	ieAllowedNSSAI                         = 0
 )
 
-// TestPathSwitchRequestAcknowledgeCarriesMandatoryIEs — §9.2.3.9: a Path Switch
+// Test5GPathSwitchRequestAcknowledgeCarriesMandatoryIEs — §9.2.3.9: a Path Switch
 // Request Acknowledge must carry the Security Context (fresh {NH, NCC}) and the
 // Allowed NSSAI, both mandatory.
 func Test5GPathSwitchRequestAcknowledgeCarriesMandatoryIEs(t *testing.T) {
@@ -244,7 +244,7 @@ func pathSwitchNCC(t *testing.T, body []byte) int64 {
 	return int64(v)
 }
 
-// TestPathSwitchRequestNCCIncrements — TS 33.501 §6.9.2.3.2: on each PATH SWITCH
+// Test5GPathSwitchRequestNCCIncrements — TS 33.501 §6.9.2.3.2: on each PATH SWITCH
 // REQUEST the AMF shall increase its locally kept NCC by one and return the
 // fresh {NH, NCC} in the acknowledge. Two consecutive switches for the same UE
 // must therefore yield NCC values differing by exactly one (mod 8).
@@ -272,7 +272,7 @@ func Test5GPathSwitchRequestNCCIncrements(t *testing.T) {
 	}
 }
 
-// TestPathSwitchRequestMissingMandatoryIE — §10.3.5: a Path Switch Request
+// Test5GPathSwitchRequestMissingMandatoryIE — §10.3.5: a Path Switch Request
 // missing a mandatory reject-criticality IE leaves the AMF unable to build a
 // Path Switch Request Failure (which itself needs those IEs), so it must
 // terminate the procedure with an Error Indication. A missing ignore-criticality
@@ -304,7 +304,7 @@ func Test5GPathSwitchRequestMissingMandatoryIE(t *testing.T) {
 	}
 }
 
-// TestPathSwitchRequestMalformedTransferFails: a Path Switch Request Transfer
+// Test5GPathSwitchRequestMalformedTransferFails: a Path Switch Request Transfer
 // whose bytes are not a valid §9.3.4.8 transfer cannot be applied, so the
 // session does not switch and the AMF fails the procedure (§8.4.4.3).
 func Test5GPathSwitchRequestMalformedTransferFails(t *testing.T) {

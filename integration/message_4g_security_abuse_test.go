@@ -5,7 +5,10 @@
 
 package integration_test
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 // fullAttach drives a UE all the way to EMM-REGISTERED, failing the test on any
 // non-compliant step.
@@ -27,17 +30,17 @@ func fullAttach(t *testing.T, enbID, ueID string) {
 	nasStep(t, enbID, ueID, "attach_complete")
 }
 
-// TestEPSPreS1SetupGating checks the MME refuses a UE-associated procedure on an
+// Test4GPreS1SetupGating checks the MME refuses a UE-associated procedure on an
 // association that has not completed S1 Setup (TS 36.413 §8.7.1): it must not
 // authenticate the UE.
 func Test4GPreS1SetupGating(t *testing.T) {
-	body := `{
+	body := fmt.Sprintf(`{
 		"mme_address": "10.3.0.2:36412",
 		"enb_s1_address": "10.3.0.3",
-		"mcc": "001", "mnc": "01", "tac": "0001", "enb_id": 1,
+		"mcc": "001", "mnc": "01", "tac": "0001", "enb_id": %d,
 		"name": "no-s1setup-enb",
 		"skip_s1_setup": true
-	}`
+	}`, claimENBID())
 
 	status, resp := doRequest(t, "POST", "/enb", body)
 	if status != 201 {
@@ -59,7 +62,7 @@ func Test4GPreS1SetupGating(t *testing.T) {
 	}
 }
 
-// TestEPSForgedS1APIDInjection checks the MME does not act on a UE-associated NAS
+// Test4GForgedS1APIDInjection checks the MME does not act on a UE-associated NAS
 // message that references an MME-UE-S1AP-ID it never assigned (a forged UE
 // association, TS 36.413 §10.6), and stays healthy afterwards.
 func Test4GForgedS1APIDInjection(t *testing.T) {
@@ -80,7 +83,7 @@ func Test4GForgedS1APIDInjection(t *testing.T) {
 	fullAttach(t, enbID, fresh)
 }
 
-// TestEPSNASReplay replays a UE's last protected uplink (its Attach Complete, at a
+// Test4GNASReplay replays a UE's last protected uplink (its Attach Complete, at a
 // now-stale NAS COUNT) and checks the MME discards it (TS 24.301 §4.4.3.5) without
 // adverse effect, staying healthy.
 func Test4GNASReplay(t *testing.T) {

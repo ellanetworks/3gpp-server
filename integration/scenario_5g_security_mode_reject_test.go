@@ -39,7 +39,7 @@ func securityModePending(t *testing.T) (string, string) {
 	return gnbID, ueID
 }
 
-// TestSecurityModeReject sends a Security Mode Reject (#23 UE security
+// Test5GSecurityModeReject sends a Security Mode Reject (#23 UE security
 // capabilities mismatch). Per TS 24.501 §5.4.2.5 the AMF shall abort the
 // ongoing registration — so it must not complete it. The spec does not mandate
 // a specific abort message, so we accept either form of abort (UE Context
@@ -64,7 +64,7 @@ func Test5GSecurityModeReject(t *testing.T) {
 	}
 }
 
-// TestSecurityModeReject_NGAPIDFuzz forges the AMF UE NGAP ID on the Security
+// Test5GSecurityModeReject_NGAPIDFuzz forges the AMF UE NGAP ID on the Security
 // Mode Reject's Uplink NAS Transport. That is an unknown local AP ID, so the
 // AMF shall initiate an Error Indication procedure (TS 38.413 §10.6).
 func Test5GSecurityModeReject_NGAPIDFuzz(t *testing.T) {

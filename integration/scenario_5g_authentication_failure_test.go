@@ -40,7 +40,7 @@ func sendAuthFailure(t *testing.T, gnbID, ueID string, cause int) (int, []byte) 
 	return doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap", body)
 }
 
-// TestAuthenticationFailure_SynchFailure sends cause #21 with a valid AUTS. Per
+// Test5GAuthenticationFailure_SynchFailure sends cause #21 with a valid AUTS. Per
 // TS 24.501 §5.4.1.3.7 f) the network shall re-synchronise (fetch new vectors)
 // and initiate authentication again — i.e. send a new Authentication Request.
 func Test5GAuthenticationFailure_SynchFailure(t *testing.T) {
@@ -56,7 +56,7 @@ func Test5GAuthenticationFailure_SynchFailure(t *testing.T) {
 	}
 }
 
-// TestAuthenticationFailure_NgKSIAlreadyInUse sends cause #71. Per TS 24.501
+// Test5GAuthenticationFailure_NgKSIAlreadyInUse sends cause #71. Per TS 24.501
 // §5.4.1.3.7 e) the network selects a new ngKSI and re-sends the challenge — a
 // new Authentication Request.
 func Test5GAuthenticationFailure_NgKSIAlreadyInUse(t *testing.T) {
@@ -72,7 +72,7 @@ func Test5GAuthenticationFailure_NgKSIAlreadyInUse(t *testing.T) {
 	}
 }
 
-// TestAuthenticationFailure_MACFailure covers the causes (#20 MAC failure, #26
+// Test5GAuthenticationFailure_MACFailure covers the causes (#20 MAC failure, #26
 // non-5G unacceptable) where TS 24.501 §5.4.1.3.7 c)/d) leave the network a
 // choice: re-identify, re-authenticate, or reject. The binding requirement is
 // that the network must NOT proceed with the procedure — so the response must
@@ -97,7 +97,7 @@ func Test5GAuthenticationFailure_MACFailure(t *testing.T) {
 	}
 }
 
-// TestAuthenticationFailure_NGAPIDFuzz forges the AMF UE NGAP ID on the
+// Test5GAuthenticationFailure_NGAPIDFuzz forges the AMF UE NGAP ID on the
 // Authentication Failure's Uplink NAS Transport. The AMF does not recognise the
 // ID and answers with an Error Indication (TS 38.413 §8.6.3).
 func Test5GAuthenticationFailure_NGAPIDFuzz(t *testing.T) {

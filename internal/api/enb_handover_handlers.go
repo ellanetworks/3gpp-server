@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/ellanetworks/3gpp-server/internal/s1ap"
 	"github.com/ellanetworks/3gpp-server/internal/store"
@@ -88,12 +87,7 @@ func (h *Handler) handleRawS1AP(w http.ResponseWriter, r *http.Request, t *trans
 		return
 	}
 
-	timeout := 5 * time.Second
-	if req.TimeoutMs > 0 {
-		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
 	resp, err := t.WaitForMessage(ctx, req.WaitFor...)
@@ -185,7 +179,7 @@ func (h *Handler) handoverFailure(t *transport.S1APTransport, req *SendENBS1APRe
 		return nil, httpErrorf(http.StatusBadRequest, "mme_ue_s1ap_id is required for handover_failure")
 	}
 
-	cause := s1ap.CauseHOFailureInTarget
+	cause := s1ap.CauseRadioNetworkHOFailureInTarget
 	if req.Cause != nil {
 		cause = *req.Cause
 	}
@@ -233,7 +227,7 @@ func (h *Handler) handoverRequired(ue *store.UEEPSContext, t *transport.S1APTran
 }
 
 func (h *Handler) handoverCancel(ctx context.Context, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
-	cause := s1ap.CauseHandoverCancelled
+	cause := s1ap.CauseRadioNetworkHandoverCancelled
 	if req.HandoverCancelCause != nil {
 		cause = *req.HandoverCancelCause
 	}
@@ -288,7 +282,7 @@ func handoverRequiredCause(req *SendENBNASRequest) int {
 		return *req.HandoverRequiredCause
 	}
 
-	return s1ap.CauseHandoverDesirableForRadioReasons
+	return s1ap.CauseRadioNetworkHandoverDesirableForRadioReason
 }
 
 func sourceMMEID(ue *store.UEEPSContext, req *SendENBNASRequest) uint32 {
@@ -346,10 +340,10 @@ func (h *Handler) MigrateENBUE(w http.ResponseWriter, r *http.Request) {
 	src.DeleteUE(ue.ID)
 	target.AdoptUE(ue)
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"ue_id":          ue.ID,
-		"enb_id":         req.TargetENBID,
-		"mme_ue_s1ap_id": ue.MMEUES1APID,
-		"enb_ue_s1ap_id": ue.ENBUES1APID,
+	writeJSON(w, http.StatusOK, MigrateENBUEResponse{
+		UEID:        ue.ID,
+		ENBID:       req.TargetENBID,
+		MMEUES1APID: ue.MMEUES1APID,
+		ENBUES1APID: ue.ENBUES1APID,
 	})
 }

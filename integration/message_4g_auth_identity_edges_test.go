@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-// TestEPSAuthenticationRepeatedSynchFailure checks the MME re-synchronises the
+// Test4GAuthenticationRepeatedSynchFailure checks the MME re-synchronises the
 // SQN only once: a first synch failure (#21) re-challenges with a fresh vector,
 // but a second consecutive synch failure must abort the procedure with an
 // Authentication Reject rather than re-sync indefinitely (TS 24.301 §5.4.2.7).
@@ -29,7 +29,7 @@ func Test4GAuthenticationRepeatedSynchFailure(t *testing.T) {
 	}
 }
 
-// TestEPSIdentityResponseMalformed checks the MME stays healthy when a UE in the
+// Test4GIdentityResponseMalformed checks the MME stays healthy when a UE in the
 // Identity procedure returns a malformed Identity Response: the message must be
 // discarded without crashing (TS 24.301 §5.4.4). Each PDU is an EMM plain header
 // (0x07) for an Identity Response (0x56) with a truncated or empty mobile

@@ -21,7 +21,7 @@ const (
 	ptiReserved   uint8 = 255 // reserved value (TS 24.501 §9.6)
 )
 
-// TestPDUSessionReleaseComplete_PTIMismatch sends a PDU SESSION RELEASE COMPLETE
+// Test5GPDUSessionReleaseComplete_PTIMismatch sends a PDU SESSION RELEASE COMPLETE
 // carrying an assigned PTI on an active session for which the network started no
 // release procedure, so the PTI matches none in use. Per TS 24.501 §7.3.1 a) the
 // network shall respond with a 5GSM STATUS carrying cause #47 "PTI mismatch".
@@ -44,7 +44,7 @@ func Test5GPDUSessionReleaseComplete_PTIMismatch(t *testing.T) {
 	assertNASCause(t, resp, "nas.cause_5gsm", cause5GSMPTIMismatch)
 }
 
-// TestPDUSessionEstablishment_UnassignedPTI sends a PDU SESSION ESTABLISHMENT
+// Test5GPDUSessionEstablishment_UnassignedPTI sends a PDU SESSION ESTABLISHMENT
 // REQUEST whose PTI is the unassigned value 0. Per TS 24.501 §7.3.1 c) the
 // network shall respond with a 5GSM STATUS carrying cause #81 "invalid PTI
 // value", not establish the session.
@@ -74,7 +74,7 @@ func Test5GPDUSessionEstablishment_UnassignedPTI(t *testing.T) {
 	assertNASCause(t, body, "nas.cause_5gsm", cause5GSMInvalidPTIValue)
 }
 
-// TestPDUSessionEstablishment_ReservedPTI sends a PDU SESSION ESTABLISHMENT
+// Test5GPDUSessionEstablishment_ReservedPTI sends a PDU SESSION ESTABLISHMENT
 // REQUEST whose PTI is the reserved value 255. Per TS 24.501 §7.3.1 d) the
 // network shall ignore the message: no response and no session. A response of
 // any kind (an Establishment Accept, a Reject, or a Resource Setup) is a §7.3.1
@@ -92,7 +92,7 @@ func Test5GPDUSessionEstablishment_ReservedPTI(t *testing.T) {
 	}
 }
 
-// TestPDUSessionModificationRequest_UnassignedPTI sends a PDU SESSION
+// Test5GPDUSessionModificationRequest_UnassignedPTI sends a PDU SESSION
 // MODIFICATION REQUEST on an active session with the unassigned PTI 0. The AMF
 // forwards it to the SMF, which per TS 24.501 §7.3.1 c) answers with a 5GSM
 // STATUS carrying cause #81 rather than a Modification Reject.
@@ -117,7 +117,7 @@ func Test5GPDUSessionModificationRequest_UnassignedPTI(t *testing.T) {
 	assertNASCause(t, body, "nas.cause_5gsm", cause5GSMInvalidPTIValue)
 }
 
-// TestPDUSessionReleaseRequest_UnassignedPTI sends a PDU SESSION RELEASE REQUEST
+// Test5GPDUSessionReleaseRequest_UnassignedPTI sends a PDU SESSION RELEASE REQUEST
 // with the unassigned PTI 0. Per TS 24.501 §7.3.1 c) the SMF answers with a 5GSM
 // STATUS carrying cause #81 rather than releasing the session.
 func Test5GPDUSessionReleaseRequest_UnassignedPTI(t *testing.T) {
@@ -141,7 +141,7 @@ func Test5GPDUSessionReleaseRequest_UnassignedPTI(t *testing.T) {
 	assertNASCause(t, body, "nas.cause_5gsm", cause5GSMInvalidPTIValue)
 }
 
-// TestPDUSessionModificationRequest_ReservedPTI sends a PDU SESSION MODIFICATION
+// Test5GPDUSessionModificationRequest_ReservedPTI sends a PDU SESSION MODIFICATION
 // REQUEST with the reserved PTI 255 on an active session. Per TS 24.501 §7.3.1
 // d) the SMF ignores the message: the AMF forwards nothing back, so the request
 // elicits no response.
@@ -157,7 +157,7 @@ func Test5GPDUSessionModificationRequest_ReservedPTI(t *testing.T) {
 	}
 }
 
-// TestPDUSessionModificationComplete_PTIMismatch sends a PDU SESSION
+// Test5GPDUSessionModificationComplete_PTIMismatch sends a PDU SESSION
 // MODIFICATION COMPLETE carrying an assigned PTI for which the network started
 // no modification procedure. Per TS 24.501 §7.3.1 a) the SMF answers with a 5GSM
 // STATUS carrying cause #47 "PTI mismatch".

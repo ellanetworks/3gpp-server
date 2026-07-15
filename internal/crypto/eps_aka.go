@@ -6,7 +6,6 @@ package crypto
 import (
 	"bytes"
 	"encoding/hex"
-	"errors"
 	"fmt"
 
 	"github.com/free5gc/util/milenage"
@@ -20,15 +19,6 @@ const (
 	fcAlgorithmKD       = "15" // K_NASenc / K_NASint derivation (A.7)
 	algTypeNASEnc uint8 = 0x01 // NAS encryption algorithm distinguisher (A.7)
 	algTypeNASInt uint8 = 0x02 // NAS integrity algorithm distinguisher (A.7)
-)
-
-var (
-	// ErrMACFailure is returned when the AUTN MAC does not verify (TS 24.301
-	// §5.4.2.6 a, EMM cause #20).
-	ErrMACFailure = errors.New("AUTN MAC failure")
-	// ErrSQNOutOfRange is returned when the recovered SQN is older than the
-	// stored value, signalling a synch failure (TS 24.301 §5.4.2.6 c, #21).
-	ErrSQNOutOfRange = errors.New("SQN out of range")
 )
 
 // EPSAKAResult holds the outputs of a successful EPS-AKA challenge.

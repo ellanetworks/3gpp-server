@@ -7,7 +7,7 @@ package integration_test
 
 import "testing"
 
-// TestEPSServiceRequest drives the idle/connected cycle: attach, an eNB-initiated
+// Test4GServiceRequest drives the idle/connected cycle: attach, an eNB-initiated
 // S1 release to ECM-IDLE, then a Service Request that re-establishes the bearer
 // (TS 24.301 §5.6.1).
 func Test4GServiceRequest(t *testing.T) {
@@ -27,7 +27,7 @@ func Test4GServiceRequest(t *testing.T) {
 	}
 }
 
-// TestEPSServiceRequestBadMAC checks the MME refuses a Service Request whose
+// Test4GServiceRequestBadMAC checks the MME refuses a Service Request whose
 // short-MAC does not verify (TS 24.301 §5.6.1.5): it must not re-establish the
 // connection, and stays healthy.
 func Test4GServiceRequestBadMAC(t *testing.T) {
@@ -44,6 +44,6 @@ func Test4GServiceRequestBadMAC(t *testing.T) {
 	}
 
 	// MME stays healthy: a fresh UE still attaches.
-	fresh := createENBUEWithIMSI(t, enbID, testSUPI(3)[len("imsi-"):])
+	fresh := mustCreateENBUE(t, enbID)
 	fullAttach(t, enbID, fresh)
 }

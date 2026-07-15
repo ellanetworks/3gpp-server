@@ -57,7 +57,7 @@ func enbUES1APIDs(t *testing.T, enbID, ueID string) (mme, enb string) {
 	return mme, enb
 }
 
-// TestEPSCrossENBReleaseHijack checks a rogue eNB cannot release another eNB's
+// Test4GCrossENBReleaseHijack checks a rogue eNB cannot release another eNB's
 // UE. The attacker eNB sends a UE Context Release Request carrying the victim's
 // (MME-UE-S1AP-ID, eNB-UE-S1AP-ID) pair on its own S1 association. Because the
 // pair belongs to a UE-associated logical connection on a different association,
@@ -88,7 +88,7 @@ func Test4GCrossENBReleaseHijack(t *testing.T) {
 	assertEPSErrorIndication(t, resp)
 }
 
-// TestEPSCrossENBUECapabilityHijack checks a rogue eNB cannot overwrite another
+// Test4GCrossENBUECapabilityHijack checks a rogue eNB cannot overwrite another
 // eNB's UE radio capability. UE Capability Info Indication is not integrity
 // protected, so without binding the UE-associated connection to its association
 // the MME would store attacker-chosen capability bytes against the victim. The

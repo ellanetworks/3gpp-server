@@ -36,7 +36,7 @@ func identityRequestPending(t *testing.T) (string, string) {
 	return gnbID, ueID
 }
 
-// TestIdentity_UnknownGUTI answers the Identity Request with the UE's SUCI,
+// Test5GIdentity_UnknownGUTI answers the Identity Request with the UE's SUCI,
 // after which the AMF can derive the identity and starts authentication.
 func Test5GIdentity_UnknownGUTI(t *testing.T) {
 	gnbID, ueID := identityRequestPending(t)
@@ -52,7 +52,7 @@ func Test5GIdentity_UnknownGUTI(t *testing.T) {
 	}
 }
 
-// TestIdentity_MalformedSUCI answers the Identity Request with a SUCI-typed but
+// Test5GIdentity_MalformedSUCI answers the Identity Request with a SUCI-typed but
 // undecodable identity. The AMF cannot derive a SUPI from it, so it must not
 // authenticate the underivable identity. TS 24.501 §5.4.3.4/§5.4.3.6 mandate no
 // specific reaction (re-request or reject is implementation latitude), so we
@@ -71,7 +71,7 @@ func Test5GIdentity_MalformedSUCI(t *testing.T) {
 	}
 }
 
-// TestIdentity_NGAPIDFuzz forges the AMF UE NGAP ID on the Identity Response's
+// Test5GIdentity_NGAPIDFuzz forges the AMF UE NGAP ID on the Identity Response's
 // Uplink NAS Transport. That is an unknown local AP ID, so the AMF shall
 // initiate an Error Indication procedure (TS 38.413 §10.6).
 func Test5GIdentity_NGAPIDFuzz(t *testing.T) {

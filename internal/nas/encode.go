@@ -23,6 +23,9 @@ type RegistrationRequestOpts struct {
 	Overrides *NASRequest
 }
 
+// BuildRegistrationRequest builds a plain REGISTRATION REQUEST (TS 24.501
+// §8.2.6). The mobile identity is the GUTI when the UE holds one, else its SUCI
+// (§5.5.1.2.2); Overrides replace the built IEs field by field.
 func BuildRegistrationRequest(opts *RegistrationRequestOpts) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
@@ -49,7 +52,7 @@ func BuildRegistrationRequest(opts *RegistrationRequestOpts) ([]byte, error) {
 	if opts.Overrides != nil && opts.Overrides.MobileIdentityOverride != nil {
 		idBytes, err := hex.DecodeString(*opts.Overrides.MobileIdentityOverride)
 		if err != nil {
-			return nil, fmt.Errorf("decode mobile_identity_override: %w", err)
+			return nil, fmt.Errorf("nas: decode mobile_identity_override: %w", err)
 		}
 		registrationRequest.MobileIdentity5GS = nasType.MobileIdentity5GS{
 			Len:    uint16(len(idBytes)),
@@ -68,7 +71,7 @@ func BuildRegistrationRequest(opts *RegistrationRequestOpts) ([]byte, error) {
 	if opts.Overrides != nil && opts.Overrides.UESecurityCapabilityOverride != nil {
 		capBytes, err := hex.DecodeString(*opts.Overrides.UESecurityCapabilityOverride)
 		if err != nil {
-			return nil, fmt.Errorf("decode ue_security_capability: %w", err)
+			return nil, fmt.Errorf("nas: decode ue_security_capability: %w", err)
 		}
 		registrationRequest.UESecurityCapability = nasType.NewUESecurityCapability(nasMessage.RegistrationRequestUESecurityCapabilityType)
 		registrationRequest.UESecurityCapability.SetLen(uint8(len(capBytes)))
@@ -91,7 +94,7 @@ func BuildRegistrationRequest(opts *RegistrationRequestOpts) ([]byte, error) {
 
 	data := new(bytes.Buffer)
 	if err := m.GmmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GMM encode error: %w", err)
+		return nil, fmt.Errorf("nas: GMM encode error: %w", err)
 	}
 
 	return data.Bytes(), nil
@@ -265,6 +268,9 @@ func applyRegistrationRequestOverrides(rr *nasMessage.RegistrationRequest, req *
 	}
 }
 
+// BuildAuthenticationResponse builds an AUTHENTICATION RESPONSE (TS 24.501
+// §8.2.2) carrying RES* in the Authentication response parameter IE, which is
+// at most 16 octets (§9.11.3.17).
 func BuildAuthenticationResponse(resStar []byte) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
@@ -290,12 +296,16 @@ func BuildAuthenticationResponse(resStar []byte) ([]byte, error) {
 
 	data := new(bytes.Buffer)
 	if err := m.GmmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GMM encode AuthenticationResponse: %w", err)
+		return nil, fmt.Errorf("nas: GMM encode AuthenticationResponse: %w", err)
 	}
 
 	return data.Bytes(), nil
 }
 
+// BuildSecurityModeComplete builds a SECURITY MODE COMPLETE (TS 24.501 §8.2.26).
+// The NAS message container replays the initial Registration Request the UE sent
+// unprotected (§4.4.6); the IMEISV answers a Security Mode Command that requested
+// it (§5.4.2.3).
 func BuildSecurityModeComplete(regRequestPdu []byte, imeisv string) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
@@ -324,14 +334,14 @@ func BuildSecurityModeComplete(regRequestPdu []byte, imeisv string) ([]byte, err
 
 	data := new(bytes.Buffer)
 	if err := m.GmmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GMM encode SecurityModeComplete: %w", err)
+		return nil, fmt.Errorf("nas: GMM encode SecurityModeComplete: %w", err)
 	}
 
 	return data.Bytes(), nil
 }
 
 // BuildAuthenticationFailure builds an AUTHENTICATION FAILURE with the given
-// 5GMM cause (TS 24.501 §8.2.3). For cause #21 "synch failure" the caller
+// 5GMM cause (TS 24.501 §8.2.4). For cause #21 "synch failure" the caller
 // supplies the AUTS re-synchronisation token in the Authentication failure
 // parameter IE.
 func BuildAuthenticationFailure(cause uint8, auts []byte) ([]byte, error) {
@@ -357,14 +367,14 @@ func BuildAuthenticationFailure(cause uint8, auts []byte) ([]byte, error) {
 
 	data := new(bytes.Buffer)
 	if err := m.GmmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GMM encode AuthenticationFailure: %w", err)
+		return nil, fmt.Errorf("nas: GMM encode AuthenticationFailure: %w", err)
 	}
 
 	return data.Bytes(), nil
 }
 
 // BuildSecurityModeReject builds a SECURITY MODE REJECT with the given 5GMM
-// cause (TS 24.501 §8.2.26).
+// cause (TS 24.501 §8.2.27).
 func BuildSecurityModeReject(cause uint8) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
@@ -381,7 +391,7 @@ func BuildSecurityModeReject(cause uint8) ([]byte, error) {
 
 	data := new(bytes.Buffer)
 	if err := m.GmmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GMM encode SecurityModeReject: %w", err)
+		return nil, fmt.Errorf("nas: GMM encode SecurityModeReject: %w", err)
 	}
 
 	return data.Bytes(), nil
@@ -408,12 +418,14 @@ func BuildIdentityResponse(mobileIdentity []byte) ([]byte, error) {
 
 	data := new(bytes.Buffer)
 	if err := m.GmmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GMM encode IdentityResponse: %w", err)
+		return nil, fmt.Errorf("nas: GMM encode IdentityResponse: %w", err)
 	}
 
 	return data.Bytes(), nil
 }
 
+// BuildRegistrationComplete builds a REGISTRATION COMPLETE (TS 24.501 §8.2.8)
+// acknowledging a Registration Accept.
 func BuildRegistrationComplete() ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
@@ -429,7 +441,7 @@ func BuildRegistrationComplete() ([]byte, error) {
 
 	data := new(bytes.Buffer)
 	if err := m.GmmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GMM encode RegistrationComplete: %w", err)
+		return nil, fmt.Errorf("nas: GMM encode RegistrationComplete: %w", err)
 	}
 
 	return data.Bytes(), nil
@@ -437,13 +449,13 @@ func BuildRegistrationComplete() ([]byte, error) {
 
 func buildIMEISV(imeisv string) (*nasType.IMEISV, error) {
 	if len(imeisv) != 16 {
-		return nil, fmt.Errorf("IMEISV must be 16 digits")
+		return nil, fmt.Errorf("nas: IMEISV must be 16 digits")
 	}
 
 	var d [16]uint8
 	for i := range 16 {
 		if imeisv[i] < '0' || imeisv[i] > '9' {
-			return nil, fmt.Errorf("IMEISV contains non-digit characters")
+			return nil, fmt.Errorf("nas: IMEISV contains non-digit characters")
 		}
 
 		d[i] = imeisv[i] - '0'

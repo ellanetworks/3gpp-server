@@ -50,14 +50,13 @@ type SendENBNASRequest struct {
 	// MME's integrity check fails; the MME must discard the message (§4.4.4).
 	CorruptMAC bool `json:"corrupt_mac,omitempty"`
 
-	// MMEUES1APIDOverride, on inject_nas, sets the MME-UE-S1AP-ID of the Uplink NAS
-	// Transport to an arbitrary value (e.g. another UE's, or one never assigned),
-	// to test the MME's UE-association validation (TS 36.413 §10.6).
+	// S1AP-level overrides (apply to the S1AP wrapper, not the NAS PDU): they
+	// replace the UE's stored S1AP ID pair on every uplink message this UE sends
+	// (Uplink NAS Transport, UE Capability Info Indication, UE Context Release
+	// Request). Set an arbitrary, stale or another UE's value to test the MME's
+	// UE-association validation (TS 36.413 §10.6); ENBUES1APIDOverride alone pairs
+	// a valid MME-UE-S1AP-ID with an inconsistent eNB-UE-S1AP-ID.
 	MMEUES1APIDOverride *uint32 `json:"mme_ue_s1ap_id,omitempty"`
-
-	// ENBUES1APIDOverride, on inject_nas, sets the eNB-UE-S1AP-ID of the Uplink NAS
-	// Transport, so a valid MME-UE-S1AP-ID can be paired with an inconsistent
-	// eNB-UE-S1AP-ID to test the MME's AP-ID pair validation (TS 36.413 §10.6).
 	ENBUES1APIDOverride *uint32 `json:"enb_ue_s1ap_id,omitempty"`
 
 	// ReplayLast, on inject_nas, resends this UE's last uplink NAS PDU verbatim, to
@@ -208,6 +207,32 @@ type MigrateENBUERequest struct {
 	TargetENBID string  `json:"target_enb_id"`
 	MMEUES1APID *uint32 `json:"mme_ue_s1ap_id,omitempty"`
 	ENBUES1APID *uint32 `json:"enb_ue_s1ap_id,omitempty"`
+}
+
+// ENBUEBearer is one PDN connection beyond the default bearer.
+type ENBUEBearer struct {
+	EBI  uint8  `json:"ebi"`
+	APN  string `json:"apn"`
+	UEIP string `json:"ue_ip"`
+}
+
+type ENBUEStateResponse struct {
+	UEID           string        `json:"ue_id"`
+	IMSI           string        `json:"imsi"`
+	UEIP           string        `json:"ue_ip"`
+	SecurityActive bool          `json:"security_active"`
+	MMEUES1APID    uint32        `json:"mme_ue_s1ap_id"`
+	ENBUES1APID    uint32        `json:"enb_ue_s1ap_id"`
+	DefaultEBI     uint8         `json:"default_ebi"`
+	Bearers        []ENBUEBearer `json:"bearers"`
+}
+
+// MigrateENBUEResponse reports the UE's S1AP ID pair on the target eNB.
+type MigrateENBUEResponse struct {
+	UEID        string `json:"ue_id"`
+	ENBID       string `json:"enb_id"`
+	MMEUES1APID uint32 `json:"mme_ue_s1ap_id"`
+	ENBUES1APID uint32 `json:"enb_ue_s1ap_id"`
 }
 
 type SendENBNASResponse struct {

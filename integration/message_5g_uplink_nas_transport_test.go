@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// TestUplinkNASTransport_NGAPIDFuzz mutates the AMF UE NGAP ID and RAN UE
+// Test5GUplinkNASTransport_NGAPIDFuzz mutates the AMF UE NGAP ID and RAN UE
 // NGAP ID of an otherwise-valid UplinkNASTransport. Per TS 38.413 §8.7.5.2,
 // when one or both UE NGAP IDs are incorrect the AMF shall respond with
 // ErrorIndication (cause "Unknown local UE NGAP ID" or "Inconsistent remote

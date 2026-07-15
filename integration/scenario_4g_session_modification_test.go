@@ -54,7 +54,7 @@ func Test4GSessionAMBRModification(t *testing.T) {
 	// Restore the default policy's session-AMBR so the env is left as found.
 	t.Cleanup(func() { setPolicyAMBR(t, token, "200 Mbps", "200 Mbps") })
 
-	enbID := createGTPUENB(t, 1, "sess-mod-enb")
+	enbID := createGTPUENB(t, claimENBID(), "sess-mod-enb")
 
 	body := fmt.Sprintf(`{"imsi":%q,"k":%q,"opc":%q,"amf":"8000","sqn":"000000000020"}`, sessionModIMSI, testK, testOPc)
 	status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue", body)

@@ -30,7 +30,7 @@ func assertEPSErrorIndication(t *testing.T, body []byte) {
 	}
 }
 
-// TestEPSUplinkNASTransportS1APIDFuzz mutates the UE S1AP IDs of an Uplink NAS
+// Test4GUplinkNASTransportS1APIDFuzz mutates the UE S1AP IDs of an Uplink NAS
 // Transport sent on an established association. Per TS 36.413 §10.6, a message
 // carrying AP ID(s) that identify a logical connection unknown to the MME (an
 // unallocated MME-UE-S1AP-ID, or an MME-UE-S1AP-ID paired with an inconsistent
@@ -89,7 +89,7 @@ var s1apIDFuzzCases = []struct {
 	{"inconsistent eNB-UE-S1AP-ID", `"enb_ue_s1ap_id":16777215`},
 }
 
-// TestEPSUECapabilityInfoS1APIDFuzz fuzzes the UE S1AP IDs of a UE Capability
+// Test4GUECapabilityInfoS1APIDFuzz fuzzes the UE S1AP IDs of a UE Capability
 // Info Indication on an established association. Per TS 36.413 §10.6 the MME
 // must reject an unknown or inconsistent AP ID with an Error Indication rather
 // than store the radio capability against a UE context.
@@ -108,7 +108,7 @@ func Test4GUECapabilityInfoS1APIDFuzz(t *testing.T) {
 	}
 }
 
-// TestEPSUEContextReleaseRequestS1APIDFuzz fuzzes the UE S1AP IDs of a UE
+// Test4GUEContextReleaseRequestS1APIDFuzz fuzzes the UE S1AP IDs of a UE
 // Context Release Request. Per TS 36.413 §10.6 an unknown or inconsistent AP ID
 // must draw an Error Indication, never a UE Context Release Command that would
 // tear down another UE's connection.

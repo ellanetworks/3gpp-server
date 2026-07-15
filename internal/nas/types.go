@@ -177,45 +177,45 @@ type NASResponse struct {
 	RAND         string `json:"rand,omitempty"`
 	AUTN         string `json:"autn,omitempty"`
 	ABBAContents string `json:"abba,omitempty"`
-	NgKSI        *uint8 `json:"ng_ksi,omitempty"`
+	NgKSI        *int   `json:"ng_ksi,omitempty"`
 	EAPMessage   string `json:"eap_message,omitempty"`
 
 	// SecurityModeCommand fields (TS 24.501 §8.2.25)
-	SelectedCipheringAlg *uint8 `json:"selected_ciphering_alg,omitempty"`
-	SelectedIntegrityAlg *uint8 `json:"selected_integrity_alg,omitempty"`
+	SelectedCipheringAlg *int `json:"selected_ciphering_alg,omitempty"`
+	SelectedIntegrityAlg *int `json:"selected_integrity_alg,omitempty"`
 
 	// RegistrationAccept fields (TS 24.501 §8.2.7)
 	GUTI string `json:"guti,omitempty"`
 
 	// RegistrationReject / AuthenticationReject
-	CauseGMM *uint8 `json:"cause_5gmm,omitempty"`
+	CauseGMM *int `json:"cause_5gmm,omitempty"`
 
 	// IdentityRequest
-	IdentityType *uint8 `json:"identity_type,omitempty"`
+	IdentityType *int `json:"identity_type,omitempty"`
 
 	// PDU Session Establishment Accept (TS 24.501 §8.3.2). The numeric IEs are
 	// pointers so a decoded value of 0 is distinct from an absent IE.
-	PDUSessionID   *uint8 `json:"pdu_session_id,omitempty"`
-	PDUSessionType *uint8 `json:"pdu_session_type,omitempty"`
+	PDUSessionID   *int   `json:"pdu_session_id,omitempty"`
+	PDUSessionType *int   `json:"pdu_session_type,omitempty"`
 	PDUAddress     string `json:"pdu_address,omitempty"`
 
 	// PDU Session Establishment Accept mandatory/conditional IEs (TS 24.501
 	// §8.3.2): Session-AMBR and Authorized QoS rules are mandatory; the
 	// Always-on PDU session indication is included per §6.4.1 when the UE
 	// requested it.
-	SessionAMBRUplink   *uint16 `json:"session_ambr_uplink,omitempty"`
-	SessionAMBRDownlink *uint16 `json:"session_ambr_downlink,omitempty"`
-	AuthorizedQoSRules  string  `json:"authorized_qos_rules,omitempty"`
-	AlwaysOnIndication  *uint8  `json:"always_on_indication,omitempty"`
+	SessionAMBRUplink   *int   `json:"session_ambr_uplink,omitempty"`
+	SessionAMBRDownlink *int   `json:"session_ambr_downlink,omitempty"`
+	AuthorizedQoSRules  string `json:"authorized_qos_rules,omitempty"`
+	AlwaysOnIndication  *int   `json:"always_on_indication,omitempty"`
 
 	// PDU Session Establishment Reject
-	Cause5GSM *uint8 `json:"cause_5gsm,omitempty"`
+	Cause5GSM *int `json:"cause_5gsm,omitempty"`
 
 	// DL NAS Transport inner message type
 	InnerNASMessageType string `json:"inner_nas_message_type,omitempty"`
 
 	// Raw hex of the NAS PDU
-	RawHex string `json:"raw_hex,omitempty"`
+	RawHex string `json:"raw_hex"`
 }
 
 const (

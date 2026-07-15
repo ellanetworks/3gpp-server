@@ -78,7 +78,7 @@ func assertMobilityRegistrationAccepted(t *testing.T, gnbID, ueID string) {
 	}
 }
 
-// TestN2HandoverPingPong hands a UE A->B and straight back B->A, as happens when
+// Test5GN2HandoverPingPong hands a UE A->B and straight back B->A, as happens when
 // a UE oscillates at a cell edge.
 func Test5GN2HandoverPingPong(t *testing.T) {
 	const hexA, hexB = "0000c0", "0000c1"
@@ -93,7 +93,7 @@ func Test5GN2HandoverPingPong(t *testing.T) {
 	assertMobilityRegistrationAccepted(t, gnbA, ueID)
 }
 
-// TestN2HandoverMultiHop walks a UE across three gNBs A->B->C, as it would move
+// Test5GN2HandoverMultiHop walks a UE across three gNBs A->B->C, as it would move
 // across cells.
 func Test5GN2HandoverMultiHop(t *testing.T) {
 	const hexA, hexB, hexC = "0000c2", "0000c3", "0000c4"
@@ -109,7 +109,7 @@ func Test5GN2HandoverMultiHop(t *testing.T) {
 	assertMobilityRegistrationAccepted(t, gnbC, ueID)
 }
 
-// TestN2HandoverConcurrentUEs hands two different UEs over the same gNB pair at
+// Test5GN2HandoverConcurrentUEs hands two different UEs over the same gNB pair at
 // once, with both in the preparing state simultaneously. The AMF must keep their
 // contexts isolated (distinct AMF UE NGAP IDs) and complete both.
 func Test5GN2HandoverConcurrentUEs(t *testing.T) {
@@ -157,7 +157,7 @@ func Test5GN2HandoverConcurrentUEs(t *testing.T) {
 	}
 }
 
-// TestN2HandoverThenIdleThenServiceRequest walks the full connected/idle cycle a
+// Test5GN2HandoverThenIdleThenServiceRequest walks the full connected/idle cycle a
 // UE goes through after moving: handover to a new gNB, release to CM-IDLE there,
 // then a Service Request to come back to CM-CONNECTED (TS 24.501 §5.6.1).
 func Test5GN2HandoverThenIdleThenServiceRequest(t *testing.T) {

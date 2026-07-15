@@ -13,9 +13,11 @@ import (
 	"testing"
 )
 
-// numTestSubscribers is the size of the subscriber pool TestMain provisions.
-// Low indices (1..6) are hard-coded by older single-UE tests; concurrency and
-// fast-sequence tests claim higher, non-overlapping blocks.
+// numTestSubscribers is the size of the reserved subscriber pool TestMain
+// provisions up front, for tests that name an index explicitly via testSUPI
+// (indices 1..25 are in use). Tests needing only a subscriber nobody else holds
+// call claimSubscriber, which allocates above this block — see
+// allocation_helpers_test.go.
 const numTestSubscribers = 40
 
 // testSUPI returns the SUPI of the i-th pooled subscriber (1-based): MCC 001,

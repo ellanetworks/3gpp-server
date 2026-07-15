@@ -7,13 +7,6 @@ import (
 	"github.com/ellanetworks/core/s1ap"
 )
 
-// S1AP CauseRadioNetwork values (TS 36.413 §9.2.1.3).
-const (
-	CauseHandoverDesirableForRadioReasons = 16
-	CauseHandoverCancelled                = 4
-	CauseHOFailureInTarget                = 6
-)
-
 // The source/target eNB transparent container is an opaque OCTET STRING at S1AP
 // (TS 36.413 §9.1.5), so one octet satisfies the mandatory IE.
 var handoverContainerStub = s1ap.TransparentContainer{0x00}
@@ -92,7 +85,7 @@ func BuildHandoverRequestAcknowledge(p HandoverRequestAcknowledgeParams) ([]byte
 	for _, id := range p.FailedERABIDs {
 		failed = append(failed, s1ap.ERABItem{
 			ERABID: s1ap.ERABID(id),
-			Cause:  s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: CauseHOFailureInTarget},
+			Cause:  s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: CauseRadioNetworkHOFailureInTarget},
 		})
 	}
 

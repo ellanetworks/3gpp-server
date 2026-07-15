@@ -47,18 +47,14 @@ func BuildInitialUEMessage(p InitialUEMessageParams) ([]byte, error) {
 	return m.Marshal()
 }
 
-// CauseRadioUserInactivity is the S1AP radio-network cause "user-inactivity"
-// (TS 36.413 §9.2.1.3), the typical cause for an eNB-requested release.
-const CauseRadioUserInactivity uint8 = 20
-
 // BuildUEContextReleaseRequest builds the eNB's request to release a UE's S1
 // context, e.g. on inactivity (TS 36.413 §9.1.4.5) — moving the UE to ECM-IDLE.
 // cause is the radio-network Cause value the eNB reports.
-func BuildUEContextReleaseRequest(mmeUEID, enbUEID uint32, cause uint8) ([]byte, error) {
+func BuildUEContextReleaseRequest(mmeUEID, enbUEID uint32, cause int) ([]byte, error) {
 	m := &s1ap.UEContextReleaseRequest{
 		MMEUES1APID: s1ap.MMEUES1APID(mmeUEID),
 		ENBUES1APID: s1ap.ENBUES1APID(enbUEID),
-		Cause:       s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: int(cause)},
+		Cause:       s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: cause},
 	}
 
 	return m.Marshal()

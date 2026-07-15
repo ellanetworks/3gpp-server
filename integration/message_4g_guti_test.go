@@ -22,7 +22,7 @@ func attachToAccept(t *testing.T, enbID string) []byte {
 	return nasStep(t, enbID, ueID, "security_mode_complete")
 }
 
-// TestGUTIReallocation checks the MME assigns a fresh GUTI on each attach
+// Test4GGUTIReallocation checks the MME assigns a fresh GUTI on each attach
 // (TS 24.301 §5.5.1.2.4) and that the M-TMSIs are not sequentially allocated, as
 // required for subscriber-identity confidentiality (TS 23.003 §2.8).
 func Test4GGUTIReallocation(t *testing.T) {
@@ -70,7 +70,7 @@ func Test4GGUTIReallocation(t *testing.T) {
 	}
 }
 
-// TestForeignGUTIIdentityRequest checks that an attach using a GUTI the MME does
+// Test4GForeignGUTIIdentityRequest checks that an attach using a GUTI the MME does
 // not recognise triggers the Identity procedure: the MME requests the IMSI
 // (TS 24.301 §5.4.4), and once given it proceeds to authentication.
 func Test4GForeignGUTIIdentityRequest(t *testing.T) {

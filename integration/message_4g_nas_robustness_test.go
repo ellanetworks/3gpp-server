@@ -54,7 +54,7 @@ func attachUEConcurrent(enbID, imsi string) error {
 	return nil
 }
 
-// TestEPSConcurrentAttach attaches several distinct subscribers at once on one
+// Test4GConcurrentAttach attaches several distinct subscribers at once on one
 // eNB, checking the MME keeps their UE contexts, security contexts, and GUTIs
 // separate and registers them all.
 func Test4GConcurrentAttach(t *testing.T) {
@@ -62,18 +62,20 @@ func Test4GConcurrentAttach(t *testing.T) {
 
 	const n = 8
 
+	supis := claimSubscribers(t, n)
+
 	errs := make(chan error, n)
 
 	var wg sync.WaitGroup
 
-	for i := 1; i <= n; i++ {
+	for _, supi := range supis {
 		wg.Add(1)
 
-		go func(i int) {
+		go func(supi string) {
 			defer wg.Done()
 
-			errs <- attachUEConcurrent(enbID, testSUPI(i)[len("imsi-"):])
-		}(i)
+			errs <- attachUEConcurrent(enbID, supi[len("imsi-"):])
+		}(supi)
 	}
 
 	wg.Wait()
@@ -86,7 +88,7 @@ func Test4GConcurrentAttach(t *testing.T) {
 	}
 }
 
-// TestEPSMalformedNAS throws garbage NAS PDUs at the MME inside an Initial UE
+// Test4GMalformedNAS throws garbage NAS PDUs at the MME inside an Initial UE
 // Message and verifies it never mistakes one for a valid attach, then confirms a
 // clean attach still completes — proof the MME stayed on its feet.
 func Test4GMalformedNAS(t *testing.T) {
@@ -124,7 +126,7 @@ func Test4GMalformedNAS(t *testing.T) {
 	})
 }
 
-// TestEPSBadMACSecurityModeComplete sends a Security Mode Complete with a
+// Test4GBadMACSecurityModeComplete sends a Security Mode Complete with a
 // corrupted NAS-MAC and checks the MME discards it (TS 24.301 §4.4.4) rather than
 // completing the attach, then confirms the MME remains healthy.
 func Test4GBadMACSecurityModeComplete(t *testing.T) {

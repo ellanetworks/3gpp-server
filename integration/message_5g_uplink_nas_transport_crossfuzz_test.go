@@ -15,7 +15,7 @@ import (
 	"testing"
 )
 
-// TestULNasTransport_CrossFuzz combines NGAP-ID overrides with malformed
+// Test5GULNasTransport_CrossFuzz combines NGAP-ID overrides with malformed
 // inner NAS PDUs. Per TS 38.413 §8.7.5.2 the NGAP-level UE ID check happens
 // before the AMF looks at the NAS payload, so whenever at least one of the
 // AMF UE NGAP ID / RAN UE NGAP ID is wrong the AMF must respond with

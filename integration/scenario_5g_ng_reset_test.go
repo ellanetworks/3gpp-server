@@ -49,7 +49,7 @@ func ngapHasConnection(body []byte, amfID, ranID int64) bool {
 	return false
 }
 
-// TestNGReset_All resets the whole NG interface. Per TS 38.413 §8.7.4.2.2 the
+// Test5GNGReset_All resets the whole NG interface. Per TS 38.413 §8.7.4.2.2 the
 // AMF releases the UE associations and answers with NG Reset Acknowledge.
 func Test5GNGReset_All(t *testing.T) {
 	gnbID := mustCreateGnB(t)
@@ -65,7 +65,7 @@ func Test5GNGReset_All(t *testing.T) {
 	}
 }
 
-// TestNGReset_Partial resets a single registered UE's association. Per TS 38.413
+// Test5GNGReset_Partial resets a single registered UE's association. Per TS 38.413
 // §8.7.4.2.2 the AMF shall include, for each reset connection, the AMF UE NGAP
 // ID and RAN UE NGAP ID in the NG Reset Acknowledge's UE-associated Logical
 // NG-connection List.

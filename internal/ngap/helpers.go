@@ -11,24 +11,12 @@ import (
 	"github.com/free5gc/ngap/ngapType"
 )
 
-func GetTacInBytes(tacStr string) ([]byte, error) {
+func tacInBytes(tacStr string) ([]byte, error) {
 	resu, err := hex.DecodeString(tacStr)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode tac to bytes: %v", err)
 	}
 	return resu, nil
-}
-
-func GetSliceInBytes(sst int32, sd string) ([]byte, []byte, error) {
-	sstBytes := []byte{byte(sst)}
-	if sd != "" {
-		sdBytes, err := hex.DecodeString(sd)
-		if err != nil {
-			return sstBytes, nil, fmt.Errorf("could not decode sd to bytes: %v", err)
-		}
-		return sstBytes, sdBytes, nil
-	}
-	return sstBytes, nil, nil
 }
 
 // encodePLMN encodes an MCC/MNC pair into the 3-octet BCD PLMN identity
@@ -71,7 +59,7 @@ func encodePLMN(mcc, mnc string) ([]byte, error) {
 	return p, nil
 }
 
-func GetNRCellIdentity(gnbID string) (ngapType.NRCellIdentity, error) {
+func nrCellIdentity(gnbID string) (ngapType.NRCellIdentity, error) {
 	nci, err := hex.DecodeString(gnbID)
 	if err != nil {
 		return ngapType.NRCellIdentity{}, fmt.Errorf("could not get NRCellIdentity: %v", err)

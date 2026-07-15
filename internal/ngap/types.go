@@ -10,7 +10,6 @@ type NGAPMessage struct {
 	PDUType       string `json:"pdu_type"`
 	Criticality   string `json:"criticality"`
 	IEs           []IE   `json:"ies,omitempty"`
-	RawPDU        string `json:"raw_pdu,omitempty"`
 }
 
 type IE struct {

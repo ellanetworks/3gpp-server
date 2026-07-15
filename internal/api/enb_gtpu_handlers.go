@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/netip"
-	"time"
 
 	"github.com/ellanetworks/3gpp-server/internal/gtpu"
 	"github.com/ellanetworks/3gpp-server/internal/store"
@@ -203,12 +202,7 @@ func (h *Handler) SendENBGTPUEcho(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	timeout := 5 * time.Second
-	if req.TimeoutMs > 0 {
-		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
 	msg, err := gt.WaitForControl(ctx, gtpu.MsgEchoResponse)
@@ -241,12 +235,7 @@ func (h *Handler) AwaitENBErrorIndication(w http.ResponseWriter, r *http.Request
 	}
 	_ = json.NewDecoder(r.Body).Decode(&req)
 
-	timeout := 5 * time.Second
-	if req.TimeoutMs > 0 {
-		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
 	if _, err := gt.WaitForControl(ctx, gtpu.MsgErrorIndication); err != nil {
@@ -277,12 +266,7 @@ func (h *Handler) AwaitENBDownlink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	timeout := 5 * time.Second
-	if req.TimeoutMs > 0 {
-		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
 	tpdu, err := gt.WaitForDownlink(ctx, dlTeid)

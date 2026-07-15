@@ -12,10 +12,6 @@ type ResetConnection struct {
 	ENBUES1APID uint32
 }
 
-// causeMiscOMIntervention is the S1AP misc cause "om-intervention" (TS 36.413
-// §9.2.1.3), a typical cause for an eNB-initiated reset.
-const causeMiscOMIntervention = 3
-
 // BuildReset builds an eNB-initiated S1 RESET (TS 36.413 §8.7.1.1). With all set,
 // it resets the whole S1 interface; otherwise it resets only the listed
 // UE-associated logical connections (partOfS1-Interface).
@@ -34,7 +30,7 @@ func BuildReset(all bool, connections []ResetConnection) ([]byte, error) {
 	}
 
 	m := &s1ap.Reset{
-		Cause:     s1ap.Cause{Group: s1ap.CauseGroupMisc, Value: causeMiscOMIntervention},
+		Cause:     s1ap.Cause{Group: s1ap.CauseGroupMisc, Value: CauseMiscOMIntervention},
 		ResetType: rt,
 	}
 

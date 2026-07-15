@@ -15,7 +15,7 @@ import (
 	"testing"
 )
 
-// TestPDUSessionModification_Rejected drives the procedure on an active session
+// Test5GPDUSessionModification_Rejected drives the procedure on an active session
 // and asserts a PDU Session Modification Reject with a 5GSM cause (TS 24.501
 // §6.4.2.4), delivered in a Downlink NAS Transport.
 func Test5GPDUSessionModification_Rejected(t *testing.T) {
@@ -46,7 +46,7 @@ func Test5GPDUSessionModification_Rejected(t *testing.T) {
 	}
 }
 
-// TestPDUSessionModification_NoActiveSession sends a Modification Request for a
+// Test5GPDUSessionModification_NoActiveSession sends a Modification Request for a
 // PDU session with no context at the AMF (the UE is registered but never
 // established one). Per TS 24.501 §7.3.2 c) the AMF cannot forward the message
 // and answers with a Downlink NAS Transport carrying 5GMM cause #90 "payload was
@@ -74,7 +74,7 @@ func Test5GPDUSessionModification_NoActiveSession(t *testing.T) {
 	assertNASCause(t, body, "nas.cause_5gmm", cause5GMMPayloadWasNotForwarded)
 }
 
-// TestPDUSessionModification_ExistingPduSessionRequestType drives the procedure
+// Test5GPDUSessionModification_ExistingPduSessionRequestType drives the procedure
 // on an active session with Request Type "existing PDU session". The AMF forwards
 // it to the SMF (TS 24.501 §5.4.5.2.3 ii), which answers with a Modification
 // Reject.
@@ -96,7 +96,7 @@ func Test5GPDUSessionModification_ExistingPduSessionRequestType(t *testing.T) {
 	}
 }
 
-// TestPDUSessionModification_EmergencyRequestType drives the procedure with
+// Test5GPDUSessionModification_EmergencyRequestType drives the procedure with
 // Request Type "initial emergency request". Ella Core does not support emergency
 // PDU sessions, so it returns the message in a Downlink NAS Transport with 5GMM
 // cause #90 "payload was not forwarded".

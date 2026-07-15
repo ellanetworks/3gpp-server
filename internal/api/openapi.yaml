@@ -187,17 +187,77 @@ paths:
       summary: Drive one EPS NAS procedure step or a source-eNB S1AP message
       description: |
         Sends one uplink message from the emulated UE over S1AP and returns the
-        MME's reply decoded as JSON. message_type selects the message: the EPS NAS
-        procedures (attach_request, authentication_response, identity_response,
-        security_mode_complete/reject, attach_complete, service_request,
-        tracking_area_update, detach_request, release_request, pdn_connectivity,
-        pdn_disconnect, modify_eps_bearer_context_accept,
-        deactivate_eps_bearer_context_accept, status_esm, ue_capability_info,
-        path_switch, reset, inject_nas), and
-        the source-eNB side of S1 handover (handover_required, handover_cancel,
-        enb_status_transfer — TS 36.413 §8.4). EPS-AKA and NAS keys are computed
-        independently, so a returned mac_verified reflects the MME's NAS-MAC
-        checked under those keys.
+        MME's reply decoded as JSON. `message_type` selects the message. EPS-AKA
+        and NAS keys are computed independently, so a returned `mac_verified`
+        reflects the MME's NAS-MAC checked under those keys.
+
+        **Does NOT auto-respond** — the caller controls the entire flow.
+
+        ## EMM procedures (TS 24.301 §5)
+
+        - `attach_request` — ATTACH REQUEST inside an Initial UE Message.
+        - `authentication_response` — Computes EPS-AKA RES from the stored
+          RAND/AUTN and sends AUTHENTICATION RESPONSE.
+        - `authentication_failure` — AUTHENTICATION FAILURE with the EMM `cause`
+          (TS 24.301 §5.4.2.6); #21 synch failure auto-includes the AUTS.
+        - `identity_response` — IDENTITY RESPONSE carrying the requested identity.
+        - `security_mode_complete` — Derives the NAS keys and sends SECURITY MODE
+          COMPLETE (integrity-protected and ciphered).
+        - `security_mode_reject` — SECURITY MODE REJECT with the EMM `cause`,
+          sent unprotected (TS 24.301 §5.4.3.5).
+        - `attach_complete` — INITIAL CONTEXT SETUP RESPONSE followed by ATTACH
+          COMPLETE.
+        - `service_request` — SERVICE REQUEST, moving the UE out of ECM-IDLE.
+        - `tracking_area_update` — TRACKING AREA UPDATE REQUEST.
+        - `detach_request` — UE-originating DETACH REQUEST; with `switch_off` the
+          MME sends no Detach Accept.
+
+        ## ESM procedures (TS 24.301 §6)
+
+        - `pdn_connectivity` — PDN CONNECTIVITY REQUEST for an additional PDN
+          connection to `apn`.
+        - `pdn_disconnect` — PDN DISCONNECT REQUEST for the PDN connection whose
+          linked default bearer is `linked_ebi`.
+        - `modify_eps_bearer_context_accept` — MODIFY EPS BEARER CONTEXT ACCEPT.
+        - `deactivate_eps_bearer_context_accept` — DEACTIVATE EPS BEARER CONTEXT
+          ACCEPT.
+        - `status_esm` — ESM STATUS with the given `esm_cause` (TS 24.301 §6.6.3).
+
+        ## UE-associated S1AP (TS 36.413)
+
+        - `ue_capability_info` — UE CAPABILITY INFO INDICATION (§8.8). Send-only;
+          the MME stores the radio capability.
+        - `initial_context_setup_failure` — INITIAL CONTEXT SETUP FAILURE (§8.3.1.4),
+          making the MME release the UE context. Send-only.
+        - `modify_response` — E-RAB MODIFY RESPONSE confirming a network-initiated
+          E-RAB modification (§8.2.2). Send-only.
+        - `error_indication` — ERROR INDICATION for the UE's connection (§8.7.2).
+        - `release_request` — UE CONTEXT RELEASE REQUEST; the MME's Release Command
+          is acknowledged with Release Complete.
+        - `reset` — RESET of this UE's connection (partOfS1-Interface), or of the
+          whole S1 interface with `reset_all` (§8.7.1).
+        - `path_switch` — Target-eNB PATH SWITCH REQUEST after an X2 handover
+          (§9.1.5.8), expecting a fresh {NH, NCC} in the acknowledge.
+
+        ## Source-eNB side of S1 handover (TS 36.413 §8.4)
+
+        - `handover_required` — HANDOVER REQUIRED toward the target eNB. Send-only;
+          the Handover Command arrives asynchronously (await it on the eNB).
+        - `handover_cancel` — HANDOVER CANCEL, expecting HANDOVER CANCEL ACKNOWLEDGE.
+        - `enb_status_transfer` — ENB STATUS TRANSFER carrying the PDCP counts.
+          Send-only.
+
+        ## Raw escape hatch
+
+        - `inject_nas` — Sends an Uplink NAS Transport carrying an
+          attacker-controlled NAS PDU: `raw_nas_pdu` (hex, sent verbatim with no
+          building or security encoding) or `replay_last` (this UE's last uplink
+          NAS PDU, to test replay protection). No reply — the MME discarding it —
+          is a valid outcome.
+
+        `mme_ue_s1ap_id` / `enb_ue_s1ap_id` override the S1AP ID pair on any of
+        the uplink messages above, to probe the MME's UE-association validation
+        (TS 36.413 §10.6).
       requestBody:
         required: true
         content:
@@ -236,6 +296,10 @@ paths:
       responses:
         "200":
           description: UE state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ENBUEStateResponse"
         "404":
           $ref: "#/components/responses/NotFound"
     patch:
@@ -340,9 +404,25 @@ paths:
       description: |
         Sends a non-UE-associated S1AP message on the eNB's S1-MME association —
         the target-eNB side of S1 handover, where the eNB acts on a UE it does not
-        yet own and addresses it by the S1AP ID pair the MME assigned. message_type
-        selects the message: handover_request_acknowledge, handover_notify, or
-        handover_failure (TS 36.413 §8.4).
+        yet own and addresses it by the S1AP ID pair the MME assigned.
+
+        ## Supported message types
+
+        - `handover_request_acknowledge` — Target-eNB HANDOVER REQUEST ACKNOWLEDGE
+          (TS 36.413 §8.4.2), admitting the E-RABs in `admitted_erabs` with their
+          downlink S1-U tunnels and rejecting those in `failed_erabs`. Send-only.
+        - `handover_notify` — Target-eNB HANDOVER NOTIFY once the UE has arrived
+          (TS 36.413 §8.4.3). Send-only.
+        - `handover_failure` — Target-eNB HANDOVER FAILURE (TS 36.413 §8.4.2),
+          making the MME abort the handover. Send-only.
+
+        ## Raw escape hatch
+
+        `raw_s1ap_pdu` (hex) is the universal primitive: when set, `message_type`
+        is ignored and the bytes are written verbatim onto the S1-MME association
+        with no encoding or validation. With `wait_for` the call blocks for one of
+        those downlink message types and returns it; otherwise it is
+        fire-and-forget.
       requestBody:
         required: true
         content:
@@ -364,6 +444,8 @@ paths:
           $ref: "#/components/responses/InternalError"
         "502":
           $ref: "#/components/responses/BadGateway"
+        "504":
+          $ref: "#/components/responses/GatewayTimeout"
 
   /enb/{enb_id}/await:
     parameters:
@@ -1284,6 +1366,23 @@ components:
         s1_setup_failure:
           type: object
           description: Present on an S1SetupFailure; cause and optional time-to-wait.
+        unknown_ies:
+          type: array
+          description: ProtocolIEs the received message carries that its message type does not model, in wire order.
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              criticality:
+                type: string
+                description: >-
+                  reject, ignore, or notify: how a receiver must act on an IE it does not
+                  comprehend (TS 36.413 §10.3.2). A value outside the ENUMERATED range is
+                  rendered Criticality(n).
+              value_hex:
+                type: string
+                description: Raw open-type value bytes as hex.
 
     CreateENBUERequest:
       type: object
@@ -1319,6 +1418,39 @@ components:
         enb_ue_s1ap_id:
           type: integer
 
+    ENBUEStateResponse:
+      type: object
+      properties:
+        ue_id:
+          type: string
+        imsi:
+          type: string
+        ue_ip:
+          type: string
+          description: Assigned in the Attach Accept; empty before the attach completes.
+        security_active:
+          type: boolean
+        mme_ue_s1ap_id:
+          type: integer
+          description: Set by the MME after the first S1AP exchange.
+        enb_ue_s1ap_id:
+          type: integer
+        default_ebi:
+          type: integer
+          description: EPS bearer identity of the default bearer.
+        bearers:
+          type: array
+          description: PDN connections beyond the default bearer (TS 24.301 §6.5.1).
+          items:
+            type: object
+            properties:
+              ebi:
+                type: integer
+              apn:
+                type: string
+              ue_ip:
+                type: string
+
     SendENBNASRequest:
       type: object
       required: [message_type]
@@ -1350,13 +1482,16 @@ components:
         mme_ue_s1ap_id:
           type: integer
           description: >
-            On inject_nas, the MME-UE-S1AP-ID of the Uplink NAS Transport — set to a
-            forged or another UE's value to test UE-association validation.
+            Override the MME-UE-S1AP-ID in the S1AP wrapper of every uplink message
+            this UE sends (Uplink NAS Transport, UE Capability Info Indication, UE
+            Context Release Request). Use a stale, unknown or another UE's value to
+            exercise TS 36.413 §10.6.
         enb_ue_s1ap_id:
           type: integer
           description: >
-            On inject_nas, the eNB-UE-S1AP-ID of the Uplink NAS Transport — pair a
-            valid MME-UE-S1AP-ID with an inconsistent eNB-UE-S1AP-ID (TS 36.413 §10.6).
+            Override the eNB-UE-S1AP-ID in the S1AP wrapper of every uplink message
+            this UE sends — on its own it pairs a valid MME-UE-S1AP-ID with an
+            inconsistent eNB-UE-S1AP-ID (TS 36.413 §10.6).
         replay_last:
           type: boolean
           description: On inject_nas, resend this UE's last uplink NAS PDU (replay test).

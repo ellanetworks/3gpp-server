@@ -7,10 +7,10 @@ package integration_test
 
 import "testing"
 
-// TestEPSPathSwitchSecurityCapabilityMatch checks that when the target eNB
-// reports the UE security capabilities the MME already holds, the Path Switch
-// Request Acknowledge omits the UE Security Capabilities IE — there is nothing to
-// correct (TS 36.413 §9.1.5.9).
+// Test4GPathSwitchSecurityCapabilityMatch checks that when the target eNB
+// reports the UE security capabilities the MME already holds, the path switch is
+// acknowledged (TS 36.413 §8.4.4.2). The UE Security Capabilities IE is optional
+// in the acknowledge (TS 36.413 §9.1.5.9), so its presence is not asserted.
 func Test4GPathSwitchSecurityCapabilityMatch(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -22,17 +22,13 @@ func Test4GPathSwitchSecurityCapabilityMatch(t *testing.T) {
 	if got := jsonGet(resp, "s1ap.message_type"); got != "PathSwitchRequestAcknowledge" {
 		t.Fatalf("path switch: s1ap.message_type = %q, want PathSwitchRequestAcknowledge; body: %s", got, resp)
 	}
-
-	if got := jsonGet(resp, "s1ap.replayed_ue_security_capabilities"); got != "" {
-		t.Fatalf("matching caps: Ack replayed UE security capabilities unexpectedly (%s); body: %s", got, resp)
-	}
 }
 
-// TestEPSPathSwitchSecurityCapabilityMismatch checks that when the target eNB
+// Test4GPathSwitchSecurityCapabilityMismatch checks that when the target eNB
 // reports UE security capabilities that differ from the MME's stored values, the
 // Path Switch Request Acknowledge replays the stored capabilities so the eNB
-// corrects its context (TS 36.413 §9.1.5.9). A default UE advertised EEA0/1/2 and
-// EIA0/1/2, which the S1AP encoding (dropping the EEA0/EIA0 bit) stores as
+// corrects its context (TS 33.401 §7.2.4.2.2). A default UE advertised EEA0/1/2
+// and EIA0/1/2, which the S1AP encoding (dropping the EEA0/EIA0 bit) stores as
 // 0xC000 for each bitmap.
 func Test4GPathSwitchSecurityCapabilityMismatch(t *testing.T) {
 	enbID := mustCreateENB(t)
@@ -48,7 +44,7 @@ func Test4GPathSwitchSecurityCapabilityMismatch(t *testing.T) {
 	}
 
 	if got := jsonGet(resp, "s1ap.replayed_ue_security_capabilities"); got == "" {
-		t.Fatalf("mismatched caps: MME did not replay its stored UE security capabilities (TS 36.413 §9.1.5.9); body: %s", resp)
+		t.Fatalf("mismatched caps: MME did not replay its stored UE security capabilities (TS 33.401 §7.2.4.2.2); body: %s", resp)
 	}
 
 	if eea := jsonGet(resp, "s1ap.replayed_ue_security_capabilities.encryption_algorithms"); eea != "49152" {

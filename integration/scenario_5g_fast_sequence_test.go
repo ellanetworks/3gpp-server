@@ -14,7 +14,7 @@ import (
 	"testing"
 )
 
-// TestFastRegisterDeregisterChurn cycles one subscriber through register →
+// Test5GFastRegisterDeregisterChurn cycles one subscriber through register →
 // deregister repeatedly with no pause. Every cycle must complete: the AMF must
 // free the UE's context on each deregistration (TS 24.501 §5.5.2.2) and serve a
 // clean registration immediately after, with no hang, leak, or stale state from
@@ -24,8 +24,12 @@ func Test5GFastRegisterDeregisterChurn(t *testing.T) {
 
 	const cycles = 10
 
+	// One subscriber across all cycles: the churn under test is the repeated
+	// reuse of a single UE's identity.
+	supi := claimSubscriber(t)
+
 	for c := 0; c < cycles; c++ {
-		r, err := registerSUPI(gnb, testSUPI(30))
+		r, err := registerSUPI(gnb, supi)
 		if err != nil {
 			t.Fatalf("cycle %d: registration failed: %v", c, err)
 		}

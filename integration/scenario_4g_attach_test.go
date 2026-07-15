@@ -11,16 +11,18 @@ import (
 )
 
 const (
-	testIMSI = "001010000000001"
-	testK    = "00112233445566778899aabbccddeeff"
-	testOPc  = "63bfa50ee6523365ff14c1f45f88737d"
+	testK   = "00112233445566778899aabbccddeeff"
+	testOPc = "63bfa50ee6523365ff14c1f45f88737d"
 )
 
-// mustCreateENBUE creates a UE on the eNB and returns its store ID.
+// mustCreateENBUE creates a UE on the eNB, drawing a subscriber no other test
+// holds, and returns its store ID. Tests that need a specific subscriber call
+// createENBUEWithIMSI.
 func mustCreateENBUE(t *testing.T, enbID string) string {
 	t.Helper()
 
-	body := fmt.Sprintf(`{"imsi":%q,"k":%q,"opc":%q,"amf":"8000","sqn":"000000000000"}`, testIMSI, testK, testOPc)
+	imsi := claimSubscriber(t)[len("imsi-"):]
+	body := fmt.Sprintf(`{"imsi":%q,"k":%q,"opc":%q,"amf":"8000","sqn":"000000000000"}`, imsi, testK, testOPc)
 
 	status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue", body)
 	if status != 201 {
@@ -48,7 +50,7 @@ func nasStep(t *testing.T, enbID, ueID, messageType string) []byte {
 	return resp
 }
 
-// TestScenarioAttach drives a full EPS Attach against the live MME and asserts
+// Test4GScenarioAttach drives a full EPS Attach against the live MME and asserts
 // each downlink is spec-compliant: an EPS-AKA challenge, a Security Mode Command
 // that replays the UE capabilities (TS 24.301 §5.4.3.2) and selects a real
 // integrity algorithm (not EIA0, §5.4.3.3 / TS 33.401 §5.1.4.1) with a NAS-MAC

@@ -19,6 +19,9 @@ type DeregistrationRequestOpts struct {
 	SwitchOff uint8
 }
 
+// BuildDeregistrationRequest builds a UE-originating DEREGISTRATION REQUEST
+// (TS 24.501 §8.2.12) over 3GPP access. With SwitchOff set the AMF sends no
+// Deregistration Accept (§5.5.2.2.2).
 func BuildDeregistrationRequest(opts *DeregistrationRequestOpts) ([]byte, error) {
 	m := gonas.NewMessage()
 	m.GmmMessage = gonas.NewGmmMessage()
@@ -45,14 +48,14 @@ func BuildDeregistrationRequest(opts *DeregistrationRequestOpts) ([]byte, error)
 	} else if opts.Suci != nil {
 		dereg.MobileIdentity5GS = *opts.Suci
 	} else {
-		return nil, fmt.Errorf("either Guti or Suci must be provided")
+		return nil, fmt.Errorf("nas: either Guti or Suci must be provided")
 	}
 
 	m.DeregistrationRequestUEOriginatingDeregistration = dereg
 
 	data := new(bytes.Buffer)
 	if err := m.GmmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GMM encode DeregistrationRequest: %w", err)
+		return nil, fmt.Errorf("nas: GMM encode DeregistrationRequest: %w", err)
 	}
 
 	return data.Bytes(), nil

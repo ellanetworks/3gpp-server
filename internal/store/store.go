@@ -94,15 +94,3 @@ func (s *Store) DeleteENB(id string) error {
 
 	return nil
 }
-
-func (s *Store) ListGnBs() []*GnBContext {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	gnbs := make([]*GnBContext, 0, len(s.gnbs))
-	for _, gnb := range s.gnbs {
-		gnbs = append(gnbs, gnb)
-	}
-
-	return gnbs
-}

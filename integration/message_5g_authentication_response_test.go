@@ -129,7 +129,7 @@ func Test5GAuthenticationResponse(t *testing.T) {
 	}
 }
 
-// TestAuthenticationResponse_WithoutChallenge sends an Authentication Response
+// Test5GAuthenticationResponse_WithoutChallenge sends an Authentication Response
 // before any registration challenge was received. The server must still put it
 // on the wire (zeroed RES*, no local 400) so the AMF can react — it must not be
 // refused locally and must not hang.

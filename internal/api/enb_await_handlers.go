@@ -6,10 +6,8 @@ package api
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/ellanetworks/3gpp-server/internal/naseps"
 	"github.com/ellanetworks/3gpp-server/internal/s1ap"
@@ -126,32 +124,6 @@ func decodeENBDownlinkNAS(ue *store.UEEPSContext, resp *s1ap.S1APResponse) *nase
 	nas, _ := naseps.Decode(plain)
 
 	return nas
-}
-
-// parsedAwaitRequest is an AwaitRequest with its timeout resolved.
-type parsedAwaitRequest struct {
-	MessageTypes []string
-	timeout      time.Duration
-}
-
-func decodeAwaitRequest(w http.ResponseWriter, r *http.Request) (parsedAwaitRequest, bool) {
-	var req AwaitRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
-		return parsedAwaitRequest{}, false
-	}
-
-	if len(req.MessageTypes) == 0 {
-		writeError(w, http.StatusBadRequest, "message_types is required")
-		return parsedAwaitRequest{}, false
-	}
-
-	timeout := 5 * time.Second
-	if req.TimeoutMs > 0 {
-		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
-	}
-
-	return parsedAwaitRequest{MessageTypes: req.MessageTypes, timeout: timeout}, true
 }
 
 // s1apUEMatcher matches a downlink S1AP PDU to a specific UE by its S1AP ID pair,

@@ -16,23 +16,6 @@ import (
 	"testing"
 )
 
-// dnResponderIP is the data-network host on N6 (compose sidecar) that replies to
-// ICMP echo.
-const dnResponderIP = "10.6.0.10"
-
-// n3Transport selects the IP family of the N3 GTP-U tunnel between the emulated
-// gNB and the UPF. N2/SCTP stays IPv4; only the GTP-U transport varies.
-type n3Transport struct {
-	name  string // subtest label
-	gnbN3 string // the gNB's N3 bind/source address
-	upfN3 string // the UPF's N3 address (GTP-U peer)
-}
-
-var (
-	n3IPv4 = n3Transport{name: "n3v4", gnbN3: "10.3.0.3", upfN3: "10.3.0.2"}
-	n3IPv6 = n3Transport{name: "n3v6", gnbN3: "fd00:3::3", upfN3: "fd00:3::2"}
-)
-
 // createGTPUGnB creates a gNB that terminates the N3 GTP-U data path over the
 // given transport family. Only one gNB can bind a given N3 address:port, so
 // callers must let cleanup run before reusing the same transport.
@@ -43,7 +26,7 @@ func createGTPUGnB(t *testing.T, gnbID, name string, n3 n3Transport) string {
 		"amf_address": "10.3.0.2:38412", "gnb_n2_address": "10.3.0.3", "gnb_n3_address": %q,
 		"mcc": "001", "mnc": "01", "tac": "000001",
 		"gnb_id": %q, "name": %q, "sst": 1, "enable_gtpu": true
-	}`, n3.gnbN3, gnbID, name)
+	}`, n3.ranN3, gnbID, name)
 
 	status, resp := doRequest(t, "POST", "/gnb", body)
 	if status != 201 {
@@ -60,7 +43,7 @@ func createGTPUGnB(t *testing.T, gnbID, name string, n3 n3Transport) string {
 	return id
 }
 
-// TestGTPU_ICMPRoundTrip: a UE uplink ICMP echo to a data-network host must come
+// Test5GGTPU_ICMPRoundTrip: a UE uplink ICMP echo to a data-network host must come
 // back as a downlink ICMP echo reply, decapsulated from the N3 tunnel — proving
 // the UPF forwards user-plane traffic on the tunnel established over the control
 // plane.
@@ -106,7 +89,7 @@ func Test5GGTPU_ICMPRoundTrip(t *testing.T) {
 	}
 }
 
-// TestGTPU_Echo: a GTP-U Echo Request — sequence-number flag set, no extension
+// Test5GGTPU_Echo: a GTP-U Echo Request — sequence-number flag set, no extension
 // header, the conformant path-management form — must be answered with an Echo
 // Response over both IPv4 and IPv6 N3 transport. A GTP-U peer "shall be prepared
 // to receive an Echo Request at any time and it shall reply with an Echo
@@ -140,10 +123,8 @@ func Test5GGTPU_Echo(t *testing.T) {
 
 // gtpuAwaitDownlink sends one uplink ICMP echo to dst and waits for the
 // decapsulated downlink reply, returning the reply body and whether one arrived.
-// The N3 data path is kept warm by the dn-responder keepalive (the UPF resolves
-// N6 next-hops lazily and loses the first packet to an unresolved one), so a
-// single round trip is deterministic: it returns as soon as the reply arrives,
-// and only a genuine forwarding failure exhausts the timeout.
+// It returns as soon as the reply arrives; only a genuine forwarding failure
+// exhausts the timeout.
 func gtpuAwaitDownlink(t *testing.T, gnbID, ueID, dst string, id, seq int) ([]byte, bool) {
 	t.Helper()
 
@@ -158,7 +139,7 @@ func gtpuAwaitDownlink(t *testing.T, gnbID, ueID, dst string, id, seq int) ([]by
 	return body, status == 200
 }
 
-// TestGTPU_ReleaseStopsForwarding: once the PDU session is released, the UPF
+// Test5GGTPU_ReleaseStopsForwarding: once the PDU session is released, the UPF
 // must stop forwarding the UE's user plane. The test first proves the tunnel
 // forwards (an uplink ICMP echo round-trips), releases the session (TS 24.501
 // §6.3.3), then replays the same uplink and requires no downlink — the UPF must
@@ -192,10 +173,7 @@ func Test5GGTPU_ReleaseStopsForwarding(t *testing.T) {
 	}
 }
 
-// udpEchoPort is the port the dn-responder echoes UDP datagrams on (socat).
-const udpEchoPort = 7
-
-// TestGTPU_UDPRoundTrip: a UE uplink UDP datagram to the data network must come
+// Test5GGTPU_UDPRoundTrip: a UE uplink UDP datagram to the data network must come
 // back as a decapsulated downlink datagram echoed by the responder — proving the
 // UPF forwards and NATs UDP user-plane traffic, not only ICMP.
 func Test5GGTPU_UDPRoundTrip(t *testing.T) {
@@ -228,10 +206,7 @@ func Test5GGTPU_UDPRoundTrip(t *testing.T) {
 	}
 }
 
-// badTEID is a non-zero TEID with no PDR at the UPF.
-const badTEID = 0xFFFFFFFE
-
-// TestGTPU_WrongTEID_Dropped: a G-PDU carrying a TEID for which the UPF has no
+// Test5GGTPU_WrongTEID_Dropped: a G-PDU carrying a TEID for which the UPF has no
 // PDR must be discarded, not forwarded (TS 29.281 §7.3.1) — no downlink results.
 func Test5GGTPU_WrongTEID_Dropped(t *testing.T) {
 	gnbID := createGTPUGnB(t, "00ec07", "gtpu-badteid", n3IPv4)
@@ -249,7 +224,7 @@ func Test5GGTPU_WrongTEID_Dropped(t *testing.T) {
 	}
 }
 
-// TestGTPU_WrongTEID_ErrorIndication: a G-PDU carrying a non-zero TEID for which
+// Test5GGTPU_WrongTEID_ErrorIndication: a G-PDU carrying a non-zero TEID for which
 // the UPF has no PDR must be answered with a GTP-U Error Indication (TS 29.281
 // §7.3.1: the node "shall also return a GTP error indication to the originating
 // node").

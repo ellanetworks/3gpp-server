@@ -106,6 +106,20 @@ type S1APResponse struct {
 	// StatusTransferContainer is the opaque PDCP status container an MME STATUS
 	// TRANSFER relays from the source eNB to the target (TS 36.413 §8.4.7), hex.
 	StatusTransferContainer string `json:"status_transfer_container,omitempty"`
+
+	// UnknownIEs lists the ProtocolIEs the received message carries that its
+	// message type does not model, in wire order.
+	UnknownIEs []UnknownIEJSON `json:"unknown_ies,omitempty"`
+}
+
+// UnknownIEJSON is one ProtocolIE-Field of a message that the message type does
+// not model: its id, criticality, and raw open-type value bytes as hex.
+// Criticality is what instructs a receiver how to act on an IE it does not
+// comprehend (TS 36.413 §10.3.2), so it is reported with the IE.
+type UnknownIEJSON struct {
+	ID          int64  `json:"id"`
+	Criticality string `json:"criticality"`
+	ValueHex    string `json:"value_hex"`
 }
 
 // PagingJSON is the decoded PAGING content (TS 36.413 §9.1.6): the paged UE's

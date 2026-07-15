@@ -72,7 +72,7 @@ func BuildServiceRequest(opts *ServiceRequestOpts) ([]byte, error) {
 
 	data := new(bytes.Buffer)
 	if err := m.GmmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GMM encode ServiceRequest: %w", err)
+		return nil, fmt.Errorf("nas: GMM encode ServiceRequest: %w", err)
 	}
 
 	return data.Bytes(), nil

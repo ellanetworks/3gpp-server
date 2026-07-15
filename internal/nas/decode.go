@@ -14,7 +14,7 @@ import (
 
 func Decode(data []byte) (*NASResponse, error) {
 	if len(data) == 0 {
-		return nil, fmt.Errorf("empty NAS PDU")
+		return nil, fmt.Errorf("nas: empty NAS PDU")
 	}
 
 	resp := &NASResponse{
@@ -35,11 +35,17 @@ func Decode(data []byte) (*NASResponse, error) {
 	}
 
 	if err := m.PlainNasDecode(&payload); err != nil {
-		return nil, fmt.Errorf("NAS decode error: %v", err)
+		return nil, fmt.Errorf("nas: plain NAS decode: %w", err)
 	}
 
 	if m.GmmMessage == nil {
-		resp.MessageType = unknownMessageType(m)
+		messageType, err := unknownMessageType(m)
+		if err != nil {
+			return nil, err
+		}
+
+		resp.MessageType = messageType
+
 		return resp, nil
 	}
 
@@ -83,13 +89,13 @@ func decodeGmm(m *gonas.Message, resp *NASResponse) error {
 // unknownMessageType labels a decoded downlink the dispatch tables do not cover,
 // keeping the numeric 5GS message type (TS 24.501 §9.7) so a malformed downlink
 // stays identifiable. A nil GmmMessage means PlainNasDecode parsed a top-level
-// 5GSM message.
-func unknownMessageType(m *gonas.Message) string {
-	if m.GsmMessage != nil {
-		return fmt.Sprintf("gsm_message_%#x", m.GsmMessage.GetMessageType())
+// 5GSM message; the extended protocol discriminator (§9.2) admits no third case.
+func unknownMessageType(m *gonas.Message) (string, error) {
+	if m.GsmMessage == nil {
+		return "", fmt.Errorf("nas: decoded message carries neither a 5GMM nor a 5GSM message")
 	}
 
-	return "unknown"
+	return fmt.Sprintf("gsm_message_%#x", m.GsmMessage.GetMessageType()), nil
 }
 
 func decodeAuthenticationRequest(m *gonas.Message, resp *NASResponse) {
@@ -107,7 +113,7 @@ func decodeAuthenticationRequest(m *gonas.Message, resp *NASResponse) {
 		resp.ABBAContents = hex.EncodeToString(m.AuthenticationRequest.ABBA.Buffer[:m.AuthenticationRequest.ABBA.Len])
 	}
 
-	ksi := m.AuthenticationRequest.GetNasKeySetIdentifiler()
+	ksi := int(m.AuthenticationRequest.GetNasKeySetIdentifiler())
 	resp.NgKSI = &ksi
 
 	if m.AuthenticationRequest.EAPMessage != nil {
@@ -122,7 +128,7 @@ func decodeIdentityRequest(m *gonas.Message, resp *NASResponse) {
 	if m.IdentityRequest == nil {
 		return
 	}
-	idType := m.SpareHalfOctetAndIdentityType.GetTypeOfIdentity()
+	idType := int(m.SpareHalfOctetAndIdentityType.GetTypeOfIdentity())
 	resp.IdentityType = &idType
 }
 
@@ -130,7 +136,7 @@ func decodeRegistrationReject(m *gonas.Message, resp *NASResponse) {
 	if m.RegistrationReject == nil {
 		return
 	}
-	cause := m.RegistrationReject.GetCauseValue()
+	cause := int(m.RegistrationReject.GetCauseValue())
 	resp.CauseGMM = &cause
 }
 
@@ -138,7 +144,7 @@ func decodeServiceReject(m *gonas.Message, resp *NASResponse) {
 	if m.ServiceReject == nil {
 		return
 	}
-	cause := m.ServiceReject.GetCauseValue()
+	cause := int(m.ServiceReject.GetCauseValue())
 	resp.CauseGMM = &cause
 }
 
@@ -147,13 +153,13 @@ func decodeSecurityModeCommand(m *gonas.Message, resp *NASResponse) {
 		return
 	}
 
-	cipherAlg := m.SelectedNASSecurityAlgorithms.GetTypeOfCipheringAlgorithm()
+	cipherAlg := int(m.SelectedNASSecurityAlgorithms.GetTypeOfCipheringAlgorithm())
 	resp.SelectedCipheringAlg = &cipherAlg
 
-	integAlg := m.SelectedNASSecurityAlgorithms.GetTypeOfIntegrityProtectionAlgorithm()
+	integAlg := int(m.SelectedNASSecurityAlgorithms.GetTypeOfIntegrityProtectionAlgorithm())
 	resp.SelectedIntegrityAlg = &integAlg
 
-	ksi := m.SecurityModeCommand.GetNasKeySetIdentifiler()
+	ksi := int(m.SecurityModeCommand.GetNasKeySetIdentifiler())
 	resp.NgKSI = &ksi
 }
 
@@ -193,7 +199,7 @@ func decodeDLNASTransport(m *gonas.Message, resp *NASResponse) error {
 	}
 
 	if m.DLNASTransport.Cause5GMM != nil {
-		cause := m.DLNASTransport.GetCauseValue()
+		cause := int(m.DLNASTransport.GetCauseValue())
 		resp.CauseGMM = &cause
 	}
 
@@ -210,7 +216,7 @@ func decodeDLNASTransport(m *gonas.Message, resp *NASResponse) error {
 
 	inner := new(gonas.Message)
 	if err := inner.GsmMessageDecode(&payload); err != nil {
-		return fmt.Errorf("decode DL NAS transport payload: %w", err)
+		return fmt.Errorf("nas: decode DL NAS transport payload: %w", err)
 	}
 
 	if inner.GsmMessage == nil {
@@ -227,17 +233,17 @@ func decodeDLNASTransport(m *gonas.Message, resp *NASResponse) error {
 		DecodePDUSessionEstablishmentReject(resp, inner.GsmMessage)
 	case gonas.MsgTypePDUSessionReleaseCommand:
 		if inner.PDUSessionReleaseCommand != nil {
-			cause := inner.PDUSessionReleaseCommand.GetCauseValue()
+			cause := int(inner.PDUSessionReleaseCommand.GetCauseValue())
 			resp.Cause5GSM = &cause
 		}
 	case gonas.MsgTypePDUSessionModificationReject:
 		if inner.PDUSessionModificationReject != nil {
-			cause := inner.PDUSessionModificationReject.GetCauseValue()
+			cause := int(inner.PDUSessionModificationReject.GetCauseValue())
 			resp.Cause5GSM = &cause
 		}
 	case gonas.MsgTypeStatus5GSM:
 		if inner.Status5GSM != nil {
-			cause := inner.Status5GSM.GetCauseValue()
+			cause := int(inner.Status5GSM.GetCauseValue())
 			resp.Cause5GSM = &cause
 		}
 	}
@@ -270,7 +276,7 @@ func gsmMessageTypeName(t uint8) string {
 	case gonas.MsgTypeStatus5GSM:
 		return "5gsm_status"
 	default:
-		return fmt.Sprintf("unknown_gsm(%d)", t)
+		return fmt.Sprintf("gsm_message_%#x", t)
 	}
 }
 
@@ -291,7 +297,7 @@ func decodeStatus5GMM(m *gonas.Message, resp *NASResponse) {
 		return
 	}
 
-	cause := m.Status5GMM.GetCauseValue()
+	cause := int(m.Status5GMM.GetCauseValue())
 	resp.CauseGMM = &cause
 }
 
@@ -348,6 +354,6 @@ func gmmMessageTypeName(t uint8) string {
 	case gonas.MsgTypeStatus5GMM:
 		return "status_5gmm"
 	default:
-		return fmt.Sprintf("unknown(%d)", t)
+		return fmt.Sprintf("gmm_message_%#x", t)
 	}
 }

@@ -15,7 +15,7 @@ import (
 	"testing"
 )
 
-// TestN2HandoverFailureRejection: the target rejects the prepared handover with
+// Test5GN2HandoverFailureRejection: the target rejects the prepared handover with
 // a HANDOVER FAILURE; the AMF must answer the source with a HANDOVER PREPARATION
 // FAILURE (TS 38.413 §8.4.2.3 → §8.4.1.3).
 func Test5GN2HandoverFailureRejection(t *testing.T) {
@@ -52,7 +52,7 @@ func Test5GN2HandoverFailureRejection(t *testing.T) {
 	}
 }
 
-// TestN2HandoverFailureThenReHandover: after a handover is rejected, a fresh
+// Test5GN2HandoverFailureThenReHandover: after a handover is rejected, a fresh
 // handover of the same UE must succeed — the rejection released the handover
 // procedure and the UE's resources (TS 38.413 §8.4.2.3).
 func Test5GN2HandoverFailureThenReHandover(t *testing.T) {
@@ -113,7 +113,7 @@ func Test5GN2HandoverFailureThenReHandover(t *testing.T) {
 	completeHandover(t, targetGNB, targetAmf2, 100)
 }
 
-// TestN2HandoverFailureUnknownAmfUeNgapID: a HANDOVER FAILURE bearing an AMF UE
+// Test5GN2HandoverFailureUnknownAmfUeNgapID: a HANDOVER FAILURE bearing an AMF UE
 // NGAP ID the AMF never assigned carries an unknown local AP ID; §10.6 requires
 // an Error Indication.
 func Test5GN2HandoverFailureUnknownAmfUeNgapID(t *testing.T) {
@@ -128,7 +128,7 @@ func Test5GN2HandoverFailureUnknownAmfUeNgapID(t *testing.T) {
 	expectErrorIndication(t, targetGNB, "Handover Failure with unknown AMF UE NGAP ID")
 }
 
-// TestN2HandoverFailureCrossAssociationHijack: a rogue gNB forges a HANDOVER
+// Test5GN2HandoverFailureCrossAssociationHijack: a rogue gNB forges a HANDOVER
 // FAILURE bearing a victim's AMF UE NGAP ID. The ID is unknown on the rogue's
 // own association, so §10.6 requires an Error Indication there, and the victim
 // must be untouched.

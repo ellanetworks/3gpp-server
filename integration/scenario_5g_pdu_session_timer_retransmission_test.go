@@ -59,7 +59,7 @@ func awaitUENGAPWithin(t *testing.T, gnbID, ueID string, timeoutMs int, messageT
 	return body
 }
 
-// TestT3592_ReleaseCommandRetransmitted drives a network-requested release and,
+// Test5GT3592_ReleaseCommandRetransmitted drives a network-requested release and,
 // by withholding the Release Complete, observes the SMF retransmit the Release
 // Command when T3592 expires (TS 24.501 §6.3.3, abnormal case a).
 func Test5GT3592_ReleaseCommandRetransmitted(t *testing.T) {
@@ -89,7 +89,7 @@ func Test5GT3592_ReleaseCommandRetransmitted(t *testing.T) {
 		`{"message_type":"pdu_session_release_complete"}`)
 }
 
-// TestT3591_ModificationCommandRetransmitted changes a session's AMBR so the
+// Test5GT3591_ModificationCommandRetransmitted changes a session's AMBR so the
 // session reconciler issues a network-requested PDU Session Modification, then,
 // by withholding the Modification Complete, observes the SMF retransmit the
 // Modification Command when T3591 expires (TS 24.501 §6.3.2.5).

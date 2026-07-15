@@ -37,7 +37,7 @@ func nasBody(t *testing.T, enbID, ueID, body string) []byte {
 	return resp
 }
 
-// TestAuthenticationWrongRES checks the MME rejects a UE that returns an
+// Test4GAuthenticationWrongRES checks the MME rejects a UE that returns an
 // incorrect RES with an Authentication Reject (TS 24.301 §5.4.2.5), rather than
 // proceeding to the Security Mode Command.
 func Test4GAuthenticationWrongRES(t *testing.T) {
@@ -52,7 +52,7 @@ func Test4GAuthenticationWrongRES(t *testing.T) {
 	}
 }
 
-// TestAuthenticationFailureNoProceed checks that when the UE rejects the
+// Test4GAuthenticationFailureNoProceed checks that when the UE rejects the
 // challenge with an Authentication Failure (#20 MAC failure or #26 non-EPS), the
 // MME does not proceed to security activation. Per TS 24.301 §5.4.2.7 c/d it may
 // run the identity procedure or send an Authentication Reject; either is
@@ -86,7 +86,7 @@ func Test4GAuthenticationFailureNoProceed(t *testing.T) {
 	}
 }
 
-// TestAuthenticationSynchFailure checks the MME handles a #21 synch failure by
+// Test4GAuthenticationSynchFailure checks the MME handles a #21 synch failure by
 // re-synchronising with the HSS and re-challenging with a fresh vector
 // (TS 24.301 §5.4.2.7 e), after which the attach can complete.
 func Test4GAuthenticationSynchFailure(t *testing.T) {

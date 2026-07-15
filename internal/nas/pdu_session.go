@@ -24,6 +24,9 @@ type PDUSessionEstablishmentRequestOpts struct {
 	SD             string
 }
 
+// BuildPDUSessionEstablishmentRequest builds a PDU SESSION ESTABLISHMENT
+// REQUEST (TS 24.501 §8.3.1). The caller wraps it in the payload container of a
+// UL NAS TRANSPORT (§8.2.10); the PTI is UE-allocated (§7.3.1).
 func BuildPDUSessionEstablishmentRequest(opts *PDUSessionEstablishmentRequestOpts) ([]byte, error) {
 	m := gonas.NewMessage()
 	m.GsmMessage = gonas.NewGsmMessage()
@@ -63,12 +66,16 @@ func BuildPDUSessionEstablishmentRequest(opts *PDUSessionEstablishmentRequestOpt
 
 	data := new(bytes.Buffer)
 	if err := m.GsmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GSM encode: %w", err)
+		return nil, fmt.Errorf("nas: GSM encode: %w", err)
 	}
 
 	return data.Bytes(), nil
 }
 
+// BuildULNASTransport wraps a 5GSM message establishing a new PDU session in a
+// UL NAS TRANSPORT (TS 24.501 §8.2.10), carrying the PDU session information —
+// PDU session ID, S-NSSAI, DNN, request type — alongside the N1 SM payload
+// container (§5.4.5.2.2).
 func BuildULNASTransport(pduSessionID uint8, payloadContainer []byte, dnn string, sst int32, sd string) ([]byte, error) {
 	m := gonas.NewMessage()
 	m.GmmMessage = gonas.NewGmmMessage()
@@ -102,7 +109,7 @@ func BuildULNASTransport(pduSessionID uint8, payloadContainer []byte, dnn string
 		var sdTemp [3]uint8
 		sdBytes, err := hex.DecodeString(sd)
 		if err != nil {
-			return nil, fmt.Errorf("decode SD: %w", err)
+			return nil, fmt.Errorf("nas: decode SD: %w", err)
 		}
 		copy(sdTemp[:], sdBytes)
 		ul.SetSD(sdTemp)
@@ -117,7 +124,7 @@ func BuildULNASTransport(pduSessionID uint8, payloadContainer []byte, dnn string
 
 	data := new(bytes.Buffer)
 	if err := m.GmmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GMM encode: %w", err)
+		return nil, fmt.Errorf("nas: GMM encode: %w", err)
 	}
 
 	return data.Bytes(), nil
@@ -141,7 +148,7 @@ func BuildPDUSessionReleaseRequest(pduSessionID, pti uint8) ([]byte, error) {
 
 	data := new(bytes.Buffer)
 	if err := m.GsmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GSM encode PDUSessionReleaseRequest: %w", err)
+		return nil, fmt.Errorf("nas: GSM encode PDUSessionReleaseRequest: %w", err)
 	}
 
 	return data.Bytes(), nil
@@ -166,7 +173,7 @@ func BuildPDUSessionModificationRequest(pduSessionID, pti uint8) ([]byte, error)
 
 	data := new(bytes.Buffer)
 	if err := m.GsmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GSM encode PDUSessionModificationRequest: %w", err)
+		return nil, fmt.Errorf("nas: GSM encode PDUSessionModificationRequest: %w", err)
 	}
 
 	return data.Bytes(), nil
@@ -190,7 +197,7 @@ func BuildPDUSessionReleaseComplete(pduSessionID, pti uint8) ([]byte, error) {
 
 	data := new(bytes.Buffer)
 	if err := m.GsmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GSM encode PDUSessionReleaseComplete: %w", err)
+		return nil, fmt.Errorf("nas: GSM encode PDUSessionReleaseComplete: %w", err)
 	}
 
 	return data.Bytes(), nil
@@ -214,7 +221,7 @@ func BuildPDUSessionModificationComplete(pduSessionID, pti uint8) ([]byte, error
 
 	data := new(bytes.Buffer)
 	if err := m.GsmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GSM encode PDUSessionModificationComplete: %w", err)
+		return nil, fmt.Errorf("nas: GSM encode PDUSessionModificationComplete: %w", err)
 	}
 
 	return data.Bytes(), nil
@@ -239,7 +246,7 @@ func BuildPDUSessionModificationCommandReject(pduSessionID, pti, cause uint8) ([
 
 	data := new(bytes.Buffer)
 	if err := m.GsmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GSM encode PDUSessionModificationCommandReject: %w", err)
+		return nil, fmt.Errorf("nas: GSM encode PDUSessionModificationCommandReject: %w", err)
 	}
 
 	return data.Bytes(), nil
@@ -263,7 +270,7 @@ func BuildPDUSessionStatus5GSM(pduSessionID, pti, cause uint8) ([]byte, error) {
 
 	data := new(bytes.Buffer)
 	if err := m.GsmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GSM encode Status5GSM: %w", err)
+		return nil, fmt.Errorf("nas: GSM encode Status5GSM: %w", err)
 	}
 
 	return data.Bytes(), nil
@@ -302,7 +309,7 @@ func BuildULNASTransportExisting(pduSessionID uint8, requestType *uint8, payload
 
 	data := new(bytes.Buffer)
 	if err := m.GmmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GMM encode: %w", err)
+		return nil, fmt.Errorf("nas: GMM encode: %w", err)
 	}
 
 	return data.Bytes(), nil
@@ -315,11 +322,12 @@ func DecodePDUSessionEstablishmentAccept(nasResp *NASResponse, gsmMsg *gonas.Gsm
 
 	msg := gsmMsg.PDUSessionEstablishmentAccept
 
-	pduSessionID := msg.GetPDUSessionID()
+	pduSessionID := int(msg.GetPDUSessionID())
 	nasResp.PDUSessionID = &pduSessionID
 
 	pduSessionType := msg.SelectedSSCModeAndSelectedPDUSessionType.Octet & 0x07
-	nasResp.PDUSessionType = &pduSessionType
+	pduSessionTypeValue := int(pduSessionType)
+	nasResp.PDUSessionType = &pduSessionTypeValue
 
 	pduAddr := msg.GetPDUAddressInformation()
 	switch pduSessionType {
@@ -332,11 +340,11 @@ func DecodePDUSessionEstablishmentAccept(nasResp *NASResponse, gsmMsg *gonas.Gsm
 	}
 
 	ulAMBR := msg.GetSessionAMBRForUplink()
-	ulAMBRValue := uint16(ulAMBR[0])<<8 | uint16(ulAMBR[1])
+	ulAMBRValue := int(uint16(ulAMBR[0])<<8 | uint16(ulAMBR[1]))
 	nasResp.SessionAMBRUplink = &ulAMBRValue
 
 	dlAMBR := msg.GetSessionAMBRForDownlink()
-	dlAMBRValue := uint16(dlAMBR[0])<<8 | uint16(dlAMBR[1])
+	dlAMBRValue := int(uint16(dlAMBR[0])<<8 | uint16(dlAMBR[1]))
 	nasResp.SessionAMBRDownlink = &dlAMBRValue
 
 	if ruleLen := msg.AuthorizedQosRules.GetLen(); ruleLen > 0 {
@@ -344,7 +352,7 @@ func DecodePDUSessionEstablishmentAccept(nasResp *NASResponse, gsmMsg *gonas.Gsm
 	}
 
 	if msg.AlwaysonPDUSessionIndication != nil {
-		apsi := msg.GetAPSI()
+		apsi := int(msg.GetAPSI())
 		nasResp.AlwaysOnIndication = &apsi
 	}
 
@@ -352,7 +360,7 @@ func DecodePDUSessionEstablishmentAccept(nasResp *NASResponse, gsmMsg *gonas.Gsm
 	// PDU session type (TS 24.501 §6.4.1.3): #50 "IPv4 only allowed" or #51
 	// "IPv6 only allowed".
 	if msg.Cause5GSM != nil {
-		cause := msg.GetCauseValue()
+		cause := int(msg.GetCauseValue())
 		nasResp.Cause5GSM = &cause
 	}
 }
@@ -362,6 +370,6 @@ func DecodePDUSessionEstablishmentReject(nasResp *NASResponse, gsmMsg *gonas.Gsm
 		return
 	}
 
-	cause := gsmMsg.PDUSessionEstablishmentReject.GetCauseValue()
+	cause := int(gsmMsg.PDUSessionEstablishmentReject.GetCauseValue())
 	nasResp.Cause5GSM = &cause
 }

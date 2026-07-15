@@ -7,7 +7,7 @@ package integration_test
 
 import "testing"
 
-// TestEPSS1ResetAll drives an eNB-initiated full S1 RESET (s1-Interface,
+// Test4GS1ResetAll drives an eNB-initiated full S1 RESET (s1-Interface,
 // reset-all). Per TS 36.413 §8.7.1.2.1 the MME releases every UE-associated
 // logical S1 connection on the association and replies with a Reset Acknowledge.
 func Test4GS1ResetAll(t *testing.T) {
@@ -36,7 +36,7 @@ func Test4GS1ResetAll(t *testing.T) {
 	fullAttach(t, enbID, fresh)
 }
 
-// TestEPSS1ResetPartial drives an eNB-initiated partial S1 RESET
+// Test4GS1ResetPartial drives an eNB-initiated partial S1 RESET
 // (partOfS1-Interface) naming one UE's connection. Per TS 36.413 §8.7.1.2.1 the
 // MME releases that connection and replies with a Reset Acknowledge whose
 // connection list echoes the UE S1AP ID pair it acted on.

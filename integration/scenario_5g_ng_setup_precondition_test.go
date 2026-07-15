@@ -69,7 +69,7 @@ func assertNotServedBeforeNGSetup(t *testing.T, context string, status int, body
 	}
 }
 
-// TestNGAPMessagesBeforeNGSetupRejected fires a UE-associated initiating message
+// Test5GNGAPMessagesBeforeNGSetupRejected fires a UE-associated initiating message
 // (Initial UE Message), a gNB-level UE-associated message (Path Switch Request),
 // and an interface-management message (NG Reset) on associations that never
 // completed NG Setup, and asserts the AMF serves none of them (TS 38.413

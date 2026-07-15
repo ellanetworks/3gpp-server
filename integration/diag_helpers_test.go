@@ -87,7 +87,7 @@ func scrapeUPFCounters(t *testing.T) upfCounters {
 }
 
 // upfDelta reports the UPF counters that moved since before, so a failing
-// user-plane assertion names the packet's fate instead of only its absence.
+// user-plane assertion names the packet's fate, not only its absence.
 func upfDelta(t *testing.T, before upfCounters) string {
 	t.Helper()
 

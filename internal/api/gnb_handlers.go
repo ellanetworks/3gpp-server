@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/ellanetworks/3gpp-server/internal/gtpu"
 	"github.com/ellanetworks/3gpp-server/internal/ngap"
@@ -71,9 +70,7 @@ func (h *Handler) CreateGnB(w http.ResponseWriter, r *http.Request) {
 
 		gt, err := gtpu.Listen(n3)
 		if err != nil {
-			_ = t.Close()
-			_ = h.Store.DeleteGnB(gnb.ID)
-			delete(h.Transports, gnb.ID)
+			h.teardownGnB(gnb.ID, t)
 			writeError(w, http.StatusBadGateway, fmt.Sprintf("gtp-u listen on %s failed: %v", n3, err))
 			return
 		}
@@ -110,9 +107,7 @@ func (h *Handler) CreateGnB(w http.ResponseWriter, r *http.Request) {
 		var berr error
 		msg, berr = ngap.BuildNGSetupRequestFromStore(req.MCC, req.MNC, req.TAC, req.GnbID, req.Name, req.SST, req.SD, sliceArgs)
 		if berr != nil {
-			_ = t.Close()
-			_ = h.Store.DeleteGnB(gnb.ID)
-			delete(h.Transports, gnb.ID)
+			h.teardownGnB(gnb.ID, t)
 			writeError(w, http.StatusBadRequest, fmt.Sprintf("build ng setup: %v", berr))
 			return
 		}
@@ -120,29 +115,23 @@ func (h *Handler) CreateGnB(w http.ResponseWriter, r *http.Request) {
 
 	encoded, err := ngap.Encode(msg)
 	if err != nil {
-		_ = t.Close()
-		_ = h.Store.DeleteGnB(gnb.ID)
-		delete(h.Transports, gnb.ID)
+		h.teardownGnB(gnb.ID, t)
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("ngap encode: %v", err))
 		return
 	}
 
 	if err := t.Send(encoded, true); err != nil {
-		_ = t.Close()
-		_ = h.Store.DeleteGnB(gnb.ID)
-		delete(h.Transports, gnb.ID)
+		h.teardownGnB(gnb.ID, t)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("sctp send: %v", err))
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(0))
 	defer cancel()
 
 	ngapResp, err := t.WaitForMessage(ctx, "NGSetupResponse", "NGSetupFailure", "ErrorIndication")
 	if err != nil {
-		_ = t.Close()
-		_ = h.Store.DeleteGnB(gnb.ID)
-		delete(h.Transports, gnb.ID)
+		h.teardownGnB(gnb.ID, t)
 		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for NGSetupResponse: %v", err))
 		return
 	}
@@ -193,4 +182,16 @@ func (h *Handler) DeleteGnB(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) teardownGnB(id string, t *transport.SCTPTransport) {
+	_ = t.Close()
+
+	if gt, ok := h.GTPU[id]; ok {
+		_ = gt.Close()
+		delete(h.GTPU, id)
+	}
+
+	_ = h.Store.DeleteGnB(id)
+	delete(h.Transports, id)
 }

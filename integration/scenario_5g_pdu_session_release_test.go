@@ -31,7 +31,7 @@ func establishedPDUSession(t *testing.T) (string, string) {
 	return gnbID, ueID
 }
 
-// TestPDUSessionRelease_UERequested releases an established session on the UE's
+// Test5GPDUSessionRelease_UERequested releases an established session on the UE's
 // initiative and confirms with a Release Complete.
 func Test5GPDUSessionRelease_UERequested(t *testing.T) {
 	gnbID, ueID := establishedPDUSession(t)
@@ -56,7 +56,7 @@ func Test5GPDUSessionRelease_UERequested(t *testing.T) {
 	}
 }
 
-// TestPDUSessionRelease_ThenReestablish confirms the release actually tore the
+// Test5GPDUSessionRelease_ThenReestablish confirms the release actually tore the
 // session down: a fresh PDU Session Establishment Request afterwards succeeds.
 func Test5GPDUSessionRelease_ThenReestablish(t *testing.T) {
 	gnbID, ueID := establishedPDUSession(t)
@@ -83,7 +83,7 @@ func Test5GPDUSessionRelease_ThenReestablish(t *testing.T) {
 	}
 }
 
-// TestPDUSessionRelease_NGAPIDFuzz forges the AMF UE NGAP ID on the Release
+// Test5GPDUSessionRelease_NGAPIDFuzz forges the AMF UE NGAP ID on the Release
 // Request's Uplink NAS Transport. That is an unknown local AP ID, so the AMF
 // shall initiate an Error Indication procedure (TS 38.413 §10.6).
 func Test5GPDUSessionRelease_NGAPIDFuzz(t *testing.T) {

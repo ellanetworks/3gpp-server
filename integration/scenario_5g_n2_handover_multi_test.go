@@ -37,7 +37,7 @@ func establishPDUSession(t *testing.T, gnbID, ueID string, sessionID int) {
 	}
 }
 
-// TestN2HandoverMultiplePDUSessions hands over a UE holding two PDU sessions.
+// Test5GN2HandoverMultiplePDUSessions hands over a UE holding two PDU sessions.
 // The AMF must request both at the target (§9.2.3.1) and confirm both in the
 // Handover Command (§9.2.3.2).
 func Test5GN2HandoverMultiplePDUSessions(t *testing.T) {
@@ -73,7 +73,7 @@ func Test5GN2HandoverMultiplePDUSessions(t *testing.T) {
 	completeHandover(t, targetGNB, targetAmfID, 100)
 }
 
-// TestN2HandoverPartialAdmission hands over two PDU sessions but the target
+// Test5GN2HandoverPartialAdmission hands over two PDU sessions but the target
 // admits only one. Per §8.4.2.2/§8.4.1.2 the AMF must confirm the admitted
 // session in the Handover List and place the non-admitted one in the PDU
 // Session Resource To Release List of the Handover Command.
@@ -115,7 +115,7 @@ func Test5GN2HandoverPartialAdmission(t *testing.T) {
 	completeHandover(t, targetGNB, targetAmfID, 100)
 }
 
-// TestN2HandoverMobilityRegistrationUpdate completes an N2 handover, then has
+// Test5GN2HandoverMobilityRegistrationUpdate completes an N2 handover, then has
 // the UE perform a Mobility Registration Update on the target over its existing
 // connection — the Registration Procedure of TS 23.502 §4.9.1.3.3 step 12. The
 // AMF must accept it with a Registration Accept (TS 24.501 §5.5.1.3), reusing

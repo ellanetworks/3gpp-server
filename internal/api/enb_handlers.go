@@ -106,12 +106,9 @@ func (h *Handler) CreateENB(w http.ResponseWriter, r *http.Request) {
 		waitFor = defaultS1SetupWait
 	}
 
-	timeout := time.Duration(req.TimeoutMs) * time.Millisecond
-	if timeout == 0 {
-		timeout = 5 * time.Second
-		if raw {
-			timeout = 2 * time.Second
-		}
+	timeout := waitTimeout(req.TimeoutMs)
+	if raw && req.TimeoutMs == 0 {
+		timeout = 2 * time.Second
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)

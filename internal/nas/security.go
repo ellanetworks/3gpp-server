@@ -4,6 +4,7 @@
 package nas
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	gonas "github.com/free5gc/nas"
@@ -38,7 +39,7 @@ func WithNASCountOverride(count uint32) EncodeOption {
 func EncodeNasPduWithSecurity(ue *store.UEContext, pdu []byte, securityHeaderType uint8, opts ...EncodeOption) ([]byte, error) {
 	m := gonas.NewMessage()
 	if err := m.PlainNasDecode(&pdu); err != nil {
-		return nil, fmt.Errorf("plain NAS decode: %v", err)
+		return nil, fmt.Errorf("nas: plain NAS decode: %w", err)
 	}
 
 	m.SecurityHeader = gonas.SecurityHeader{
@@ -56,7 +57,7 @@ func nasEncode(ue *store.UEContext, msg *gonas.Message, securityHeaderType uint8
 	}
 
 	if !ue.SecurityContextAvailable && len(ue.Kamf) == 0 {
-		return nil, fmt.Errorf("no security context available")
+		return nil, fmt.Errorf("nas: no security context available")
 	}
 
 	if securityHeaderType == gonas.SecurityHeaderTypeIntegrityProtectedWithNew5gNasSecurityContext ||
@@ -74,14 +75,14 @@ func nasEncode(ue *store.UEContext, msg *gonas.Message, securityHeaderType uint8
 
 	payload, err := msg.PlainNasEncode()
 	if err != nil {
-		return nil, fmt.Errorf("plain NAS encode: %v", err)
+		return nil, fmt.Errorf("nas: plain NAS encode: %w", err)
 	}
 
 	if securityHeaderType != gonas.SecurityHeaderTypeIntegrityProtected &&
 		securityHeaderType != gonas.SecurityHeaderTypeIntegrityProtectedWithNew5gNasSecurityContext {
 		if err = security.NASEncrypt(ue.CipheringAlg, ue.KnasEnc, count, security.Bearer3GPP,
 			security.DirectionUplink, payload); err != nil {
-			return nil, fmt.Errorf("NAS encrypt: %v", err)
+			return nil, fmt.Errorf("nas: NAS encrypt: %w", err)
 		}
 	}
 
@@ -89,7 +90,7 @@ func nasEncode(ue *store.UEContext, msg *gonas.Message, securityHeaderType uint8
 
 	mac32, err := security.NASMacCalculate(ue.IntegrityAlg, ue.KnasInt, count, security.Bearer3GPP, security.DirectionUplink, payload)
 	if err != nil {
-		return nil, fmt.Errorf("NAS MAC: %v", err)
+		return nil, fmt.Errorf("nas: NAS MAC: %w", err)
 	}
 
 	payload = append(mac32, payload...)
@@ -109,11 +110,11 @@ func nasEncode(ue *store.UEContext, msg *gonas.Message, securityHeaderType uint8
 
 func DecodeSecuredNAS(ue *store.UEContext, message []byte) (*NASResponse, error) {
 	if len(message) == 0 {
-		return nil, fmt.Errorf("empty NAS PDU")
+		return nil, fmt.Errorf("nas: empty NAS PDU")
 	}
 
 	resp := &NASResponse{
-		RawHex: encodeHex(message),
+		RawHex: hex.EncodeToString(message),
 	}
 
 	secHeaderType := gonas.GetSecurityHeaderType(message) & 0x0f
@@ -124,7 +125,7 @@ func DecodeSecuredNAS(ue *store.UEContext, message []byte) (*NASResponse, error)
 	}
 
 	if len(message) < 7 {
-		return nil, fmt.Errorf("secured NAS too short: %d bytes", len(message))
+		return nil, fmt.Errorf("nas: secured NAS too short: %d bytes", len(message))
 	}
 
 	sequenceNumber := message[6]
@@ -155,7 +156,7 @@ func DecodeSecuredNAS(ue *store.UEContext, message []byte) (*NASResponse, error)
 	if cph && ue.SecurityContextAvailable {
 		if err := security.NASEncrypt(ue.CipheringAlg, ue.KnasEnc, ue.DLCount, security.Bearer3GPP,
 			security.DirectionDownlink, payload); err != nil {
-			return nil, fmt.Errorf("NAS decrypt: %v", err)
+			return nil, fmt.Errorf("nas: NAS decrypt: %w", err)
 		}
 	}
 
@@ -164,7 +165,7 @@ func DecodeSecuredNAS(ue *store.UEContext, message []byte) (*NASResponse, error)
 	copy(payloadCopy, payload)
 
 	if err := m.PlainNasDecode(&payloadCopy); err != nil {
-		return nil, fmt.Errorf("NAS decode after decrypt: %v", err)
+		return nil, fmt.Errorf("nas: NAS decode after decrypt: %w", err)
 	}
 
 	if newSecurityContext && m.GmmMessage != nil {
@@ -173,7 +174,7 @@ func DecodeSecuredNAS(ue *store.UEContext, message []byte) (*NASResponse, error)
 			ue.IntegrityAlg = m.SelectedNASSecurityAlgorithms.GetTypeOfIntegrityProtectionAlgorithm()
 
 			if err := deriveAlgKeys(ue); err != nil {
-				return nil, fmt.Errorf("derive algorithm keys: %v", err)
+				return nil, fmt.Errorf("nas: derive algorithm keys: %w", err)
 			}
 
 			ue.DLCount = 0
@@ -182,7 +183,13 @@ func DecodeSecuredNAS(ue *store.UEContext, message []byte) (*NASResponse, error)
 	}
 
 	if m.GmmMessage == nil {
-		resp.MessageType = unknownMessageType(m)
+		messageType, err := unknownMessageType(m)
+		if err != nil {
+			return nil, err
+		}
+
+		resp.MessageType = messageType
+
 		return resp, nil
 	}
 
@@ -199,18 +206,8 @@ func deriveAlgKeys(ue *store.UEContext) error {
 
 func deriveAlgKeysFromKamf(cipheringAlg uint8, kamf []byte, knasEnc *[16]uint8, integrityAlg uint8, knasInt *[16]uint8) error {
 	if len(kamf) == 0 {
-		return fmt.Errorf("kamf is empty")
+		return fmt.Errorf("nas: kamf is empty")
 	}
 
 	return crypto.AlgorithmKeyDerivation(cipheringAlg, kamf, knasEnc, integrityAlg, knasInt)
-}
-
-func encodeHex(data []byte) string {
-	const hextable = "0123456789abcdef"
-	dst := make([]byte, len(data)*2)
-	for i, v := range data {
-		dst[i*2] = hextable[v>>4]
-		dst[i*2+1] = hextable[v&0x0f]
-	}
-	return string(dst)
 }

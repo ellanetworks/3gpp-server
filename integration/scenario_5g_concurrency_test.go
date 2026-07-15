@@ -16,7 +16,7 @@ import (
 	"testing"
 )
 
-// TestConcurrentRegistration registers many distinct subscribers simultaneously
+// Test5GConcurrentRegistration registers many distinct subscribers simultaneously
 // on one gNB. The AMF must assign each a unique AMF UE NGAP ID (unique per
 // AMF–RAN association, TS 38.413 §9.3.3.1) and a unique 5G-GUTI (TS 23.501
 // §5.9.4). A shared value betrays an allocator race.
@@ -25,10 +25,11 @@ func Test5GConcurrentRegistration(t *testing.T) {
 
 	const n = 8
 
+	supis := claimSubscribers(t, n)
 	results := make([]regResult, n)
 
 	runParallel(t, n, func(i int) error {
-		r, err := registerSUPI(gnb, testSUPI(10+i))
+		r, err := registerSUPI(gnb, supis[i])
 		results[i] = r
 
 		return err
@@ -61,7 +62,7 @@ func Test5GConcurrentRegistration(t *testing.T) {
 	}
 }
 
-// TestConcurrentPDUSessionEstablishment has many registered UEs establish a PDU
+// Test5GConcurrentPDUSessionEstablishment has many registered UEs establish a PDU
 // session at the same time. The SMF must allocate each a distinct UE IP from the
 // pool (TS 23.501 §5.8.2.2); a duplicate means the IP allocator raced.
 func Test5GConcurrentPDUSessionEstablishment(t *testing.T) {
@@ -69,10 +70,11 @@ func Test5GConcurrentPDUSessionEstablishment(t *testing.T) {
 
 	const n = 6
 
+	supis := claimSubscribers(t, n)
 	ueIDs := make([]string, n)
 
 	runParallel(t, n, func(i int) error {
-		r, err := registerSUPI(gnb, testSUPI(18+i))
+		r, err := registerSUPI(gnb, supis[i])
 		ueIDs[i] = r.ueID
 
 		return err
@@ -108,7 +110,7 @@ func Test5GConcurrentPDUSessionEstablishment(t *testing.T) {
 	}
 }
 
-// TestConcurrentDeregistration registers many UEs, deregisters them all at once,
+// Test5GConcurrentDeregistration registers many UEs, deregisters them all at once,
 // then re-registers them all at once. The identities freed by the simultaneous
 // release must be cleanly reusable: the second wave must again get distinct AMF
 // UE NGAP IDs, with no collision, leak, or double-assignment.
@@ -117,10 +119,13 @@ func Test5GConcurrentDeregistration(t *testing.T) {
 
 	const n = 6
 
+	// Both waves register the same subscribers, so the second re-registers the
+	// identities the first released.
+	supis := claimSubscribers(t, n)
 	first := make([]regResult, n)
 
 	runParallel(t, n, func(i int) error {
-		r, err := registerSUPI(gnb, testSUPI(24+i))
+		r, err := registerSUPI(gnb, supis[i])
 		first[i] = r
 
 		return err
@@ -137,7 +142,7 @@ func Test5GConcurrentDeregistration(t *testing.T) {
 	second := make([]regResult, n)
 
 	runParallel(t, n, func(i int) error {
-		r, err := registerSUPI(gnb, testSUPI(24+i))
+		r, err := registerSUPI(gnb, supis[i])
 		second[i] = r
 
 		return err

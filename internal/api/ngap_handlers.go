@@ -230,18 +230,12 @@ func (h *Handler) AwaitUEMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req AwaitRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
+	req, ok := decodeAwaitRequest(w, r)
+	if !ok {
 		return
 	}
 
-	if len(req.MessageTypes) == 0 {
-		writeError(w, http.StatusBadRequest, "message_types is required")
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), ngapWaitTimeout(req.TimeoutMs))
+	ctx, cancel := context.WithTimeout(r.Context(), req.timeout)
 	defer cancel()
 
 	ngapResp, err := t.WaitForMessageMatching(ctx, ueNGAPMatcher(ue.RanUeNgapID, ue.AmfUeNgapID), req.MessageTypes...)
@@ -291,18 +285,12 @@ func (h *Handler) AwaitGnBMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req AwaitRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
+	req, ok := decodeAwaitRequest(w, r)
+	if !ok {
 		return
 	}
 
-	if len(req.MessageTypes) == 0 {
-		writeError(w, http.StatusBadRequest, "message_types is required")
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), ngapWaitTimeout(req.TimeoutMs))
+	ctx, cancel := context.WithTimeout(r.Context(), req.timeout)
 	defer cancel()
 
 	ngapResp, err := t.WaitForMessage(ctx, req.MessageTypes...)
@@ -424,7 +412,7 @@ func handleHandoverCancel(w http.ResponseWriter, r *http.Request, gnb *store.GnB
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), ngapWaitTimeout(req.TimeoutMs))
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
 	ngapResp, err := t.WaitForMessage(ctx, "HandoverCancelAcknowledge", "ErrorIndication")
@@ -578,7 +566,7 @@ func handlePathSwitchRequest(w http.ResponseWriter, r *http.Request, gnb *store.
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), ngapWaitTimeout(req.TimeoutMs))
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
 	ngapResp, err := t.WaitForMessage(ctx, req.WaitFor...)
@@ -686,7 +674,7 @@ func handleRawNGAP(w http.ResponseWriter, r *http.Request, t *transport.SCTPTran
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), ngapWaitTimeout(req.TimeoutMs))
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
 	ngapResp, err := t.WaitForMessage(ctx, req.WaitFor...)
@@ -727,7 +715,7 @@ func handleNGReset(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), ngapWaitTimeout(req.TimeoutMs))
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
 	ngapResp, err := t.WaitForMessage(ctx, "NGResetAcknowledge", "ErrorIndication")
@@ -1128,7 +1116,7 @@ func handlePDUSessionEstablishmentRequest(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), ngapWaitTimeout(req.TimeoutMs))
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
 	ngapResp, err := t.WaitForMessageMatching(ctx, ueNGAPMatcher(effectiveRanID(req, ue), effectiveAmfID(req, ue)),
@@ -1233,7 +1221,7 @@ func handleDeregistrationRequest(w http.ResponseWriter, r *http.Request, gnb *st
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), ngapWaitTimeout(req.TimeoutMs))
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
 	ngapResp, err := t.WaitForMessageMatching(ctx, ueNGAPMatcher(effectiveRanID(req, ue), effectiveAmfID(req, ue)),
@@ -1301,7 +1289,7 @@ func handleUEContextReleaseRequest(w http.ResponseWriter, r *http.Request, gnb *
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), ngapWaitTimeout(req.TimeoutMs))
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
 	ngapResp, err := t.WaitForMessageMatching(ctx, ueNGAPMatcher(effectiveRanID(req, ue), effectiveAmfID(req, ue)),
@@ -1906,7 +1894,7 @@ func handleServiceRequest(w http.ResponseWriter, r *http.Request, gnb *store.GnB
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), ngapWaitTimeout(req.TimeoutMs))
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
 	ngapResp, err := t.WaitForMessageMatching(ctx, ueNGAPMatcher(effectiveRanID(req, ue), effectiveAmfID(req, ue)),
@@ -1992,7 +1980,7 @@ func handleInjectNAS(w http.ResponseWriter, r *http.Request, gnb *store.GnBConte
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), ngapWaitTimeout(req.TimeoutMs))
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
 	ngapResp, err := t.WaitForMessage(ctx, "DownlinkNASTransport", "ErrorIndication", "UEContextReleaseCommand")
@@ -2080,23 +2068,13 @@ func sendUplinkAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GnBCon
 	sendRawAndWait(w, r, gnb, ue, t, req, encoded, waitFor...)
 }
 
-// ngapWaitTimeout is how long a per-UE or per-gNB NGAP send blocks for its
-// downlink: the request's timeout_ms when set, otherwise 5s.
-func ngapWaitTimeout(timeoutMs int) time.Duration {
-	if timeoutMs > 0 {
-		return time.Duration(timeoutMs) * time.Millisecond
-	}
-
-	return 5 * time.Second
-}
-
 func sendRawAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest, encoded []byte, waitFor ...string) {
 	if err := t.Send(encoded, false); err != nil {
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), ngapWaitTimeout(req.TimeoutMs))
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
 	ngapResp, err := t.WaitForMessageMatching(ctx, ueNGAPMatcher(effectiveRanID(req, ue), effectiveAmfID(req, ue)), waitFor...)
@@ -2135,7 +2113,7 @@ func sendRawAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GnBContex
 			}
 
 			if nasResp != nil && nasResp.NgKSI != nil && nasResp.SelectedCipheringAlg != nil {
-				ue.NgKsi = *nasResp.NgKSI
+				ue.NgKsi = uint8(*nasResp.NgKSI)
 			}
 
 			if nasResp != nil && nasResp.GUTI != "" {

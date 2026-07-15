@@ -34,38 +34,40 @@ func createENBID(t *testing.T, enbID int) string {
 	return id
 }
 
-// TestEPSAssociationFlood opens many eNB S1-MME associations at once and checks
+// Test4GAssociationFlood opens many eNB S1-MME associations at once and checks
 // the MME completes S1 Setup for all of them and remains responsive to one more.
 func Test4GAssociationFlood(t *testing.T) {
 	const n = 50
 
 	for i := 1; i <= n; i++ {
-		createENBID(t, i)
+		createENBID(t, claimENBID())
 	}
 
 	// The MME is still serving new associations.
-	createENBID(t, n+1)
+	createENBID(t, claimENBID())
 }
 
-// TestEPSAttachFlood attaches many distinct subscribers concurrently on one eNB
+// Test4GAttachFlood attaches many distinct subscribers concurrently on one eNB
 // and checks they all register and that the MME stays responsive to a fresh UE.
 func Test4GAttachFlood(t *testing.T) {
 	enbID := mustCreateENB(t)
 
 	const n = 25
 
+	supis := claimSubscribers(t, n)
+
 	errs := make(chan error, n)
 
 	var wg sync.WaitGroup
 
-	for i := 1; i <= n; i++ {
+	for _, supi := range supis {
 		wg.Add(1)
 
-		go func(i int) {
+		go func(supi string) {
 			defer wg.Done()
 
-			errs <- attachUEConcurrent(enbID, testSUPI(i)[len("imsi-"):])
-		}(i)
+			errs <- attachUEConcurrent(enbID, supi[len("imsi-"):])
+		}(supi)
 	}
 
 	wg.Wait()
@@ -77,11 +79,11 @@ func Test4GAttachFlood(t *testing.T) {
 		}
 	}
 
-	fresh := createENBUEWithIMSI(t, enbID, testSUPI(n + 1)[len("imsi-"):])
+	fresh := mustCreateENBUE(t, enbID)
 	fullAttach(t, enbID, fresh)
 }
 
-// TestEPSOversizedPDU sends oversized S1AP and NAS PDUs (near the SCTP read
+// Test4GOversizedPDU sends oversized S1AP and NAS PDUs (near the SCTP read
 // buffer) and checks the MME does not crash — a clean attach still completes.
 func Test4GOversizedPDU(t *testing.T) {
 	// ~60 KB of bytes as a raw S1AP PDU.
@@ -100,6 +102,6 @@ func Test4GOversizedPDU(t *testing.T) {
 	}
 
 	// The MME stayed on its feet: a fresh clean attach completes.
-	fresh := createENBUEWithIMSI(t, enbID, testSUPI(30)[len("imsi-"):])
+	fresh := mustCreateENBUE(t, enbID)
 	fullAttach(t, enbID, fresh)
 }

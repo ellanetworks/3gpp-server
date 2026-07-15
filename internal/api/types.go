@@ -103,6 +103,14 @@ type MigrateUERequest struct {
 	AmfUeNgapID *int64 `json:"amf_ue_ngap_id,omitempty"`
 }
 
+// MigrateUEResponse reports the UE's NGAP ID pair on the target gNB.
+type MigrateUEResponse struct {
+	UEID        string `json:"ue_id"`
+	GnBID       string `json:"gnb_id"`
+	RanUeNgapID int64  `json:"ran_ue_ngap_id"`
+	AmfUeNgapID int64  `json:"amf_ue_ngap_id"`
+}
+
 // HandoverPDUSession is an admitted PDU session in a Handover Request
 // Acknowledge, carrying the target gNB's downlink GTP tunnel. RawTransfer (hex)
 // overrides the built transfer verbatim, for crafting malformed transfers.

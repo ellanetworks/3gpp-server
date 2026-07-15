@@ -19,7 +19,7 @@ func getENBUE(t *testing.T, enbID, ueID string) []byte {
 	return body
 }
 
-// TestEPSMultiPDNConnect drives a UE-requested additional PDN connection: after
+// Test4GMultiPDNConnect drives a UE-requested additional PDN connection: after
 // attach (default APN), the UE requests connectivity to a second APN. Per
 // TS 24.301 §6.5.1.3 the MME activates a new default EPS bearer with a distinct
 // EPS bearer identity and a distinct IP address — a second, independent PDN
@@ -51,7 +51,7 @@ func Test4GMultiPDNConnect(t *testing.T) {
 	}
 }
 
-// TestEPSMultiPDNIPv6 checks an additional PDN connection with PDN type IPv6 is
+// Test4GMultiPDNIPv6 checks an additional PDN connection with PDN type IPv6 is
 // assigned an IPv6 address: after an IPv4 default attach, the UE requests an
 // IPv6 PDN to an IPv6 data network. Per TS 24.301 §9.9.4.9 the Activate Default
 // PDN address carries the PDN type IPv6 (octet 2) and the 8-octet interface
@@ -90,7 +90,7 @@ func connectSecondPDN(t *testing.T, enbID, ueID string) string {
 	return jsonGet(resp, "nas.eps_bearer_identity")
 }
 
-// TestEPSPDNDisconnect drives a UE-requested PDN disconnect of an additional PDN
+// Test4GPDNDisconnect drives a UE-requested PDN disconnect of an additional PDN
 // connection. Per TS 24.301 §6.5.2.3 the MME deactivates the PDN's bearer with a
 // Deactivate EPS Bearer Context Request; the UE's default PDN connection stays up.
 func Test4GPDNDisconnect(t *testing.T) {
@@ -121,7 +121,7 @@ func Test4GPDNDisconnect(t *testing.T) {
 	}
 }
 
-// TestEPSPDNConnectivityUnknownAPN checks the MME rejects a PDN connection to an
+// Test4GPDNConnectivityUnknownAPN checks the MME rejects a PDN connection to an
 // APN it does not provision: per TS 24.301 §6.5.1.4 it returns a PDN Connectivity
 // Reject with ESM cause #27 "missing or unknown APN" (or #66 "requested APN not
 // supported in current RAT and PLMN combination").
@@ -142,7 +142,7 @@ func Test4GPDNConnectivityUnknownAPN(t *testing.T) {
 	}
 }
 
-// TestEPSPDNConnectivityInvalidPTI checks the MME rejects a PDN Connectivity
+// Test4GPDNConnectivityInvalidPTI checks the MME rejects a PDN Connectivity
 // Request that carries a reserved PTI value (0). Per TS 24.301 §7.3.1 a) the MME
 // shall respond with a PDN Connectivity Reject including ESM cause #81 "invalid
 // PTI value".
@@ -163,7 +163,7 @@ func Test4GPDNConnectivityInvalidPTI(t *testing.T) {
 	}
 }
 
-// TestEPSPDNConnectivityInvalidEBI checks the MME rejects a PDN Connectivity
+// Test4GPDNConnectivityInvalidEBI checks the MME rejects a PDN Connectivity
 // Request whose ESM-header EPS bearer identity is non-zero (an assigned value;
 // a valid request uses 0). Per TS 24.301 §7.3.2 a) the MME shall respond with a
 // PDN Connectivity Reject including ESM cause #43 "invalid EPS bearer identity".
@@ -184,7 +184,7 @@ func Test4GPDNConnectivityInvalidEBI(t *testing.T) {
 	}
 }
 
-// TestEPSPDNDisconnectInvalidPTI checks the MME rejects a PDN Disconnect Request
+// Test4GPDNDisconnectInvalidPTI checks the MME rejects a PDN Disconnect Request
 // carrying a reserved PTI value (0). Per TS 24.301 §7.3.1 b) the MME shall respond
 // with a PDN Disconnect Reject including ESM cause #81 "invalid PTI value".
 func Test4GPDNDisconnectInvalidPTI(t *testing.T) {
@@ -204,7 +204,7 @@ func Test4GPDNDisconnectInvalidPTI(t *testing.T) {
 	}
 }
 
-// TestEPSPDNDisconnectLastPDN checks the MME refuses to disconnect the only PDN
+// Test4GPDNDisconnectLastPDN checks the MME refuses to disconnect the only PDN
 // connection. Per TS 24.301 §6.5.2.4, when EMM-REGISTERED without PDN connection
 // is not supported, the MME returns a PDN Disconnect Reject with ESM cause #49
 // "last PDN disconnection not allowed".
@@ -226,7 +226,7 @@ func Test4GPDNDisconnectLastPDN(t *testing.T) {
 	}
 }
 
-// TestEPSPDNConnectivityDuplicateAPN checks the MME's handling of a second PDN
+// Test4GPDNConnectivityDuplicateAPN checks the MME's handling of a second PDN
 // connection request to an APN already connected. Per TS 24.301 §6.5.1.4.3 the
 // network may either accept it (deactivating the existing connection) or reject
 // it with ESM cause #55 "multiple PDN connections for a given APN not allowed" —

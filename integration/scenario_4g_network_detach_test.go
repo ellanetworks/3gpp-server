@@ -47,7 +47,7 @@ func Test4GNetworkInitiatedDetach(t *testing.T) {
 	// Recreate the deleted subscriber so the env is left as found for re-runs.
 	t.Cleanup(func() { createSubscriber(token, networkDetachIMSI) })
 
-	enbID := createGTPUENB(t, 1, "net-detach-enb")
+	enbID := createGTPUENB(t, claimENBID(), "net-detach-enb")
 
 	body := fmt.Sprintf(`{"imsi":%q,"k":%q,"opc":%q,"amf":"8000","sqn":"000000000020"}`, networkDetachIMSI, testK, testOPc)
 	status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue", body)

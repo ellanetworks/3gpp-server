@@ -7,7 +7,7 @@ import "testing"
 
 // TestGnBContextDeleteUEPurgesSideMaps asserts DeleteUE removes the per-UE state
 // held in the ranUeID-keyed side-maps, not only the UEs map — otherwise every
-// created/deleted UE leaks its NGAP ID, PDU sessions, and AMBR.
+// created/deleted UE leaks its NGAP ID and PDU sessions.
 func TestGnBContextDeleteUEPurgesSideMaps(t *testing.T) {
 	g := NewGnBContext("g1", "001", "01", "000001", "000001", "gnb", 1, "", nil)
 
@@ -15,7 +15,6 @@ func TestGnBContextDeleteUEPurgesSideMaps(t *testing.T) {
 	g.CreateUE(ue)
 	g.UpdateNGAPIDs(42, 100)
 	g.StorePDUSession(42, &PDUSessionInfo{PDUSessionID: 1})
-	g.StoreUEAmbr(42, &UEAmbrInfo{UplinkBps: 1, DownlinkBps: 2})
 
 	if !g.DeleteUE("ue1") {
 		t.Fatal("DeleteUE returned false for an existing UE")
@@ -35,9 +34,5 @@ func TestGnBContextDeleteUEPurgesSideMaps(t *testing.T) {
 
 	if len(g.NGAPIDs) != 0 {
 		t.Errorf("NGAPIDs map = %d entries, want 0", len(g.NGAPIDs))
-	}
-
-	if len(g.UEAmbr) != 0 {
-		t.Errorf("UEAmbr map = %d entries, want 0", len(g.UEAmbr))
 	}
 }

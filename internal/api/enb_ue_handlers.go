@@ -91,22 +91,20 @@ func (h *Handler) GetENBUE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bearers := make([]map[string]any, 0, len(ue.Bearers))
+	bearers := make([]ENBUEBearer, 0, len(ue.Bearers))
 	for _, b := range ue.Bearers {
-		bearers = append(bearers, map[string]any{
-			"ebi": b.EBI, "apn": b.APN, "ue_ip": b.UEIP,
-		})
+		bearers = append(bearers, ENBUEBearer{EBI: b.EBI, APN: b.APN, UEIP: b.UEIP})
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"ue_id":           ue.ID,
-		"imsi":            ue.IMSI,
-		"ue_ip":           ue.UEIP,
-		"security_active": ue.SecurityActive,
-		"mme_ue_s1ap_id":  ue.MMEUES1APID,
-		"enb_ue_s1ap_id":  ue.ENBUES1APID,
-		"default_ebi":     ue.EPSBearerID,
-		"bearers":         bearers,
+	writeJSON(w, http.StatusOK, ENBUEStateResponse{
+		UEID:           ue.ID,
+		IMSI:           ue.IMSI,
+		UEIP:           ue.UEIP,
+		SecurityActive: ue.SecurityActive,
+		MMEUES1APID:    ue.MMEUES1APID,
+		ENBUES1APID:    ue.ENBUES1APID,
+		DefaultEBI:     ue.EPSBearerID,
+		Bearers:        bearers,
 	})
 }
 
@@ -135,12 +133,7 @@ func (h *Handler) SendENBNAS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	timeout := time.Duration(req.TimeoutMs) * time.Millisecond
-	if timeout == 0 {
-		timeout = 5 * time.Second
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
 	var (
@@ -688,10 +681,6 @@ func (h *Handler) sendUplink(enb *store.ENBContext, ue *store.UEEPSContext, t *t
 	return t.Send(ul, false)
 }
 
-// injectNAS sends an Uplink NAS Transport with an attacker-controlled NAS PDU
-// and, optionally, a forged MME-UE-S1AP-ID, to probe the MME's UE-association
-// validation and replay protection. No reply (the MME discarding it) is a valid
-// outcome.
 // ueCapabilityInfo sends a UE Capability Info Indication (one-way; no MME reply).
 // The MME stores the radio capability for replay in a later Initial Context Setup
 // Request (TS 23.401 §5.11.2).
@@ -730,9 +719,6 @@ func (h *Handler) ueCapabilityInfo(ctx context.Context, enb *store.ENBContext, u
 
 // forgeIDs returns the UE's MME- and eNB-UE-S1AP-IDs, each replaced by its
 // override when the request sets one (for AP-ID fuzzing, TS 36.413 §10.6).
-// forgeIDs resolves the UE S1AP IDs a send puts on the wire: the request
-// override when present, else the stored value. A forged or stale ID must draw
-// an Error Indication rather than be routed (TS 36.413 §10.6).
 func forgeIDs(ue *store.UEEPSContext, req *SendENBNASRequest) (uint32, uint32) {
 	mmeID, enbID := ue.MMEUES1APID, ue.ENBUES1APID
 	if req == nil {
@@ -1307,9 +1293,9 @@ func (h *Handler) trackingAreaUpdate(ctx context.Context, enb *store.ENBContext,
 func (h *Handler) releaseRequest(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	mmeID, enbID := forgeIDs(ue, req)
 
-	cause := s1ap.CauseRadioUserInactivity
+	cause := s1ap.CauseRadioNetworkUserInactivity
 	if req.ReleaseCause != nil {
-		cause = uint8(*req.ReleaseCause)
+		cause = *req.ReleaseCause
 	}
 
 	rr, err := s1ap.BuildUEContextReleaseRequest(mmeID, enbID, cause)

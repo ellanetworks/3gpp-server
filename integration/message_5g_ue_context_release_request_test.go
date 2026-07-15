@@ -16,7 +16,7 @@ import (
 	"testing"
 )
 
-// TestUEContextReleaseRequest covers the happy path and valid cause variations.
+// Test5GUEContextReleaseRequest covers the happy path and valid cause variations.
 // In every case a registered UE's release request must elicit a UE Context
 // Release Command from the AMF.
 func Test5GUEContextReleaseRequest(t *testing.T) {
@@ -55,7 +55,7 @@ func Test5GUEContextReleaseRequest(t *testing.T) {
 	}
 }
 
-// TestUEContextReleaseRequest_AfterPDUSession releases a UE that has an active
+// Test5GUEContextReleaseRequest_AfterPDUSession releases a UE that has an active
 // PDU session. The AMF should still release the whole UE context.
 func Test5GUEContextReleaseRequest_AfterPDUSession(t *testing.T) {
 	gnbID := mustCreateGnB(t)
@@ -80,7 +80,7 @@ func Test5GUEContextReleaseRequest_AfterPDUSession(t *testing.T) {
 	}
 }
 
-// TestUEContextReleaseRequest_ThenReregister verifies the release frees only the
+// Test5GUEContextReleaseRequest_ThenReregister verifies the release frees only the
 // NG/N2 logical connection: the UE stays RM-REGISTERED and the AMF keeps its
 // context, so returning from CM-IDLE is a Mobility Registration Update that the
 // AMF accepts by reusing the retained 5G NAS security context — no fresh
@@ -113,7 +113,7 @@ func Test5GUEContextReleaseRequest_ThenReregister(t *testing.T) {
 	}
 }
 
-// TestUEContextReleaseRequest_NGAPIDFuzz mutates the AMF/RAN UE NGAP IDs. Per
+// Test5GUEContextReleaseRequest_NGAPIDFuzz mutates the AMF/RAN UE NGAP IDs. Per
 // TS 38.413 §8.7.5.2 an incorrect ID must elicit an Error Indication, not a
 // release command.
 func Test5GUEContextReleaseRequest_NGAPIDFuzz(t *testing.T) {
@@ -167,7 +167,7 @@ func Test5GUEContextReleaseRequest_NGAPIDFuzz(t *testing.T) {
 	}
 }
 
-// TestUEContextReleaseRequest_BeforeRegistration sends a release request for a
+// Test5GUEContextReleaseRequest_BeforeRegistration sends a release request for a
 // UE the AMF has never seen (no Initial UE Message yet). The AMF has no context
 // for the RAN UE NGAP ID and must answer with Error Indication.
 func Test5GUEContextReleaseRequest_BeforeRegistration(t *testing.T) {
@@ -185,7 +185,7 @@ func Test5GUEContextReleaseRequest_BeforeRegistration(t *testing.T) {
 	}
 }
 
-// TestUEContextReleaseRequest_DoubleRelease releases twice. The second request
+// Test5GUEContextReleaseRequest_DoubleRelease releases twice. The second request
 // references a context the AMF already tore down, so it must answer with Error
 // Indication rather than a second release command.
 func Test5GUEContextReleaseRequest_DoubleRelease(t *testing.T) {
@@ -213,7 +213,7 @@ func Test5GUEContextReleaseRequest_DoubleRelease(t *testing.T) {
 	}
 }
 
-// TestUEContextReleaseRequest_OutOfRangeCause sends a radio-network Cause value
+// Test5GUEContextReleaseRequest_OutOfRangeCause sends a radio-network Cause value
 // outside the enumerated range. The server must not hang or 5xx — the AMF
 // should still process the request (the Cause IE is informational).
 func Test5GUEContextReleaseRequest_OutOfRangeCause(t *testing.T) {
@@ -235,7 +235,7 @@ func Test5GUEContextReleaseRequest_OutOfRangeCause(t *testing.T) {
 	}
 }
 
-// TestUEContextReleaseRequest_CommandCarriesCause confirms the AMF's release
+// Test5GUEContextReleaseRequest_CommandCarriesCause confirms the AMF's release
 // command carries a Cause IE (decoded into the response).
 func Test5GUEContextReleaseRequest_CommandCarriesCause(t *testing.T) {
 	gnbID := mustCreateGnB(t)

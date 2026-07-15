@@ -24,7 +24,7 @@ func createENBUEWithIMSI(t *testing.T, enbID, imsi string) string {
 	return jsonGet(resp, "ue_id")
 }
 
-// TestEPSAttachUnknownIMSI checks the MME rejects an attach from an IMSI it
+// Test4GAttachUnknownIMSI checks the MME rejects an attach from an IMSI it
 // cannot serve with an Attach Reject carrying EMM cause #2 "IMSI unknown in HSS"
 // (TS 24.301 §5.5.1.2.5).
 func Test4GAttachUnknownIMSI(t *testing.T) {
@@ -42,7 +42,7 @@ func Test4GAttachUnknownIMSI(t *testing.T) {
 	}
 }
 
-// TestEPSCombinedAttach checks that a combined EPS/IMSI attach succeeds but the
+// Test4GCombinedAttach checks that a combined EPS/IMSI attach succeeds but the
 // Attach Accept reports EPS-only service via EMM cause #18 "CS domain not
 // available", since the MME has no SGs interface (TS 24.301 §5.5.1.2.4).
 func Test4GCombinedAttach(t *testing.T) {

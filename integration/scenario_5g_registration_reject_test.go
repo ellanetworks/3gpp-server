@@ -28,7 +28,7 @@ func createUEWithBody(t *testing.T, gnbID, body string) string {
 	return ueID
 }
 
-// TestRegistrationReject_UnknownUE registers a UE whose SUPI is not provisioned
+// Test5GRegistrationReject_UnknownUE registers a UE whose SUPI is not provisioned
 // in the core (null-scheme SUCI, so the SUPI is derivable but unknown). The
 // network cannot serve it and must reject the registration (TS 24.501
 // §5.5.1.2.5). The spec leaves the 5GMM cause to the network ("an appropriate
@@ -56,7 +56,7 @@ func Test5GRegistrationReject_UnknownUE(t *testing.T) {
 	}
 }
 
-// TestRegistrationReject_InvalidHomeNetworkKey registers with a Profile A SUCI
+// Test5GRegistrationReject_InvalidHomeNetworkKey registers with a Profile A SUCI
 // concealed under an X25519 public key that does not match the core's. The core
 // cannot de-conceal the SUCI, so it cannot derive the UE identity and must
 // reject with 5GMM cause #9 "UE identity cannot be derived by the network" —

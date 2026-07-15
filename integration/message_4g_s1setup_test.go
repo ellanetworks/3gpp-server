@@ -112,7 +112,7 @@ func assertS1SetupRejected(t *testing.T, resp []byte) {
 	}
 }
 
-// TestS1SetupHappyVariations checks the MME accepts a range of valid eNB
+// Test4GS1SetupHappyVariations checks the MME accepts a range of valid eNB
 // configurations with an S1 Setup Response. An eNB broadcasting a served PLMN
 // but a TAC this MME does not serve is rejected with an S1 Setup Failure: the
 // integration operator serves only TAC 000001, and the MME declines an eNB with
@@ -154,7 +154,7 @@ func Test4GS1SetupHappyVariations(t *testing.T) {
 	}
 }
 
-// TestS1SetupWrongPLMN checks the MME refuses an eNB none of whose PLMNs it
+// Test4GS1SetupWrongPLMN checks the MME refuses an eNB none of whose PLMNs it
 // serves. TS 36.413 §8.7.3.4 mandates this: "none of the PLMNs provided by the
 // eNB is identified by the MME, then the MME shall reject the eNB S1 Setup
 // Request procedure with the appropriate cause value, e.g. 'Unknown PLMN'." The
@@ -188,7 +188,7 @@ func Test4GS1SetupWrongPLMN(t *testing.T) {
 	}
 }
 
-// TestS1SetupMalformed throws PDUs that cannot be a valid S1 Setup at the MME
+// Test4GS1SetupMalformed throws PDUs that cannot be a valid S1 Setup at the MME
 // and verifies it never mistakes one for a Response. These inputs are either
 // incomplete (truncated) or not S1AP at all, so the only correct outcomes are a
 // silent drop (null response), an Error Indication, or a Failure. Ambiguous
@@ -222,7 +222,7 @@ func Test4GS1SetupMalformed(t *testing.T) {
 	}
 }
 
-// TestS1SetupResilience drives a barrage of corrupted and oversized PDUs — any
+// Test4GS1SetupResilience drives a barrage of corrupted and oversized PDUs — any
 // MME outcome is acceptable, including accepting a flip that happens to stay
 // valid — then confirms a fresh eNB still completes S1 Setup, proving the MME
 // stayed on its feet.
@@ -254,7 +254,7 @@ func Test4GS1SetupResilience(t *testing.T) {
 	}
 }
 
-// TestS1SetupPLMNFlex exercises the precise boundary of TS 36.413 §8.7.3.4,
+// Test4GS1SetupPLMNFlex exercises the precise boundary of TS 36.413 §8.7.3.4,
 // which rejects only when *none* of the eNB's broadcast PLMNs is served. An eNB
 // broadcasting several PLMNs of which one is served (S1-flex / RAN sharing) must
 // be accepted; one broadcasting only unserved PLMNs must be rejected.
@@ -286,7 +286,7 @@ func Test4GS1SetupPLMNFlex(t *testing.T) {
 	})
 }
 
-// TestS1SetupENBIDVariants checks the MME accepts every Global eNB ID encoding
+// Test4GS1SetupENBIDVariants checks the MME accepts every Global eNB ID encoding
 // (TS 36.413 §9.2.1.37): macro (20-bit), home (28-bit), short-macro (18-bit),
 // and long-macro (21-bit), each at its maximum value.
 func Test4GS1SetupENBIDVariants(t *testing.T) {
@@ -312,7 +312,7 @@ func Test4GS1SetupENBIDVariants(t *testing.T) {
 	}
 }
 
-// TestS1SetupSupportedTAs checks the MME accepts an eNB advertising several
+// Test4GS1SetupSupportedTAs checks the MME accepts an eNB advertising several
 // supported TAs and a maximum-length eNB Name (TS 36.413 §9.1.8.4; the eNB Name
 // is a PrintableString of SIZE(1..150)).
 func Test4GS1SetupSupportedTAs(t *testing.T) {

@@ -106,7 +106,7 @@ func assertConcealedRegistration(t *testing.T, gnbID, ueID string) {
 	}
 }
 
-// TestRegistrationSUCIProfileA registers a UE whose SUPI is concealed under
+// Test5GRegistrationSUCIProfileA registers a UE whose SUPI is concealed under
 // ECIES Profile A (X25519) with the public key matching the core's provisioned
 // Profile A key. The core must de-conceal it and register the subscriber.
 func Test5GRegistrationSUCIProfileA(t *testing.T) {
@@ -117,7 +117,7 @@ func Test5GRegistrationSUCIProfileA(t *testing.T) {
 	assertConcealedRegistration(t, gnbID, ueID)
 }
 
-// TestRegistrationSUCIProfileB registers a UE whose SUPI is concealed under
+// Test5GRegistrationSUCIProfileB registers a UE whose SUPI is concealed under
 // ECIES Profile B (P-256), with the public key in compressed form (as published
 // by the core). The core must de-conceal it and register the subscriber.
 func Test5GRegistrationSUCIProfileB(t *testing.T) {

@@ -116,7 +116,7 @@ func Test5GRegistrationComplete_Fuzz(t *testing.T) {
 	}
 }
 
-// TestRegistrationComplete_NGAPIDFuzz exercises NGAP-level ID mutations on
+// Test5GRegistrationComplete_NGAPIDFuzz exercises NGAP-level ID mutations on
 // the UL NAS TRANSPORT that carries RegistrationComplete. AMF must reject /
 // ignore mismatched IDs without crashing, per TS 38.413 §8.6.2.
 func Test5GRegistrationComplete_NGAPIDFuzz(t *testing.T) {

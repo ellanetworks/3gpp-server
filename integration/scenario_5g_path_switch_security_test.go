@@ -61,7 +61,7 @@ func ngapIEByID(body []byte, id int64) map[string]any {
 // (TS 38.413 §9.3.1.86).
 const ngapProtocolIEIDUESecurityCapabilities = 119
 
-// TestPathSwitchRequestSuccess — §8.4.4.2: a PATH SWITCH REQUEST for an existing
+// Test5GPathSwitchRequestSuccess — §8.4.4.2: a PATH SWITCH REQUEST for an existing
 // UE context is acknowledged, echoing the UE's AMF UE NGAP ID and the new RAN UE
 // NGAP ID assigned by the requesting node.
 func Test5GPathSwitchRequestSuccess(t *testing.T) {
@@ -95,7 +95,7 @@ func Test5GPathSwitchRequestSuccess(t *testing.T) {
 	}
 }
 
-// TestPathSwitchRequestDuplicatePDUSessionIDsFailure — §8.4.4.4: a PATH SWITCH
+// Test5GPathSwitchRequestDuplicatePDUSessionIDsFailure — §8.4.4.4: a PATH SWITCH
 // REQUEST whose to-be-switched list contains two PDU Session ID IEs set to the
 // same value must be answered with PATH SWITCH REQUEST FAILURE, and the UE's
 // existing context must be left intact.
@@ -126,7 +126,7 @@ func Test5GPathSwitchRequestDuplicatePDUSessionIDsFailure(t *testing.T) {
 	assertUEStillConnected(t, sourceGNB, ueID)
 }
 
-// TestPathSwitchRequestSecurityCapabilityMismatchAcknowledged — TS 33.501
+// Test5GPathSwitchRequestSecurityCapabilityMismatchAcknowledged — TS 33.501
 // §6.7.3.1: when the UE 5G security capabilities reported in a PATH SWITCH
 // REQUEST differ from the AMF's locally stored values, the AMF must still
 // acknowledge the switch and return its locally stored capabilities to the

@@ -15,7 +15,7 @@ import (
 	"testing"
 )
 
-// TestPDUSessionEstablishment_AcceptMandatoryIEs drives a successful
+// Test5GPDUSessionEstablishment_AcceptMandatoryIEs drives a successful
 // establishment and asserts the Accept carries its mandatory IEs (TS 24.501
 // §8.3.2): a Session-AMBR with non-zero up/downlink rates and a non-empty
 // Authorized QoS rules IE.
@@ -47,7 +47,7 @@ func Test5GPDUSessionEstablishment_AcceptMandatoryIEs(t *testing.T) {
 	}
 }
 
-// TestPDUSessionEstablishment_AlwaysOnIndication establishes a session whose
+// Test5GPDUSessionEstablishment_AlwaysOnIndication establishes a session whose
 // request carries the Always-on PDU session requested IE. Per TS 24.501 §6.4.1
 // (case b-i) the SMF shall include an Always-on PDU session indication in the
 // Establishment Accept (set to "required" or "not allowed") whenever the UE
@@ -72,7 +72,7 @@ func Test5GPDUSessionEstablishment_AlwaysOnIndication(t *testing.T) {
 	}
 }
 
-// TestPDUSessionModificationCommandReject_PTIMismatch sends a PDU SESSION
+// Test5GPDUSessionModificationCommandReject_PTIMismatch sends a PDU SESSION
 // MODIFICATION COMMAND REJECT carrying a PTI for which the network started no
 // modification procedure. Per TS 24.501 §7.3.1 a) the SMF answers with a 5GSM
 // STATUS carrying cause #47 "PTI mismatch".
@@ -95,7 +95,7 @@ func Test5GPDUSessionModificationCommandReject_PTIMismatch(t *testing.T) {
 	assertNASCause(t, resp, "nas.cause_5gsm", cause5GSMPTIMismatch)
 }
 
-// TestStatus5GSM_FromUE_SessionRemainsUsable sends a 5GSM STATUS to the SMF for
+// Test5GStatus5GSM_FromUE_SessionRemainsUsable sends a 5GSM STATUS to the SMF for
 // an active session. TS 24.501 §7.4 leaves the network's reaction to an
 // unsolicited 5GSM STATUS implementation-dependent, so no specific response is
 // required; the session must remain intact, which is shown by a subsequent

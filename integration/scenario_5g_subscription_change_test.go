@@ -64,7 +64,7 @@ func assertValidReleaseCause(t *testing.T, body []byte) {
 	}
 }
 
-// TestSubscriptionChange_SliceRemovedReleasesPDUSession establishes a PDU
+// Test5GSubscriptionChange_SliceRemovedReleasesPDUSession establishes a PDU
 // session on the default slice, then moves the subscriber to a profile whose
 // slice (SST 2) does not match it. TS 23.501 §5.15.5.2.2: when a slice is no
 // longer available for a UE due to a subscription change, the orphaned PDU

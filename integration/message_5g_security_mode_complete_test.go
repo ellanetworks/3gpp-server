@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// TestSecurityModeComplete_NGAPIDFuzz sends a Security Mode Complete on an
+// Test5GSecurityModeComplete_NGAPIDFuzz sends a Security Mode Complete on an
 // established connection with a wrong UE NGAP ID and expects a spec-compliant
 // Error Indication (TS 38.413 §10.6, §8.7.5.2).
 func Test5GSecurityModeComplete_NGAPIDFuzz(t *testing.T) {

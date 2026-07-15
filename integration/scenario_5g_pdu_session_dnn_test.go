@@ -16,7 +16,7 @@ import (
 	"testing"
 )
 
-// TestPDUSessionEstablishment_UnknownDNN registers a UE whose DNN is not
+// Test5GPDUSessionEstablishment_UnknownDNN registers a UE whose DNN is not
 // provisioned in the core, then requests a PDU session for it. The slice is
 // served but the DNN is not part of it, so per TS 24.501 §9.11.4.2 the SMF
 // answers with a PDU Session Establishment Reject carrying 5GSM cause #70

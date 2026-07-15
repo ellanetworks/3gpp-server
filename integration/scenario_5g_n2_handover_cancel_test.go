@@ -15,7 +15,7 @@ import (
 	"testing"
 )
 
-// TestN2HandoverCancelDuringPreparation: the source cancels after the target has
+// Test5GN2HandoverCancelDuringPreparation: the source cancels after the target has
 // received the Handover Request but before it is acknowledged. The AMF must
 // answer with HANDOVER CANCEL ACKNOWLEDGE (TS 38.413 §8.4.5.2).
 func Test5GN2HandoverCancelDuringPreparation(t *testing.T) {
@@ -51,7 +51,7 @@ func Test5GN2HandoverCancelDuringPreparation(t *testing.T) {
 	}
 }
 
-// TestN2HandoverCancelAfterCommand: the source cancels after it has already
+// Test5GN2HandoverCancelAfterCommand: the source cancels after it has already
 // received the Handover Command (a valid late cancel — TS 38.413 §8.4.1.3
 // interaction with Handover Cancel). The AMF must still acknowledge it.
 func Test5GN2HandoverCancelAfterCommand(t *testing.T) {
@@ -92,7 +92,7 @@ func Test5GN2HandoverCancelAfterCommand(t *testing.T) {
 	}
 }
 
-// TestN2HandoverCancelThenReHandover: after cancelling a handover, a fresh
+// Test5GN2HandoverCancelThenReHandover: after cancelling a handover, a fresh
 // handover of the same UE must succeed — proving the cancel freed the handover
 // procedure and the UE's resources (TS 38.413 §8.4.5).
 func Test5GN2HandoverCancelThenReHandover(t *testing.T) {
@@ -151,7 +151,7 @@ func Test5GN2HandoverCancelThenReHandover(t *testing.T) {
 	completeHandover(t, targetGNB, targetAmf, 100)
 }
 
-// TestN2HandoverCancelNoHandoverInProgress: a Handover Cancel for a UE with no
+// Test5GN2HandoverCancelNoHandoverInProgress: a Handover Cancel for a UE with no
 // handover underway. TS 38.413 §8.4.5 defines the procedure only for an ongoing
 // or prepared handover, so the response here is unspecified — but the spec
 // universally requires the core not to be disturbed: the UE must stay usable.
@@ -166,7 +166,7 @@ func Test5GN2HandoverCancelNoHandoverInProgress(t *testing.T) {
 	assertUEStillConnected(t, gnb, ueID)
 }
 
-// TestN2HandoverCancelUnknownRanUeNgapID: a Handover Cancel bearing a RAN UE
+// Test5GN2HandoverCancelUnknownRanUeNgapID: a Handover Cancel bearing a RAN UE
 // NGAP ID the AMF never assigned carries an unknown local AP ID; §10.6 requires
 // an Error Indication.
 func Test5GN2HandoverCancelUnknownRanUeNgapID(t *testing.T) {
@@ -185,7 +185,7 @@ func Test5GN2HandoverCancelUnknownRanUeNgapID(t *testing.T) {
 	}
 }
 
-// TestN2HandoverCancelInconsistentAmfUeNgapID: a Handover Cancel whose AMF UE
+// Test5GN2HandoverCancelInconsistentAmfUeNgapID: a Handover Cancel whose AMF UE
 // NGAP ID is inconsistent with the one stored for the UE must draw an Error
 // Indication and must not be acted upon (TS 38.413 §10.6) — exactly as the AMF
 // does for an inconsistent ID in Handover Required.

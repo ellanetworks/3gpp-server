@@ -43,7 +43,7 @@ func assertUEStillSwitchable(t *testing.T, gnbID string, amfID, newRanID int64, 
 	assertPathSwitchType(t, context, status, body, ngapPathSwitchRequestAcknowledge)
 }
 
-// TestPathSwitchStaleSourceUEContextReleaseRejected — §10.6: after the UE has
+// Test5GPathSwitchStaleSourceUEContextReleaseRejected — §10.6: after the UE has
 // switched to the target, a UE Context Release Request from the source (bearing
 // the stale RAN UE NGAP ID) must be answered with an Error Indication, and must
 // not release the UE that now lives on the target.
@@ -66,7 +66,7 @@ func Test5GPathSwitchStaleSourceUEContextReleaseRejected(t *testing.T) {
 	assertUEStillSwitchable(t, targetGNB, amfID, 211, "UE survives a stale source UE Context Release Request")
 }
 
-// TestPathSwitchStaleSourceUplinkNASRejected — §10.6: a NAS uplink from the
+// Test5GPathSwitchStaleSourceUplinkNASRejected — §10.6: a NAS uplink from the
 // stale source association carries the old AP IDs and must be answered with an
 // Error Indication rather than served.
 func Test5GPathSwitchStaleSourceUplinkNASRejected(t *testing.T) {
@@ -86,7 +86,7 @@ func Test5GPathSwitchStaleSourceUplinkNASRejected(t *testing.T) {
 	}
 }
 
-// TestPathSwitchSourceNGResetPreservesMovedUE — §8.7.4: an NG Reset resets only
+// Test5GPathSwitchSourceNGResetPreservesMovedUE — §8.7.4: an NG Reset resets only
 // the connections on the resetting association. After the UE has switched to the
 // target, a full NG Reset from the source must not release it.
 func Test5GPathSwitchSourceNGResetPreservesMovedUE(t *testing.T) {

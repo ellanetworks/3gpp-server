@@ -7,7 +7,7 @@ package integration_test
 
 import "testing"
 
-// TestEPSServiceRequestAfterDetach checks a detached UE cannot re-establish its
+// Test4GServiceRequestAfterDetach checks a detached UE cannot re-establish its
 // connection with a Service Request: the EMM context is no longer registered, so
 // the MME must reject it (Service Reject, TS 24.301 §5.6.1.5) and must not
 // re-establish the bearer.
@@ -29,7 +29,7 @@ func Test4GServiceRequestAfterDetach(t *testing.T) {
 	fullAttach(t, enbID, fresh)
 }
 
-// TestEPSServiceRequestWhileConnected checks a Service Request from an
+// Test4GServiceRequestWhileConnected checks a Service Request from an
 // already-connected UE does not crash the MME: it carries a fresh Initial UE
 // Message, so the MME treats it as a new S1 connection and re-establishes the
 // context (TS 24.301 §5.6.1) — or rejects it — without disrupting service.
@@ -53,7 +53,7 @@ func Test4GServiceRequestWhileConnected(t *testing.T) {
 	fullAttach(t, enbID, fresh)
 }
 
-// TestEPSServiceRequestBackToBack checks two Service Requests in succession after
+// Test4GServiceRequestBackToBack checks two Service Requests in succession after
 // an idle release do not crash the MME: the first re-establishes the connection,
 // the second arrives on the freshly-connected UE (TS 24.301 §5.6.1).
 func Test4GServiceRequestBackToBack(t *testing.T) {

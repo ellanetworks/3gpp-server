@@ -9,50 +9,33 @@
 package integration_test
 
 import (
+	"fmt"
 	"testing"
 )
 
-// mustCreateENB creates a standard eNB, completes S1 Setup against the MME, and
-// returns the store handle. Registers cleanup.
+// mustCreateENB creates a standard eNB on an allocated eNB ID, completes S1
+// Setup against the MME, and returns the store handle. Registers cleanup. Tests
+// that need a specific S1AP eNB ID call createENBWithID.
 func mustCreateENB(t *testing.T) string {
 	t.Helper()
 
-	body := `{
-		"mme_address": "10.3.0.2:36412",
-		"enb_s1_address": "10.3.0.3",
-		"mcc": "001", "mnc": "01",
-		"tac": "0001", "enb_id": 1,
-		"name": "test-enb"
-	}`
-
-	status, resp := doRequest(t, "POST", "/enb", body)
-	if status != 201 {
-		t.Fatalf("create enb: HTTP %d: %s", status, resp)
-	}
-
-	enbID := jsonGet(resp, "enb_id")
-	if enbID == "" {
-		t.Fatal("create enb: no enb_id in response")
-	}
-
-	t.Cleanup(func() {
-		doRequest(t, "DELETE", "/enb/"+enbID, "")
-	})
-
-	return enbID
+	return createENBWithID(t, claimENBID(), "test-enb")
 }
 
 func Test4GScenarioS1Setup(t *testing.T) {
-	enbID := mustCreateENB(t)
+	// The state assertion below reads back this eNB's own S1AP eNB ID, so the
+	// value must be known here.
+	stateENBID := claimENBID()
+	enbID := createENBWithID(t, stateENBID, "test-enb")
 
 	t.Run("S1 Setup Response returned", func(t *testing.T) {
-		status, resp := doRequest(t, "POST", "/enb", `{
+		status, resp := doRequest(t, "POST", "/enb", fmt.Sprintf(`{
 			"mme_address": "10.3.0.2:36412",
 			"enb_s1_address": "10.3.0.3",
 			"mcc": "001", "mnc": "01",
-			"tac": "0001", "enb_id": 2,
+			"tac": "0001", "enb_id": %d,
 			"name": "assert-enb"
-		}`)
+		}`, claimENBID()))
 		if status != 201 {
 			t.Fatalf("create enb: HTTP %d: %s", status, resp)
 		}
@@ -83,7 +66,7 @@ func Test4GScenarioS1Setup(t *testing.T) {
 			"mcc":    "001",
 			"mnc":    "01",
 			"tac":    "0001",
-			"enb_id": "1",
+			"enb_id": fmt.Sprintf("%d", stateENBID),
 			"name":   "test-enb",
 		} {
 			if got := jsonGet(body, key); got != want {
