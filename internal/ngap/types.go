@@ -77,6 +77,32 @@ type IE struct {
 	// locally stored UE 5G security capabilities, returned on a mismatch with the
 	// values the target gNB reported (TS 33.501 §6.7.3.1).
 	UESecurityCapabilities *UESecurityCapabilitiesJSON `json:"ue_security_capabilities,omitempty"`
+
+	// RANStatusTransfer is the RAN Status Transfer Transparent Container the AMF
+	// relays to the target NG-RAN node (TS 38.413 §8.4.7.2).
+	RANStatusTransfer *RANStatusTransferJSON `json:"ran_status_transfer,omitempty"`
+}
+
+// COUNTValueJSON is a PDCP COUNT: the sequence number and its hyper-frame number
+// (TS 38.413 §9.3.1.108).
+type COUNTValueJSON struct {
+	PDCPSN int64 `json:"pdcp_sn"`
+	HFN    int64 `json:"hfn"`
+}
+
+// DRBStatusTransferItemJSON is one DRB's preserved PDCP state within a RAN Status
+// Transfer Transparent Container (TS 38.413 §9.3.1.108).
+type DRBStatusTransferItemJSON struct {
+	DRBID   int64           `json:"drb_id"`
+	ULCount *COUNTValueJSON `json:"ul_count,omitempty"`
+	DLCount *COUNTValueJSON `json:"dl_count,omitempty"`
+}
+
+// RANStatusTransferJSON is the RAN Status Transfer Transparent Container
+// (TS 38.413 §9.3.1.108), carried unchanged from the source NG-RAN node to the
+// target.
+type RANStatusTransferJSON struct {
+	DRBs []DRBStatusTransferItemJSON `json:"drbs_subject_to_status_transfer"`
 }
 
 // UESecurityCapabilitiesJSON holds the NR/E-UTRA encryption and integrity

@@ -323,6 +323,10 @@ func runN2HandoverFlow(t *testing.T, establishBody string) {
 	// The command must confirm the same PDU session for handover (§9.2.3.2).
 	assertCarriesPDUSession(t, hoCmd, 1, "HandoverCommand")
 
+	// Steps 4a/4b: source gNB → AMF → target gNB: the PDCP status the target needs
+	// for a lossless handover (TS 23.502 §4.9.1.3.3 steps 2-3).
+	assertRANStatusTransferRelayed(t, sourceGNB, targetGNB, ueID, targetRanUeNgapID)
+
 	// Step 5: target gNB → AMF: Handover Notify (TS 23.502 §4.9.1.3.3 step 5; TS 38.413 §8.4.3) — UE has arrived.
 	status, body = doRequest(t, "POST", "/gnb/"+targetGNB+"/ngap",
 		fmt.Sprintf(`{"message_type":"handover_notify","amf_ue_ngap_id":%d,"ran_ue_ngap_id":%d}`,

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/netip"
 	"strconv"
 	"strings"
 	"time"
@@ -20,6 +21,17 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/store"
 	"github.com/ellanetworks/3gpp-server/internal/transport"
 )
+
+// erabUPFIP picks the S-GW S1-U endpoint the eNB sends uplink user data to: the
+// address matching the eNB's own S1-U family, falling back to the other when the
+// S-GW signalled only one. A dual-stack S-GW signals both (TS 36.414 §5.3).
+func erabUPFIP(enb *store.ENBContext, e s1ap.ERABSetupItemJSON) string {
+	if a, err := netip.ParseAddr(enb.N3Addr); err == nil && a.Is6() {
+		return firstNonEmpty(e.TransportLayerAddressIPv6, e.TransportLayerAddress)
+	}
+
+	return firstNonEmpty(e.TransportLayerAddress, e.TransportLayerAddressIPv6)
+}
 
 // ksiNoKey is the NAS key set identifier value "no key available" (TS 24.301
 // §9.9.3.21), used in the initial Attach Request.
@@ -555,7 +567,7 @@ func (h *Handler) securityModeComplete(ctx context.Context, enb *store.ENBContex
 		e := dl.ERABSetupItems[0]
 		ue.ERABID = uint8(e.ERABID)
 		ue.ULTeid = e.GTPTEID
-		ue.UPFIP = e.TransportLayerAddress
+		ue.UPFIP = erabUPFIP(enb, e)
 	}
 
 	// The eNB advertises its own downlink TEID in the Initial Context Setup
@@ -926,7 +938,7 @@ func (h *Handler) acceptAdditionalBearer(enb *store.ENBContext, ue *store.UEEPSC
 	if len(dl.ERABSetupItems) > 0 {
 		e := dl.ERABSetupItems[0]
 		bearer.ULTeid = e.GTPTEID
-		bearer.UPFIP = e.TransportLayerAddress
+		bearer.UPFIP = erabUPFIP(enb, e)
 	}
 
 	ue.Bearers[ebi] = bearer

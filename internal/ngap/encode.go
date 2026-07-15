@@ -1411,6 +1411,74 @@ func BuildErrorIndication(amfUeNgapID, ranUeNgapID, causeRadioNetwork int64) ([]
 	return ngap.Encoder(pdu)
 }
 
+// DRBStatusTransferItem is one DRB's preserved PDCP state for an UPLINK RAN
+// STATUS TRANSFER (TS 38.413 §8.4.6.2): the source NG-RAN node reports the DRB
+// ID with its UL and DL COUNT for every DRB subject to status transfer.
+type DRBStatusTransferItem struct {
+	DRBID    int64
+	ULPDCPSN int64
+	ULHFN    int64
+	DLPDCPSN int64
+	DLHFN    int64
+}
+
+// BuildUplinkRANStatusTransfer builds an UPLINK RAN STATUS TRANSFER (TS 38.413
+// §8.4.6) sent by the source NG-RAN node to hand the AMF the PDCP SN/HFN status
+// the target needs for a lossless handover. The COUNT values use the 12-bit
+// PDCP-SN alternative (TS 38.413 §9.3.1.108).
+func BuildUplinkRANStatusTransfer(amfUeNgapID, ranUeNgapID int64, drbs []DRBStatusTransferItem) ([]byte, error) {
+	pdu := ngapType.NGAPPDU{}
+	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
+	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
+
+	im := pdu.InitiatingMessage
+	im.ProcedureCode.Value = ngapType.ProcedureCodeUplinkRANStatusTransfer
+	im.Criticality.Value = ngapType.CriticalityPresentReject
+	im.Value.Present = ngapType.InitiatingMessagePresentUplinkRANStatusTransfer
+	im.Value.UplinkRANStatusTransfer = new(ngapType.UplinkRANStatusTransfer)
+
+	ies := &im.Value.UplinkRANStatusTransfer.ProtocolIEs
+
+	add := func(id int64, crit aper.Enumerated, present int) *ngapType.UplinkRANStatusTransferIEsValue {
+		ie := ngapType.UplinkRANStatusTransferIEs{}
+		ie.Id.Value = id
+		ie.Criticality.Value = crit
+		ie.Value.Present = present
+		ies.List = append(ies.List, ie)
+
+		return &ies.List[len(ies.List)-1].Value
+	}
+
+	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentReject,
+		ngapType.UplinkRANStatusTransferIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: amfUeNgapID}
+
+	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentReject,
+		ngapType.UplinkRANStatusTransferIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
+
+	container := new(ngapType.RANStatusTransferTransparentContainer)
+
+	for _, d := range drbs {
+		item := ngapType.DRBsSubjectToStatusTransferItem{DRBID: ngapType.DRBID{Value: d.DRBID}}
+
+		item.DRBStatusUL.Present = ngapType.DRBStatusULPresentDRBStatusUL12
+		item.DRBStatusUL.DRBStatusUL12 = &ngapType.DRBStatusUL12{
+			ULCOUNTValue: ngapType.COUNTValueForPDCPSN12{PDCPSN12: d.ULPDCPSN, HFNPDCPSN12: d.ULHFN},
+		}
+
+		item.DRBStatusDL.Present = ngapType.DRBStatusDLPresentDRBStatusDL12
+		item.DRBStatusDL.DRBStatusDL12 = &ngapType.DRBStatusDL12{
+			DLCOUNTValue: ngapType.COUNTValueForPDCPSN12{PDCPSN12: d.DLPDCPSN, HFNPDCPSN12: d.DLHFN},
+		}
+
+		container.DRBsSubjectToStatusTransferList.List = append(container.DRBsSubjectToStatusTransferList.List, item)
+	}
+
+	add(ngapType.ProtocolIEIDRANStatusTransferTransparentContainer, ngapType.CriticalityPresentReject,
+		ngapType.UplinkRANStatusTransferIEsPresentRANStatusTransferTransparentContainer).RANStatusTransferTransparentContainer = container
+
+	return ngap.Encoder(pdu)
+}
+
 // BuildHandoverNotify builds a HANDOVER NOTIFY (TS 38.413 §8.4.3) sent by the
 // target gNB once the UE has arrived.
 func BuildHandoverNotify(amfUeNgapID, ranUeNgapID int64, mcc, mnc, tac, gnbID string) ([]byte, error) {

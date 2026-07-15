@@ -414,7 +414,62 @@ func decodeInitiatingMessage(im *ngapType.InitiatingMessage, resp *NGAPResponse)
 		decodeErrorIndication(im.Value.ErrorIndication, resp)
 	case ngapType.InitiatingMessagePresentPaging:
 		decodePaging(im.Value.Paging, resp)
+	case ngapType.InitiatingMessagePresentDownlinkRANStatusTransfer:
+		decodeDownlinkRANStatusTransfer(im.Value.DownlinkRANStatusTransfer, resp)
 	}
+}
+
+// decodeDownlinkRANStatusTransfer surfaces the IEs of a DOWNLINK RAN STATUS
+// TRANSFER (TS 38.413 §9.2.3.14): the target's UE NGAP IDs and the RAN Status
+// Transfer Transparent Container the AMF relayed from the source.
+func decodeDownlinkRANStatusTransfer(msg *ngapType.DownlinkRANStatusTransfer, resp *NGAPResponse) {
+	if msg == nil {
+		return
+	}
+
+	for _, ie := range msg.ProtocolIEs.List {
+		decoded := IE{ID: ie.Id.Value, Criticality: criticalityToString(ie.Criticality.Value)}
+
+		switch ie.Id.Value {
+		case ngapType.ProtocolIEIDAMFUENGAPID:
+			if ie.Value.AMFUENGAPID != nil {
+				v := ie.Value.AMFUENGAPID.Value
+				decoded.AmfUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDRANUENGAPID:
+			if ie.Value.RANUENGAPID != nil {
+				v := ie.Value.RANUENGAPID.Value
+				decoded.RanUeNgapID = &v
+			}
+		case ngapType.ProtocolIEIDRANStatusTransferTransparentContainer:
+			if ie.Value.RANStatusTransferTransparentContainer != nil {
+				decoded.RANStatusTransfer = decodeRANStatusTransferContainer(ie.Value.RANStatusTransferTransparentContainer)
+			}
+		}
+
+		resp.IEs = append(resp.IEs, decoded)
+	}
+}
+
+func decodeRANStatusTransferContainer(c *ngapType.RANStatusTransferTransparentContainer) *RANStatusTransferJSON {
+	out := &RANStatusTransferJSON{DRBs: make([]DRBStatusTransferItemJSON, 0, len(c.DRBsSubjectToStatusTransferList.List))}
+
+	for i := range c.DRBsSubjectToStatusTransferList.List {
+		item := &c.DRBsSubjectToStatusTransferList.List[i]
+		d := DRBStatusTransferItemJSON{DRBID: item.DRBID.Value}
+
+		if ul := item.DRBStatusUL.DRBStatusUL12; ul != nil {
+			d.ULCount = &COUNTValueJSON{PDCPSN: ul.ULCOUNTValue.PDCPSN12, HFN: ul.ULCOUNTValue.HFNPDCPSN12}
+		}
+
+		if dl := item.DRBStatusDL.DRBStatusDL12; dl != nil {
+			d.DLCount = &COUNTValueJSON{PDCPSN: dl.DLCOUNTValue.PDCPSN12, HFN: dl.DLCOUNTValue.HFNPDCPSN12}
+		}
+
+		out.DRBs = append(out.DRBs, d)
+	}
+
+	return out
 }
 
 // decodePaging surfaces the IEs of a PAGING (TS 38.413 §9.2.4.1), the
@@ -952,6 +1007,8 @@ func getInitiatingMessageName(msgType int, procedureCode int64) string {
 		return "UEContextReleaseCommand"
 	case ngapType.InitiatingMessagePresentPaging:
 		return "Paging"
+	case ngapType.InitiatingMessagePresentDownlinkRANStatusTransfer:
+		return "DownlinkRANStatusTransfer"
 	case ngapType.InitiatingMessagePresentErrorIndication:
 		return "ErrorIndication"
 	case ngapType.InitiatingMessagePresentNGSetupRequest:

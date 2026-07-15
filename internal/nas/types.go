@@ -115,6 +115,11 @@ type NASRequest struct {
 	// handover_cancel carries. Defaults to handover-cancelled.
 	HandoverCancelCause *int64 `json:"handover_cancel_cause,omitempty"`
 
+	// StatusTransferDRBs, on ran_status_transfer, are the DRBs whose PDCP status
+	// the source NG-RAN node reports (TS 38.413 §8.4.6.2). Defaults to one DRB
+	// with zeroed COUNTs.
+	StatusTransferDRBs []DRBStatusTransferInput `json:"status_transfer_drbs,omitempty"`
+
 	// PDUSessionIDOverride sets which PDU session a pdu_session_establishment_request
 	// establishes, so a UE can hold more than one session.
 	PDUSessionIDOverride *uint8 `json:"pdu_session_id,omitempty"`
@@ -143,6 +148,16 @@ type NASRequest struct {
 	// UERadioCapability, on ue_capability_info, is the hex radio capability the
 	// gNB reports; the AMF replays it in a later Initial Context Setup Request.
 	UERadioCapability *string `json:"ue_radio_capability,omitempty"`
+}
+
+// DRBStatusTransferInput is one DRB's PDCP status in a ran_status_transfer: the
+// DRB ID with its UL and DL COUNT (TS 38.413 §8.4.6.2, §9.3.1.108).
+type DRBStatusTransferInput struct {
+	DRBID    int64 `json:"drb_id"`
+	ULPDCPSN int64 `json:"ul_pdcp_sn,omitempty"`
+	ULHFN    int64 `json:"ul_hfn,omitempty"`
+	DLPDCPSN int64 `json:"dl_pdcp_sn,omitempty"`
+	DLHFN    int64 `json:"dl_hfn,omitempty"`
 }
 
 type SNSSAIJSON struct {

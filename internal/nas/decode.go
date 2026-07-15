@@ -43,16 +43,30 @@ func Decode(data []byte) (*NASResponse, error) {
 		return resp, nil
 	}
 
+	if err := decodeGmm(m, resp); err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+// decodeGmm names a decoded plain 5GMM message and surfaces its IEs. Both the
+// plain path and the unwrapped-secured path dispatch through this one table: a
+// message carries the same IEs whichever way it arrived, so a message the core
+// sends unprotected still yields the fields that show what it sent.
+func decodeGmm(m *gonas.Message, resp *NASResponse) error {
 	msgType := m.GmmMessage.GetMessageType()
 	resp.MessageType = gmmMessageTypeName(msgType)
 
 	switch msgType {
 	case gonas.MsgTypeAuthenticationRequest:
 		decodeAuthenticationRequest(m, resp)
-	case gonas.MsgTypeAuthenticationReject:
-		// No additional fields
 	case gonas.MsgTypeIdentityRequest:
 		decodeIdentityRequest(m, resp)
+	case gonas.MsgTypeSecurityModeCommand:
+		decodeSecurityModeCommand(m, resp)
+	case gonas.MsgTypeRegistrationAccept:
+		decodeRegistrationAccept(m, resp)
 	case gonas.MsgTypeRegistrationReject:
 		decodeRegistrationReject(m, resp)
 	case gonas.MsgTypeServiceReject:
@@ -60,12 +74,10 @@ func Decode(data []byte) (*NASResponse, error) {
 	case gonas.MsgTypeStatus5GMM:
 		decodeStatus5GMM(m, resp)
 	case gonas.MsgTypeDLNASTransport:
-		if err := decodeDLNASTransport(m, resp); err != nil {
-			return nil, err
-		}
+		return decodeDLNASTransport(m, resp)
 	}
 
-	return resp, nil
+	return nil
 }
 
 // unknownMessageType labels a decoded downlink the dispatch tables do not cover,

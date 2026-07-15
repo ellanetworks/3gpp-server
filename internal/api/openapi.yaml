@@ -1564,7 +1564,7 @@ components:
         message_type:
           type: string
           description: NAS message to send.
-          enum: [registration_request, authentication_response, security_mode_complete, registration_complete, pdu_session_establishment_request, deregistration_request, ue_context_release_request, service_request, identity_response, pdu_session_release_request, pdu_session_release_complete, pdu_session_modification_request, pdu_session_modification_complete, pdu_session_modification_command_reject, status_5gsm, authentication_failure, security_mode_reject, handover_required, handover_cancel, inject_nas, ue_capability_info, error_indication]
+          enum: [registration_request, authentication_response, security_mode_complete, registration_complete, pdu_session_establishment_request, deregistration_request, ue_context_release_request, service_request, identity_response, pdu_session_release_request, pdu_session_release_complete, pdu_session_modification_request, pdu_session_modification_complete, pdu_session_modification_command_reject, status_5gsm, authentication_failure, security_mode_reject, handover_required, handover_cancel, ran_status_transfer, inject_nas, ue_capability_info, error_indication]
         raw_nas_pdu:
           type: string
           description: |
@@ -1595,6 +1595,19 @@ components:
         replay_last:
           type: boolean
           description: On inject_nas, resend this UE's last secured uplink NAS PDU verbatim (NAS replay protection test, TS 24.501 §4.4.3.2).
+        status_transfer_drbs:
+          type: array
+          description: |
+            On ran_status_transfer, the DRBs whose PDCP status the source NG-RAN
+            node reports (TS 38.413 §8.4.6.2). Defaults to one DRB with zeroed COUNTs.
+          items:
+            type: object
+            properties:
+              drb_id: { type: integer }
+              ul_pdcp_sn: { type: integer }
+              ul_hfn: { type: integer }
+              dl_pdcp_sn: { type: integer }
+              dl_hfn: { type: integer }
         timeout_ms:
           type: integer
           description: Bounds how long a send waits for a downlink. Default 5000.

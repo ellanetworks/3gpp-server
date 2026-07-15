@@ -85,6 +85,7 @@ const (
 	ngapHandoverCancelAcknowledge        = "HandoverCancelAcknowledge"
 	ngapPathSwitchRequestAcknowledge     = "PathSwitchRequestAcknowledge"
 	ngapPathSwitchRequestFailure         = "PathSwitchRequestFailure"
+	ngapDownlinkRANStatusTransfer        = "DownlinkRANStatusTransfer"
 )
 
 // NAS message-type names as decoded by the server (internal/nas/decode.go),

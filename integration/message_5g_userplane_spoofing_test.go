@@ -30,7 +30,7 @@ func gnbDrainDownlinks(t *testing.T, gnbID, ueID string) {
 // drop A's spoofed-source uplink. Mirrors Test4GUserPlaneSourceSpoofing on the N3
 // GTP-U path.
 func Test5GUserPlaneSourceSpoofing(t *testing.T) {
-	gnbID := createGTPUGnB(t, "00ec05", "gtpu-spoof", n3IPv4)
+	gnbID := createGTPUGnB(t, "00ec09", "gtpu-spoof", n3IPv4)
 
 	ueA := establishRegisteredUEWithSUPI(t, gnbID, testSUPI(1))
 	ueB := establishRegisteredUEWithSUPI(t, gnbID, testSUPI(2))

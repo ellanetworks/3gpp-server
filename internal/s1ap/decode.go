@@ -177,7 +177,7 @@ func decodeInitialContextSetupRequest(value []byte, resp *S1APResponse) error {
 
 	for _, it := range m.ERABToBeSetup {
 		item := ERABSetupItemJSON{ERABID: int(it.ERABID), GTPTEID: uint32(it.GTPTEID)}
-		item.TransportLayerAddress = transportLayerIP(it.TransportLayerAddress)
+		item.TransportLayerAddress, item.TransportLayerAddressIPv6 = transportLayerIPs(it.TransportLayerAddress)
 
 		resp.ERABSetupItems = append(resp.ERABSetupItems, item)
 
@@ -275,11 +275,8 @@ func decodeERABSetupRequest(value []byte, resp *S1APResponse) error {
 	setUEIDs(resp, int64(m.MMEUES1APID), int64(m.ENBUES1APID))
 
 	for _, it := range m.ERABToBeSetup {
-		item := ERABSetupItemJSON{
-			ERABID:                int(it.ERABID),
-			GTPTEID:               uint32(it.GTPTEID),
-			TransportLayerAddress: transportLayerIP(it.TransportLayerAddress),
-		}
+		item := ERABSetupItemJSON{ERABID: int(it.ERABID), GTPTEID: uint32(it.GTPTEID)}
+		item.TransportLayerAddress, item.TransportLayerAddressIPv6 = transportLayerIPs(it.TransportLayerAddress)
 		resp.ERABSetupItems = append(resp.ERABSetupItems, item)
 
 		// The Activate Default EPS Bearer Context Request rides as the E-RAB's NAS-PDU.
@@ -357,11 +354,9 @@ func decodeHandoverRequest(value []byte, resp *S1APResponse) error {
 	resp.MMEUES1APID = &mme
 
 	for _, it := range m.ERABToBeSetup {
-		resp.ERABSetupItems = append(resp.ERABSetupItems, ERABSetupItemJSON{
-			ERABID:                int(it.ERABID),
-			GTPTEID:               uint32(it.GTPTEID),
-			TransportLayerAddress: transportLayerIP(it.TransportLayerAddress),
-		})
+		item := ERABSetupItemJSON{ERABID: int(it.ERABID), GTPTEID: uint32(it.GTPTEID)}
+		item.TransportLayerAddress, item.TransportLayerAddressIPv6 = transportLayerIPs(it.TransportLayerAddress)
+		resp.ERABSetupItems = append(resp.ERABSetupItems, item)
 	}
 
 	resp.SecurityContext = &SecurityContextJSON{
@@ -417,6 +412,7 @@ func decodeMMEStatusTransfer(value []byte, resp *S1APResponse) error {
 	}
 
 	setUEIDs(resp, int64(m.MMEUES1APID), int64(m.ENBUES1APID))
+	resp.StatusTransferContainer = hex.EncodeToString(m.Container)
 
 	return nil
 }
@@ -475,18 +471,19 @@ func cnDomainName(d s1ap.CNDomain) string {
 	}
 }
 
-// transportLayerIP renders an S1AP Transport Layer Address (TS 36.414): 4 octets
-// for IPv4, 16 for IPv6, or 20 for a dual-stack address carrying the IPv4
-// followed by the IPv6. The IPv4 is preferred when present, since the user-plane
-// data path is IPv4.
-func transportLayerIP(b []byte) string {
+// transportLayerIPs renders an S1AP Transport Layer Address (TS 36.414 §5.3): 32
+// bits for IPv4, 128 bits for IPv6, or 160 bits when both are signalled, in which
+// case the IPv4 address is contained in the first 32 bits.
+func transportLayerIPs(b []byte) (ipv4, ipv6 string) {
 	switch len(b) {
-	case 4, 20:
-		return net.IP(b[:4]).String()
+	case 4:
+		return net.IP(b).String(), ""
 	case 16:
-		return net.IP(b).String()
+		return "", net.IP(b).String()
+	case 20:
+		return net.IP(b[:4]).String(), net.IP(b[4:20]).String()
 	default:
-		return ""
+		return "", ""
 	}
 }
 

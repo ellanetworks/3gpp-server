@@ -186,28 +186,8 @@ func DecodeSecuredNAS(ue *store.UEContext, message []byte) (*NASResponse, error)
 		return resp, nil
 	}
 
-	msgType := m.GmmMessage.GetMessageType()
-	resp.MessageType = gmmMessageTypeName(msgType)
-
-	switch msgType {
-	case gonas.MsgTypeSecurityModeCommand:
-		decodeSecurityModeCommand(m, resp)
-	case gonas.MsgTypeRegistrationAccept:
-		decodeRegistrationAccept(m, resp)
-	case gonas.MsgTypeAuthenticationRequest:
-		decodeAuthenticationRequest(m, resp)
-	case gonas.MsgTypeRegistrationReject:
-		decodeRegistrationReject(m, resp)
-	case gonas.MsgTypeServiceReject:
-		decodeServiceReject(m, resp)
-	case gonas.MsgTypeIdentityRequest:
-		decodeIdentityRequest(m, resp)
-	case gonas.MsgTypeStatus5GMM:
-		decodeStatus5GMM(m, resp)
-	case gonas.MsgTypeDLNASTransport:
-		if err := decodeDLNASTransport(m, resp); err != nil {
-			return nil, err
-		}
+	if err := decodeGmm(m, resp); err != nil {
+		return nil, err
 	}
 
 	return resp, nil

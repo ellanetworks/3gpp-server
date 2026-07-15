@@ -99,8 +99,12 @@ func runS1HandoverFlow(t *testing.T, sourceENB, targetENB, ueID string) {
 
 	// Source eNB → MME → target eNB: eNB STATUS TRANSFER (TS 36.413 §8.4.6)
 	// relayed as MME STATUS TRANSFER (§8.4.7; TS 23.401 §5.5.1.2.2 steps 10, 10c).
+	// The status container is transparent to the MME (§9.2.1.44), so the target
+	// must receive exactly what the source sent.
+	const statusContainer = "0a1b2c3d"
+
 	status, body = doRequest(t, "POST", "/enb/"+sourceENB+"/ue/"+ueID+"/nas",
-		`{"message_type":"enb_status_transfer"}`)
+		fmt.Sprintf(`{"message_type":"enb_status_transfer","status_transfer_container":%q}`, statusContainer))
 	if status != 200 {
 		t.Fatalf("enb_status_transfer: HTTP %d\n  body: %s", status, body)
 	}
@@ -108,6 +112,11 @@ func runS1HandoverFlow(t *testing.T, sourceENB, targetENB, ueID string) {
 	mmeStatus := awaitENBS1AP(t, targetENB, `["MMEStatusTransfer"]`)
 	if got := jsonGet(mmeStatus, "s1ap.message_type"); got != "MMEStatusTransfer" {
 		t.Errorf("s1ap.message_type = %q, want MMEStatusTransfer (the MME must relay eNB status, TS 36.413 §8.4.7)\n  body: %s", got, mmeStatus)
+	}
+
+	if got := jsonGet(mmeStatus, "s1ap.status_transfer_container"); got != statusContainer {
+		t.Errorf("relayed status_transfer_container = %q, want %q — the MME must convey the source's status container to the target unchanged (TS 36.413 §8.4.7, §9.2.1.44)\n  body: %s",
+			got, statusContainer, mmeStatus)
 	}
 
 	// Target eNB → MME: HANDOVER NOTIFY (TS 23.401 §5.5.1.2.2 step 13).

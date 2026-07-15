@@ -34,3 +34,40 @@ func Test4GInitialContextSetup_UEAMBR(t *testing.T) {
 
 	nasStep(t, enbID, ueID, "attach_complete")
 }
+
+// Test4GInitialContextSetup_TransportLayerAddress checks the S-GW S1-U endpoint
+// the MME signals in the Initial Context Setup Request's E-RAB To Be Setup Item.
+// The Transport Layer Address is mandatory there (TS 36.413 §9.1.4.1) and is
+// encoded per TS 36.414 §5.3: "32 bits in case of IPv4 address; 128 bits in case
+// of IPv6 address; or 160 bits if both IPv4 and IPv6 addresses are signalled, in
+// which case the IPv4 address is contained in the first 32 bits."
+//
+// This core's S1-U carries both families, so a conformant address recovers both
+// halves — a swapped or truncated encoding yields a wrong address for its family.
+func Test4GInitialContextSetup_TransportLayerAddress(t *testing.T) {
+	enbID := mustCreateENB(t)
+	ueID := mustCreateENBUE(t, enbID)
+
+	nasStep(t, enbID, ueID, "attach_request")
+	nasStep(t, enbID, ueID, "authentication_response")
+	ics := nasStep(t, enbID, ueID, "security_mode_complete")
+
+	v4 := jsonGet(ics, "s1ap.erab_setup_items.0.transport_layer_address")
+	v6 := jsonGet(ics, "s1ap.erab_setup_items.0.transport_layer_address_ipv6")
+
+	if v4 == "" && v6 == "" {
+		t.Fatalf("ICS Request E-RAB item carries no Transport Layer Address (mandatory, TS 36.413 §9.1.4.1; TS 36.414 §5.3)\n  body: %s", ics)
+	}
+
+	if v4 != n3IPv4.upfN3 {
+		t.Errorf("ICS Request transport_layer_address = %q, want the S-GW S1-U IPv4 %q — with both families signalled the IPv4 occupies the first 32 bits (TS 36.414 §5.3)\n  body: %s",
+			v4, n3IPv4.upfN3, ics)
+	}
+
+	if v6 != n3IPv6.upfN3 {
+		t.Errorf("ICS Request transport_layer_address_ipv6 = %q, want the S-GW S1-U IPv6 %q — a 160-bit address carries the IPv6 in the 128 bits following the IPv4 (TS 36.414 §5.3)\n  body: %s",
+			v6, n3IPv6.upfN3, ics)
+	}
+
+	nasStep(t, enbID, ueID, "attach_complete")
+}

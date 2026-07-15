@@ -94,6 +94,8 @@ func (h *Handler) SendNGAP(w http.ResponseWriter, r *http.Request) {
 		handleSecurityModeReject(w, r, gnb, ue, t, &req)
 	case "handover_required":
 		handleHandoverRequired(w, r, gnb, ue, t, &req)
+	case "ran_status_transfer":
+		handleRANStatusTransfer(w, r, gnb, ue, t, &req)
 	case "handover_cancel":
 		handleHandoverCancel(w, r, gnb, ue, t, &req)
 	default:
@@ -355,6 +357,41 @@ func handleHandoverRequired(w http.ResponseWriter, r *http.Request, gnb *store.G
 
 // handleHandoverCancel sends a HANDOVER CANCEL for the UE (TS 38.413 §8.4.5) and
 // returns the AMF's Handover Cancel Acknowledge (or Error Indication).
+// handleRANStatusTransfer sends an UPLINK RAN STATUS TRANSFER for the UE
+// (TS 38.413 §8.4.6): the source NG-RAN node hands the AMF the PDCP status the
+// target needs for a lossless handover. Send-only — the AMF relays it to the
+// target as a DOWNLINK RAN STATUS TRANSFER (§8.4.7.2), which the target gNB
+// observes on its own association.
+func handleRANStatusTransfer(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
+	drbs := make([]ngap.DRBStatusTransferItem, 0, len(req.StatusTransferDRBs))
+	for _, d := range req.StatusTransferDRBs {
+		drbs = append(drbs, ngap.DRBStatusTransferItem{
+			DRBID:    d.DRBID,
+			ULPDCPSN: d.ULPDCPSN,
+			ULHFN:    d.ULHFN,
+			DLPDCPSN: d.DLPDCPSN,
+			DLHFN:    d.DLHFN,
+		})
+	}
+
+	if len(drbs) == 0 {
+		drbs = append(drbs, ngap.DRBStatusTransferItem{DRBID: 1})
+	}
+
+	encoded, err := ngap.BuildUplinkRANStatusTransfer(effectiveAmfID(req, ue), effectiveRanID(req, ue), drbs)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build UplinkRANStatusTransfer: %v", err))
+		return
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, SendNGAPResponse{})
+}
+
 func handleHandoverCancel(w http.ResponseWriter, r *http.Request, gnb *store.GnBContext, ue *store.UEContext, t *transport.SCTPTransport, req *SendNGAPRequest) {
 	amfUeNgapID := ue.AmfUeNgapID
 	if req.AmfUeNgapIDOverride != nil {

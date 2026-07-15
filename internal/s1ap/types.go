@@ -102,6 +102,10 @@ type S1APResponse struct {
 	// ReleasedERABs lists the E-RAB IDs a Handover Command reports the target did
 	// not admit, so the source releases their PDN connections (TS 36.413 §9.1.5.2).
 	ReleasedERABs []int `json:"released_erabs,omitempty"`
+
+	// StatusTransferContainer is the opaque PDCP status container an MME STATUS
+	// TRANSFER relays from the source eNB to the target (TS 36.413 §8.4.7), hex.
+	StatusTransferContainer string `json:"status_transfer_container,omitempty"`
 }
 
 // PagingJSON is the decoded PAGING content (TS 36.413 §9.1.6): the paged UE's
@@ -134,11 +138,13 @@ type SecurityContextJSON struct {
 }
 
 // ERABSetupItemJSON identifies an E-RAB the MME asked the eNB to set up, with the
-// S-GW S1-U endpoint the eNB sends uplink user data to.
+// S-GW S1-U endpoint the eNB sends uplink user data to. A dual-stack endpoint
+// signals both addresses (TS 36.414 §5.3), so both are surfaced.
 type ERABSetupItemJSON struct {
-	ERABID                int    `json:"erab_id"`
-	GTPTEID               uint32 `json:"gtp_teid,omitempty"`
-	TransportLayerAddress string `json:"transport_layer_address,omitempty"`
+	ERABID                    int    `json:"erab_id"`
+	GTPTEID                   uint32 `json:"gtp_teid,omitempty"`
+	TransportLayerAddress     string `json:"transport_layer_address,omitempty"`
+	TransportLayerAddressIPv6 string `json:"transport_layer_address_ipv6,omitempty"`
 }
 
 // ERABModifyItemJSON is one E-RAB an E-RAB Modify Request reconfigures, with its
