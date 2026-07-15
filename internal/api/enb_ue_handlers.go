@@ -156,7 +156,7 @@ func (h *Handler) SendENBNAS(w http.ResponseWriter, r *http.Request) {
 	case "authentication_failure":
 		resp, herr = h.authenticationFailure(ctx, enb, ue, t, &req)
 	case "identity_response":
-		resp, herr = h.identityResponse(ctx, enb, ue, t)
+		resp, herr = h.identityResponse(ctx, enb, ue, t, &req)
 	case "inject_nas":
 		resp, herr = h.injectNAS(ctx, enb, ue, t, &req)
 	case "detach_request":
@@ -200,7 +200,7 @@ func (h *Handler) SendENBNAS(w http.ResponseWriter, r *http.Request) {
 	case "security_mode_reject":
 		resp, herr = h.securityModeReject(ctx, enb, ue, t, &req)
 	case "attach_complete":
-		resp, herr = h.attachComplete(ctx, enb, ue, t)
+		resp, herr = h.attachComplete(ctx, enb, ue, t, &req)
 	default:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unsupported message_type %q", req.MessageType))
 		return
@@ -342,7 +342,7 @@ func (h *Handler) authenticationResponse(ctx context.Context, enb *store.ENBCont
 		return nil, err
 	}
 
-	if err := h.sendUplink(enb, ue, t, pdu); err != nil {
+	if err := h.sendUplink(enb, ue, t, pdu, req); err != nil {
 		return nil, err
 	}
 
@@ -407,13 +407,13 @@ func (h *Handler) authenticationResponse(ctx context.Context, enb *store.ENBCont
 	return &SendENBNASResponse{S1AP: dl, NAS: smc, MACVerified: &verified}, nil
 }
 
-func (h *Handler) identityResponse(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport) (*SendENBNASResponse, error) {
+func (h *Handler) identityResponse(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	pdu, err := naseps.BuildIdentityResponse(ue.IMSI)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := h.sendUplink(enb, ue, t, pdu); err != nil {
+	if err := h.sendUplink(enb, ue, t, pdu, req); err != nil {
 		return nil, err
 	}
 
@@ -464,7 +464,7 @@ func (h *Handler) authenticationFailure(ctx context.Context, enb *store.ENBConte
 		return nil, err
 	}
 
-	if err := h.sendUplink(enb, ue, t, pdu); err != nil {
+	if err := h.sendUplink(enb, ue, t, pdu, req); err != nil {
 		return nil, err
 	}
 
@@ -514,7 +514,7 @@ func (h *Handler) securityModeComplete(ctx context.Context, enb *store.ENBContex
 		protected[1] ^= 0xff
 	}
 
-	if err := h.sendUplink(enb, ue, t, protected); err != nil {
+	if err := h.sendUplink(enb, ue, t, protected, req); err != nil {
 		return nil, err
 	}
 
@@ -607,7 +607,7 @@ func (h *Handler) securityModeReject(ctx context.Context, enb *store.ENBContext,
 		return nil, err
 	}
 
-	if err := h.sendUplink(enb, ue, t, pdu); err != nil {
+	if err := h.sendUplink(enb, ue, t, pdu, req); err != nil {
 		return nil, err
 	}
 
@@ -620,7 +620,7 @@ func (h *Handler) securityModeReject(ctx context.Context, enb *store.ENBContext,
 	return &SendENBNASResponse{S1AP: dl}, nil
 }
 
-func (h *Handler) attachComplete(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport) (*SendENBNASResponse, error) {
+func (h *Handler) attachComplete(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	icsResp, err := s1ap.BuildInitialContextSetupResponse(s1ap.InitialContextSetupResponseParams{
 		MMEUES1APID: ue.MMEUES1APID, ENBUES1APID: ue.ENBUES1APID,
 		ERABID: ue.ERABID, ENBN3Addr: enb.N3Addr, GTPTEID: ue.ENBUES1APID,
@@ -648,7 +648,7 @@ func (h *Handler) attachComplete(ctx context.Context, enb *store.ENBContext, ue 
 		return nil, err
 	}
 
-	if err := h.sendUplink(enb, ue, t, protected); err != nil {
+	if err := h.sendUplink(enb, ue, t, protected, req); err != nil {
 		return nil, err
 	}
 
@@ -672,9 +672,11 @@ func (h *Handler) attachComplete(ctx context.Context, enb *store.ENBContext, ue 
 	return resp, nil
 }
 
-func (h *Handler) sendUplink(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, nasPDU []byte) error {
+func (h *Handler) sendUplink(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, nasPDU []byte, req *SendENBNASRequest) error {
+	mmeID, enbID := forgeIDs(ue, req)
+
 	ul, err := s1ap.BuildUplinkNASTransport(s1ap.UplinkNASTransportParams{
-		MMEUES1APID: ue.MMEUES1APID, ENBUES1APID: ue.ENBUES1APID, NASPDU: nasPDU,
+		MMEUES1APID: mmeID, ENBUES1APID: enbID, NASPDU: nasPDU,
 		MCC: enb.MCC, MNC: enb.MNC, TAC: enb.TAC, CellID: 1,
 	})
 	if err != nil {
@@ -728,8 +730,15 @@ func (h *Handler) ueCapabilityInfo(ctx context.Context, enb *store.ENBContext, u
 
 // forgeIDs returns the UE's MME- and eNB-UE-S1AP-IDs, each replaced by its
 // override when the request sets one (for AP-ID fuzzing, TS 36.413 §10.6).
+// forgeIDs resolves the UE S1AP IDs a send puts on the wire: the request
+// override when present, else the stored value. A forged or stale ID must draw
+// an Error Indication rather than be routed (TS 36.413 §10.6).
 func forgeIDs(ue *store.UEEPSContext, req *SendENBNASRequest) (uint32, uint32) {
 	mmeID, enbID := ue.MMEUES1APID, ue.ENBUES1APID
+	if req == nil {
+		return mmeID, enbID
+	}
+
 	if req.MMEUES1APIDOverride != nil {
 		mmeID = *req.MMEUES1APIDOverride
 	}
@@ -874,7 +883,7 @@ func (h *Handler) pdnConnectivity(ctx context.Context, enb *store.ENBContext, ue
 		return nil, err
 	}
 
-	if err := h.sendUplink(enb, ue, t, protected); err != nil {
+	if err := h.sendUplink(enb, ue, t, protected, req); err != nil {
 		return nil, err
 	}
 
@@ -906,7 +915,7 @@ func (h *Handler) pdnConnectivity(ctx context.Context, enb *store.ENBContext, ue
 		return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
 	}
 
-	if err := h.acceptAdditionalBearer(enb, ue, t, dl, nas); err != nil {
+	if err := h.acceptAdditionalBearer(enb, ue, t, dl, nas, req); err != nil {
 		return nil, err
 	}
 
@@ -916,7 +925,7 @@ func (h *Handler) pdnConnectivity(ctx context.Context, enb *store.ENBContext, ue
 // acceptAdditionalBearer completes a UE-requested PDN connection: it records the
 // new bearer, acknowledges the radio leg with an E-RAB Setup Response, and the
 // session with an Activate Default EPS Bearer Context Accept (TS 24.301 §6.5.1.3).
-func (h *Handler) acceptAdditionalBearer(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, dl *s1ap.S1APResponse, nas *naseps.NASResponse) error {
+func (h *Handler) acceptAdditionalBearer(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, dl *s1ap.S1APResponse, nas *naseps.NASResponse, req *SendENBNASRequest) error {
 	if nas.EPSBearerIdentity == nil {
 		return fmt.Errorf("activate default without an EPS bearer identity")
 	}
@@ -965,7 +974,7 @@ func (h *Handler) acceptAdditionalBearer(enb *store.ENBContext, ue *store.UEEPSC
 		return err
 	}
 
-	return h.sendUplink(enb, ue, t, protectedAccept)
+	return h.sendUplink(enb, ue, t, protectedAccept, req)
 }
 
 // pdnDisconnect drives a UE-requested PDN disconnect (TS 24.301 §6.5.2): it sends
@@ -997,7 +1006,7 @@ func (h *Handler) pdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *
 		return nil, err
 	}
 
-	if err := h.sendUplink(enb, ue, t, protected); err != nil {
+	if err := h.sendUplink(enb, ue, t, protected, req); err != nil {
 		return nil, err
 	}
 
@@ -1054,7 +1063,7 @@ func (h *Handler) pdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *
 			return nil, perr
 		}
 
-		if serr := h.sendUplink(enb, ue, t, protectedAccept); serr != nil {
+		if serr := h.sendUplink(enb, ue, t, protectedAccept, req); serr != nil {
 			return nil, serr
 		}
 
@@ -1085,7 +1094,7 @@ func (h *Handler) statusESM(enb *store.ENBContext, ue *store.UEEPSContext, t *tr
 		return nil, err
 	}
 
-	return h.sendESM(enb, ue, t, esm)
+	return h.sendESM(enb, ue, t, esm, req)
 }
 
 // modifyBearerAccept acknowledges a network-initiated bearer modification
@@ -1100,7 +1109,7 @@ func (h *Handler) modifyBearerAccept(enb *store.ENBContext, ue *store.UEEPSConte
 		return nil, err
 	}
 
-	return h.sendESM(enb, ue, t, esm)
+	return h.sendESM(enb, ue, t, esm, req)
 }
 
 // deactivateBearerAccept acknowledges a network-initiated bearer deactivation
@@ -1115,16 +1124,16 @@ func (h *Handler) deactivateBearerAccept(enb *store.ENBContext, ue *store.UEEPSC
 		return nil, err
 	}
 
-	return h.sendESM(enb, ue, t, esm)
+	return h.sendESM(enb, ue, t, esm, req)
 }
 
-func (h *Handler) sendESM(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, esm []byte) (*SendENBNASResponse, error) {
+func (h *Handler) sendESM(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, esm []byte, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	protected, err := naseps.Protect(esm, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := h.sendUplink(enb, ue, t, protected); err != nil {
+	if err := h.sendUplink(enb, ue, t, protected, req); err != nil {
 		return nil, err
 	}
 
@@ -1226,7 +1235,7 @@ func (h *Handler) trackingAreaUpdate(ctx context.Context, enb *store.ENBContext,
 		protected[1] ^= 0xff
 	}
 
-	if err := h.sendUplink(enb, ue, t, protected); err != nil {
+	if err := h.sendUplink(enb, ue, t, protected, req); err != nil {
 		return nil, err
 	}
 
@@ -1283,7 +1292,7 @@ func (h *Handler) trackingAreaUpdate(ctx context.Context, enb *store.ENBContext,
 			return nil, perr
 		}
 
-		if serr := h.sendUplink(enb, ue, t, protectedC); serr != nil {
+		if serr := h.sendUplink(enb, ue, t, protectedC, req); serr != nil {
 			return nil, serr
 		}
 	}
@@ -1443,7 +1452,7 @@ func (h *Handler) detach(ctx context.Context, enb *store.ENBContext, ue *store.U
 		return nil, err
 	}
 
-	if err := h.sendUplink(enb, ue, t, protected); err != nil {
+	if err := h.sendUplink(enb, ue, t, protected, req); err != nil {
 		return nil, err
 	}
 

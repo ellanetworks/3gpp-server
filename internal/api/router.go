@@ -22,6 +22,9 @@ func NewRouter(h *Handler) *http.ServeMux {
 	// 4G/LTE: UE lifecycle and EPS NAS procedures over S1AP.
 	mux.HandleFunc("POST /enb/{enb_id}/ue", h.CreateENBUE)
 	mux.HandleFunc("GET /enb/{enb_id}/ue/{ue_id}", h.GetENBUE)
+	mux.HandleFunc("PATCH /enb/{enb_id}/ue/{ue_id}", h.PatchENBUE)
+	mux.HandleFunc("DELETE /enb/{enb_id}/ue/{ue_id}", h.DeleteENBUE)
+	mux.HandleFunc("GET /enb/{enb_id}/ue/{ue_id}/tunnel", h.GetENBTunnel)
 	mux.HandleFunc("POST /enb/{enb_id}/ue/{ue_id}/nas", h.SendENBNAS)
 	mux.HandleFunc("POST /enb/{enb_id}/ue/{ue_id}/migrate", h.MigrateENBUE)
 

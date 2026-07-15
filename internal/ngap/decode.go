@@ -380,11 +380,9 @@ func decodePDUSessionResourceModifyRequest(msg *ngapType.PDUSessionResourceModif
 		case ngapType.ProtocolIEIDPDUSessionResourceModifyListModReq:
 			if ie.Value.PDUSessionResourceModifyListModReq != nil {
 				for i := range ie.Value.PDUSessionResourceModifyListModReq.List {
-					if nasPDU := ie.Value.PDUSessionResourceModifyListModReq.List[i].NASPDU; nasPDU != nil {
+					if nasPDU := ie.Value.PDUSessionResourceModifyListModReq.List[i].NASPDU; nasPDU != nil && decoded.NasPDU == nil {
 						s := hex.EncodeToString(nasPDU.Value)
 						decoded.NasPDU = &s
-
-						break
 					}
 				}
 			}
@@ -778,7 +776,10 @@ func decodePDUSessionResourceSetupRequest(msg *ngapType.PDUSessionResourceSetupR
 		case ngapType.ProtocolIEIDPDUSessionResourceSetupListSUReq:
 			if ie.Value.PDUSessionResourceSetupListSUReq != nil {
 				for _, item := range ie.Value.PDUSessionResourceSetupListSUReq.List {
-					if item.PDUSessionNASPDU != nil {
+					// First-wins, as everywhere else a per-item list carries a
+					// NAS-PDU: a later item must not displace the message the
+					// caller is waiting on.
+					if item.PDUSessionNASPDU != nil && decoded.NasPDU == nil {
 						s := hex.EncodeToString(item.PDUSessionNASPDU.Value)
 						decoded.NasPDU = &s
 					}

@@ -822,7 +822,7 @@ type HandoverAdmittedSession struct {
 // BuildHandoverRequired builds a HANDOVER REQUIRED (TS 38.413 §8.4.1) sent by
 // the source gNB. The source-to-target container and per-session transfer are
 // opaque to the AMF, so placeholders suffice.
-func BuildHandoverRequired(amfUeNgapID, ranUeNgapID int64, targetGnbID, mcc, mnc, tac string, pduSessionIDs []int64) ([]byte, error) {
+func BuildHandoverRequired(amfUeNgapID, ranUeNgapID int64, targetGnbID, mcc, mnc, tac string, pduSessionIDs []int64, causeRadioNetwork int64) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
 	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
@@ -856,7 +856,7 @@ func BuildHandoverRequired(amfUeNgapID, ranUeNgapID int64, targetGnbID, mcc, mnc
 	add(ngapType.ProtocolIEIDCause, ngapType.CriticalityPresentIgnore,
 		ngapType.HandoverRequiredIEsPresentCause).Cause = &ngapType.Cause{
 		Present:      ngapType.CausePresentRadioNetwork,
-		RadioNetwork: &ngapType.CauseRadioNetwork{Value: ngapType.CauseRadioNetworkPresentHandoverDesirableForRadioReason},
+		RadioNetwork: &ngapType.CauseRadioNetwork{Value: aper.Enumerated(causeRadioNetwork)},
 	}
 
 	plmnID, err := encodePLMN(mcc, mnc)
@@ -1251,6 +1251,11 @@ func buildPathSwitchRequestSetupFailedTransfer() ([]byte, error) {
 
 	return buf, nil
 }
+
+// CauseRadioNetworkHandoverDesirableForRadioReason is the radio-network Cause
+// value "handover-desirable-for-radio-reason" (TS 38.413 §9.3.1.2), the usual
+// trigger for a source NG-RAN node's Handover Required.
+const CauseRadioNetworkHandoverDesirableForRadioReason int64 = 16
 
 // CauseRadioNetworkHandoverCancelled is the radio-network Cause value
 // "handover-cancelled" (TS 38.413 §9.3.1.2).

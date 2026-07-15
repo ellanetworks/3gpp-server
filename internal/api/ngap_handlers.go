@@ -340,8 +340,13 @@ func handleHandoverRequired(w http.ResponseWriter, r *http.Request, gnb *store.G
 		pduSessionIDs = req.PDUSessionIDs
 	}
 
+	cause := int64(ngap.CauseRadioNetworkHandoverDesirableForRadioReason)
+	if req.HandoverRequiredCause != nil {
+		cause = *req.HandoverRequiredCause
+	}
+
 	encoded, err := ngap.BuildHandoverRequired(amfUeNgapID, ranUeNgapID, *req.TargetGnbID,
-		gnb.MCC, gnb.MNC, gnb.TAC, pduSessionIDs)
+		gnb.MCC, gnb.MNC, gnb.TAC, pduSessionIDs, cause)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build HandoverRequired: %v", err))
 		return

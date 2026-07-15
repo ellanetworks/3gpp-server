@@ -215,7 +215,7 @@ func (h *Handler) handoverRequired(ue *store.UEEPSContext, t *transport.S1APTran
 	encoded, err := s1ap.BuildHandoverRequired(s1ap.HandoverRequiredParams{
 		MMEUES1APID: sourceMMEID(ue, req),
 		ENBUES1APID: sourceENBID(ue, req),
-		Cause:       s1ap.CauseHandoverDesirableForRadioReasons,
+		Cause:       handoverRequiredCause(req),
 		TargetMCC:   target.MCC,
 		TargetMNC:   target.MNC,
 		TargetTAC:   target.TAC,
@@ -281,6 +281,16 @@ func (h *Handler) enbStatusTransfer(ue *store.UEEPSContext, t *transport.S1APTra
 
 // sourceMMEID and sourceENBID resolve the S1AP ID pair a source-eNB handover
 // message carries: the request override when present, else the UE's stored IDs.
+// handoverRequiredCause is the radio-network Cause a handover_required reports
+// (TS 36.413 §9.2.1.3), defaulting to handover-desirable-for-radio-reasons.
+func handoverRequiredCause(req *SendENBNASRequest) int {
+	if req != nil && req.HandoverRequiredCause != nil {
+		return *req.HandoverRequiredCause
+	}
+
+	return s1ap.CauseHandoverDesirableForRadioReasons
+}
+
 func sourceMMEID(ue *store.UEEPSContext, req *SendENBNASRequest) uint32 {
 	if req.MMEUES1APIDOverride != nil {
 		return *req.MMEUES1APIDOverride

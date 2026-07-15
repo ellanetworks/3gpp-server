@@ -115,6 +115,10 @@ type NASRequest struct {
 	// handover_cancel carries. Defaults to handover-cancelled.
 	HandoverCancelCause *int64 `json:"handover_cancel_cause,omitempty"`
 
+	// HandoverRequiredCause is the radio-network Cause (TS 38.413 §9.3.1.2) a
+	// handover_required reports. Defaults to handover-desirable-for-radio-reason.
+	HandoverRequiredCause *int64 `json:"handover_required_cause,omitempty"`
+
 	// StatusTransferDRBs, on ran_status_transfer, are the DRBs whose PDCP status
 	// the source NG-RAN node reports (TS 38.413 §8.4.6.2). Defaults to one DRB
 	// with zeroed COUNTs.

@@ -146,6 +146,10 @@ type SendENBNASRequest struct {
 	// PLMN and eNB-ID form the Target eNB-ID the MME resolves.
 	TargetENBID *string `json:"target_enb_id,omitempty"`
 
+	// HandoverRequiredCause is the radio-network Cause (TS 36.413 §9.2.1.3) a
+	// handover_required reports. Defaults to handover-desirable-for-radio-reasons.
+	HandoverRequiredCause *int `json:"handover_required_cause,omitempty"`
+
 	// HandoverCancelCause overrides the radio-network Cause on a handover_cancel
 	// (default handover-cancelled, TS 36.413 §9.2.1.3).
 	HandoverCancelCause *int `json:"handover_cancel_cause,omitempty"`

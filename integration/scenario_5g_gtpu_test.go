@@ -170,8 +170,10 @@ func Test5GGTPU_ReleaseStopsForwarding(t *testing.T) {
 	const icmpID, icmpSeq = 0x1234, 11
 
 	// Forwarding works while the session is up.
+	baseline := scrapeUPFCounters(t)
 	if _, ok := gtpuAwaitDownlink(t, gnbID, ueID, dnResponderIP, icmpID, icmpSeq); !ok {
-		t.Fatalf("no downlink before release — the tunnel should forward while the session is up")
+		t.Fatalf("no downlink before release — the tunnel should forward while the session is up\n%s",
+			upfDelta(t, baseline))
 	}
 
 	// Release the PDU session (TS 24.501 §6.3.3).
@@ -183,8 +185,10 @@ func Test5GGTPU_ReleaseStopsForwarding(t *testing.T) {
 	}
 
 	// Forwarding must stop: the UPF drops the user plane for the torn-down session.
+	released := scrapeUPFCounters(t)
 	if _, ok := gtpuAwaitDownlink(t, gnbID, ueID, dnResponderIP, icmpID, icmpSeq); ok {
-		t.Fatalf("a downlink arrived after the session was released — the UPF kept forwarding torn-down user plane")
+		t.Fatalf("a downlink arrived after the session was released — the UPF kept forwarding torn-down user plane (TS 24.501 §6.3.3)\n%s",
+			upfDelta(t, released))
 	}
 }
 

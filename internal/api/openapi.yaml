@@ -238,6 +238,62 @@ paths:
           description: UE state.
         "404":
           $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: patchENBUE
+      summary: Update an eNB UE's stored context
+      description: |
+        Overrides stored UE state before a send, so a step can be driven with
+        altered credentials or identifiers. Only the fields present are changed.
+        There is no slice (sst/sd) counterpart: slicing is 5GS-only (TS 23.501 §5.15).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                k: { type: string }
+                opc: { type: string }
+                amf: { type: string }
+                sqn: { type: string }
+                mme_ue_s1ap_id: { type: integer, description: "Force the stored MME UE S1AP ID." }
+      responses:
+        "204": { description: "UE updated." }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteENBUE
+      summary: Delete an eNB UE
+      description: Removes the UE context from the eNB without signalling the MME.
+      responses:
+        "204": { description: "UE deleted." }
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /enb/{enb_id}/ue/{ue_id}/tunnel:
+    parameters:
+      - $ref: "#/components/parameters/enb_id"
+      - $ref: "#/components/parameters/ue_id"
+    get:
+      operationId: getENBTunnel
+      summary: Get the S1-U GTP-U tunnel state for a UE's EPS bearer
+      description: |
+        Returns the captured tunnel for the selected bearer (the default bearer
+        when `ebi` is absent): the S-GW uplink endpoint (upf_ip, ul_teid), the
+        eNB downlink TEID (dl_teid), and the UE IP (ue_ip). Populated when the
+        bearer was established on a GTP-U-enabled eNB.
+      parameters:
+        - name: ebi
+          in: query
+          schema: { type: integer }
+          description: "EPS bearer identity. Defaults to the UE's default bearer."
+      responses:
+        "200": { description: "Tunnel state." }
+        "400": { description: "No user-plane tunnel for the bearer." }
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /enb/{enb_id}/ue/{ue_id}/migrate:
     parameters:
@@ -1363,6 +1419,9 @@ components:
         target_enb_id:
           type: string
           description: On handover_required, the store ID of the target eNB (its PLMN and eNB-ID form the Target eNB-ID the MME resolves).
+        handover_required_cause:
+          type: integer
+          description: On handover_required, the radio-network Cause the source eNB reports (TS 36.413 §9.2.1.3). Defaults to handover-desirable-for-radio-reasons.
         handover_cancel_cause:
           type: integer
           description: On handover_cancel, override the radio-network Cause (TS 36.413 §9.2.1.3).
@@ -1643,6 +1702,9 @@ components:
         cause_5gsm:
           type: integer
           description: "5GSM cause for a UE-originated reject/status message (TS 24.501 §9.11.4.2). Applies to the pdu_session_modification_command_reject / status_5gsm endpoints. Defaults to #111 protocol error, unspecified."
+        handover_required_cause:
+          type: integer
+          description: "Radio-network Cause the source NG-RAN node reports on handover_required (TS 38.413 §9.3.1.2). Defaults to handover-desirable-for-radio-reason."
         handover_cancel_cause:
           type: integer
           description: "Radio-network Cause for handover_cancel (TS 38.413 §9.3.1.2). Defaults to handover-cancelled."
