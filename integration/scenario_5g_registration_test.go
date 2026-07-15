@@ -17,15 +17,17 @@ func Test5GScenarioRegistration(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 
 	var ueID string
+	supi := claimSubscriber(t)
+
 	t.Run("create UE and verify state", func(t *testing.T) {
-		ueID = mustCreateUE(t, gnbID)
+		ueID = mustCreateUEWithSUPI(t, gnbID, supi)
 
 		status, body := doRequest(t, "GET", "/gnb/"+gnbID+"/ue/"+ueID, "")
 		if status != 200 {
 			t.Fatalf("HTTP %d: %s", status, body)
 		}
 		checks := map[string]string{
-			"supi":              "imsi-001010000000001",
+			"supi":              supi,
 			"mcc":               "001",
 			"mnc":               "01",
 			"dnn":               "internet",
