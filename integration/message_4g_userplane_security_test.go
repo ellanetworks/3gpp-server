@@ -15,7 +15,7 @@ import (
 func gtpuENBAttach(t *testing.T) (string, string) {
 	t.Helper()
 
-	enbID := createGTPUENB(t, claimENBID(), "gtpu-enb")
+	enbID := createGTPUENB(t, claimENBID(), "gtpu-enb", n3IPv4)
 	ueID := mustCreateENBUE(t, enbID)
 	fullAttach(t, enbID, ueID)
 

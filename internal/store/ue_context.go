@@ -13,69 +13,73 @@ import (
 	"github.com/free5gc/nas/nasType"
 )
 
+// UEContext is an emulated UE's 5GS registration state on a gNB: its identity
+// and concealed SUCI, credentials, the NGAP UE-association identities, the last
+// authentication challenge, and the 5G NAS security context once established.
 type UEContext struct {
-	ID string `json:"id"`
+	ID string
 
 	// Identity
-	Supi             string `json:"supi"`
-	Msin             string `json:"msin"`
-	MCC              string `json:"mcc"`
-	MNC              string `json:"mnc"`
-	RoutingIndicator string `json:"routing_indicator"`
+	Supi             string
+	Msin             string
+	MCC              string
+	MNC              string
+	RoutingIndicator string
 
 	// Credentials
-	K   string `json:"k"`
-	OPc string `json:"opc"`
-	Amf string `json:"amf"`
-	Sqn string `json:"sqn"`
+	K   string
+	OPc string
+	Amf string
+	Sqn string
 
 	// SUCI
-	ProtectionScheme string `json:"protection_scheme"`
-	PublicKeyID      string `json:"public_key_id"`
-	PublicKeyHex     string `json:"public_key_hex,omitempty"`
+	ProtectionScheme string
+	PublicKeyID      string
+	PublicKeyHex     string
 
-	Suci       nasType.MobileIdentity5GS `json:"-"`
-	SuciString string                    `json:"suci"`
+	Suci       nasType.MobileIdentity5GS
+	SuciString string
 
 	// NGAP IDs
-	RanUeNgapID int64 `json:"ran_ue_ngap_id"`
-	AmfUeNgapID int64 `json:"amf_ue_ngap_id"`
+	RanUeNgapID int64
+	AmfUeNgapID int64
 
-	// Security
-	UeSecurityCapability     *nasType.UESecurityCapability `json:"-"`
-	IntegrityAlg             uint8                         `json:"-"`
-	CipheringAlg             uint8                         `json:"-"`
-	KnasEnc                  [16]uint8                     `json:"-"`
-	KnasInt                  [16]uint8                     `json:"-"`
-	Kamf                     []byte                        `json:"-"`
-	NgKsi                    uint8                         `json:"-"`
-	ULCount                  uint32                        `json:"-"`
-	DLCount                  uint32                        `json:"-"`
-	SecurityContextAvailable bool                          `json:"-"`
+	// 5G NAS security context (TS 33.501 §6.2). Counts are per-direction and
+	// increment per protected message.
+	UeSecurityCapability     *nasType.UESecurityCapability
+	IntegrityAlg             uint8
+	CipheringAlg             uint8
+	KnasEnc                  [16]uint8
+	KnasInt                  [16]uint8
+	Kamf                     []byte
+	NgKsi                    uint8
+	ULCount                  uint32
+	DLCount                  uint32
+	SecurityContextAvailable bool
 
 	// LastUplinkNAS is the most recent secured uplink NAS PDU sent, kept so it
 	// can be replayed to test the AMF's NAS replay protection (TS 24.501 §4.4.3.2).
-	LastUplinkNAS []byte `json:"-"`
+	LastUplinkNAS []byte
 
-	// Last received AuthenticationRequest parameters
-	LastRAND []byte `json:"-"`
-	LastAUTN []byte `json:"-"`
+	// Last authentication challenge, stored from the Authentication Request so the
+	// response can be computed without the client re-supplying it.
+	LastRAND []byte
+	LastAUTN []byte
 
 	// Serving network name
-	Snn string `json:"snn"`
+	Snn string
 
 	// Session config
-	DNN            string `json:"dnn"`
-	PDUSessionID   uint8  `json:"pdu_session_id"`
-	PDUSessionType uint8  `json:"pdu_session_type"`
-	SST            int32  `json:"sst"`
-	SD             string `json:"sd,omitempty"`
+	DNN            string
+	PDUSessionID   uint8
+	PDUSessionType uint8
+	SST            int32
+	SD             string
 
-	// GUTI (set by AMF during registration)
-	Guti *nasType.GUTI5G `json:"-"`
+	// GUTI assigned in the Registration Accept.
+	Guti *nasType.GUTI5G
 
-	// IMEISV
-	IMEISV string `json:"imeisv,omitempty"`
+	IMEISV string
 }
 
 type CreateUEOpts struct {

@@ -14,7 +14,7 @@ import (
 // to a data-network host round-trips back as a decapsulated downlink reply on the
 // S1-U tunnel — the MME/UPF programmed the forwarding state from the attach.
 func Test4GUserPlane(t *testing.T) {
-	enbID := createGTPUENB(t, claimENBID(), "gtpu-enb")
+	enbID := createGTPUENB(t, claimENBID(), "gtpu-enb", n3IPv4)
 	ueID := mustCreateENBUE(t, enbID)
 	fullAttach(t, enbID, ueID)
 
@@ -45,7 +45,7 @@ func Test4GUserPlane(t *testing.T) {
 // own bearer: an uplink ICMP echo selected by the additional bearer's EBI
 // round-trips on that bearer's distinct S1-U tunnel, not the default bearer's.
 func Test4GMultiPDNUserPlane(t *testing.T) {
-	enbID := createGTPUENB(t, claimENBID(), "gtpu-multipdn-enb")
+	enbID := createGTPUENB(t, claimENBID(), "gtpu-multipdn-enb", n3IPv4)
 	ueID := mustCreateENBUE(t, enbID)
 
 	ebi := connectSecondPDN(t, enbID, ueID)

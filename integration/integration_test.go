@@ -97,7 +97,7 @@ func waitForEllaCore(timeout time.Duration) error {
 	for time.Now().Before(deadline) {
 		resp, err := http.Get(ellaAPIURL + "/api/v1/status")
 		if err == nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			if resp.StatusCode == 200 {
 				return nil
 			}
@@ -112,7 +112,7 @@ func waitForTester(timeout time.Duration) error {
 	for time.Now().Before(deadline) {
 		resp, err := http.Post(testerURL+"/gnb", "application/json", strings.NewReader(`{}`))
 		if err == nil {
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			return nil
 		}
 		time.Sleep(500 * time.Millisecond)
@@ -140,7 +140,7 @@ func postForToken(url, body string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	b, _ := io.ReadAll(resp.Body)
 
@@ -173,7 +173,7 @@ func createSubscriber(token, imsi string) error {
 	if err != nil {
 		return fmt.Errorf("create subscriber: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != 201 && resp.StatusCode != 200 {
 		b, _ := io.ReadAll(resp.Body)
 		if strings.Contains(string(b), "already") || resp.StatusCode == 409 {
@@ -283,7 +283,7 @@ func provisionHomeNetworkKeys(token string) error {
 		}
 
 		b, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		// On a fresh DB the create returns 201. On a persistent env the key
 		// already exists, which the core reports without a stable status code, so
@@ -306,7 +306,7 @@ func ensureProvisioned(token, collectionPath, name, body string) error {
 
 	if resp, err := http.DefaultClient.Do(getReq); err == nil {
 		_, _ = io.Copy(io.Discard, resp.Body)
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		if resp.StatusCode == 200 {
 			return nil
@@ -321,7 +321,7 @@ func ensureProvisioned(token, collectionPath, name, body string) error {
 	if err != nil {
 		return fmt.Errorf("POST %s: %v", collectionPath, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == 201 || resp.StatusCode == 200 {
 		return nil
@@ -354,7 +354,7 @@ func doRequest(t *testing.T, method, path, body string) (int, []byte) {
 	if err != nil {
 		t.Fatalf("HTTP %s %s: %v", method, path, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("read body: %v", err)
@@ -476,25 +476,6 @@ func doRegistrationFlow(t *testing.T, gnbID, ueID string) {
 	}
 }
 
-// doFullFlow completes registration + PDU session + deregistration.
-func doFullFlow(t *testing.T, gnbID, ueID string) {
-	t.Helper()
-
-	doRegistrationFlow(t, gnbID, ueID)
-
-	status, resp := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
-		`{"message_type":"pdu_session_establishment_request"}`)
-	if status != 200 {
-		t.Fatalf("pdu_session: HTTP %d: %s", status, resp)
-	}
-
-	status, resp = doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
-		`{"message_type":"deregistration_request"}`)
-	if status != 200 {
-		t.Fatalf("deregistration: HTTP %d: %s", status, resp)
-	}
-}
-
 // fieldCheck is used in table-driven tests to assert a JSON field value.
 type fieldCheck struct {
 	wantNonEmpty bool
@@ -502,8 +483,6 @@ type fieldCheck struct {
 }
 
 var nonEmpty = fieldCheck{wantNonEmpty: true}
-
-func exact(v string) fieldCheck { return fieldCheck{wantExact: v} }
 
 func (fc fieldCheck) assert(t *testing.T, field, got string) {
 	t.Helper()

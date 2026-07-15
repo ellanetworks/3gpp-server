@@ -42,17 +42,6 @@ func Test5GAuthenticationResponse(t *testing.T) {
 			wantNASMsgType:  nasAuthenticationReject,
 		},
 		{
-			// The free5gc NAS decoder requires a 16-octet RES*, so a shorter one
-			// makes the message undecodable and the AMF returns 5GMM STATUS #111
-			// rather than the §5.4.1.3.5 reject.
-			name:             "truncated RES*: 8 bytes",
-			body:             `{"message_type":"authentication_response","res_star_override":"0000000000000000"}`,
-			wantHTTP:         200,
-			wantNGAPMsgType:  ngapDownlinkNASTransport,
-			wantNASMsgType:   nasStatus5GMM,
-			wantNASCause5GMM: cause5GMMProtocolErrorUnspecified,
-		},
-		{
 			// 32 bytes still decode as a 16-octet RES* that mismatches → reject.
 			name:            "oversized RES*: 32 bytes",
 			body:            `{"message_type":"authentication_response","res_star_override":"0000000000000000000000000000000000000000000000000000000000000000"}`,
@@ -145,5 +134,33 @@ func Test5GAuthenticationResponse_WithoutChallenge(t *testing.T) {
 	}
 	if status != 200 {
 		t.Fatalf("HTTP %d, want 200 (message must reach the AMF, not be refused locally)\n  body: %s", status, body)
+	}
+}
+
+// Test5GAuthenticationResponse_TruncatedRESStar sends an 8-octet RES*, which is
+// a syntactically incorrect mandatory IE (TS 24.501 §9.11.3.17 fixes RES* at 16
+// octets). TS 24.501 §7.5.1 lets the network "either: 1) try to treat the
+// message (the exact further actions are implementation dependent); or 2) ignore
+// the message except that it should return a status message ... with cause #96
+// 'invalid mandatory information'." Option 1 leaves the treatment open, so the
+// message type is not pinned; #96 is the only cause the clause names for a
+// status answering this message.
+func Test5GAuthenticationResponse_TruncatedRESStar(t *testing.T) {
+	gnbID := mustCreateGnB(t)
+	ueID := mustCreateUE(t, gnbID)
+
+	if status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+		`{"message_type":"registration_request"}`); status != 200 {
+		t.Fatalf("registration_request: HTTP %d\n  body: %s", status, body)
+	}
+
+	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+		`{"message_type":"authentication_response","res_star_override":"0000000000000000"}`)
+	if status != 200 {
+		t.Fatalf("HTTP %d, want 200 — a syntactically incorrect mandatory IE must draw a reply (TS 24.501 §7.5.1)\n  body: %s", status, body)
+	}
+
+	if got := jsonGet(body, "nas.message_type"); got == nasStatus5GMM {
+		assertNASCause(t, body, "nas.cause_5gmm", cause5GMMInvalidMandatoryInformation)
 	}
 }

@@ -27,7 +27,7 @@ func deleteSubscriber(t *testing.T, token, imsi string) {
 		t.Fatalf("delete subscriber %s: %v", imsi, err)
 	}
 
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 // Test4GNetworkInitiatedDetach: deleting an attached subscriber must make the MME
@@ -45,9 +45,13 @@ func Test4GNetworkInitiatedDetach(t *testing.T) {
 		t.Fatalf("create subscriber: %v", err)
 	}
 	// Recreate the deleted subscriber so the env is left as found for re-runs.
-	t.Cleanup(func() { createSubscriber(token, networkDetachIMSI) })
+	t.Cleanup(func() {
+		if err := createSubscriber(token, networkDetachIMSI); err != nil {
+			t.Errorf("restore subscriber %s: %v", networkDetachIMSI, err)
+		}
+	})
 
-	enbID := createGTPUENB(t, claimENBID(), "net-detach-enb")
+	enbID := createGTPUENB(t, claimENBID(), "net-detach-enb", n3IPv4)
 
 	body := fmt.Sprintf(`{"imsi":%q,"k":%q,"opc":%q,"amf":"8000","sqn":"000000000020"}`, networkDetachIMSI, testK, testOPc)
 	status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue", body)

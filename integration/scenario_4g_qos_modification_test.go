@@ -31,7 +31,7 @@ func setPolicyQoS(t *testing.T, token string, var5qi, arp int) {
 		t.Fatalf("set policy QoS: %v", err)
 	}
 
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 // Test4GQoSModification: changing the 5QI/ARP of an attached UE's policy must
@@ -52,7 +52,7 @@ func Test4GQoSModification(t *testing.T) {
 	// Restore the default policy's QoS so the env is left as found.
 	t.Cleanup(func() { setPolicyQoS(t, token, 9, 1) })
 
-	enbID := createGTPUENB(t, claimENBID(), "qos-mod-enb")
+	enbID := createGTPUENB(t, claimENBID(), "qos-mod-enb", n3IPv4)
 
 	body := fmt.Sprintf(`{"imsi":%q,"k":%q,"opc":%q,"amf":"8000","sqn":"000000000020"}`, qosModIMSI, testK, testOPc)
 	status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue", body)

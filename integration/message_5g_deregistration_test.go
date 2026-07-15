@@ -11,11 +11,12 @@ import (
 
 func Test5GDeregistration_Fuzz(t *testing.T) {
 	tests := []struct {
-		name            string
-		body            string
-		wantHTTP        int
-		wantNGAPMsgType string
-		wantNASMsgType  string
+		name             string
+		body             string
+		wantHTTP         int
+		wantNGAPMsgType  string
+		wantNASMsgType   string
+		wantNASCause5GMM int
 	}{
 		{
 			name:     "valid deregistration after full registration + PDU session",
@@ -72,11 +73,19 @@ func Test5GDeregistration_Fuzz(t *testing.T) {
 			wantHTTP: 200,
 		},
 		{
-			// valid 5GMM header but unknown deregistration message type
-			// (0x46 = DeregistrationAcceptUEOriginating — wrong direction)
-			name:     "raw NAS: deregistration accept type (wrong direction)",
-			body:     `{"message_type":"deregistration_request","raw_nas_pdu":"7e0046"}`,
-			wantHTTP: 200,
+			// 0x46 = DeregistrationAcceptUEOriginating, a downlink type sent
+			// uplink. Per TS 24.501 §7.4 NOTE, "a message type not defined for
+			// the EPD in the given direction is regarded by the receiver as a
+			// message type not defined for the EPD". Reception of an unsolicited
+			// 5GMM message from the UE is foreseen, so §7.4's implementation-
+			// dependent branch does not apply: the AMF "shall ignore the message
+			// except that it should return a status message ... with cause #97
+			// 'message type non-existent or not implemented'".
+			name:             "raw NAS: deregistration accept type (wrong direction)",
+			body:             `{"message_type":"deregistration_request","raw_nas_pdu":"7e0046"}`,
+			wantHTTP:         200,
+			wantNASMsgType:   nasStatus5GMM,
+			wantNASCause5GMM: cause5GMMMessageTypeNonExistent,
 		},
 		{
 			name: "raw NAS: missing security header (single byte EPD)",
@@ -138,6 +147,8 @@ func Test5GDeregistration_Fuzz(t *testing.T) {
 					t.Errorf("nas.message_type = %q, want %q\n  body: %s", got, tt.wantNASMsgType, body)
 				}
 			}
+
+			assertNASCause(t, body, "nas.cause_5gmm", tt.wantNASCause5GMM)
 		})
 	}
 }

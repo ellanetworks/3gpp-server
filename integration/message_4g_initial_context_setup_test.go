@@ -42,8 +42,11 @@ func Test4GInitialContextSetup_UEAMBR(t *testing.T) {
 // of IPv6 address; or 160 bits if both IPv4 and IPv6 addresses are signalled, in
 // which case the IPv4 address is contained in the first 32 bits."
 //
-// This core's S1-U carries both families, so a conformant address recovers both
-// halves — a swapped or truncated encoding yields a wrong address for its family.
+// All three forms are conformant, so the test does not demand a particular one:
+// it requires that at least one family decodes (a length outside 32/128/160 bits
+// yields none) and that every family present names the S-GW's S1-U address for
+// that family — a swapped or truncated 160-bit encoding hands back a v4 address
+// read out of the v6 half, or the reverse.
 func Test4GInitialContextSetup_TransportLayerAddress(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -56,15 +59,15 @@ func Test4GInitialContextSetup_TransportLayerAddress(t *testing.T) {
 	v6 := jsonGet(ics, "s1ap.erab_setup_items.0.transport_layer_address_ipv6")
 
 	if v4 == "" && v6 == "" {
-		t.Fatalf("ICS Request E-RAB item carries no Transport Layer Address (mandatory, TS 36.413 §9.1.4.1; TS 36.414 §5.3)\n  body: %s", ics)
+		t.Fatalf("ICS Request E-RAB item carries no decodable Transport Layer Address; it is mandatory (TS 36.413 §9.1.4.1) and must be 32, 128 or 160 bits (TS 36.414 §5.3)\n  body: %s", ics)
 	}
 
-	if v4 != n3IPv4.upfN3 {
+	if v4 != "" && v4 != n3IPv4.upfN3 {
 		t.Errorf("ICS Request transport_layer_address = %q, want the S-GW S1-U IPv4 %q — with both families signalled the IPv4 occupies the first 32 bits (TS 36.414 §5.3)\n  body: %s",
 			v4, n3IPv4.upfN3, ics)
 	}
 
-	if v6 != n3IPv6.upfN3 {
+	if v6 != "" && v6 != n3IPv6.upfN3 {
 		t.Errorf("ICS Request transport_layer_address_ipv6 = %q, want the S-GW S1-U IPv6 %q — a 160-bit address carries the IPv6 in the 128 bits following the IPv4 (TS 36.414 §5.3)\n  body: %s",
 			v6, n3IPv6.upfN3, ics)
 	}

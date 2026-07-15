@@ -17,7 +17,7 @@ import (
 // is delivered to B's tunnel — proving A impersonated B's IP. The UPF must
 // instead drop A's spoofed-source uplink.
 func Test4GUserPlaneSourceSpoofing(t *testing.T) {
-	enbID := createGTPUENB(t, claimENBID(), "gtpu-enb")
+	enbID := createGTPUENB(t, claimENBID(), "gtpu-enb", n3IPv4)
 
 	ueA := createENBUEWithIMSI(t, enbID, testSUPI(1)[len("imsi-"):])
 	fullAttach(t, enbID, ueA)

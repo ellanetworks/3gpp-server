@@ -93,6 +93,32 @@ func Test5GRegistration_MobilityUpdate(t *testing.T) {
 	}
 }
 
+// Test5GRegistration_MobilityUpdateBadMAC drives a Mobility Registration Update
+// whose NAS-MAC does not verify. TS 24.501 §4.4.4.3 lets the AMF process a
+// REGISTRATION REQUEST that fails the integrity check, but not accept it on the
+// spot: "If a REGISTRATION REQUEST message for mobility and periodic
+// registration update fails the integrity check [...] the AMF shall initiate a
+// primary authentication and key agreement procedure to create a new native 5G
+// NAS security context. Additionally, the AMF shall initiate a security mode
+// control procedure". Rejecting or re-identifying the UE also keeps security
+// closed; issuing a Registration Accept does not.
+func Test5GRegistration_MobilityUpdateBadMAC(t *testing.T) {
+	gnbID := mustCreateGnB(t)
+	ueID := mustCreateUE(t, gnbID)
+
+	registerThenIdle(t, gnbID, ueID)
+
+	body := fmt.Sprintf(`{"message_type":"registration_request","registration_type":%d,"corrupt_mac":true,"timeout_ms":3000}`, registrationTypeMobility)
+	status, resp := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap", body)
+	if status != 200 && status != 504 {
+		t.Fatalf("mobility update with a bad NAS-MAC: HTTP %d, want 200 or 504\n  body: %s", status, resp)
+	}
+
+	if got := jsonGet(resp, "nas.message_type"); got == nasRegistrationAccept {
+		t.Fatalf("the AMF accepted a mobility registration update whose NAS-MAC failed the integrity check; it must re-authenticate and re-activate security first (TS 24.501 §4.4.4.3)\n  body: %s", resp)
+	}
+}
+
 // Test5GRegistration_PeriodicUpdate mirrors the mobility case for the Periodic
 // Registration Updating procedure (TS 24.501 §5.5.1.3).
 func Test5GRegistration_PeriodicUpdate(t *testing.T) {

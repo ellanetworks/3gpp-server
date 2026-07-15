@@ -56,6 +56,43 @@ func Test5GAuthenticationFailure_SynchFailure(t *testing.T) {
 	}
 }
 
+// Test5GAuthenticationFailure_RepeatedSynchFailure sends cause #21 twice in a
+// row. The first is mandatory to act on: per TS 24.501 §5.4.1.3.7 f) "Upon the
+// first receipt of an AUTHENTICATION FAILURE message from the UE with the 5GMM
+// cause #21 'synch failure', the network shall use the returned AUTS parameter
+// [...] to re-synchronise", then "shall initiate the 5G AKA based primary
+// authentication and key agreement procedure" — a fresh Authentication Request.
+//
+// For the second, NOTE 4 of the same subclause says the network "may terminate
+// the 5G AKA based primary authentication and key agreement procedure by sending
+// an AUTHENTICATION REJECT message" — permission, not obligation, so
+// re-synchronising once more is equally conformant. The binding invariant is
+// that an unauthenticated UE must not reach security activation.
+func Test5GAuthenticationFailure_RepeatedSynchFailure(t *testing.T) {
+	gnbID, ueID := authChallengePending(t)
+
+	status, first := sendAuthFailure(t, gnbID, ueID, cause5GMMSynchFailure)
+	if status != 200 {
+		t.Fatalf("first synch failure: HTTP %d, want 200\n  body: %s", status, first)
+	}
+
+	if got := jsonGet(first, "nas.message_type"); got != nasAuthenticationRequest {
+		t.Fatalf("first synch failure: nas.message_type = %q, want a fresh authentication_request (TS 24.501 §5.4.1.3.7 f)\n  body: %s", got, first)
+	}
+
+	status, second := sendAuthFailure(t, gnbID, ueID, cause5GMMSynchFailure)
+	if status != 200 {
+		t.Fatalf("repeated synch failure: HTTP %d, want 200\n  body: %s", status, second)
+	}
+
+	switch got := jsonGet(second, "nas.message_type"); got {
+	case nasAuthenticationReject, nasAuthenticationRequest:
+		// Both permitted: terminate (§5.4.1.3.7 NOTE 4) or re-synchronise again (item f).
+	default:
+		t.Errorf("repeated synch failure: nas.message_type = %q, want authentication_reject (TS 24.501 §5.4.1.3.7 NOTE 4) or a further authentication_request (item f)\n  body: %s", got, second)
+	}
+}
+
 // Test5GAuthenticationFailure_NgKSIAlreadyInUse sends cause #71. Per TS 24.501
 // §5.4.1.3.7 e) the network selects a new ngKSI and re-sends the challenge — a
 // new Authentication Request.

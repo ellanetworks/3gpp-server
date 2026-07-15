@@ -33,6 +33,14 @@ func identityRequestPending(t *testing.T) (string, string) {
 		t.Fatalf("nas.message_type = %q, want identity_request (TS 24.501 §5.4.3)\n  body: %s", got, body)
 	}
 
+	// The Identity Request names the identity it wants in the Identity type IE
+	// (TS 24.501 §5.4.3.2). With no 5G NAS security context and an unresolvable
+	// 5G-GUTI, SUCI is the only identity that recovers the SUPI — identity type
+	// "001" (TS 24.501 §9.11.3.3, Table 9.11.3.3.1).
+	if got := jsonGet(body, "nas.identity_type"); got != identityTypeSUCI {
+		t.Fatalf("nas.identity_type = %q, want %s (SUCI) — the AMF cannot derive the SUPI from an unknown 5G-GUTI (TS 24.501 §9.11.3.3)\n  body: %s", got, identityTypeSUCI, body)
+	}
+
 	return gnbID, ueID
 }
 

@@ -63,7 +63,16 @@ func (h *Handler) CreateENBUE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ue := enb.CreateUE(imsi, req.K, req.OPc, req.AMF, req.SQN)
+	enbUES1APID := enb.AllocateENBUES1APID()
+	ueID := fmt.Sprintf("%d", enbUES1APID)
+
+	ue := store.NewUEEPSContext(ueID, enbUES1APID, &store.CreateUEEPSOpts{
+		IMSI: imsi,
+		K:    req.K,
+		OPc:  req.OPc,
+		AMF:  req.AMF,
+		SQN:  req.SQN,
+	})
 
 	if req.UENetworkCapability != "" {
 		cap, err := hex.DecodeString(req.UENetworkCapability)
@@ -74,6 +83,8 @@ func (h *Handler) CreateENBUE(w http.ResponseWriter, r *http.Request) {
 
 		ue.UENetworkCapability = cap
 	}
+
+	enb.CreateUE(ue)
 
 	writeJSON(w, http.StatusCreated, CreateENBUEResponse{UEID: ue.ID, ENBUES1APID: ue.ENBUES1APID})
 }

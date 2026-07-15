@@ -23,16 +23,18 @@ func attachToAccept(t *testing.T, enbID string) []byte {
 }
 
 // Test4GGUTIReallocation checks the MME assigns a fresh GUTI on each attach
-// (TS 24.301 §5.5.1.2.4) and that the M-TMSIs are not sequentially allocated, as
-// required for subscriber-identity confidentiality (TS 23.003 §2.8).
+// (TS 24.301 §5.5.1.2.4) and that M-TMSI allocation is unpredictable:
+// "M-TMSI generation should be following the best practices of unpredictable
+// identifier generation" (TS 33.401 §7.1). Test5GGUTIReallocation asserts the
+// same against TS 33.501 §6.12.3.
 func Test4GGUTIReallocation(t *testing.T) {
 	enbID := mustCreateENB(t)
 
 	const n = 4
 
 	var (
-		seen     = map[string]bool{}
-		min, max uint64
+		seen   = map[string]bool{}
+		mtmsis []uint64
 	)
 
 	for i := 0; i < n; i++ {
@@ -51,23 +53,13 @@ func Test4GGUTIReallocation(t *testing.T) {
 
 		v, err := strconv.ParseUint(mtmsi, 16, 32)
 		if err != nil {
-			t.Fatalf("M-TMSI %q not hex: %v", mtmsi, err)
+			t.Fatalf("M-TMSI %q not a 32-bit hex value: %v", mtmsi, err)
 		}
 
-		if i == 0 || v < min {
-			min = v
-		}
-
-		if i == 0 || v > max {
-			max = v
-		}
+		mtmsis = append(mtmsis, v)
 	}
 
-	// Sequential allocation would pack n M-TMSIs into a span of n-1; a spread far
-	// larger than that is evidence of the unpredictable allocation the spec wants.
-	if max-min < 1000 {
-		t.Fatalf("M-TMSIs span only %d across %d attaches; allocation looks sequential/predictable (TS 23.003 §2.8)", max-min, n)
-	}
+	assertUnpredictableTMSIs(t, mtmsis, "M-TMSI", "TS 33.401 §7.1")
 }
 
 // Test4GForeignGUTIIdentityRequest checks that an attach using a GUTI the MME does

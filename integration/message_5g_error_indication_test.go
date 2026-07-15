@@ -39,6 +39,38 @@ func ngapErrorIndicationIDs(body []byte) (amf, ran *int64) {
 	return amf, ran
 }
 
+// criticalityDiagnosticsJSON mirrors the Criticality Diagnostics IE the server
+// decodes (TS 38.413 §9.3.1.3); every field is optional there.
+type criticalityDiagnosticsJSON struct {
+	ProcedureCode        *int64  `json:"procedure_code"`
+	TriggeringMessage    *string `json:"triggering_message"`
+	ProcedureCriticality *string `json:"procedure_criticality"`
+}
+
+// ngapCriticalityDiagnostics returns the Criticality Diagnostics IE carried in
+// the response's IE list, or nil when absent.
+func ngapCriticalityDiagnostics(body []byte) *criticalityDiagnosticsJSON {
+	var top struct {
+		NGAP struct {
+			IEs []struct {
+				CriticalityDiagnostics *criticalityDiagnosticsJSON `json:"criticality_diagnostics"`
+			} `json:"ies"`
+		} `json:"ngap"`
+	}
+
+	if err := json.Unmarshal(body, &top); err != nil {
+		return nil
+	}
+
+	for _, ie := range top.NGAP.IEs {
+		if ie.CriticalityDiagnostics != nil {
+			return ie.CriticalityDiagnostics
+		}
+	}
+
+	return nil
+}
+
 // assertSpecCompliantErrorIndication checks that a response to a UE-associated
 // message carrying a wrong AMF/RAN UE NGAP ID is an Error Indication with the
 // IEs TS 38.413 §10.6 and §8.7.5.2 require: it uses UE-associated signalling

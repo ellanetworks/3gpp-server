@@ -341,44 +341,30 @@ func BuildUplinkNASTransport(amfUeNgapID, ranUeNgapID int64, nasPDU []byte, mcc,
 
 	ies := &im.Value.UplinkNASTransport.ProtocolIEs
 
-	amfIE := ngapType.UplinkNASTransportIEs{}
-	amfIE.Id.Value = ngapType.ProtocolIEIDAMFUENGAPID
-	amfIE.Criticality.Value = ngapType.CriticalityPresentReject
-	amfIE.Value.Present = ngapType.UplinkNASTransportIEsPresentAMFUENGAPID
-	amfIE.Value.AMFUENGAPID = new(ngapType.AMFUENGAPID)
-	amfIE.Value.AMFUENGAPID.Value = amfUeNgapID
-	ies.List = append(ies.List, amfIE)
+	add := func(id int64, crit aper.Enumerated, present int) *ngapType.UplinkNASTransportIEsValue {
+		ie := ngapType.UplinkNASTransportIEs{}
+		ie.Id.Value = id
+		ie.Criticality.Value = crit
+		ie.Value.Present = present
+		ies.List = append(ies.List, ie)
 
-	ranIE := ngapType.UplinkNASTransportIEs{}
-	ranIE.Id.Value = ngapType.ProtocolIEIDRANUENGAPID
-	ranIE.Criticality.Value = ngapType.CriticalityPresentReject
-	ranIE.Value.Present = ngapType.UplinkNASTransportIEsPresentRANUENGAPID
-	ranIE.Value.RANUENGAPID = new(ngapType.RANUENGAPID)
-	ranIE.Value.RANUENGAPID.Value = ranUeNgapID
-	ies.List = append(ies.List, ranIE)
+		return &ies.List[len(ies.List)-1].Value
+	}
 
-	nasIE := ngapType.UplinkNASTransportIEs{}
-	nasIE.Id.Value = ngapType.ProtocolIEIDNASPDU
-	nasIE.Criticality.Value = ngapType.CriticalityPresentReject
-	nasIE.Value.Present = ngapType.UplinkNASTransportIEsPresentNASPDU
-	nasIE.Value.NASPDU = new(ngapType.NASPDU)
-	nasIE.Value.NASPDU.Value = nasPDU
-	ies.List = append(ies.List, nasIE)
-
-	uliIE := ngapType.UplinkNASTransportIEs{}
-	uliIE.Id.Value = ngapType.ProtocolIEIDUserLocationInformation
-	uliIE.Criticality.Value = ngapType.CriticalityPresentIgnore
-	uliIE.Value.Present = ngapType.UplinkNASTransportIEsPresentUserLocationInformation
-	uliIE.Value.UserLocationInformation = new(ngapType.UserLocationInformation)
-
-	uli := uliIE.Value.UserLocationInformation
-	uli.Present = ngapType.UserLocationInformationPresentUserLocationInformationNR
-	uli.UserLocationInformationNR = new(ngapType.UserLocationInformationNR)
-	uli.UserLocationInformationNR.NRCGI.PLMNIdentity = plmnID
-	uli.UserLocationInformationNR.NRCGI.NRCellIdentity = nrCellID
-	uli.UserLocationInformationNR.TAI.PLMNIdentity = plmnID
-	uli.UserLocationInformationNR.TAI.TAC.Value = tacBytes
-	ies.List = append(ies.List, uliIE)
+	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentReject,
+		ngapType.UplinkNASTransportIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: amfUeNgapID}
+	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentReject,
+		ngapType.UplinkNASTransportIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
+	add(ngapType.ProtocolIEIDNASPDU, ngapType.CriticalityPresentReject,
+		ngapType.UplinkNASTransportIEsPresentNASPDU).NASPDU = &ngapType.NASPDU{Value: nasPDU}
+	add(ngapType.ProtocolIEIDUserLocationInformation, ngapType.CriticalityPresentIgnore,
+		ngapType.UplinkNASTransportIEsPresentUserLocationInformation).UserLocationInformation = &ngapType.UserLocationInformation{
+		Present: ngapType.UserLocationInformationPresentUserLocationInformationNR,
+		UserLocationInformationNR: &ngapType.UserLocationInformationNR{
+			NRCGI: ngapType.NRCGI{PLMNIdentity: plmnID, NRCellIdentity: nrCellID},
+			TAI:   ngapType.TAI{PLMNIdentity: plmnID, TAC: ngapType.TAC{Value: tacBytes}},
+		},
+	}
 
 	return ngap.Encoder(pdu)
 }
@@ -437,21 +423,20 @@ func BuildPDUSessionResourceSetupResponse(amfUeNgapID, ranUeNgapID, pduSessionID
 
 	ies := &so.Value.PDUSessionResourceSetupResponse.ProtocolIEs
 
-	amfIE := ngapType.PDUSessionResourceSetupResponseIEs{}
-	amfIE.Id.Value = ngapType.ProtocolIEIDAMFUENGAPID
-	amfIE.Criticality.Value = ngapType.CriticalityPresentIgnore
-	amfIE.Value.Present = ngapType.PDUSessionResourceSetupResponseIEsPresentAMFUENGAPID
-	amfIE.Value.AMFUENGAPID = new(ngapType.AMFUENGAPID)
-	amfIE.Value.AMFUENGAPID.Value = amfUeNgapID
-	ies.List = append(ies.List, amfIE)
+	add := func(id int64, crit aper.Enumerated, present int) *ngapType.PDUSessionResourceSetupResponseIEsValue {
+		ie := ngapType.PDUSessionResourceSetupResponseIEs{}
+		ie.Id.Value = id
+		ie.Criticality.Value = crit
+		ie.Value.Present = present
+		ies.List = append(ies.List, ie)
 
-	ranIE := ngapType.PDUSessionResourceSetupResponseIEs{}
-	ranIE.Id.Value = ngapType.ProtocolIEIDRANUENGAPID
-	ranIE.Criticality.Value = ngapType.CriticalityPresentIgnore
-	ranIE.Value.Present = ngapType.PDUSessionResourceSetupResponseIEsPresentRANUENGAPID
-	ranIE.Value.RANUENGAPID = new(ngapType.RANUENGAPID)
-	ranIE.Value.RANUENGAPID.Value = ranUeNgapID
-	ies.List = append(ies.List, ranIE)
+		return &ies.List[len(ies.List)-1].Value
+	}
+
+	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentIgnore,
+		ngapType.PDUSessionResourceSetupResponseIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: amfUeNgapID}
+	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentIgnore,
+		ngapType.PDUSessionResourceSetupResponseIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
 
 	// Downlink GTP tunnel for the admitted PDU session (TS 38.413 §9.2.1.2).
 	transfer, err := buildPDUSessionResourceSetupResponseTransfer(dlTeid, dlIP)
@@ -459,19 +444,14 @@ func BuildPDUSessionResourceSetupResponse(amfUeNgapID, ranUeNgapID, pduSessionID
 		return nil, err
 	}
 
-	suIE := ngapType.PDUSessionResourceSetupResponseIEs{}
-	suIE.Id.Value = ngapType.ProtocolIEIDPDUSessionResourceSetupListSURes
-	suIE.Criticality.Value = ngapType.CriticalityPresentIgnore
-	suIE.Value.Present = ngapType.PDUSessionResourceSetupResponseIEsPresentPDUSessionResourceSetupListSURes
-	suIE.Value.PDUSessionResourceSetupListSURes = new(ngapType.PDUSessionResourceSetupListSURes)
-	suIE.Value.PDUSessionResourceSetupListSURes.List = append(
-		suIE.Value.PDUSessionResourceSetupListSURes.List,
-		ngapType.PDUSessionResourceSetupItemSURes{
-			PDUSessionID:                            ngapType.PDUSessionID{Value: pduSessionID},
-			PDUSessionResourceSetupResponseTransfer: transfer,
-		},
-	)
-	ies.List = append(ies.List, suIE)
+	setupList := &ngapType.PDUSessionResourceSetupListSURes{}
+	setupList.List = append(setupList.List, ngapType.PDUSessionResourceSetupItemSURes{
+		PDUSessionID:                            ngapType.PDUSessionID{Value: pduSessionID},
+		PDUSessionResourceSetupResponseTransfer: transfer,
+	})
+
+	add(ngapType.ProtocolIEIDPDUSessionResourceSetupListSURes, ngapType.CriticalityPresentIgnore,
+		ngapType.PDUSessionResourceSetupResponseIEsPresentPDUSessionResourceSetupListSURes).PDUSessionResourceSetupListSURes = setupList
 
 	return ngap.Encoder(pdu)
 }
@@ -564,21 +544,20 @@ func BuildPDUSessionResourceReleaseResponse(amfUeNgapID, ranUeNgapID int64) ([]b
 
 	ies := &so.Value.PDUSessionResourceReleaseResponse.ProtocolIEs
 
-	amfIE := ngapType.PDUSessionResourceReleaseResponseIEs{}
-	amfIE.Id.Value = ngapType.ProtocolIEIDAMFUENGAPID
-	amfIE.Criticality.Value = ngapType.CriticalityPresentIgnore
-	amfIE.Value.Present = ngapType.PDUSessionResourceReleaseResponseIEsPresentAMFUENGAPID
-	amfIE.Value.AMFUENGAPID = new(ngapType.AMFUENGAPID)
-	amfIE.Value.AMFUENGAPID.Value = amfUeNgapID
-	ies.List = append(ies.List, amfIE)
+	add := func(id int64, crit aper.Enumerated, present int) *ngapType.PDUSessionResourceReleaseResponseIEsValue {
+		ie := ngapType.PDUSessionResourceReleaseResponseIEs{}
+		ie.Id.Value = id
+		ie.Criticality.Value = crit
+		ie.Value.Present = present
+		ies.List = append(ies.List, ie)
 
-	ranIE := ngapType.PDUSessionResourceReleaseResponseIEs{}
-	ranIE.Id.Value = ngapType.ProtocolIEIDRANUENGAPID
-	ranIE.Criticality.Value = ngapType.CriticalityPresentIgnore
-	ranIE.Value.Present = ngapType.PDUSessionResourceReleaseResponseIEsPresentRANUENGAPID
-	ranIE.Value.RANUENGAPID = new(ngapType.RANUENGAPID)
-	ranIE.Value.RANUENGAPID.Value = ranUeNgapID
-	ies.List = append(ies.List, ranIE)
+		return &ies.List[len(ies.List)-1].Value
+	}
+
+	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentIgnore,
+		ngapType.PDUSessionResourceReleaseResponseIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: amfUeNgapID}
+	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentIgnore,
+		ngapType.PDUSessionResourceReleaseResponseIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
 
 	return ngap.Encoder(pdu)
 }
@@ -596,21 +575,20 @@ func BuildInitialContextSetupResponse(amfUeNgapID, ranUeNgapID int64) ([]byte, e
 
 	ies := &so.Value.InitialContextSetupResponse.ProtocolIEs
 
-	amfIE := ngapType.InitialContextSetupResponseIEs{}
-	amfIE.Id.Value = ngapType.ProtocolIEIDAMFUENGAPID
-	amfIE.Criticality.Value = ngapType.CriticalityPresentIgnore
-	amfIE.Value.Present = ngapType.InitialContextSetupResponseIEsPresentAMFUENGAPID
-	amfIE.Value.AMFUENGAPID = new(ngapType.AMFUENGAPID)
-	amfIE.Value.AMFUENGAPID.Value = amfUeNgapID
-	ies.List = append(ies.List, amfIE)
+	add := func(id int64, crit aper.Enumerated, present int) *ngapType.InitialContextSetupResponseIEsValue {
+		ie := ngapType.InitialContextSetupResponseIEs{}
+		ie.Id.Value = id
+		ie.Criticality.Value = crit
+		ie.Value.Present = present
+		ies.List = append(ies.List, ie)
 
-	ranIE := ngapType.InitialContextSetupResponseIEs{}
-	ranIE.Id.Value = ngapType.ProtocolIEIDRANUENGAPID
-	ranIE.Criticality.Value = ngapType.CriticalityPresentIgnore
-	ranIE.Value.Present = ngapType.InitialContextSetupResponseIEsPresentRANUENGAPID
-	ranIE.Value.RANUENGAPID = new(ngapType.RANUENGAPID)
-	ranIE.Value.RANUENGAPID.Value = ranUeNgapID
-	ies.List = append(ies.List, ranIE)
+		return &ies.List[len(ies.List)-1].Value
+	}
+
+	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentIgnore,
+		ngapType.InitialContextSetupResponseIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: amfUeNgapID}
+	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentIgnore,
+		ngapType.InitialContextSetupResponseIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
 
 	return ngap.Encoder(pdu)
 }
@@ -628,21 +606,20 @@ func BuildUEContextReleaseComplete(amfUeNgapID, ranUeNgapID int64) ([]byte, erro
 
 	ies := &so.Value.UEContextReleaseComplete.ProtocolIEs
 
-	amfIE := ngapType.UEContextReleaseCompleteIEs{}
-	amfIE.Id.Value = ngapType.ProtocolIEIDAMFUENGAPID
-	amfIE.Criticality.Value = ngapType.CriticalityPresentIgnore
-	amfIE.Value.Present = ngapType.UEContextReleaseCompleteIEsPresentAMFUENGAPID
-	amfIE.Value.AMFUENGAPID = new(ngapType.AMFUENGAPID)
-	amfIE.Value.AMFUENGAPID.Value = amfUeNgapID
-	ies.List = append(ies.List, amfIE)
+	add := func(id int64, crit aper.Enumerated, present int) *ngapType.UEContextReleaseCompleteIEsValue {
+		ie := ngapType.UEContextReleaseCompleteIEs{}
+		ie.Id.Value = id
+		ie.Criticality.Value = crit
+		ie.Value.Present = present
+		ies.List = append(ies.List, ie)
 
-	ranIE := ngapType.UEContextReleaseCompleteIEs{}
-	ranIE.Id.Value = ngapType.ProtocolIEIDRANUENGAPID
-	ranIE.Criticality.Value = ngapType.CriticalityPresentIgnore
-	ranIE.Value.Present = ngapType.UEContextReleaseCompleteIEsPresentRANUENGAPID
-	ranIE.Value.RANUENGAPID = new(ngapType.RANUENGAPID)
-	ranIE.Value.RANUENGAPID.Value = ranUeNgapID
-	ies.List = append(ies.List, ranIE)
+		return &ies.List[len(ies.List)-1].Value
+	}
+
+	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentIgnore,
+		ngapType.UEContextReleaseCompleteIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: amfUeNgapID}
+	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentIgnore,
+		ngapType.UEContextReleaseCompleteIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
 
 	return ngap.Encoder(pdu)
 }
@@ -663,31 +640,25 @@ func BuildUEContextReleaseRequest(amfUeNgapID, ranUeNgapID int64, causeRadioNetw
 
 	ies := &im.Value.UEContextReleaseRequest.ProtocolIEs
 
-	amfIE := ngapType.UEContextReleaseRequestIEs{}
-	amfIE.Id.Value = ngapType.ProtocolIEIDAMFUENGAPID
-	amfIE.Criticality.Value = ngapType.CriticalityPresentReject
-	amfIE.Value.Present = ngapType.UEContextReleaseRequestIEsPresentAMFUENGAPID
-	amfIE.Value.AMFUENGAPID = new(ngapType.AMFUENGAPID)
-	amfIE.Value.AMFUENGAPID.Value = amfUeNgapID
-	ies.List = append(ies.List, amfIE)
+	add := func(id int64, crit aper.Enumerated, present int) *ngapType.UEContextReleaseRequestIEsValue {
+		ie := ngapType.UEContextReleaseRequestIEs{}
+		ie.Id.Value = id
+		ie.Criticality.Value = crit
+		ie.Value.Present = present
+		ies.List = append(ies.List, ie)
 
-	ranIE := ngapType.UEContextReleaseRequestIEs{}
-	ranIE.Id.Value = ngapType.ProtocolIEIDRANUENGAPID
-	ranIE.Criticality.Value = ngapType.CriticalityPresentReject
-	ranIE.Value.Present = ngapType.UEContextReleaseRequestIEsPresentRANUENGAPID
-	ranIE.Value.RANUENGAPID = new(ngapType.RANUENGAPID)
-	ranIE.Value.RANUENGAPID.Value = ranUeNgapID
-	ies.List = append(ies.List, ranIE)
+		return &ies.List[len(ies.List)-1].Value
+	}
 
-	causeIE := ngapType.UEContextReleaseRequestIEs{}
-	causeIE.Id.Value = ngapType.ProtocolIEIDCause
-	causeIE.Criticality.Value = ngapType.CriticalityPresentIgnore
-	causeIE.Value.Present = ngapType.UEContextReleaseRequestIEsPresentCause
-	causeIE.Value.Cause = new(ngapType.Cause)
-	causeIE.Value.Cause.Present = ngapType.CausePresentRadioNetwork
-	causeIE.Value.Cause.RadioNetwork = new(ngapType.CauseRadioNetwork)
-	causeIE.Value.Cause.RadioNetwork.Value = aper.Enumerated(causeRadioNetwork)
-	ies.List = append(ies.List, causeIE)
+	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentReject,
+		ngapType.UEContextReleaseRequestIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: amfUeNgapID}
+	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentReject,
+		ngapType.UEContextReleaseRequestIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
+	add(ngapType.ProtocolIEIDCause, ngapType.CriticalityPresentIgnore,
+		ngapType.UEContextReleaseRequestIEsPresentCause).Cause = &ngapType.Cause{
+		Present:      ngapType.CausePresentRadioNetwork,
+		RadioNetwork: &ngapType.CauseRadioNetwork{Value: aper.Enumerated(causeRadioNetwork)},
+	}
 
 	return ngap.Encoder(pdu)
 }

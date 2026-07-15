@@ -46,7 +46,7 @@ func scrapeUPFCounters(t *testing.T) upfCounters {
 		t.Logf("diag: scrape UPF counters: %v", err)
 		return nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	out := make(upfCounters)
 

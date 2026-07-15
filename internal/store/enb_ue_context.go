@@ -83,6 +83,27 @@ type UEEPSContext struct {
 	GUTIMTMSI   uint32
 }
 
+type CreateUEEPSOpts struct {
+	IMSI string
+	K    string
+	OPc  string
+	AMF  string
+	SQN  string
+}
+
+func NewUEEPSContext(id string, enbUES1APID uint32, opts *CreateUEEPSOpts) *UEEPSContext {
+	return &UEEPSContext{
+		ID:          id,
+		IMSI:        opts.IMSI,
+		K:           opts.K,
+		OPc:         opts.OPc,
+		AMF:         opts.AMF,
+		SQN:         opts.SQN,
+		ENBUES1APID: enbUES1APID,
+		Bearers:     make(map[uint8]*EPSBearer),
+	}
+}
+
 // NextUL returns the current uplink NAS COUNT and advances it.
 func (u *UEEPSContext) NextUL() uint32 {
 	c := u.ULCount

@@ -121,39 +121,62 @@ func decodeESM(plain []byte, resp *NASResponse) (*NASResponse, error) {
 	switch mt {
 	case eps.MsgActivateDefaultEPSBearerContextRequest:
 		resp.MessageType = "activate_default_eps_bearer_context_request"
-		decodeDefaultBearer(plain, resp)
+
+		if err := decodeDefaultBearer(plain, resp); err != nil {
+			return nil, fmt.Errorf("naseps: parse activate default EPS bearer context request: %w", err)
+		}
 	case eps.MsgPDNConnectivityReject:
 		resp.MessageType = "pdn_connectivity_reject"
-		if m, err := eps.ParsePDNConnectivityReject(plain); err == nil {
-			setESM(resp, int(m.EPSBearerIdentity), int(m.ProcedureTransactionIdentity), &m.ESMCause)
+
+		m, err := eps.ParsePDNConnectivityReject(plain)
+		if err != nil {
+			return nil, fmt.Errorf("naseps: parse PDN connectivity reject: %w", err)
 		}
+
+		setESM(resp, int(m.EPSBearerIdentity), int(m.ProcedureTransactionIdentity), &m.ESMCause)
 	case eps.MsgPDNDisconnectReject:
 		resp.MessageType = "pdn_disconnect_reject"
-		if m, err := eps.ParsePDNDisconnectReject(plain); err == nil {
-			setESM(resp, int(m.EPSBearerIdentity), int(m.ProcedureTransactionIdentity), &m.ESMCause)
+
+		m, err := eps.ParsePDNDisconnectReject(plain)
+		if err != nil {
+			return nil, fmt.Errorf("naseps: parse PDN disconnect reject: %w", err)
 		}
+
+		setESM(resp, int(m.EPSBearerIdentity), int(m.ProcedureTransactionIdentity), &m.ESMCause)
 	case eps.MsgDeactivateEPSBearerContextRequest:
 		resp.MessageType = "deactivate_eps_bearer_context_request"
-		if m, err := eps.ParseDeactivateEPSBearerContextRequest(plain); err == nil {
-			setESM(resp, int(m.EPSBearerIdentity), int(m.ProcedureTransactionIdentity), &m.ESMCause)
+
+		m, err := eps.ParseDeactivateEPSBearerContextRequest(plain)
+		if err != nil {
+			return nil, fmt.Errorf("naseps: parse deactivate EPS bearer context request: %w", err)
 		}
+
+		setESM(resp, int(m.EPSBearerIdentity), int(m.ProcedureTransactionIdentity), &m.ESMCause)
 	case eps.MsgModifyEPSBearerContextRequest:
 		resp.MessageType = "modify_eps_bearer_context_request"
-		if m, err := eps.ParseModifyEPSBearerContextRequest(plain); err == nil {
-			ebi := int(m.EPSBearerIdentity)
-			pti := int(m.ProcedureTransactionIdentity)
-			resp.EPSBearerIdentity = &ebi
-			resp.BearerPTI = &pti
 
-			if len(m.APNAMBR) > 0 {
-				resp.APNAMBR = hex.EncodeToString(m.APNAMBR)
-			}
+		m, err := eps.ParseModifyEPSBearerContextRequest(plain)
+		if err != nil {
+			return nil, fmt.Errorf("naseps: parse modify EPS bearer context request: %w", err)
+		}
+
+		ebi := int(m.EPSBearerIdentity)
+		pti := int(m.ProcedureTransactionIdentity)
+		resp.EPSBearerIdentity = &ebi
+		resp.BearerPTI = &pti
+
+		if len(m.APNAMBR) > 0 {
+			resp.APNAMBR = hex.EncodeToString(m.APNAMBR)
 		}
 	case eps.MsgESMStatus:
 		resp.MessageType = "esm_status"
-		if m, err := eps.ParseESMStatus(plain); err == nil {
-			setESM(resp, int(m.EPSBearerIdentity), int(m.ProcedureTransactionIdentity), &m.ESMCause)
+
+		m, err := eps.ParseESMStatus(plain)
+		if err != nil {
+			return nil, fmt.Errorf("naseps: parse ESM status: %w", err)
 		}
+
+		setESM(resp, int(m.EPSBearerIdentity), int(m.ProcedureTransactionIdentity), &m.ESMCause)
 	default:
 		resp.MessageType = fmt.Sprintf("esm_message_%#x", uint8(mt))
 	}
@@ -231,19 +254,19 @@ func decodeAttachAccept(b []byte, resp *NASResponse) error {
 	}
 
 	if len(m.ESMMessageContainer) > 0 {
-		decodeDefaultBearer(m.ESMMessageContainer, resp)
+		// A decode error is non-fatal — the outer Attach Accept fields are already set.
+		_ = decodeDefaultBearer(m.ESMMessageContainer, resp)
 	}
 
 	return nil
 }
 
-// decodeDefaultBearer extracts the default-bearer parameters from the Activate
-// Default EPS Bearer Context Request embedded in an Attach Accept. A decode error
-// is non-fatal — the outer Attach Accept fields are already set.
-func decodeDefaultBearer(container []byte, resp *NASResponse) {
+// decodeDefaultBearer extracts the default-bearer parameters from an Activate
+// Default EPS Bearer Context Request.
+func decodeDefaultBearer(container []byte, resp *NASResponse) error {
 	m, err := eps.ParseActivateDefaultEPSBearerContextRequest(container)
 	if err != nil {
-		return
+		return err
 	}
 
 	ebi := int(m.EPSBearerIdentity)
@@ -257,6 +280,8 @@ func decodeDefaultBearer(container []byte, resp *NASResponse) {
 		c := int(*m.ESMCause)
 		resp.BearerESMCause = &c
 	}
+
+	return nil
 }
 
 func decodeAttachReject(b []byte, resp *NASResponse) error {

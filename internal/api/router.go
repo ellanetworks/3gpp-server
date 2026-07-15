@@ -10,9 +10,9 @@ func NewRouter(h *Handler) *http.ServeMux {
 
 	mux.Handle("GET /openapi.yaml", OpenAPISpec())
 
-	mux.HandleFunc("POST /gnb", h.CreateGnB)
-	mux.HandleFunc("GET /gnb/{gnb_id}", h.GetGnB)
-	mux.HandleFunc("DELETE /gnb/{gnb_id}", h.DeleteGnB)
+	mux.HandleFunc("POST /gnb", h.CreateGNB)
+	mux.HandleFunc("GET /gnb/{gnb_id}", h.GetGNB)
+	mux.HandleFunc("DELETE /gnb/{gnb_id}", h.DeleteGNB)
 
 	// 4G/LTE: eNB lifecycle over S1-MME (S1AP).
 	mux.HandleFunc("POST /enb", h.CreateENB)

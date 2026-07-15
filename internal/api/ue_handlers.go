@@ -14,7 +14,7 @@ import (
 func (h *Handler) CreateUE(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 
-	gnb, err := h.Store.GetGnB(gnbID)
+	gnb, err := h.Store.GetGNB(gnbID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("gnb not found: %v", err))
 		return
@@ -78,7 +78,7 @@ func (h *Handler) GetUE(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 	ueID := r.PathValue("ue_id")
 
-	gnb, err := h.Store.GetGnB(gnbID)
+	gnb, err := h.Store.GetGNB(gnbID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("gnb not found: %v", err))
 		return
@@ -116,7 +116,7 @@ func (h *Handler) PatchUE(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 	ueID := r.PathValue("ue_id")
 
-	gnb, err := h.Store.GetGnB(gnbID)
+	gnb, err := h.Store.GetGNB(gnbID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("gnb not found: %v", err))
 		return
@@ -169,7 +169,7 @@ func (h *Handler) DeleteUE(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 	ueID := r.PathValue("ue_id")
 
-	gnb, err := h.Store.GetGnB(gnbID)
+	gnb, err := h.Store.GetGNB(gnbID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("gnb not found: %v", err))
 		return
@@ -190,7 +190,7 @@ func (h *Handler) MigrateUE(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 	ueID := r.PathValue("ue_id")
 
-	src, err := h.Store.GetGnB(gnbID)
+	src, err := h.Store.GetGNB(gnbID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("gnb not found: %v", err))
 		return
@@ -208,26 +208,13 @@ func (h *Handler) MigrateUE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	target, err := h.Store.GetGnB(req.TargetGnbID)
+	target, err := h.Store.GetGNB(req.TargetGnbID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("target gnb not found: %v", err))
 		return
 	}
 
-	// Purge the source's per-UE state under its current RAN-UE-NGAP-ID before any
-	// override rekeys the UE, so the source's side-maps are not left orphaned.
-	src.DeleteUE(ueID)
-
-	if req.RanUeNgapID != nil {
-		ue.RanUeNgapID = *req.RanUeNgapID
-	}
-
-	if req.AmfUeNgapID != nil {
-		ue.AmfUeNgapID = *req.AmfUeNgapID
-	}
-
-	target.CreateUE(ue)
-	target.UpdateNGAPIDs(ue.RanUeNgapID, ue.AmfUeNgapID)
+	src.MigrateUE(target, ue, req.RanUeNgapID, req.AmfUeNgapID)
 
 	writeJSON(w, http.StatusOK, MigrateUEResponse{
 		UEID:        ue.ID,

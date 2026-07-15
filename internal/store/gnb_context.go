@@ -8,24 +8,29 @@ import (
 	"sync/atomic"
 )
 
-type GnBContext struct {
+// GNBContext is an emulated gNB's NG-C association state, including the UE
+// contexts attached through it.
+type GNBContext struct {
 	ID    string
 	MCC   string
 	MNC   string
 	SST   int32
 	SD    string
 	TAC   string
-	GnbID string
+	GNBID string
 	Name  string
+
+	// N3Addr is the gNB's N3 transport address, advertised as the downlink
+	// endpoint in the PDU Session Resource Setup Response.
+	N3Addr string
 
 	Slices []SliceConfig
 
 	mu          sync.RWMutex
-	UEs         map[string]*UEContext
+	ues         map[string]*UEContext
 	nextRanUeID atomic.Int64
 
-	NGAPIDs     map[int64]int64
-	PDUSessions map[int64]map[int64]*PDUSessionInfo
+	pduSessions map[int64]map[int64]*PDUSessionInfo
 }
 
 type SliceConfig struct {
@@ -48,11 +53,11 @@ type PDUSessionInfo struct {
 }
 
 // GetPDUSession returns the stored session state for a UE's PDU session.
-func (g *GnBContext) GetPDUSession(ranUeID, pduSessionID int64) (*PDUSessionInfo, bool) {
+func (g *GNBContext) GetPDUSession(ranUeID, pduSessionID int64) (*PDUSessionInfo, bool) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
-	sessions, ok := g.PDUSessions[ranUeID]
+	sessions, ok := g.pduSessions[ranUeID]
 	if !ok {
 		return nil, false
 	}
@@ -62,74 +67,85 @@ func (g *GnBContext) GetPDUSession(ranUeID, pduSessionID int64) (*PDUSessionInfo
 	return info, ok
 }
 
-func NewGnBContext(id, mcc, mnc, tac, gnbID, name string, sst int32, sd string, slices []SliceConfig) *GnBContext {
-	return &GnBContext{
+func NewGNBContext(id, mcc, mnc, tac, gnbID, name string, sst int32, sd string, slices []SliceConfig) *GNBContext {
+	return &GNBContext{
 		ID:          id,
 		MCC:         mcc,
 		MNC:         mnc,
 		SST:         sst,
 		SD:          sd,
 		TAC:         tac,
-		GnbID:       gnbID,
+		GNBID:       gnbID,
 		Name:        name,
 		Slices:      slices,
-		UEs:         make(map[string]*UEContext),
-		NGAPIDs:     make(map[int64]int64),
-		PDUSessions: make(map[int64]map[int64]*PDUSessionInfo),
+		ues:         make(map[string]*UEContext),
+		pduSessions: make(map[int64]map[int64]*PDUSessionInfo),
 	}
 }
 
-func (g *GnBContext) AllocateRanUeNgapID() int64 {
+func (g *GNBContext) AllocateRanUeNgapID() int64 {
 	return g.nextRanUeID.Add(1)
 }
 
-func (g *GnBContext) UpdateNGAPIDs(ranUeID, amfUeID int64) {
+func (g *GNBContext) StorePDUSession(ranUeID int64, info *PDUSessionInfo) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	g.NGAPIDs[ranUeID] = amfUeID
-}
-
-func (g *GnBContext) GetAMFUENGAPID(ranUeID int64) (int64, bool) {
-	g.mu.RLock()
-	defer g.mu.RUnlock()
-	id, ok := g.NGAPIDs[ranUeID]
-	return id, ok
-}
-
-func (g *GnBContext) StorePDUSession(ranUeID int64, info *PDUSessionInfo) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	if g.PDUSessions[ranUeID] == nil {
-		g.PDUSessions[ranUeID] = make(map[int64]*PDUSessionInfo)
+	if g.pduSessions[ranUeID] == nil {
+		g.pduSessions[ranUeID] = make(map[int64]*PDUSessionInfo)
 	}
-	g.PDUSessions[ranUeID][info.PDUSessionID] = info
+	g.pduSessions[ranUeID][info.PDUSessionID] = info
 }
 
-func (g *GnBContext) CreateUE(ue *UEContext) {
+func (g *GNBContext) CreateUE(ue *UEContext) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	g.UEs[ue.ID] = ue
+	g.ues[ue.ID] = ue
 }
 
-func (g *GnBContext) GetUE(ueID string) (*UEContext, bool) {
+func (g *GNBContext) GetUE(ueID string) (*UEContext, bool) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
-	ue, ok := g.UEs[ueID]
+	ue, ok := g.ues[ueID]
+
 	return ue, ok
 }
 
-func (g *GnBContext) DeleteUE(ueID string) bool {
+func (g *GNBContext) DeleteUE(ueID string) bool {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 
-	ue, ok := g.UEs[ueID]
+	return g.deleteUELocked(ueID)
+}
+
+func (g *GNBContext) deleteUELocked(ueID string) bool {
+	ue, ok := g.ues[ueID]
 	if !ok {
 		return false
 	}
 
-	delete(g.UEs, ueID)
-	delete(g.NGAPIDs, ue.RanUeNgapID)
-	delete(g.PDUSessions, ue.RanUeNgapID)
+	delete(g.ues, ueID)
+	delete(g.pduSessions, ue.RanUeNgapID)
 
 	return true
+}
+
+// MigrateUE moves a UE context from this gNB to target, modelling the UE
+// arriving at the target after an N2 handover. The context keeps its identity,
+// credentials, and 5G NAS security state; non-nil IDs replace its NGAP UE
+// identities on the target. The source's ranUeID-keyed session state is purged
+// under the UE's current RAN-UE-NGAP-ID, before any new ID is applied.
+func (g *GNBContext) MigrateUE(target *GNBContext, ue *UEContext, ranUeNgapID, amfUeNgapID *int64) {
+	g.mu.Lock()
+	g.deleteUELocked(ue.ID)
+	g.mu.Unlock()
+
+	if ranUeNgapID != nil {
+		ue.RanUeNgapID = *ranUeNgapID
+	}
+
+	if amfUeNgapID != nil {
+		ue.AmfUeNgapID = *amfUeNgapID
+	}
+
+	target.CreateUE(ue)
 }

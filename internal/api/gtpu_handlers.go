@@ -55,7 +55,7 @@ func (h *Handler) gtpuSession(w http.ResponseWriter, r *http.Request, pduSession
 	gnbID := r.PathValue("gnb_id")
 	ueID := r.PathValue("ue_id")
 
-	gnb, err := h.Store.GetGnB(gnbID)
+	gnb, err := h.Store.GetGNB(gnbID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("gnb not found: %v", err))
 		return nil, nil, false

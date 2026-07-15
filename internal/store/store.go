@@ -12,21 +12,21 @@ import (
 
 type Store struct {
 	mu     sync.RWMutex
-	gnbs   map[string]*GnBContext
+	gnbs   map[string]*GNBContext
 	enbs   map[string]*ENBContext
 	nextID atomic.Int64
 }
 
 func New() *Store {
 	return &Store{
-		gnbs: make(map[string]*GnBContext),
+		gnbs: make(map[string]*GNBContext),
 		enbs: make(map[string]*ENBContext),
 	}
 }
 
-func (s *Store) CreateGnB(mcc, mnc, tac, gnbID, name string, sst int32, sd string, slices []SliceConfig) *GnBContext {
+func (s *Store) CreateGNB(mcc, mnc, tac, gnbID, name string, sst int32, sd string, slices []SliceConfig) *GNBContext {
 	id := strconv.FormatInt(s.nextID.Add(1), 10)
-	gnb := NewGnBContext(id, mcc, mnc, tac, gnbID, name, sst, sd, slices)
+	gnb := NewGNBContext(id, mcc, mnc, tac, gnbID, name, sst, sd, slices)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -35,7 +35,7 @@ func (s *Store) CreateGnB(mcc, mnc, tac, gnbID, name string, sst int32, sd strin
 	return gnb
 }
 
-func (s *Store) GetGnB(id string) (*GnBContext, error) {
+func (s *Store) GetGNB(id string) (*GNBContext, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -47,7 +47,7 @@ func (s *Store) GetGnB(id string) (*GnBContext, error) {
 	return gnb, nil
 }
 
-func (s *Store) DeleteGnB(id string) error {
+func (s *Store) DeleteGNB(id string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

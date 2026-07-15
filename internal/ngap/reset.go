@@ -32,27 +32,29 @@ func BuildNGReset(connections []NGResetConnection) ([]byte, error) {
 
 	ies := &im.Value.NGReset.ProtocolIEs
 
-	causeIE := ngapType.NGResetIEs{}
-	causeIE.Id.Value = ngapType.ProtocolIEIDCause
-	causeIE.Criticality.Value = ngapType.CriticalityPresentIgnore
-	causeIE.Value.Present = ngapType.NGResetIEsPresentCause
-	causeIE.Value.Cause = &ngapType.Cause{
+	add := func(id int64, crit aper.Enumerated, present int) *ngapType.NGResetIEsValue {
+		ie := ngapType.NGResetIEs{}
+		ie.Id.Value = id
+		ie.Criticality.Value = crit
+		ie.Value.Present = present
+		ies.List = append(ies.List, ie)
+
+		return &ies.List[len(ies.List)-1].Value
+	}
+
+	add(ngapType.ProtocolIEIDCause, ngapType.CriticalityPresentIgnore,
+		ngapType.NGResetIEsPresentCause).Cause = &ngapType.Cause{
 		Present: ngapType.CausePresentMisc,
 		Misc:    &ngapType.CauseMisc{Value: aper.Enumerated(CauseMiscOMIntervention)},
 	}
-	ies.List = append(ies.List, causeIE)
 
-	rtIE := ngapType.NGResetIEs{}
-	rtIE.Id.Value = ngapType.ProtocolIEIDResetType
-	rtIE.Criticality.Value = ngapType.CriticalityPresentReject
-	rtIE.Value.Present = ngapType.NGResetIEsPresentResetType
-	rtIE.Value.ResetType = new(ngapType.ResetType)
+	resetType := new(ngapType.ResetType)
 
 	if len(connections) == 0 {
-		rtIE.Value.ResetType.Present = ngapType.ResetTypePresentNGInterface
-		rtIE.Value.ResetType.NGInterface = &ngapType.ResetAll{Value: ngapType.ResetAllPresentResetAll}
+		resetType.Present = ngapType.ResetTypePresentNGInterface
+		resetType.NGInterface = &ngapType.ResetAll{Value: ngapType.ResetAllPresentResetAll}
 	} else {
-		rtIE.Value.ResetType.Present = ngapType.ResetTypePresentPartOfNGInterface
+		resetType.Present = ngapType.ResetTypePresentPartOfNGInterface
 		list := new(ngapType.UEAssociatedLogicalNGConnectionList)
 
 		for _, c := range connections {
@@ -68,10 +70,11 @@ func BuildNGReset(connections []NGResetConnection) ([]byte, error) {
 			list.List = append(list.List, item)
 		}
 
-		rtIE.Value.ResetType.PartOfNGInterface = list
+		resetType.PartOfNGInterface = list
 	}
 
-	ies.List = append(ies.List, rtIE)
+	add(ngapType.ProtocolIEIDResetType, ngapType.CriticalityPresentReject,
+		ngapType.NGResetIEsPresentResetType).ResetType = resetType
 
 	return ngap.Encoder(pdu)
 }

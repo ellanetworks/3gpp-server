@@ -33,7 +33,7 @@ func setPolicyAMBR(t *testing.T, token, ul, dl string) {
 		t.Fatalf("set policy AMBR: %v", err)
 	}
 
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
 // Test4GSessionAMBRModification: changing the session-AMBR of an attached UE's
@@ -54,7 +54,7 @@ func Test4GSessionAMBRModification(t *testing.T) {
 	// Restore the default policy's session-AMBR so the env is left as found.
 	t.Cleanup(func() { setPolicyAMBR(t, token, "200 Mbps", "200 Mbps") })
 
-	enbID := createGTPUENB(t, claimENBID(), "sess-mod-enb")
+	enbID := createGTPUENB(t, claimENBID(), "sess-mod-enb", n3IPv4)
 
 	body := fmt.Sprintf(`{"imsi":%q,"k":%q,"opc":%q,"amf":"8000","sqn":"000000000020"}`, sessionModIMSI, testK, testOPc)
 	status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue", body)

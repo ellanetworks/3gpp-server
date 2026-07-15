@@ -33,7 +33,7 @@ func updateSubscriberProfile(t *testing.T, token, imsi, profile string) {
 	if err != nil {
 		t.Fatalf("update subscriber %s -> %s: %v", imsi, profile, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		b, _ := io.ReadAll(resp.Body)

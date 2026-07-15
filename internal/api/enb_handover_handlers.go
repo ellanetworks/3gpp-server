@@ -329,16 +329,7 @@ func (h *Handler) MigrateENBUE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.MMEUES1APID != nil {
-		ue.MMEUES1APID = *req.MMEUES1APID
-	}
-
-	if req.ENBUES1APID != nil {
-		ue.ENBUES1APID = *req.ENBUES1APID
-	}
-
-	src.DeleteUE(ue.ID)
-	target.AdoptUE(ue)
+	src.MigrateUE(target, ue, req.MMEUES1APID, req.ENBUES1APID)
 
 	writeJSON(w, http.StatusOK, MigrateENBUEResponse{
 		UEID:        ue.ID,

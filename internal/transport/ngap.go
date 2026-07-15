@@ -9,12 +9,12 @@ import (
 	ngapCodec "github.com/ellanetworks/3gpp-server/internal/ngap"
 )
 
-// SCTPTransport is an NGAP association to an AMF (PPID 60, TS 38.412).
-type SCTPTransport struct {
+// NGAPTransport is an NGAP association to an AMF (PPID 60, TS 38.412).
+type NGAPTransport struct {
 	*framed[ngapCodec.NGAPResponse]
 }
 
-func Dial(localAddr, remoteAddr string) (*SCTPTransport, error) {
+func DialNGAP(localAddr, remoteAddr string) (*NGAPTransport, error) {
 	f, err := dialFramed(
 		localAddr, remoteAddr, ngap.PPID,
 		ngapCodec.Decode,
@@ -24,5 +24,5 @@ func Dial(localAddr, remoteAddr string) (*SCTPTransport, error) {
 		return nil, err
 	}
 
-	return &SCTPTransport{f}, nil
+	return &NGAPTransport{f}, nil
 }

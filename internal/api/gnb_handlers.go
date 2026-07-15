@@ -17,7 +17,7 @@ import (
 
 type Handler struct {
 	Store          *store.Store
-	Transports     map[string]*transport.SCTPTransport // gnb store ID -> N2 transport
+	Transports     map[string]*transport.NGAPTransport // gnb store ID -> N2 transport
 	GTPU           map[string]*gtpu.Endpoint           // gnb store ID -> N3 GTP-U endpoint
 	S1APTransports map[string]*transport.S1APTransport // enb store ID -> S1-MME transport
 }
@@ -25,13 +25,13 @@ type Handler struct {
 func NewHandler(s *store.Store) *Handler {
 	return &Handler{
 		Store:          s,
-		Transports:     make(map[string]*transport.SCTPTransport),
+		Transports:     make(map[string]*transport.NGAPTransport),
 		GTPU:           make(map[string]*gtpu.Endpoint),
 		S1APTransports: make(map[string]*transport.S1APTransport),
 	}
 }
 
-func (h *Handler) CreateGnB(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateGNB(w http.ResponseWriter, r *http.Request) {
 	var req CreateGnBRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
@@ -48,7 +48,7 @@ func (h *Handler) CreateGnB(w http.ResponseWriter, r *http.Request) {
 		localAddr = "0.0.0.0"
 	}
 
-	t, err := transport.Dial(localAddr, req.AMFAddress)
+	t, err := transport.DialNGAP(localAddr, req.AMFAddress)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("sctp dial failed: %v", err))
 		return
@@ -59,22 +59,24 @@ func (h *Handler) CreateGnB(w http.ResponseWriter, r *http.Request) {
 		slices = append(slices, store.SliceConfig{SST: s.SST, SD: s.SD})
 	}
 
-	gnb := h.Store.CreateGnB(req.MCC, req.MNC, req.TAC, req.GnbID, req.Name, req.SST, req.SD, slices)
+	gnb := h.Store.CreateGNB(req.MCC, req.MNC, req.TAC, req.GnbID, req.Name, req.SST, req.SD, slices)
+	gnb.N3Addr = localAddr
 	h.Transports[gnb.ID] = t
 
 	if req.EnableGTPU {
 		n3 := req.GnBN3Address
 		if n3 == "" {
-			n3 = req.GnBN2Address
+			n3 = localAddr
 		}
 
 		gt, err := gtpu.Listen(n3)
 		if err != nil {
-			h.teardownGnB(gnb.ID, t)
+			h.teardownGNB(gnb.ID, t)
 			writeError(w, http.StatusBadGateway, fmt.Sprintf("gtp-u listen on %s failed: %v", n3, err))
 			return
 		}
 
+		gnb.N3Addr = n3
 		h.GTPU[gnb.ID] = gt
 	}
 
@@ -107,7 +109,7 @@ func (h *Handler) CreateGnB(w http.ResponseWriter, r *http.Request) {
 		var berr error
 		msg, berr = ngap.BuildNGSetupRequestFromStore(req.MCC, req.MNC, req.TAC, req.GnbID, req.Name, req.SST, req.SD, sliceArgs)
 		if berr != nil {
-			h.teardownGnB(gnb.ID, t)
+			h.teardownGNB(gnb.ID, t)
 			writeError(w, http.StatusBadRequest, fmt.Sprintf("build ng setup: %v", berr))
 			return
 		}
@@ -115,13 +117,13 @@ func (h *Handler) CreateGnB(w http.ResponseWriter, r *http.Request) {
 
 	encoded, err := ngap.Encode(msg)
 	if err != nil {
-		h.teardownGnB(gnb.ID, t)
+		h.teardownGNB(gnb.ID, t)
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("ngap encode: %v", err))
 		return
 	}
 
 	if err := t.Send(encoded, true); err != nil {
-		h.teardownGnB(gnb.ID, t)
+		h.teardownGNB(gnb.ID, t)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("sctp send: %v", err))
 		return
 	}
@@ -131,7 +133,7 @@ func (h *Handler) CreateGnB(w http.ResponseWriter, r *http.Request) {
 
 	ngapResp, err := t.WaitForMessage(ctx, "NGSetupResponse", "NGSetupFailure", "ErrorIndication")
 	if err != nil {
-		h.teardownGnB(gnb.ID, t)
+		h.teardownGNB(gnb.ID, t)
 		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for NGSetupResponse: %v", err))
 		return
 	}
@@ -142,10 +144,10 @@ func (h *Handler) CreateGnB(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) GetGnB(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetGNB(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 
-	gnb, err := h.Store.GetGnB(gnbID)
+	gnb, err := h.Store.GetGNB(gnbID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
@@ -156,14 +158,14 @@ func (h *Handler) GetGnB(w http.ResponseWriter, r *http.Request) {
 		MCC:   gnb.MCC,
 		MNC:   gnb.MNC,
 		TAC:   gnb.TAC,
-		GnbID: gnb.GnbID,
+		GnbID: gnb.GNBID,
 		Name:  gnb.Name,
 		SST:   gnb.SST,
 		SD:    gnb.SD,
 	})
 }
 
-func (h *Handler) DeleteGnB(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DeleteGNB(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 
 	if t, ok := h.Transports[gnbID]; ok {
@@ -176,7 +178,7 @@ func (h *Handler) DeleteGnB(w http.ResponseWriter, r *http.Request) {
 		delete(h.GTPU, gnbID)
 	}
 
-	if err := h.Store.DeleteGnB(gnbID); err != nil {
+	if err := h.Store.DeleteGNB(gnbID); err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
@@ -184,7 +186,7 @@ func (h *Handler) DeleteGnB(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *Handler) teardownGnB(id string, t *transport.SCTPTransport) {
+func (h *Handler) teardownGNB(id string, t *transport.NGAPTransport) {
 	_ = t.Close()
 
 	if gt, ok := h.GTPU[id]; ok {
@@ -192,6 +194,6 @@ func (h *Handler) teardownGnB(id string, t *transport.SCTPTransport) {
 		delete(h.GTPU, id)
 	}
 
-	_ = h.Store.DeleteGnB(id)
+	_ = h.Store.DeleteGNB(id)
 	delete(h.Transports, id)
 }

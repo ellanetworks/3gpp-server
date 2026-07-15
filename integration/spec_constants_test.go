@@ -25,6 +25,8 @@ const (
 	cause5GMMNon5GAuthenticationUnacceptable = 26
 	cause5GMMngKSIAlreadyInUse               = 71
 	cause5GMMPayloadWasNotForwarded          = 90
+	cause5GMMInvalidMandatoryInformation     = 96
+	cause5GMMMessageTypeNonExistent          = 97
 	cause5GMMProtocolErrorUnspecified        = 111
 )
 
@@ -123,6 +125,20 @@ const (
 	causeMiscUnknownPLMNOrSNPN = 4
 )
 
+// NGAP Cause, Protocol group — TS 38.413 §9.3.1.2 (CauseProtocol).
+const (
+	causeProtocolTransferSyntaxError = 0
+)
+
+// NGAP procedure codes — TS 38.413 §9.4.5.
+const (
+	ngapProcedureCodeUplinkNASTransport = 46
+)
+
+// 5GS identity types — TS 24.501 §9.11.3.3, Table 9.11.3.3.1. Rendered as the
+// decimal string the server emits for nas.identity_type.
+const identityTypeSUCI = "1"
+
 // NAS registration types — TS 24.501 §9.11.3.7, Table 9.11.3.7.1.
 const (
 	registrationTypeInitial   = 1
@@ -209,5 +225,34 @@ func assertNGAPCauseMisc(t *testing.T, body []byte, responseKey string, want int
 	if group != causePresentMisc || val != want {
 		t.Errorf("%s NGAP cause = (%q, %d), want (%q, %d)\n  body: %s",
 			responseKey, group, val, causePresentMisc, want, body)
+	}
+}
+
+// assertUnpredictableTMSIs checks that temporary identities are not handed out
+// in a predictable sequence. Sequential allocation packs n values into a span of
+// n-1; a span far wider is evidence of the unpredictable generation the security
+// specs call for (TS 33.401 §7.1 for M-TMSI, TS 33.501 §6.12.3 for 5G-TMSI).
+func assertUnpredictableTMSIs(t *testing.T, values []uint64, name, cite string) {
+	t.Helper()
+
+	if len(values) < 2 {
+		t.Fatalf("need at least 2 %ss to judge allocation, got %d", name, len(values))
+	}
+
+	min, max := values[0], values[0]
+
+	for _, v := range values[1:] {
+		if v < min {
+			min = v
+		}
+
+		if v > max {
+			max = v
+		}
+	}
+
+	if max-min < 1000 {
+		t.Errorf("%ss span only %d across %d allocations; allocation looks sequential/predictable (%s)",
+			name, max-min, len(values), cite)
 	}
 }
