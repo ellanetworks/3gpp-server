@@ -15,9 +15,6 @@ import (
 	"testing"
 )
 
-// Test5GPDUSessionModification_Rejected drives the procedure on an active session
-// and asserts a PDU Session Modification Reject with a 5GSM cause (TS 24.501
-// §6.4.2.4), delivered in a Downlink NAS Transport.
 func Test5GPDUSessionModification_Rejected(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := establishRegisteredUE(t, gnbID) // registered UE with an active PDU session
@@ -46,11 +43,8 @@ func Test5GPDUSessionModification_Rejected(t *testing.T) {
 	}
 }
 
-// Test5GPDUSessionModification_NoActiveSession sends a Modification Request for a
-// PDU session with no context at the AMF (the UE is registered but never
-// established one). Per TS 24.501 §7.3.2 c) the AMF cannot forward the message
-// and answers with a Downlink NAS Transport carrying 5GMM cause #90 "payload was
-// not forwarded".
+// With no PDU session context at the AMF there is nothing to forward the message
+// to, so TS 24.501 §7.3.2 c) requires 5GMM cause #90 "payload was not forwarded".
 func Test5GPDUSessionModification_NoActiveSession(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -74,10 +68,8 @@ func Test5GPDUSessionModification_NoActiveSession(t *testing.T) {
 	assertNASCause(t, body, "nas.cause_5gmm", cause5GMMPayloadWasNotForwarded)
 }
 
-// Test5GPDUSessionModification_ExistingPduSessionRequestType drives the procedure
-// on an active session with Request Type "existing PDU session". The AMF forwards
-// it to the SMF (TS 24.501 §5.4.5.2.3 ii), which answers with a Modification
-// Reject.
+// Request Type "existing PDU session" must be forwarded to the SMF (TS 24.501
+// §5.4.5.2.3 ii), which answers with a Modification Reject.
 func Test5GPDUSessionModification_ExistingPduSessionRequestType(t *testing.T) {
 	const requestTypeExistingPduSession = 2
 
@@ -96,10 +88,8 @@ func Test5GPDUSessionModification_ExistingPduSessionRequestType(t *testing.T) {
 	}
 }
 
-// Test5GPDUSessionModification_EmergencyRequestType drives the procedure with
-// Request Type "initial emergency request". Ella Core does not support emergency
-// PDU sessions, so it returns the message in a Downlink NAS Transport with 5GMM
-// cause #90 "payload was not forwarded".
+// Ella Core supports no emergency PDU sessions, so Request Type "initial
+// emergency request" has nothing to forward to and draws 5GMM cause #90.
 func Test5GPDUSessionModification_EmergencyRequestType(t *testing.T) {
 	const requestTypeInitialEmergency = 3
 

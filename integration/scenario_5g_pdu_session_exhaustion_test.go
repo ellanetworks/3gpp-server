@@ -114,8 +114,6 @@ func newExhaustUE(t *testing.T, gnbID, supi string) string {
 	return ueID
 }
 
-// mustEstablishExhaust establishes a PDU session on the exhaust DNN and requires
-// it to be accepted (the pool still has a free address).
 func mustEstablishExhaust(t *testing.T, gnbID, ueID string) {
 	t.Helper()
 

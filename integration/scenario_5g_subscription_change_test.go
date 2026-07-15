@@ -20,7 +20,6 @@ import (
 	"testing"
 )
 
-// updateSubscriberProfile changes a subscriber's profile via the Ella Core API.
 func updateSubscriberProfile(t *testing.T, token, imsi, profile string) {
 	t.Helper()
 
@@ -48,8 +47,6 @@ var validNetworkReleaseCauses = map[string]bool{
 	"38": true, "39": true, "46": true, "67": true, "69": true,
 }
 
-// assertValidReleaseCause fails unless the response carries a 5GSM cause from the
-// valid network-requested-release set (TS 24.501 §6.3.3).
 func assertValidReleaseCause(t *testing.T, body []byte) {
 	t.Helper()
 
@@ -64,11 +61,9 @@ func assertValidReleaseCause(t *testing.T, body []byte) {
 	}
 }
 
-// Test5GSubscriptionChange_SliceRemovedReleasesPDUSession establishes a PDU
-// session on the default slice, then moves the subscriber to a profile whose
-// slice (SST 2) does not match it. TS 23.501 §5.15.5.2.2: when a slice is no
-// longer available for a UE due to a subscription change, the orphaned PDU
-// session shall be released — the AMF/SMF send a network-requested release.
+// Moving the subscriber to a profile whose slice (SST 2) does not match its
+// established session makes that session orphaned; TS 23.501 §5.15.5.2.2 requires
+// the network to release it.
 func Test5GSubscriptionChange_SliceRemovedReleasesPDUSession(t *testing.T) {
 	token, err := provisionEllaCore()
 	if err != nil {

@@ -43,8 +43,6 @@ func skipUnlessTimerTestsEnabled(t *testing.T) {
 	}
 }
 
-// awaitUENGAPWithin waits up to timeoutMs for an unsolicited downlink NGAP
-// message of one of messageTypes addressed to the UE.
 func awaitUENGAPWithin(t *testing.T, gnbID, ueID string, timeoutMs int, messageTypes ...string) []byte {
 	t.Helper()
 
@@ -59,9 +57,8 @@ func awaitUENGAPWithin(t *testing.T, gnbID, ueID string, timeoutMs int, messageT
 	return body
 }
 
-// Test5GT3592_ReleaseCommandRetransmitted drives a network-requested release and,
-// by withholding the Release Complete, observes the SMF retransmit the Release
-// Command when T3592 expires (TS 24.501 §6.3.3, abnormal case a).
+// Withholding the Release Complete is what makes T3592 expire, so the SMF must
+// retransmit the Release Command (TS 24.501 §6.3.3, abnormal case a).
 func Test5GT3592_ReleaseCommandRetransmitted(t *testing.T) {
 	skipUnlessTimerTestsEnabled(t)
 
@@ -89,10 +86,9 @@ func Test5GT3592_ReleaseCommandRetransmitted(t *testing.T) {
 		`{"message_type":"pdu_session_release_complete"}`)
 }
 
-// Test5GT3591_ModificationCommandRetransmitted changes a session's AMBR so the
-// session reconciler issues a network-requested PDU Session Modification, then,
-// by withholding the Modification Complete, observes the SMF retransmit the
-// Modification Command when T3591 expires (TS 24.501 §6.3.2.5).
+// Changing a session's AMBR is what drives a network-requested Modification;
+// withholding the Modification Complete then makes T3591 expire, so the SMF must
+// retransmit the Modification Command (TS 24.501 §6.3.2.5).
 func Test5GT3591_ModificationCommandRetransmitted(t *testing.T) {
 	skipUnlessTimerTestsEnabled(t)
 

@@ -15,9 +15,8 @@ import (
 	"testing"
 )
 
-// idleRegisteredUE registers a UE, establishes a PDU session, then releases the
-// RAN connection so the UE is RM-REGISTERED / CM-IDLE — the precondition for a
-// Service Request. Returns the gNB and UE IDs.
+// idleRegisteredUE leaves the UE RM-REGISTERED / CM-IDLE with a PDU session, the
+// precondition for a Service Request.
 func idleRegisteredUE(t *testing.T) (string, string) {
 	t.Helper()
 
@@ -44,9 +43,6 @@ func idleRegisteredUE(t *testing.T) (string, string) {
 	return gnbID, ueID
 }
 
-// Test5GServiceRequest_Data drives the canonical data Service Request: an idle UE
-// reconnects and the AMF re-activates its PDU session via Initial Context
-// Setup, then the UE gets a Service Accept.
 func Test5GServiceRequest_Data(t *testing.T) {
 	gnbID, ueID := idleRegisteredUE(t)
 
@@ -56,7 +52,6 @@ func Test5GServiceRequest_Data(t *testing.T) {
 		t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
 	}
 
-	// The AMF reactivates the session via Initial Context Setup Request.
 	if got := jsonGet(body, "ngap.message_type"); got != ngapInitialContextSetupRequest {
 		t.Errorf("ngap.message_type = %q, want InitialContextSetupRequest\n  body: %s", got, body)
 	}
@@ -67,8 +62,7 @@ func Test5GServiceRequest_Data(t *testing.T) {
 	}
 }
 
-// Test5GServiceRequest_Signalling sends a signalling-type Service Request (no
-// user-plane reactivation). The AMF should accept it.
+// A signalling-type Service Request asks for no user-plane reactivation.
 func Test5GServiceRequest_Signalling(t *testing.T) {
 	gnbID, ueID := idleRegisteredUE(t)
 
@@ -88,8 +82,7 @@ func Test5GServiceRequest_Signalling(t *testing.T) {
 	}
 }
 
-// Test5GServiceRequest_ThenDeregister verifies the UE is fully CM-CONNECTED after
-// a Service Request by running a normal deregistration afterward.
+// A normal deregistration afterwards is what proves the UE reached CM-CONNECTED.
 func Test5GServiceRequest_ThenDeregister(t *testing.T) {
 	gnbID, ueID := idleRegisteredUE(t)
 
@@ -112,14 +105,11 @@ func Test5GServiceRequest_ThenDeregister(t *testing.T) {
 	}
 }
 
-// Test5GServiceRequest_WithoutRegistration sends a Service Request for a UE that
-// was never registered. The server sends it plain (no security context) with a
-// zeroed 5G-S-TMSI so it reaches the AMF, which must NOT grant service to an
-// unknown, unprotected UE. The exact rejection form is not pinned: a SERVICE
-// REQUEST must be integrity protected (TS 24.501 §4.4.4.2), so an unprotected
-// one from an unknown UE may be answered either with a 5GMM STATUS (protocol
-// error) or a SERVICE REJECT — both satisfy the security property. We only
-// assert service is not granted.
+// With no security context the request goes out plain with a zeroed 5G-S-TMSI, so
+// it reaches the AMF. A SERVICE REQUEST must be integrity protected (TS 24.501
+// §4.4.4.2), so an unprotected one from an unknown UE may draw either a 5GMM
+// STATUS or a SERVICE REJECT; only the security property is asserted: service
+// must not be granted.
 func Test5GServiceRequest_WithoutRegistration(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -133,14 +123,13 @@ func Test5GServiceRequest_WithoutRegistration(t *testing.T) {
 		t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
 	}
 
-	// The AMF must not accept an unprotected Service Request from an unknown UE.
 	if got := jsonGet(body, "nas.message_type"); got == nasServiceAccept {
 		t.Errorf("AMF granted service to an unregistered UE (nas.message_type=service_accept)\n  body: %s", body)
 	}
 }
 
-// idleRegisteredUENoSession registers a UE and releases it without ever
-// establishing a PDU session — CM-IDLE with no active session.
+// idleRegisteredUENoSession leaves the UE CM-IDLE having never established a PDU
+// session.
 func idleRegisteredUENoSession(t *testing.T) (string, string) {
 	t.Helper()
 
@@ -161,9 +150,8 @@ func idleRegisteredUENoSession(t *testing.T) (string, string) {
 	return gnbID, ueID
 }
 
-// Test5GServiceRequest_IdleNoSession sends a Service Request claiming no active
-// PDU sessions from an idle UE that never had one. The AMF should accept it
-// (signalling-style reactivation) without trying to set up any session.
+// Claiming no active PDU sessions must draw a signalling-style reactivation, with
+// no session set up.
 func Test5GServiceRequest_IdleNoSession(t *testing.T) {
 	gnbID, ueID := idleRegisteredUENoSession(t)
 
@@ -178,9 +166,8 @@ func Test5GServiceRequest_IdleNoSession(t *testing.T) {
 	}
 }
 
-// Test5GServiceRequest_PDUStatusMismatch claims an active PDU session (id 1) the
-// AMF does not have (the UE never established one). The AMF must reconcile and
-// still accept the Service Request, not error out.
+// A UE claiming a PDU session the AMF does not hold must be reconciled against
+// the AMF's view and still accepted.
 func Test5GServiceRequest_PDUStatusMismatch(t *testing.T) {
 	gnbID, ueID := idleRegisteredUENoSession(t)
 
@@ -195,9 +182,8 @@ func Test5GServiceRequest_PDUStatusMismatch(t *testing.T) {
 	}
 }
 
-// Test5GServiceRequest_WhileConnected sends a Service Request while the UE is
-// still CM-CONNECTED (no prior release). This is out-of-state; the AMF must
-// respond (accept on the new connection or reject), never hang.
+// A Service Request from a still-CM-CONNECTED UE is out-of-state, so either an
+// accept on the new connection or a reject is conformant; only a hang is not.
 func Test5GServiceRequest_WhileConnected(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -214,9 +200,8 @@ func Test5GServiceRequest_WhileConnected(t *testing.T) {
 	}
 }
 
-// Test5GServiceRequest_AfterDeregistration sends a Service Request after the UE
-// has fully deregistered. With no context for the UE, the AMF must answer with
-// a SERVICE REJECT (TS 24.501 §5.6.1.5).
+// With no context left for a deregistered UE, the AMF must answer with a SERVICE
+// REJECT (TS 24.501 §5.6.1.5).
 func Test5GServiceRequest_AfterDeregistration(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -242,9 +227,8 @@ func Test5GServiceRequest_AfterDeregistration(t *testing.T) {
 	}
 }
 
-// Test5GServiceRequest_BackToBack sends two Service Requests in a row. The first
-// brings the UE to CM-CONNECTED; the second is therefore an out-of-state
-// (already-connected) request. Neither must hang.
+// The first request brings the UE to CM-CONNECTED, making the second an
+// out-of-state already-connected request; neither must hang.
 func Test5GServiceRequest_BackToBack(t *testing.T) {
 	gnbID, ueID := idleRegisteredUE(t)
 
@@ -267,9 +251,8 @@ func Test5GServiceRequest_BackToBack(t *testing.T) {
 	}
 }
 
-// Test5GServiceRequest_ServiceTypes exercises the remaining service types from an
-// idle UE. Behaviour varies by type (and whether the UE is emergency-
-// registered), so we assert the AMF responds and does not hang.
+// Behaviour varies by service type and by whether the UE is emergency-registered,
+// so only liveness is asserted.
 func Test5GServiceRequest_ServiceTypes(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -297,9 +280,8 @@ func Test5GServiceRequest_ServiceTypes(t *testing.T) {
 	}
 }
 
-// Test5GServiceRequest_Fuzz sends Service Requests with malformed/raw NAS payloads
-// over an otherwise-valid Initial UE Message + 5G-S-TMSI. The AMF must respond,
-// never silently drop.
+// Malformed NAS payloads ride an otherwise-valid Initial UE Message + 5G-S-TMSI,
+// so they reach the AMF, which must answer and not leave the request hanging.
 func Test5GServiceRequest_Fuzz(t *testing.T) {
 	tests := []struct {
 		name string
@@ -328,8 +310,8 @@ func Test5GServiceRequest_Fuzz(t *testing.T) {
 			gnbID, ueID := idleRegisteredUE(t)
 
 			status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap", tt.body)
-			// Either the server rejects the build locally (400/500) or the AMF
-			// answers; what must not happen is a 504 hang.
+			// A local build rejection (400/500) and an AMF answer are both
+			// acceptable; only a 504 hang is not.
 			if status == 504 {
 				t.Fatalf("service request hung (HTTP 504)\n  body: %s", body)
 			}
@@ -337,10 +319,9 @@ func Test5GServiceRequest_Fuzz(t *testing.T) {
 	}
 }
 
-// Test5GServiceRequest_StaleAMFIDOverride forges the AMF UE NGAP ID on the Uplink path is
-// not applicable here (Service Request opens a fresh connection via Initial UE
-// Message). Instead we forge the RAN UE NGAP ID override and confirm the AMF
-// still produces a usable response or an Error Indication, never a hang.
+// A Service Request opens a fresh connection via Initial UE Message, which
+// carries no AMF UE NGAP ID, so the forged override is inert and the AMF must
+// serve the request normally.
 func Test5GServiceRequest_StaleAMFIDOverride(t *testing.T) {
 	gnbID, ueID := idleRegisteredUE(t)
 
@@ -352,8 +333,6 @@ func Test5GServiceRequest_StaleAMFIDOverride(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
 	}
-	// Initial UE Message carries no AMF UE NGAP ID, so the override is inert;
-	// the AMF should still process the service request normally.
 	if got := jsonGet(body, "nas.message_type"); got != nasServiceAccept {
 		t.Errorf("nas.message_type = %q, want service_accept\n  body: %s", got, body)
 	}
