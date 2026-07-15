@@ -3,11 +3,10 @@
 
 //go:build integration
 
-// PDU session establishment toward a DNN the core has no data network for. The
+// PDU session establishment toward a DNN the core has no data network for: the
 // UE's slice (S-NSSAI) is served but the requested DNN is not part of it, so per
 // TS 24.501 §9.11.4.2 the SMF rejects with 5GSM cause #70 "missing or unknown
-// DNN in a slice". A failing test means Ella Core answers with a non-compliant
-// cause.
+// DNN in a slice".
 
 package integration_test
 
@@ -16,11 +15,6 @@ import (
 	"testing"
 )
 
-// Test5GPDUSessionEstablishment_UnknownDNN registers a UE whose DNN is not
-// provisioned in the core, then requests a PDU session for it. The slice is
-// served but the DNN is not part of it, so per TS 24.501 §9.11.4.2 the SMF
-// answers with a PDU Session Establishment Reject carrying 5GSM cause #70
-// "missing or unknown DNN in a slice", delivered in a Downlink NAS Transport.
 func Test5GPDUSessionEstablishment_UnknownDNN(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUEWithDNN(t, gnbID, "unconfigured")
@@ -47,8 +41,6 @@ func Test5GPDUSessionEstablishment_UnknownDNN(t *testing.T) {
 	assertNASCause(t, body, "nas.cause_5gsm", cause5GSMMissingOrUnknownDNNInASlice)
 }
 
-// mustCreateUEWithDNN creates a UE configured to request the given DNN, so the
-// establishment can target a DNN the core does not provision.
 func mustCreateUEWithDNN(t *testing.T, gnbID, dnn string) string {
 	t.Helper()
 

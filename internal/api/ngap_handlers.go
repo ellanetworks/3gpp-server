@@ -2057,7 +2057,6 @@ func sendRawAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GNBContex
 		}
 	}
 
-	// A gNB answers a UE Context Release Command with a Release Complete.
 	if ngapResp.MessageType == "UEContextReleaseCommand" {
 		if relComplete, berr := ngap.BuildUEContextReleaseComplete(ue.AmfUeNgapID, ue.RanUeNgapID); berr == nil {
 			_ = t.Send(relComplete, false)

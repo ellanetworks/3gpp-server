@@ -4,14 +4,12 @@
 //go:build integration
 
 // Registration Reject (TS 24.501 §5.5.1.2.5): the network rejects an initial
-// registration it cannot serve. Assertions follow the spec; a failure means
-// Ella Core deviates.
+// registration it cannot serve.
 
 package integration_test
 
 import "testing"
 
-// createUEWithBody creates a UE from a raw JSON body and returns its ID.
 func createUEWithBody(t *testing.T, gnbID, body string) string {
 	t.Helper()
 
@@ -28,11 +26,10 @@ func createUEWithBody(t *testing.T, gnbID, body string) string {
 	return ueID
 }
 
-// Test5GRegistrationReject_UnknownUE registers a UE whose SUPI is not provisioned
-// in the core (null-scheme SUCI, so the SUPI is derivable but unknown). The
-// network cannot serve it and must reject the registration (TS 24.501
-// §5.5.1.2.5). The spec leaves the 5GMM cause to the network ("an appropriate
-// 5GMM cause value"), so only the rejection itself is asserted.
+// The null-scheme SUCI makes the SUPI derivable but unknown, so the network
+// cannot serve the registration and must reject it (TS 24.501 §5.5.1.2.5). The
+// spec leaves the 5GMM cause to the network ("an appropriate 5GMM cause value"),
+// so only the rejection itself is asserted.
 func Test5GRegistrationReject_UnknownUE(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := createUEWithBody(t, gnbID, `{
@@ -56,11 +53,10 @@ func Test5GRegistrationReject_UnknownUE(t *testing.T) {
 	}
 }
 
-// Test5GRegistrationReject_InvalidHomeNetworkKey registers with a Profile A SUCI
-// concealed under an X25519 public key that does not match the core's. The core
-// cannot de-conceal the SUCI, so it cannot derive the UE identity and must
-// reject with 5GMM cause #9 "UE identity cannot be derived by the network" —
-// the cause defined for exactly this condition (TS 24.501 §9.11.3.2).
+// A Profile A SUCI concealed under an X25519 public key that does not match the
+// core's cannot be de-concealed, so the core cannot derive the UE identity and
+// must reject with 5GMM cause #9, defined for exactly this condition (TS 24.501
+// §9.11.3.2).
 func Test5GRegistrationReject_InvalidHomeNetworkKey(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := createUEWithBody(t, gnbID, `{

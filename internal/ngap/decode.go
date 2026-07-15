@@ -985,8 +985,8 @@ func criticalityName(c aper.Enumerated) string {
 }
 
 // initiatingMessageName labels an initiating message, falling back to the
-// on-wire procedure code for messages this decoder does not model, so the label
-// stays stable and awaitable.
+// on-wire procedure code (TS 38.413 §9.4.7) for messages this decoder does not
+// model, so the label stays stable and awaitable.
 func initiatingMessageName(msgType int, procedureCode int64) string {
 	switch msgType {
 	case ngapType.InitiatingMessagePresentDownlinkNASTransport:

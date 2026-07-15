@@ -10,7 +10,7 @@ import (
 )
 
 // An Uplink NAS Transport (procedure code 46 = 0x2e, criticality "ignore" =
-// 0x40 — TS 38.413 §9.4.5) carrying a legal 4-octet open-type length
+// 0x40 — TS 38.413 §9.4.3) carrying a legal 4-octet open-type length
 // determinant over a body of garbage: the outer PDU is well formed while its
 // contents cannot be decoded, the "receiver is not able to decode the received
 // physical message" case of TS 38.413 §10.2. Test4GCriticalityDiagnostics
@@ -77,7 +77,7 @@ func assertTransferSyntaxErrorIndication(t *testing.T, body []byte) {
 	}
 
 	if cd.ProcedureCriticality != nil && *cd.ProcedureCriticality != "ignore" {
-		t.Errorf("criticality_diagnostics.procedure_criticality = %q, want ignore — the criticality signalled for UplinkNASTransport (TS 38.413 §9.4.5)\n  body: %s",
+		t.Errorf("criticality_diagnostics.procedure_criticality = %q, want ignore — the criticality signalled for UplinkNASTransport (TS 38.413 §9.4.3)\n  body: %s",
 			*cd.ProcedureCriticality, body)
 	}
 }

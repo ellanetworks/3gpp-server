@@ -126,7 +126,7 @@ const (
 	causeProtocolTransferSyntaxError = 0
 )
 
-// NGAP procedure codes — TS 38.413 §9.4.5.
+// NGAP procedure codes — TS 38.413 §9.4.7 (Constant Definitions).
 const (
 	ngapProcedureCodeUplinkNASTransport = 46
 )
