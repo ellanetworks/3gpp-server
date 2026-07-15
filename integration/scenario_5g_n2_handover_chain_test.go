@@ -3,11 +3,6 @@
 
 //go:build integration
 
-// Realistic repeated-mobility scenarios: a UE handed over across several gNBs,
-// as happens continuously in a live network (TS 38.413 §8.4, TS 23.502
-// §4.9.1.3). Each hop must complete and leave the UE consistently served by the
-// new gNB.
-
 package integration_test
 
 import (
@@ -15,9 +10,7 @@ import (
 	"testing"
 )
 
-// handoverHop migrates the UE onto the target once the handover completes, so
-// the next hop can originate there. tgtGNB is the target's store ID (URL paths,
-// migrate); tgtGnbHex is its NGAP gNB ID (the Handover Required target).
+// tgtGNB is the target's store ID (URL paths); tgtGnbHex is its NGAP gNB ID.
 func handoverHop(t *testing.T, srcGNB, ueID, tgtGNB, tgtGnbHex string) int64 {
 	t.Helper()
 
@@ -60,8 +53,6 @@ func handoverHop(t *testing.T, srcGNB, ueID, tgtGNB, tgtGnbHex string) int64 {
 	return tgtAmf
 }
 
-// An accepted Mobility Registration Update (TS 24.501 §5.5.1.3) over the UE's
-// current connection is what proves a moved UE is still usable.
 func assertMobilityRegistrationAccepted(t *testing.T, gnbID, ueID string) {
 	t.Helper()
 
@@ -76,7 +67,6 @@ func assertMobilityRegistrationAccepted(t *testing.T, gnbID, ueID string) {
 	}
 }
 
-// Models a UE oscillating at a cell edge.
 func Test5GN2HandoverPingPong(t *testing.T) {
 	const hexA, hexB = "0000c0", "0000c1"
 	gnbA := createGnBWithID(t, hexA, "ho-pp-a")
@@ -90,7 +80,6 @@ func Test5GN2HandoverPingPong(t *testing.T) {
 	assertMobilityRegistrationAccepted(t, gnbA, ueID)
 }
 
-// Models a UE moving across three cells, A->B->C.
 func Test5GN2HandoverMultiHop(t *testing.T) {
 	const hexA, hexB, hexC = "0000c2", "0000c3", "0000c4"
 	gnbA := createGnBWithID(t, hexA, "ho-mh-a")
@@ -105,15 +94,12 @@ func Test5GN2HandoverMultiHop(t *testing.T) {
 	assertMobilityRegistrationAccepted(t, gnbC, ueID)
 }
 
-// With two UEs preparing over the same gNB pair simultaneously, the AMF must
-// keep their contexts isolated (distinct AMF UE NGAP IDs) and complete both.
 func Test5GN2HandoverConcurrentUEs(t *testing.T) {
 	srcGNB := createGnBWithID(t, "0002f0", "ho-cc-src")
 	tgtHex := "0002f1"
 	targetGNB := createGnBWithID(t, tgtHex, "ho-cc-tgt")
 
-	// Dedicated subscribers so a mid-flow abort here cannot leave the
-	// widely-shared subscribers in a dirty state for other tests.
+	// Dedicated subscribers: a mid-flow abort must not dirty the shared ones.
 	ue1 := establishRegisteredUEWithSUPI(t, srcGNB, "imsi-001010000000005")
 	ue2 := establishRegisteredUEWithSUPI(t, srcGNB, "imsi-001010000000006")
 
@@ -152,9 +138,6 @@ func Test5GN2HandoverConcurrentUEs(t *testing.T) {
 	}
 }
 
-// Models the connected/idle cycle a UE goes through after moving: handover to a
-// new gNB, release to CM-IDLE there, then a Service Request to come back to
-// CM-CONNECTED (TS 24.501 §5.6.1).
 func Test5GN2HandoverThenIdleThenServiceRequest(t *testing.T) {
 	gnbA := createGnBWithID(t, "000210", "ho-cyc-a")
 	hexB := "000211"

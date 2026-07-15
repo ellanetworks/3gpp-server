@@ -10,10 +10,7 @@ import (
 	"testing"
 )
 
-// Test4GPathSwitch drives an X2-handover PATH SWITCH REQUEST: the MME must
-// acknowledge with a fresh key-chain {NH, NCC} (TS 36.413 §9.1.5.8, TS 33.401
-// §7.2.8). NCC seeds at 1 on Initial Context Setup and increases by one per path
-// switch (§7.2.8.4), so the first switch returns NCC=2 with a 256-bit NH.
+// NCC seeds at 1 at Initial Context Setup and advances by one per path switch, so the first switch returns 2 (TS 33.401 §7.2.8.4).
 func Test4GPathSwitch(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -40,8 +37,6 @@ func Test4GPathSwitch(t *testing.T) {
 	}
 }
 
-// Test4GPathSwitchNCCIncrements switches twice: the NCC must increase by one each
-// time (TS 33.401 §7.2.8.4.3), proving each NH is freshly derived.
 func Test4GPathSwitchNCCIncrements(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -59,9 +54,6 @@ func Test4GPathSwitchNCCIncrements(t *testing.T) {
 	}
 }
 
-// Test4GPathSwitchUnknownUE names a source MME-UE-S1AP-ID the MME never
-// assigned: it must fail with cause unknown-mme-ue-s1ap-id (TS 36.413 §9.2.1.3,
-// radio-network #13).
 func Test4GPathSwitchUnknownUE(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -79,9 +71,6 @@ func Test4GPathSwitchUnknownUE(t *testing.T) {
 	}
 }
 
-// Test4GPathSwitchDuplicateERAB repeats an E-RAB ID in the to-be-switched list:
-// the MME must fail with cause multiple-E-RAB-ID-instances (TS 36.413 §9.2.1.3,
-// radio-network #31).
 func Test4GPathSwitchDuplicateERAB(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -99,10 +88,7 @@ func Test4GPathSwitchDuplicateERAB(t *testing.T) {
 	}
 }
 
-// Test4GPathSwitchUnknownERAB names E-RAB 7, which the UE does not have (its only
-// bearer is the default, E-RAB 5). No E-RAB is switched, so the MME must fail with
-// cause transport-resource-unavailable (TS 36.413 §9.1.5.10, §9.2.1.3 transport
-// #0).
+// The UE's only bearer is the default, E-RAB 5, so E-RAB 7 names none of its bearers.
 func Test4GPathSwitchUnknownERAB(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)

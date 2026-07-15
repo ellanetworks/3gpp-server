@@ -7,9 +7,6 @@ package integration_test
 
 import "testing"
 
-// Test4GServiceRequest drives the idle/connected cycle: an S1 release to
-// ECM-IDLE, then a Service Request that re-establishes the bearer (TS 24.301
-// §5.6.1).
 func Test4GServiceRequest(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -27,8 +24,6 @@ func Test4GServiceRequest(t *testing.T) {
 	}
 }
 
-// Test4GServiceRequestBadMAC sends a Service Request whose short-MAC does not
-// verify: the MME must refuse to re-establish the connection (TS 24.301 §5.6.1.5).
 func Test4GServiceRequestBadMAC(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)

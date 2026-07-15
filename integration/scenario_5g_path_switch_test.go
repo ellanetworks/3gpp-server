@@ -66,7 +66,7 @@ func Test5GPathSwitchRequestNoSwitchableSessionFails(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "0000e1", "ps-none-src")
 	targetGNB := createGnBWithID(t, "0000e2", "ps-none-tgt")
 
-	ueID := establishRegisteredUEWithSUPI(t, sourceGNB, "imsi-001010000000001") // holds session 1
+	ueID := establishRegisteredUEWithSUPI(t, sourceGNB, "imsi-001010000000001")
 	amf, _ := ueNGAPIDs(t, sourceGNB, ueID)
 
 	status, body := sendPathSwitch(t, targetGNB,
@@ -80,7 +80,7 @@ func Test5GPathSwitchRequestFailureReportsReleasedSessions(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "0000e3", "ps-rel-src")
 	targetGNB := createGnBWithID(t, "0000e4", "ps-rel-tgt")
 
-	ueID := establishRegisteredUEWithSUPI(t, sourceGNB, "imsi-001010000000002") // holds session 1
+	ueID := establishRegisteredUEWithSUPI(t, sourceGNB, "imsi-001010000000002")
 	amf, _ := ueNGAPIDs(t, sourceGNB, ueID)
 
 	status, body := sendPathSwitch(t, targetGNB,
@@ -114,7 +114,7 @@ func Test5GPathSwitchRequestPartialSuccess(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "0000e7", "ps-part-src")
 	targetGNB := createGnBWithID(t, "0000e8", "ps-part-tgt")
 
-	ueID := establishRegisteredUEWithSUPI(t, sourceGNB, "imsi-001010000000004") // holds session 1 only
+	ueID := establishRegisteredUEWithSUPI(t, sourceGNB, "imsi-001010000000004")
 	amf, _ := ueNGAPIDs(t, sourceGNB, ueID)
 
 	status, body := sendPathSwitch(t, targetGNB,

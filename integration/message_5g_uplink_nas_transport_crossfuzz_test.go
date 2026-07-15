@@ -3,19 +3,14 @@
 
 //go:build integration
 
-// Cross-fuzz tests: mutate the UplinkNASTransport's NGAP-level UE IDs and its
-// carried NAS payload at once, surfacing AMF paths where the NGAP ID check and
-// the NAS decode interact.
-
 package integration_test
 
 import (
 	"testing"
 )
 
-// Per TS 38.413 §8.7.5.2 the NGAP-level UE ID check precedes any look at the
-// NAS payload, so a wrong AMF or RAN UE NGAP ID must draw an ErrorIndication
-// whatever the NAS PDU contains.
+// TS 38.413 §8.7.5.2: the NGAP-level UE ID check precedes any look at the NAS
+// payload, so the PDU's contents cannot change the outcome.
 func Test5GULNasTransport_CrossFuzz(t *testing.T) {
 	tests := []struct {
 		name            string

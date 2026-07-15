@@ -7,7 +7,6 @@ package integration_test
 
 import "testing"
 
-// Test4GTrackingAreaUpdate drives a connected normal TAU (TS 24.301 §5.5.3).
 func Test4GTrackingAreaUpdate(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -20,9 +19,7 @@ func Test4GTrackingAreaUpdate(t *testing.T) {
 	}
 }
 
-// Test4GTAUCombined drives a combined TA/LA update: with no SGs interface on the
-// MME it must be accepted for EPS only, carrying EMM cause #18 "CS domain not
-// available" (TS 24.301 §5.5.3.2.4).
+// The MME has no SGs interface, so a combined TA/LA update is accepted for EPS only (TS 24.301 §5.5.3.2.4).
 func Test4GTAUCombined(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -40,8 +37,6 @@ func Test4GTAUCombined(t *testing.T) {
 	}
 }
 
-// Test4GTAUBadMAC sends a TAU whose NAS-MAC does not verify: the MME must refuse
-// it (TS 24.301 §4.4.4).
 func Test4GTAUBadMAC(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -55,8 +50,6 @@ func Test4GTAUBadMAC(t *testing.T) {
 	}
 }
 
-// Test4GTAUReplay replays a TAU on a stale uplink NAS COUNT: the MME must refuse
-// it (TS 24.301 §4.4.3.5).
 func Test4GTAUReplay(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)

@@ -3,8 +3,6 @@
 
 //go:build integration
 
-// S1 Setup is the first procedure on an S1-MME association (TS 36.413 §8.7).
-
 package integration_test
 
 import (
@@ -19,7 +17,6 @@ func mustCreateENB(t *testing.T) string {
 }
 
 func Test4GScenarioS1Setup(t *testing.T) {
-	// The state assertion below reads this eNB's own S1AP eNB ID back.
 	stateENBID := claimENBID()
 	enbID := createENBWithID(t, stateENBID, "test-enb")
 

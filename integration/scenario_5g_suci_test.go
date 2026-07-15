@@ -3,12 +3,6 @@
 
 //go:build integration
 
-// SUCI concealment (TS 33.501 §6.12.2, Annex C): when the home network has
-// provisioned an ECIES public key, the UE conceals its SUPI in the SUCI under
-// Profile A (X25519) or Profile B (P-256), and the core's SIDF must de-conceal it
-// to recover the SUPI and authenticate the subscriber. Each test conceals under a
-// key the core holds, so the scheme is one it has provisioned support for.
-
 package integration_test
 
 import (
@@ -34,8 +28,6 @@ func deriveX25519PubHex(t *testing.T, privHex string) string {
 	return hex.EncodeToString(k.PublicKey().Bytes())
 }
 
-// The compressed form (33 bytes, 0x02/0x03 prefix) is what an operator publishes
-// and the core returns.
 func deriveP256CompressedPubHex(t *testing.T, privHex string) string {
 	t.Helper()
 
@@ -73,9 +65,6 @@ func mustCreateUEProfile(t *testing.T, gnbID, supi, scheme, keyID, pubKeyHex str
 	return createUEWithBody(t, gnbID, body)
 }
 
-// The Authentication Request on the first step is what proves the core
-// de-concealed the SUCI to a known SUPI, since an undecodable SUCI draws a
-// rejection instead.
 func assertConcealedRegistration(t *testing.T, gnbID, ueID string) {
 	t.Helper()
 
@@ -98,7 +87,6 @@ func assertConcealedRegistration(t *testing.T, gnbID, ueID string) {
 	}
 }
 
-// ECIES Profile A (X25519), concealed under the core's provisioned Profile A key.
 func Test5GRegistrationSUCIProfileA(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	pubKey := deriveX25519PubHex(t, profileAPrivKey)
@@ -107,8 +95,6 @@ func Test5GRegistrationSUCIProfileA(t *testing.T) {
 	assertConcealedRegistration(t, gnbID, ueID)
 }
 
-// ECIES Profile B (P-256), concealed under the core's provisioned Profile B key
-// in compressed form.
 func Test5GRegistrationSUCIProfileB(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	pubKey := deriveP256CompressedPubHex(t, profileBPrivKey)

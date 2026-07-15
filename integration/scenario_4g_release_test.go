@@ -24,8 +24,6 @@ func Test4GUEContextRelease(t *testing.T) {
 	}
 }
 
-// Test4GUEContextReleaseCommandEchoesCause: the Release Command must report the
-// radio-network Cause the eNB requested (TS 36.413 §9.1.4.6).
 func Test4GUEContextReleaseCommandEchoesCause(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -44,9 +42,6 @@ func Test4GUEContextReleaseCommandEchoesCause(t *testing.T) {
 	}
 }
 
-// Test4GUEContextReleaseBeforeContext releases on an MME-UE-S1AP-ID the MME never
-// allocated: per TS 36.413 §10.6 it must answer with an Error Indication, never a
-// Release Command for a non-existent UE.
 func Test4GUEContextReleaseBeforeContext(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -60,10 +55,6 @@ func Test4GUEContextReleaseBeforeContext(t *testing.T) {
 	assertEPSErrorIndication(t, resp)
 }
 
-// Test4GUEContextReleaseDoubleRelease releases an already-released UE. The first
-// release moves the UE to ECM-IDLE, discarding the S1 context and its
-// MME-UE-S1AP-ID, so the repeat names an unknown logical connection and the MME
-// must answer with an Error Indication (TS 36.413 §10.6).
 func Test4GUEContextReleaseDoubleRelease(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)

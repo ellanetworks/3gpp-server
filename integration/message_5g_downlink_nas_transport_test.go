@@ -3,8 +3,6 @@
 
 //go:build integration
 
-// Tests for DownlinkNASTransport (TS 38.413 §9.2.5.2) decode.
-
 package integration_test
 
 import (

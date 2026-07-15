@@ -3,9 +3,6 @@
 
 //go:build integration
 
-// Tests for the gNB-initiated UE Context Release Request (TS 38.413 §8.3.2):
-// the UE transitions to CM-IDLE while remaining RM-REGISTERED.
-
 package integration_test
 
 import (
@@ -73,11 +70,6 @@ func Test5GUEContextReleaseRequest_AfterPDUSession(t *testing.T) {
 	}
 }
 
-// The release frees only the NG/N2 logical connection: the UE stays
-// RM-REGISTERED and the AMF keeps its context, so returning from CM-IDLE is a
-// Mobility Registration Update the AMF accepts by reusing the retained 5G NAS
-// security context — no fresh authentication (TS 24.501 §5.5.1.3, TS 23.501
-// §5.3.2).
 func Test5GUEContextReleaseRequest_ThenReregister(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -103,8 +95,6 @@ func Test5GUEContextReleaseRequest_ThenReregister(t *testing.T) {
 	}
 }
 
-// Per TS 38.413 §8.7.5.2 an incorrect UE NGAP ID must elicit an Error
-// Indication, not a release command.
 func Test5GUEContextReleaseRequest_NGAPIDFuzz(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -156,8 +146,6 @@ func Test5GUEContextReleaseRequest_NGAPIDFuzz(t *testing.T) {
 	}
 }
 
-// Without a preceding Initial UE Message the AMF holds no context for the RAN
-// UE NGAP ID, so it must answer with an Error Indication.
 func Test5GUEContextReleaseRequest_BeforeRegistration(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -173,8 +161,6 @@ func Test5GUEContextReleaseRequest_BeforeRegistration(t *testing.T) {
 	}
 }
 
-// The second release references a context the AMF already tore down, so it must
-// answer with an Error Indication.
 func Test5GUEContextReleaseRequest_DoubleRelease(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -200,9 +186,8 @@ func Test5GUEContextReleaseRequest_DoubleRelease(t *testing.T) {
 	}
 }
 
-// The Cause IE is informational, so a radio-network value outside the
-// enumerated range leaves the AMF free either to process the request or to
-// reject the encoding; both outcomes are accepted.
+// The Cause IE is informational, so an out-of-range value leaves the AMF free to
+// process the request or to reject the encoding.
 func Test5GUEContextReleaseRequest_OutOfRangeCause(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)

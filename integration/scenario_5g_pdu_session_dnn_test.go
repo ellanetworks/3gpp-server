@@ -3,11 +3,6 @@
 
 //go:build integration
 
-// PDU session establishment toward a DNN the core has no data network for: the
-// UE's slice (S-NSSAI) is served but the requested DNN is not part of it, so per
-// TS 24.501 §9.11.4.2 the SMF rejects with 5GSM cause #70 "missing or unknown
-// DNN in a slice".
-
 package integration_test
 
 import (

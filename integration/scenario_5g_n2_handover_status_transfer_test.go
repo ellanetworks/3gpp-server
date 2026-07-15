@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-// Distinct values, so the relayed container can be compared field by field.
+// Distinct values, so a field the relay swaps is caught.
 const (
 	statusDRBID    = 3
 	statusULPDCPSN = 42
@@ -80,13 +80,8 @@ func ngapFirstRanUeNgapID(body []byte) (int64, bool) {
 	return 0, false
 }
 
-// assertRANStatusTransferRelayed drives the RAN status transfer of an in-progress
-// N2 handover. Per TS 38.413 §8.4.7.2 the AMF conveys the source's transparent
-// container (§9.3.1.108: per-DRB UL/DL COUNT, §8.4.6.2) to the target unchanged,
-// addressed to the target's UE association (§9.2.3.14).
-//
-// The handover must already be prepared (Handover Request Acknowledge sent):
-// §8.4.7.3 lets a target ignore the message when no prepared handover exists.
+// Requires an already-prepared handover: TS 38.413 §8.4.7.3 lets a target ignore
+// the message when none exists.
 func assertRANStatusTransferRelayed(t *testing.T, sourceGNB, targetGNB, ueID string, targetRanUeNgapID int64) {
 	t.Helper()
 

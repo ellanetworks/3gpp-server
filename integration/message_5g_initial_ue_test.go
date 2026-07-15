@@ -3,9 +3,6 @@
 
 //go:build integration
 
-// Tests for InitialUEMessage (TS 38.413 §9.2.5.1) and the NAS RegistrationRequest
-// (TS 24.501 §8.2.6) it carries.
-
 package integration_test
 
 import (
@@ -472,15 +469,13 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 		},
 		{
 			name: "raw NAS: single byte 0x7e (5GMM EPD only)",
-			// Too short to carry a complete message type IE, so it shall be
-			// ignored (TS 24.501 §7.2.1): no reply is the mandated outcome.
+			// TS 24.501 §7.2.1: too short for a message type IE, so it is ignored — no reply.
 			body:     `{"message_type":"registration_request","raw_nas_pdu":"7e"}`,
 			wantHTTP: 504,
 		},
 		{
 			name: "raw NAS: two bytes (EPD + security header, no message type)",
-			// Still too short to carry a message type IE, so it shall be
-			// ignored (TS 24.501 §7.2.1): no reply is the mandated outcome.
+			// TS 24.501 §7.2.1: too short for a message type IE, so it is ignored — no reply.
 			body:     `{"message_type":"registration_request","raw_nas_pdu":"7e00"}`,
 			wantHTTP: 504,
 		},

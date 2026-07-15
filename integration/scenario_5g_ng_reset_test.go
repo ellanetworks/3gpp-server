@@ -3,9 +3,6 @@
 
 //go:build integration
 
-// NG Reset (TS 38.413 §8.7.4): the gNB resets the whole NG interface or a
-// subset of UE associations; the AMF answers with NG Reset Acknowledge.
-
 package integration_test
 
 import (
@@ -46,8 +43,6 @@ func ngapHasConnection(body []byte, amfID, ranID int64) bool {
 	return false
 }
 
-// On a full NG Reset the AMF releases the UE associations and answers with NG
-// Reset Acknowledge (TS 38.413 §8.7.4.2.2).
 func Test5GNGReset_All(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 
@@ -62,9 +57,6 @@ func Test5GNGReset_All(t *testing.T) {
 	}
 }
 
-// For each reset connection the AMF shall include the AMF UE NGAP ID and RAN UE
-// NGAP ID in the NG Reset Acknowledge's UE-associated Logical NG-connection List
-// (TS 38.413 §8.7.4.2.2).
 func Test5GNGReset_Partial(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)

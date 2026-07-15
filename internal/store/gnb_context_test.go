@@ -5,9 +5,6 @@ package store
 
 import "testing"
 
-// TestGNBContextDeleteUEPurgesSessions asserts DeleteUE removes the per-UE state
-// held in the ranUeID-keyed session map, not only the UE map — otherwise every
-// created/deleted UE leaks its PDU sessions.
 func TestGNBContextDeleteUEPurgesSessions(t *testing.T) {
 	g := NewGNBContext("g1", "001", "01", "000001", "000001", "gnb", 1, "", nil)
 
@@ -28,9 +25,6 @@ func TestGNBContextDeleteUEPurgesSessions(t *testing.T) {
 	}
 }
 
-// TestGNBContextMigrateUEPurgesSourceUnderOldID asserts MigrateUE purges the
-// source's session state keyed by the UE's pre-migration RAN-UE-NGAP-ID: a rekey
-// applied before the purge orphans the source's entry.
 func TestGNBContextMigrateUEPurgesSourceUnderOldID(t *testing.T) {
 	src := NewGNBContext("g1", "001", "01", "000001", "000001", "src", 1, "", nil)
 	target := NewGNBContext("g2", "001", "01", "000001", "000002", "target", 1, "", nil)

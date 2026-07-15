@@ -7,9 +7,6 @@ package integration_test
 
 import "testing"
 
-// Test4GS1ResetAll drives an eNB-initiated full S1 RESET (s1-Interface,
-// reset-all): per TS 36.413 §8.7.1.2.1 the MME releases every UE-associated
-// logical S1 connection on the association.
 func Test4GS1ResetAll(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -22,8 +19,6 @@ func Test4GS1ResetAll(t *testing.T) {
 		t.Fatalf("S1 reset (all): s1ap.message_type = %q, want ResetAcknowledge (TS 36.413 §8.7.1.2.1); body: %s", got, resp)
 	}
 
-	// The reset released the UE's S1 connection, so a message on its MME-UE-S1AP-ID
-	// draws an Error Indication (TS 36.413 §10.6).
 	after := nasBody(t, enbID, ueID, `{"message_type":"release_request","timeout_ms":3000}`)
 	if got := jsonGet(after, "s1ap.message_type"); got == "UEContextReleaseCommand" {
 		t.Fatalf("UE S1 connection survived a reset-all; body: %s", after)
@@ -35,10 +30,6 @@ func Test4GS1ResetAll(t *testing.T) {
 	fullAttach(t, enbID, fresh)
 }
 
-// Test4GS1ResetPartial drives an eNB-initiated partial S1 RESET
-// (partOfS1-Interface) naming one UE's connection: per TS 36.413 §8.7.1.2.1 the
-// MME releases that connection and echoes the UE S1AP ID pair it acted on in the
-// acknowledge's connection list.
 func Test4GS1ResetPartial(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -60,8 +51,6 @@ func Test4GS1ResetPartial(t *testing.T) {
 		t.Fatalf("partial reset ack eNB-UE-S1AP-ID = %q, want the reset connection %q; body: %s", got, enb, resp)
 	}
 
-	// The named connection was released, so a message on it draws an Error
-	// Indication (TS 36.413 §10.6).
 	after := nasBody(t, enbID, ueID, `{"message_type":"release_request","timeout_ms":3000}`)
 	assertEPSErrorIndication(t, after)
 }

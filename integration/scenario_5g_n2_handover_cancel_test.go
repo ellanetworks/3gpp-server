@@ -3,10 +3,6 @@
 
 //go:build integration
 
-// Handover Cancellation (TS 38.413 §8.4.5): the source gNB aborts an ongoing or
-// already-prepared N2 handover with a HANDOVER CANCEL, and the AMF replies with
-// HANDOVER CANCEL ACKNOWLEDGE (§8.4.5.2). Abnormal cases follow §10.6.
-
 package integration_test
 
 import (
@@ -14,8 +10,6 @@ import (
 	"testing"
 )
 
-// Cancelling after the target received the Handover Request but before it is
-// acknowledged must draw a HANDOVER CANCEL ACKNOWLEDGE (TS 38.413 §8.4.5.2).
 func Test5GN2HandoverCancelDuringPreparation(t *testing.T) {
 	srcGNB := createGnBWithID(t, "000301", "ho-cancel-src")
 	targetGNB := createGnBWithID(t, "000302", "ho-cancel-tgt")
@@ -42,14 +36,11 @@ func Test5GN2HandoverCancelDuringPreparation(t *testing.T) {
 		t.Errorf("handover_cancel during preparation: ngap.message_type = %q, want HandoverCancelAcknowledge (TS 38.413 §8.4.5.2)\n  body: %s", got, body)
 	}
 
-	// Cancelling must release the resources reserved at the target (TS 38.413 §8.4.5).
 	if got := jsonGet(awaitNGAP(t, targetGNB, ngapUEContextReleaseCommand), "ngap.message_type"); got != ngapUEContextReleaseCommand {
 		t.Errorf("after cancel, target did not receive UEContextReleaseCommand (prepared resources not released): got %q", got)
 	}
 }
 
-// Cancelling once the source already holds the Handover Command is a valid late
-// cancel (TS 38.413 §8.4.1.3), which the AMF must still acknowledge.
 func Test5GN2HandoverCancelAfterCommand(t *testing.T) {
 	srcGNB := createGnBWithID(t, "000303", "ho-cancel-src")
 	targetGNB := createGnBWithID(t, "000304", "ho-cancel-tgt")
@@ -88,8 +79,6 @@ func Test5GN2HandoverCancelAfterCommand(t *testing.T) {
 	}
 }
 
-// A succeeding second handover of the same UE is what proves the cancel freed
-// the handover procedure and the UE's resources (TS 38.413 §8.4.5).
 func Test5GN2HandoverCancelThenReHandover(t *testing.T) {
 	srcGNB := createGnBWithID(t, "00030a", "ho-recancel-src")
 	targetGNB := createGnBWithID(t, "00030b", "ho-recancel-tgt")
@@ -145,8 +134,7 @@ func Test5GN2HandoverCancelThenReHandover(t *testing.T) {
 }
 
 // TS 38.413 §8.4.5 defines Handover Cancel only for an ongoing or prepared
-// handover, so the AMF's response to one with no handover underway is
-// unspecified; only the invariant is asserted: the UE stays usable.
+// handover, so with none underway only the UE staying usable is asserted.
 func Test5GN2HandoverCancelNoHandoverInProgress(t *testing.T) {
 	gnb := createGnBWithID(t, "00030c", "ho-nocancel")
 
@@ -157,8 +145,6 @@ func Test5GN2HandoverCancelNoHandoverInProgress(t *testing.T) {
 	assertUEStillConnected(t, gnb, ueID)
 }
 
-// A RAN UE NGAP ID the AMF never assigned is an unknown local AP ID, which
-// §10.6 requires it to answer with an Error Indication.
 func Test5GN2HandoverCancelUnknownRanUeNgapID(t *testing.T) {
 	srcGNB := createGnBWithID(t, "000305", "ho-cancel-src")
 
@@ -175,8 +161,6 @@ func Test5GN2HandoverCancelUnknownRanUeNgapID(t *testing.T) {
 	}
 }
 
-// An AMF UE NGAP ID inconsistent with the one stored for the UE must draw an
-// Error Indication and must not be acted upon (TS 38.413 §10.6).
 func Test5GN2HandoverCancelInconsistentAmfUeNgapID(t *testing.T) {
 	srcGNB := createGnBWithID(t, "000306", "ho-cancel-src")
 	targetGNB := createGnBWithID(t, "000307", "ho-cancel-tgt")

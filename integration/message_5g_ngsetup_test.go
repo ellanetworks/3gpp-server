@@ -79,9 +79,8 @@ func Test5GNGSetup(t *testing.T) {
 			wantContain: ngapNGSetupResponse,
 		},
 		{
-			// A missing mandatory (reject-criticality) IE must be rejected. TS 38.413
-			// §10.3.5 leaves the rejection form open between NG SETUP FAILURE and
-			// Error Indication, so only the absence of a response is asserted.
+			// TS 38.413 §10.3.5 leaves the rejection form open between NG SETUP FAILURE
+			// and Error Indication, so only the absence of a response is asserted.
 			name: "custom IEs missing GlobalRANNodeID",
 			body: `{
 				"amf_address":"10.3.0.2:38412", "gnb_n2_address":"10.3.0.3",

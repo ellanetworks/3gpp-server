@@ -141,7 +141,6 @@ func (t *framed[T]) WaitForMessage(ctx context.Context, messageTypes ...string) 
 	return t.WaitForMessageMatching(ctx, nil, messageTypes...)
 }
 
-// A nil match accepts any frame.
 func (t *framed[T]) WaitForMessageMatching(ctx context.Context, match func(*T) bool, messageTypes ...string) (*T, error) {
 	// The receiver broadcasts only on new frames, so ctx expiry must wake waiters itself.
 	stop := make(chan struct{})

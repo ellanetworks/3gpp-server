@@ -7,10 +7,7 @@ package integration_test
 
 import "testing"
 
-// Test4GPathSwitchSecurityCapabilityMatch has the target eNB report the UE
-// security capabilities the MME already holds: the path switch is acknowledged
-// (TS 36.413 §8.4.4.2). The UE Security Capabilities IE is optional in the
-// acknowledge (TS 36.413 §9.1.5.9), so its presence is not asserted.
+// The UE Security Capabilities IE is optional in the acknowledge (TS 36.413 §9.1.5.9), so its presence is not asserted.
 func Test4GPathSwitchSecurityCapabilityMatch(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -24,19 +21,13 @@ func Test4GPathSwitchSecurityCapabilityMatch(t *testing.T) {
 	}
 }
 
-// Test4GPathSwitchSecurityCapabilityMismatch has the target eNB report UE
-// security capabilities differing from the MME's stored values: the Path Switch
-// Request Acknowledge must replay the stored capabilities for the eNB to correct
-// its context (TS 33.401 §7.2.4.2.2). The UE advertised EEA0/1/2 and EIA0/1/2,
-// which the S1AP encoding stores as 0xC000 per bitmap by dropping the EEA0/EIA0
-// bit.
 func Test4GPathSwitchSecurityCapabilityMismatch(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
 
 	fullAttach(t, enbID, ueID)
 
-	// Report EEA1/EIA1 only (0x8000), which differs from the stored 0xC000.
+	// Report 0x8000 (EEA1/EIA1 only); the MME stores 0xC000 for the UE's advertised EEA0/1/2 + EIA0/1/2, the S1AP bitmap carrying no EEA0/EIA0 bit.
 	resp := nasBody(t, enbID, ueID, `{"message_type":"path_switch","path_switch_eea":32768,"path_switch_eia":32768}`)
 
 	if got := jsonGet(resp, "s1ap.message_type"); got != "PathSwitchRequestAcknowledge" {

@@ -42,7 +42,7 @@ func ngapIEByID(body []byte, id int64) map[string]any {
 	return nil
 }
 
-// TS 38.413 §9.3.1.86.
+// TS 38.413 §9.4.7.
 const ngapProtocolIEIDUESecurityCapabilities = 119
 
 func Test5GPathSwitchRequestSuccess(t *testing.T) {

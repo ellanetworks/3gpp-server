@@ -101,9 +101,6 @@ func Test4GPDNDisconnect(t *testing.T) {
 	}
 }
 
-// Test4GPDNConnectivityUnknownAPN requests an unprovisioned APN: per TS 24.301
-// §6.5.1.4 the MME rejects it with ESM cause #27 "missing or unknown APN", or
-// #66 "requested APN not supported in current RAT and PLMN combination".
 func Test4GPDNConnectivityUnknownAPN(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -121,8 +118,6 @@ func Test4GPDNConnectivityUnknownAPN(t *testing.T) {
 	}
 }
 
-// Test4GPDNConnectivityInvalidPTI sends a reserved PTI value (0): per TS 24.301
-// §7.3.1 a) the MME shall reject with ESM cause #81 "invalid PTI value".
 func Test4GPDNConnectivityInvalidPTI(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -140,9 +135,7 @@ func Test4GPDNConnectivityInvalidPTI(t *testing.T) {
 	}
 }
 
-// Test4GPDNConnectivityInvalidEBI sends an assigned ESM-header EPS bearer
-// identity where a valid request carries 0: per TS 24.301 §7.3.2 a) the MME shall
-// reject with ESM cause #43 "invalid EPS bearer identity".
+// A valid PDN Connectivity Request carries EPS bearer identity 0 in the ESM header (TS 24.301 §7.3.2 a)).
 func Test4GPDNConnectivityInvalidEBI(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -160,8 +153,6 @@ func Test4GPDNConnectivityInvalidEBI(t *testing.T) {
 	}
 }
 
-// Test4GPDNDisconnectInvalidPTI sends a reserved PTI value (0): per TS 24.301
-// §7.3.1 b) the MME shall reject with ESM cause #81 "invalid PTI value".
 func Test4GPDNDisconnectInvalidPTI(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -179,9 +170,6 @@ func Test4GPDNDisconnectInvalidPTI(t *testing.T) {
 	}
 }
 
-// Test4GPDNDisconnectLastPDN disconnects the only PDN connection. Per TS 24.301
-// §6.5.2.4, with EMM-REGISTERED without PDN connection unsupported, the MME shall
-// reject with ESM cause #49 "last PDN disconnection not allowed".
 func Test4GPDNDisconnectLastPDN(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -200,11 +188,6 @@ func Test4GPDNDisconnectLastPDN(t *testing.T) {
 	}
 }
 
-// Test4GPDNConnectivityDuplicateAPN requests a second PDN connection to an APN
-// already connected. Per TS 24.301 §6.5.1.4.3 the network may accept it,
-// deactivating the existing connection, or reject it with ESM cause #55 "multiple
-// PDN connections for a given APN not allowed"; both outcomes are conformant, an
-// absent answer is not.
 func Test4GPDNConnectivityDuplicateAPN(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -215,7 +198,7 @@ func Test4GPDNConnectivityDuplicateAPN(t *testing.T) {
 
 	switch got := jsonGet(resp, "nas.message_type"); got {
 	case "activate_default_eps_bearer_context_request":
-		// Accepted, re-establishing the connection.
+		// Accepting the request, deactivating the existing connection, is conformant (TS 24.301 §6.5.1.4.3).
 	case "pdn_connectivity_reject":
 		if c := jsonGet(resp, "nas.esm_cause"); c != "55" {
 			t.Fatalf("duplicate APN reject: esm_cause = %q, want 55 (multiple PDN connections for a given APN not allowed); body: %s", c, resp)

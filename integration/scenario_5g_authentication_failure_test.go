@@ -3,10 +3,6 @@
 
 //go:build integration
 
-// Authentication Failure (TS 24.501 §5.4.1.3.6 / §5.4.1.3.7): the UE rejects an
-// Authentication Request with a 5GMM cause, and the network's mandated reaction
-// depends on that cause.
-
 package integration_test
 
 import (
@@ -37,8 +33,6 @@ func sendAuthFailure(t *testing.T, gnbID, ueID string, cause int) (int, []byte) 
 	return doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap", body)
 }
 
-// On cause #21 with a valid AUTS the network shall re-synchronise and initiate
-// authentication again (TS 24.501 §5.4.1.3.7 f).
 func Test5GAuthenticationFailure_SynchFailure(t *testing.T) {
 	gnbID, ueID := authChallengePending(t)
 
@@ -52,11 +46,8 @@ func Test5GAuthenticationFailure_SynchFailure(t *testing.T) {
 	}
 }
 
-// On the first cause #21 the network shall re-synchronise from the AUTS and
-// initiate authentication again (TS 24.501 §5.4.1.3.7 f). On a repeat, NOTE 4 of
-// the same subclause only permits terminating with an AUTHENTICATION REJECT, so
-// re-synchronising once more is equally conformant; the binding invariant is
-// that an unauthenticated UE must not reach security activation.
+// On a repeated cause #21 both terminating and re-synchronising again are
+// conformant (TS 24.501 §5.4.1.3.7 f and NOTE 4), so only security activation fails.
 func Test5GAuthenticationFailure_RepeatedSynchFailure(t *testing.T) {
 	gnbID, ueID := authChallengePending(t)
 
@@ -76,14 +67,11 @@ func Test5GAuthenticationFailure_RepeatedSynchFailure(t *testing.T) {
 
 	switch got := jsonGet(second, "nas.message_type"); got {
 	case nasAuthenticationReject, nasAuthenticationRequest:
-		// Both permitted: terminate (§5.4.1.3.7 NOTE 4) or re-synchronise again (item f).
 	default:
 		t.Errorf("repeated synch failure: nas.message_type = %q, want authentication_reject (TS 24.501 §5.4.1.3.7 NOTE 4) or a further authentication_request (item f)\n  body: %s", got, second)
 	}
 }
 
-// On cause #71 the network selects a new ngKSI and re-sends the challenge
-// (TS 24.501 §5.4.1.3.7 e).
 func Test5GAuthenticationFailure_NgKSIAlreadyInUse(t *testing.T) {
 	gnbID, ueID := authChallengePending(t)
 
@@ -97,9 +85,8 @@ func Test5GAuthenticationFailure_NgKSIAlreadyInUse(t *testing.T) {
 	}
 }
 
-// For causes #20 and #26, TS 24.501 §5.4.1.3.7 c)/d) leave the network a choice:
-// re-identify, re-authenticate, or reject. The binding requirement is that it
-// must not proceed with the procedure, so a Security Mode Command is never valid.
+// §5.4.1.3.7 c)/d) leave the network a choice of re-identify, re-authenticate or
+// reject, so only proceeding to a Security Mode Command is disqualifying.
 func Test5GAuthenticationFailure_MACFailure(t *testing.T) {
 	for _, cause := range []int{cause5GMMMACFailure, cause5GMMNon5GAuthenticationUnacceptable} {
 		t.Run(fmt.Sprintf("cause-%d", cause), func(t *testing.T) {
@@ -112,7 +99,6 @@ func Test5GAuthenticationFailure_MACFailure(t *testing.T) {
 
 			switch got := jsonGet(body, "nas.message_type"); got {
 			case nasAuthenticationReject, nasIdentityRequest, nasAuthenticationRequest:
-				// Spec-permitted reactions (§5.4.1.3.7 c)/d), §5.4.1.3.5).
 			default:
 				t.Errorf("nas.message_type = %q, want one of {authentication_reject, identity_request, authentication_request} (TS 24.501 §5.4.1.3.7)\n  body: %s", got, body)
 			}
@@ -120,8 +106,6 @@ func Test5GAuthenticationFailure_MACFailure(t *testing.T) {
 	}
 }
 
-// A forged AMF UE NGAP ID on the Uplink NAS Transport is an unknown local AP ID,
-// which the AMF must answer with an Error Indication (TS 38.413 §8.6.3).
 func Test5GAuthenticationFailure_NGAPIDFuzz(t *testing.T) {
 	gnbID, ueID := authChallengePending(t)
 

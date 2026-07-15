@@ -17,6 +17,7 @@ import (
 
 const sessionModIMSI = "001010000000103"
 
+// The default policy seeds at 5QI 9, ARP 1, session-AMBR 200 Mbps.
 func setPolicyAMBR(t *testing.T, token, ul, dl string) {
 	t.Helper()
 
@@ -34,10 +35,6 @@ func setPolicyAMBR(t *testing.T, token, ul, dl string) {
 	_ = resp.Body.Close()
 }
 
-// Test4GSessionAMBRModification changes the session-AMBR of an attached UE's
-// policy: the MME must reconfigure the bearer in place with a Modify EPS Bearer
-// Context Request carrying the new APN-AMBR (TS 24.301 §6.4.3), and must not
-// re-establish the bearer.
 func Test4GSessionAMBRModification(t *testing.T) {
 	token, err := provisionEllaCore()
 	if err != nil {
@@ -48,7 +45,6 @@ func Test4GSessionAMBRModification(t *testing.T) {
 		t.Fatalf("create subscriber: %v", err)
 	}
 	t.Cleanup(func() { deleteSubscriber(t, token, sessionModIMSI) })
-	// Restore the default policy's session-AMBR so the env is left as found.
 	t.Cleanup(func() { setPolicyAMBR(t, token, "200 Mbps", "200 Mbps") })
 
 	enbID := createGTPUENB(t, claimENBID(), "sess-mod-enb", n3IPv4)
@@ -62,7 +58,6 @@ func Test4GSessionAMBRModification(t *testing.T) {
 	ueID := jsonGet(resp, "ue_id")
 	fullAttach(t, enbID, ueID)
 
-	// The policy seeds at 200 Mbps.
 	const newAMBR = "50 Mbps"
 	setPolicyAMBR(t, token, newAMBR, newAMBR)
 
@@ -81,8 +76,7 @@ func Test4GSessionAMBRModification(t *testing.T) {
 		t.Fatalf("Modify EPS Bearer Context Request apn_ambr = %q, want %q (50 Mbps, TS 24.301 §9.9.4.2)\n  body: %s", got, wantAMBR, body2)
 	}
 
-	// The accept is mandatory for the MME to commit the modification and stop
-	// T3486 (TS 24.301 §6.4.3.3).
+	// The accept is mandatory for the MME to commit the modification and stop T3486 (TS 24.301 §6.4.3.3).
 	accept := fmt.Sprintf(`{"message_type":"modify_eps_bearer_context_accept","eps_bearer_identity":%s,"pti":%s}`,
 		jsonGet(body2, "nas.eps_bearer_identity"), jsonGet(body2, "nas.bearer_pti"))
 	if s, ab := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas", accept); s != 200 {

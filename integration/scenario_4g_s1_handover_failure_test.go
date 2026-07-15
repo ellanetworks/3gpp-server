@@ -3,10 +3,6 @@
 
 //go:build integration
 
-// S1 handover failure paths (TS 36.413 §8.4.1.3, §8.4.2.3): when the target eNB
-// rejects the handover or is unknown, the MME must abort the preparation and
-// return a HANDOVER PREPARATION FAILURE to the source eNB.
-
 package integration_test
 
 import (
@@ -14,8 +10,6 @@ import (
 	"testing"
 )
 
-// createUnconnectedENB creates an eNB without opening its S1 association, so its
-// Global eNB-ID is a valid handover target identity the MME cannot resolve.
 func createUnconnectedENB(t *testing.T, enbID int, name string) string {
 	t.Helper()
 
@@ -38,8 +32,6 @@ func createUnconnectedENB(t *testing.T, enbID int, name string) string {
 	return id
 }
 
-// Test4GS1HandoverTargetRejects has the target eNB answer the resource
-// allocation with HANDOVER FAILURE.
 func Test4GS1HandoverTargetRejects(t *testing.T) {
 	sourceENB := createENBWithID(t, 1, "source-enb")
 	targetENB := createENBWithID(t, 2, "target-enb")
@@ -59,7 +51,6 @@ func Test4GS1HandoverTargetRejects(t *testing.T) {
 		t.Fatalf("HandoverRequest missing MME UE S1AP ID\n  body: %s", hoReq)
 	}
 
-	// Target eNB → MME: HANDOVER FAILURE.
 	status, body = doRequest(t, "POST", "/enb/"+targetENB+"/s1ap",
 		fmt.Sprintf(`{"message_type":"handover_failure","mme_ue_s1ap_id":%s}`, targetMME))
 	if status != 200 {
@@ -80,8 +71,6 @@ func Test4GS1HandoverTargetRejects(t *testing.T) {
 	}
 }
 
-// Test4GS1HandoverUnknownTarget names a target eNB the MME does not serve: it
-// must fail preparation with cause unknown-targetID (TS 36.413 §8.4.1.3).
 func Test4GS1HandoverUnknownTarget(t *testing.T) {
 	sourceENB := createENBWithID(t, 1, "source-enb")
 	unknownTarget := createUnconnectedENB(t, 99, "unconnected-enb")

@@ -3,10 +3,6 @@
 
 //go:build integration
 
-// Handover Failure (TS 38.413 §8.4.2.3): the target gNB rejects a handover with
-// a HANDOVER FAILURE, and the AMF answers the source with a HANDOVER PREPARATION
-// FAILURE (§8.4.1.3). Abnormal AP-ID cases follow §10.6.
-
 package integration_test
 
 import (
@@ -14,8 +10,6 @@ import (
 	"testing"
 )
 
-// When the target rejects a prepared handover, the AMF must answer the source
-// with a HANDOVER PREPARATION FAILURE (TS 38.413 §8.4.2.3 → §8.4.1.3).
 func Test5GN2HandoverFailureRejection(t *testing.T) {
 	srcGNB := createGnBWithID(t, "000401", "ho-fail-src")
 	targetGNB := createGnBWithID(t, "000402", "ho-fail-tgt")
@@ -49,8 +43,6 @@ func Test5GN2HandoverFailureRejection(t *testing.T) {
 	}
 }
 
-// A succeeding second handover of the same UE is what proves the rejection freed
-// the handover procedure and the UE's resources (TS 38.413 §8.4.2.3).
 func Test5GN2HandoverFailureThenReHandover(t *testing.T) {
 	srcGNB := createGnBWithID(t, "000403", "ho-refail-src")
 	targetGNB := createGnBWithID(t, "000404", "ho-refail-tgt")
@@ -107,8 +99,6 @@ func Test5GN2HandoverFailureThenReHandover(t *testing.T) {
 	completeHandover(t, targetGNB, targetAmf2, 100)
 }
 
-// An AMF UE NGAP ID the AMF never assigned is an unknown local AP ID, which
-// §10.6 requires it to answer with an Error Indication.
 func Test5GN2HandoverFailureUnknownAmfUeNgapID(t *testing.T) {
 	targetGNB := createGnBWithID(t, "000405", "ho-fail-tgt")
 
@@ -121,8 +111,6 @@ func Test5GN2HandoverFailureUnknownAmfUeNgapID(t *testing.T) {
 	expectErrorIndication(t, targetGNB, "Handover Failure with unknown AMF UE NGAP ID")
 }
 
-// A victim's AMF UE NGAP ID is unknown on a rogue gNB's own association, so
-// §10.6 requires an Error Indication there and the victim must be untouched.
 func Test5GN2HandoverFailureCrossAssociationHijack(t *testing.T) {
 	victimGNB := createGnBWithID(t, "000406", "victim-gnb")
 	attackerGNB := createGnBWithID(t, "000407", "attacker-gnb")

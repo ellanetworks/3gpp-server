@@ -158,7 +158,7 @@ func Test5GN2HandoverAcknowledgeNonRequestedSession(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "0000a8", "ho-extra-src")
 	targetGNB := createGnBWithID(t, "0000a9", "ho-extra-tgt")
 
-	ueID := establishRegisteredUE(t, sourceGNB) // session 1 only
+	ueID := establishRegisteredUE(t, sourceGNB)
 
 	status, body := doRequest(t, "POST", "/gnb/"+sourceGNB+"/ue/"+ueID+"/ngap",
 		`{"message_type":"handover_required","target_gnb_id":"0000a9"}`)
@@ -401,7 +401,7 @@ func Test5GN2HandoverRequiredManyPDUSessions(t *testing.T) {
 	tgtHex := "0002e1"
 	targetGNB := createGnBWithID(t, tgtHex, "ho-many-tgt")
 
-	ueID := establishRegisteredUE(t, srcGNB) // only session 1 exists
+	ueID := establishRegisteredUE(t, srcGNB)
 
 	status, body := doRequest(t, "POST", "/gnb/"+srcGNB+"/ue/"+ueID+"/ngap",
 		fmt.Sprintf(`{"message_type":"handover_required","target_gnb_id":"%s","pdu_session_ids":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]}`, tgtHex))

@@ -15,10 +15,7 @@ import (
 	"testing"
 )
 
-// x963KDF is the ANSI-X9.63 KDF of TS 33.501 §C.3.4.1: for counter = 1, 2, …
-// it hashes Z ‖ counter(4-octet big-endian) ‖ SharedInfo and concatenates full
-// hash blocks. Reimplemented from the spec so the assertions stay independent of
-// ansiX963KDF.
+// Reimplemented from TS 33.501 §C.3.4.1 so the assertions stay independent of ansiX963KDF.
 func x963KDF(t *testing.T, z, sharedInfo []byte, minLen int) []byte {
 	t.Helper()
 
@@ -46,8 +43,6 @@ func TestAnsiX963KDF(t *testing.T) {
 	}
 }
 
-// The null-scheme SUCI carries the MSIN in the clear (TS 23.003 §2.2B), so its
-// encoding is deterministic.
 func TestCipherSuciNullScheme(t *testing.T) {
 	profile := HomeNetworkPublicKey{ProtectionScheme: NullScheme, PublicKeyID: "0"}
 
@@ -66,10 +61,7 @@ func TestCipherSuciNullScheme(t *testing.T) {
 	}
 }
 
-// Profile A (X25519 ECIES, TS 33.501 §C.3.4.1) uses a fresh random ephemeral key
-// per call, so Annex C's fixed-key vector cannot be reproduced. This exercises
-// the scheme end-to-end: encrypt with the home-network public key, then recover
-// the MSIN with the matching private key.
+// The ephemeral key is random per call, so TS 33.501 Annex C's fixed-key vector cannot be reproduced.
 func TestProfileAEncryptRoundTrip(t *testing.T) {
 	const msin = "0000000001"
 
@@ -102,8 +94,7 @@ func TestProfileAEncryptRoundTrip(t *testing.T) {
 		profileAEncKeyLen, profileAIcbLen, profileAMacKeyLen, profileAMacLen)
 }
 
-// Profile B (P-256 ECIES, TS 33.501 §C.3.4.2); round-trip for the same reason as
-// profile A. The ephemeral key is embedded in compressed SEC1 form.
+// The ephemeral key is embedded in compressed SEC1 form.
 func TestProfileBEncryptRoundTrip(t *testing.T) {
 	const msin = "0000000001"
 

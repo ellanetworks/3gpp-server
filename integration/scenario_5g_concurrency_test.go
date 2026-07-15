@@ -3,10 +3,6 @@
 
 //go:build integration
 
-// Concurrency: many UEs driving the same procedure at once on a shared gNB
-// association, to catch races in the AMF/SMF allocators (AMF UE NGAP ID,
-// 5G-GUTI, UE IP) that could hand the same identity to two simultaneous UEs.
-
 package integration_test
 
 import (
@@ -14,8 +10,6 @@ import (
 	"testing"
 )
 
-// The AMF must assign each UE an AMF UE NGAP ID unique per AMF–RAN association
-// (TS 38.413 §9.3.3.1) and a unique 5G-GUTI (TS 23.501 §5.9.4).
 func Test5GConcurrentRegistration(t *testing.T) {
 	gnb := createGnBWithID(t, "00c001", "conc-reg")
 
@@ -58,7 +52,6 @@ func Test5GConcurrentRegistration(t *testing.T) {
 	}
 }
 
-// The SMF must allocate each UE a distinct IP from the pool (TS 23.501 §5.8.2.2).
 func Test5GConcurrentPDUSessionEstablishment(t *testing.T) {
 	gnb := createGnBWithID(t, "00c002", "conc-pdu")
 
@@ -104,15 +97,12 @@ func Test5GConcurrentPDUSessionEstablishment(t *testing.T) {
 	}
 }
 
-// Identities freed by a simultaneous release must be cleanly reusable: the
-// second wave must again get distinct AMF UE NGAP IDs.
 func Test5GConcurrentDeregistration(t *testing.T) {
 	gnb := createGnBWithID(t, "00c003", "conc-dereg")
 
 	const n = 6
 
-	// Both waves use the same subscribers, so the second re-registers the
-	// identities the first released.
+	// Both waves share subscribers, so the second re-registers what the first released.
 	supis := claimSubscribers(t, n)
 	first := make([]regResult, n)
 

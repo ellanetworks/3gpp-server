@@ -3,10 +3,6 @@
 
 //go:build integration
 
-// N2 handover (inter-gNB without Xn, TS 38.413 §8.4): a registered UE with a
-// PDU session is handed over from a source gNB to a target gNB through the AMF.
-// The flow is driven message-by-message across two gNB associations.
-
 package integration_test
 
 import (
@@ -15,7 +11,6 @@ import (
 	"testing"
 )
 
-// A specific NGAP gNB ID lets two gNBs coexist on the same core.
 func createGnBWithID(t *testing.T, gnbID, name string) string {
 	t.Helper()
 
@@ -161,7 +156,6 @@ func assertCarriesPDUSessions(t *testing.T, body []byte, want []int64, context s
 	}
 }
 
-// ngapAMBR returns the UE Aggregate Maximum Bit Rate in bps.
 func ngapAMBR(body []byte) (dl, ul int64, ok bool) {
 	var top struct {
 		NGAP struct {
@@ -211,7 +205,7 @@ func ngapHasCause(body []byte) bool {
 	return false
 }
 
-// The Security Context IE is surfaced via its Next Hop Chaining Count.
+// The Security Context IE is surfaced only via its Next Hop Chaining Count.
 func ngapHasSecurityContext(body []byte) bool {
 	var top struct {
 		NGAP struct {
@@ -234,12 +228,7 @@ func ngapHasSecurityContext(body []byte) bool {
 	return false
 }
 
-// runN2HandoverFlow drives the inter-NG-RAN N2 handover signalling flow between
-// two gNBs. The message order follows TS 23.502 §4.9.1.3: preparation §4.9.1.3.2
-// (Handover Required step 1 → Handover Request step 9 → Handover Request
-// Acknowledge step 10) and execution §4.9.1.3.3 (Handover Command step 1 →
-// Handover Notify step 5 → UE Context Release Command step 14a). The given body
-// establishes the PDU session that is handed over.
+// Drives an inter-NG-RAN N2 handover, preparation then execution (TS 23.502 §4.9.1.3).
 func runN2HandoverFlow(t *testing.T, establishBody string) {
 	t.Helper()
 
@@ -265,9 +254,6 @@ func runN2HandoverFlow(t *testing.T, establishBody string) {
 		t.Fatalf("ngap.message_type = %q, want HandoverRequest (TS 38.413 §8.4.2.2)\n  body: %s", got, hoReq)
 	}
 
-	// The PDU session list, UE AMBR and Security Context are all mandatory IEs of
-	// HANDOVER REQUEST (TS 38.413 §9.2.3.1); the Security Context carries the
-	// NH/NCC the target derives K_gNB from (TS 33.501 §6.9).
 	assertCarriesPDUSession(t, hoReq, 1, "HandoverRequest")
 
 	if dl, ul, ok := ngapAMBR(hoReq); !ok || dl == 0 || ul == 0 {
@@ -296,11 +282,8 @@ func runN2HandoverFlow(t *testing.T, establishBody string) {
 		t.Fatalf("ngap.message_type = %q, want HandoverCommand (TS 38.413 §8.4.1.2)\n  body: %s", got, hoCmd)
 	}
 
-	// The command must confirm the same PDU session for handover (§9.2.3.2).
 	assertCarriesPDUSession(t, hoCmd, 1, "HandoverCommand")
 
-	// The PDCP status the target needs for a lossless handover (TS 23.502
-	// §4.9.1.3.3 steps 2-3).
 	assertRANStatusTransferRelayed(t, sourceGNB, targetGNB, ueID, targetRanUeNgapID)
 
 	status, body = doRequest(t, "POST", "/gnb/"+targetGNB+"/ngap",
@@ -310,8 +293,6 @@ func runN2HandoverFlow(t *testing.T, establishBody string) {
 		t.Fatalf("handover_notify: HTTP %d\n  body: %s", status, body)
 	}
 
-	// The Notify is what makes the AMF release the source's resources (TS 23.502
-	// §4.9.1.3.3 step 14a).
 	rel := awaitNGAP(t, sourceGNB, ngapUEContextReleaseCommand)
 	if got := jsonGet(rel, "ngap.message_type"); got != ngapUEContextReleaseCommand {
 		t.Errorf("ngap.message_type = %q, want UEContextReleaseCommand (source released after handover)\n  body: %s", got, rel)

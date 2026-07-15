@@ -105,7 +105,7 @@ func derivateKamf(key []byte, snName string, imsi, sqnXorAK []byte) ([]byte, err
 		return nil, fmt.Errorf("derive Kseaf: %w", err)
 	}
 
-	abba := []byte{0x00, 0x00} // non-interworking 5GS (TS 33.501 §A.7.1)
+	abba := []byte{0x00, 0x00}
 
 	Kamf, err := ueauth.GetKDFValue(Kseaf, ueauth.FC_FOR_KAMF_DERIVATION,
 		imsi, ueauth.KDFLen(imsi),

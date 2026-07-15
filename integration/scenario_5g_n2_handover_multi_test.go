@@ -3,9 +3,6 @@
 
 //go:build integration
 
-// N2 handover scenarios involving more than one PDU session and the follow-on
-// mobility registration (TS 38.413 §8.4, TS 23.502 §4.9.1.3).
-
 package integration_test
 
 import (
@@ -13,8 +10,6 @@ import (
 	"testing"
 )
 
-// Finishing the procedure leaves the UE clean on the target, so it cannot become
-// cross-test residue.
 func completeHandover(t *testing.T, targetGNB string, amfUeNgapID, ranUeNgapID int64) {
 	t.Helper()
 
@@ -35,13 +30,11 @@ func establishPDUSession(t *testing.T, gnbID, ueID string, sessionID int) {
 	}
 }
 
-// For a UE holding two PDU sessions the AMF must request both at the target
-// (§9.2.3.1) and confirm both in the Handover Command (§9.2.3.2).
 func Test5GN2HandoverMultiplePDUSessions(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "000011", "ho-multi-src")
 	targetGNB := createGnBWithID(t, "000012", "ho-multi-tgt")
 
-	ueID := establishRegisteredUE(t, sourceGNB) // session 1
+	ueID := establishRegisteredUE(t, sourceGNB)
 	establishPDUSession(t, sourceGNB, ueID, 2)
 
 	status, body := doRequest(t, "POST", "/gnb/"+sourceGNB+"/ue/"+ueID+"/ngap",
@@ -70,14 +63,11 @@ func Test5GN2HandoverMultiplePDUSessions(t *testing.T) {
 	completeHandover(t, targetGNB, targetAmfID, 100)
 }
 
-// When the target admits only one of two sessions, §8.4.2.2/§8.4.1.2 require the
-// AMF to confirm the admitted one in the Handover List and place the other in the
-// Handover Command's PDU Session Resource To Release List.
 func Test5GN2HandoverPartialAdmission(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "000013", "ho-part-src")
 	targetGNB := createGnBWithID(t, "000014", "ho-part-tgt")
 
-	ueID := establishRegisteredUE(t, sourceGNB) // session 1
+	ueID := establishRegisteredUE(t, sourceGNB)
 	establishPDUSession(t, sourceGNB, ueID, 2)
 
 	status, body := doRequest(t, "POST", "/gnb/"+sourceGNB+"/ue/"+ueID+"/ngap",
@@ -110,9 +100,6 @@ func Test5GN2HandoverPartialAdmission(t *testing.T) {
 	completeHandover(t, targetGNB, targetAmfID, 100)
 }
 
-// The Mobility Registration Update on the target is the Registration Procedure
-// of TS 23.502 §4.9.1.3.3 step 12: the AMF must accept it (TS 24.501 §5.5.1.3),
-// reusing the migrated security context.
 func Test5GN2HandoverMobilityRegistrationUpdate(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "000015", "ho-mru-src")
 	targetGNB := createGnBWithID(t, "000016", "ho-mru-tgt")

@@ -3,12 +3,6 @@
 
 //go:build integration
 
-// IP-pool exhaustion (TS 24.501 §6.4.1.x): when the PDU session cannot be
-// established because no address can be allocated, the SMF shall reject the PDU
-// SESSION ESTABLISHMENT REQUEST with 5GSM cause #26 "insufficient resources".
-// The condition is transient — once a session releases its address a retry
-// succeeds (§6.2.12).
-
 package integration_test
 
 import (
@@ -16,14 +10,12 @@ import (
 	"testing"
 )
 
-// exhaustDNN is provisioned in TestMain with an IPv4 /30 pool, i.e. exactly two
-// allocatable host addresses.
+// exhaustDNN is provisioned in TestMain with an IPv4 /30 pool: two host addresses.
 const exhaustDNN = "exhaust"
 
 func Test5GPDUSessionEstablishment_IPPoolExhausted(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 
-	// Two registered UEs fill the /30 pool (addresses .1 and .2).
 	ue1 := newExhaustUE(t, gnbID, testSUPI(1))
 	mustEstablishExhaust(t, gnbID, ue1)
 
@@ -52,19 +44,14 @@ func Test5GPDUSessionEstablishment_IPPoolExhausted(t *testing.T) {
 
 	assertNASCause(t, body, "nas.cause_5gsm", cause5GSMInsufficientResources)
 
-	// A successful UL NAS transport carrying an SMF reject is not a 5GMM protocol
-	// error, so the Establishment Reject is the complete response (TS 24.501
-	// §6.4.1.x) and any follow-up NAS message for this UE is a violation.
+	// The Establishment Reject is the complete response, so any follow-up NAS is a violation.
 	if st, extra := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ue3+"/await",
 		`{"message_types":["DownlinkNASTransport"],"timeout_ms":3000}`); st == 200 {
 		t.Errorf("a PDU Session Establishment Reject must be the complete response (TS 24.501 §6.4.1.x), but a follow-up NAS message arrived — the AMF emits a spurious 5GMM STATUS:\n  %s", extra)
 	}
 
-	// #26 is a temporary condition (TS 24.501 §6.2.12), so freeing an address must
-	// let a fresh establishment succeed. A UE-requested release runs as a
-	// network-requested release (§6.4.3.3 → §6.3.3): the SMF frees the address on
-	// Release Complete, so the UE must finish the handshake before the lease
-	// returns to the pool.
+	// The SMF frees the address only on Release Complete (TS 24.501 §6.4.3.3 → §6.3.3),
+	// so the handshake must finish before the lease returns to the pool.
 	if st, rel := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ue1+"/ngap",
 		`{"message_type":"pdu_session_release_request"}`); st != 200 {
 		t.Fatalf("release on ue1: HTTP %d\n  body: %s", st, rel)
@@ -79,8 +66,7 @@ func Test5GPDUSessionEstablishment_IPPoolExhausted(t *testing.T) {
 	mustEstablishExhaust(t, gnbID, ue4)
 }
 
-// The cleanup de-registration releases the UE's IP leases, keeping the shared
-// pool clean across runs.
+// The cleanup de-registration returns the UE's IP leases to the shared pool.
 func newExhaustUE(t *testing.T, gnbID, supi string) string {
 	t.Helper()
 

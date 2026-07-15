@@ -11,9 +11,6 @@ import (
 	"testing"
 )
 
-// createGnBAssertingNGSetup creates a gNB on an allocated gNB ID, asserts the
-// AMF answered with an NG Setup Response (TS 38.413 §8.7.1), and returns its
-// store ID.
 func createGnBAssertingNGSetup(t *testing.T, name string) string {
 	t.Helper()
 
@@ -47,11 +44,9 @@ func Test5GAssociationFlood(t *testing.T) {
 		createGnBAssertingNGSetup(t, "flood-gnb")
 	}
 
-	// One more association proves the flood left the AMF serving.
 	createGnBAssertingNGSetup(t, "flood-probe")
 }
 
-// PDUs near the SCTP read buffer size must not kill the AMF.
 func Test5GOversizedPDU(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 
@@ -63,14 +58,12 @@ func Test5GOversizedPDU(t *testing.T) {
 
 	ueID := mustCreateUE(t, gnbID)
 
-	// 8 KB stays within the NGAP OCTET STRING encoder's bound, so the PDU
-	// builds and reaches the AMF.
+	// 8 KB stays within the NGAP OCTET STRING encoder's bound, so the PDU reaches the AMF.
 	body := fmt.Sprintf(`{"message_type":"registration_request","raw_nas_pdu":%q,"timeout_ms":800}`, strings.Repeat("cd", 8000))
 	if status, resp := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap", body); status != 200 {
 		t.Fatalf("oversized NAS: server failed to handle it (HTTP %d): %s", status, resp)
 	}
 
-	// A clean registration completing proves the AMF survived the oversized PDUs.
 	fresh := mustCreateUE(t, gnbID)
 	doRegistrationFlow(t, gnbID, fresh)
 }

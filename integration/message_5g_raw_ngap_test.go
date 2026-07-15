@@ -3,8 +3,6 @@
 
 //go:build integration
 
-// Raw-NGAP fuzz coverage: a malformed NGAP PDU must not crash the core.
-
 package integration_test
 
 import (
@@ -40,7 +38,6 @@ func Test5GRawNGAPMalformedDoesNotCrashCore(t *testing.T) {
 			gnbID := createGnBWithID(t, fmt.Sprintf("%06x", 0x100+i), "fuzz-src")
 			sendRawNGAP(t, gnbID, tc.hex)
 
-			// Liveness probe: a fresh gNB completing NG Setup proves the core survived.
 			createGnBWithID(t, fmt.Sprintf("%06x", 0x200+i), "fuzz-probe")
 		})
 	}

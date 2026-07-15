@@ -10,9 +10,6 @@ import (
 	"testing"
 )
 
-// pduSessionSetupItem is one session of a PDU Session Resource Setup Request,
-// carrying the UPF's uplink N3 GTP-U tunnel as the server decodes it from the
-// UL NG-U UP TNL Information IE (TS 38.413 §9.3.4.1).
 type pduSessionSetupItem struct {
 	PDUSessionID int64  `json:"pdu_session_id"`
 	ULTeid       uint32 `json:"ul_teid"`
@@ -42,19 +39,8 @@ func ngapPDUSessionSetupItems(body []byte) []pduSessionSetupItem {
 	return nil
 }
 
-// The UPF N3 endpoint the AMF signals in the PDU Session Resource Setup Request
-// Transfer's UL NG-U UP TNL Information carries a Transport Layer Address
-// encoded per TS 38.414 §5.3: "The Transport Layer Address signalled in NGAP
-// messages is a bit string
-// of a) 32 bits in case of IPv4 address [...]; or b) 128 bits in case of IPv6
-// address [...]; or c) 160 bits if both IPv4 and IPv6 addresses are signalled, in
-// which case the IPv4 address is contained in the first 32 bits."
-//
-// All three forms are conformant, so the test does not demand a particular one:
-// it requires that at least one family decodes (a length outside 32/128/160 bits
-// yields none) and that every family present names the UPF's N3 address for that
-// family — a swapped or truncated 160-bit encoding hands back a v4 address read
-// out of the v6 half, or the reverse.
+// TS 38.414 §5.3 makes the 32-, 128- and 160-bit forms all conformant, so no
+// particular address family is demanded.
 func Test5GPDUSessionResourceSetup_TransportLayerAddress(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)

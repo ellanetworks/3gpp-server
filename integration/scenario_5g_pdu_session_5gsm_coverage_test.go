@@ -3,19 +3,12 @@
 
 //go:build integration
 
-// 5GSM coverage beyond the PTI rules: Establishment Accept mandatory-IE content
-// (TS 24.501 §8.3.2), the Always-on PDU session indication (§6.4.1), and the
-// remaining UE-originated 5GSM messages (Modification Command Reject, 5GSM
-// STATUS).
-
 package integration_test
 
 import (
 	"testing"
 )
 
-// TS 24.501 §8.3.2 makes the Session-AMBR and Authorized QoS rules IEs mandatory
-// in the Establishment Accept.
 func Test5GPDUSessionEstablishment_AcceptMandatoryIEs(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -44,9 +37,6 @@ func Test5GPDUSessionEstablishment_AcceptMandatoryIEs(t *testing.T) {
 	}
 }
 
-// Whenever the UE requests an always-on PDU session, TS 24.501 §6.4.1 (case b-i)
-// requires the SMF to include an Always-on PDU session indication in the Accept,
-// set to "required" or "not allowed".
 func Test5GPDUSessionEstablishment_AlwaysOnIndication(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -67,8 +57,6 @@ func Test5GPDUSessionEstablishment_AlwaysOnIndication(t *testing.T) {
 	}
 }
 
-// For a PTI the network started no modification procedure for, TS 24.501 §7.3.1 a)
-// requires the SMF to answer with a 5GSM STATUS carrying cause #47 "PTI mismatch".
 func Test5GPDUSessionModificationCommandReject_PTIMismatch(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := establishRegisteredUE(t, gnbID)
@@ -88,9 +76,8 @@ func Test5GPDUSessionModificationCommandReject_PTIMismatch(t *testing.T) {
 	assertNASCause(t, resp, "nas.cause_5gsm", cause5GSMPTIMismatch)
 }
 
-// TS 24.501 §7.4 leaves the network's reaction to an unsolicited 5GSM STATUS
-// implementation-dependent, so only the invariant is asserted: the session
-// remains intact, shown by a subsequent UE-requested release succeeding.
+// TS 24.501 §7.4 leaves the reaction to an unsolicited 5GSM STATUS to the
+// implementation, so only the session surviving is asserted.
 func Test5GStatus5GSM_FromUE_SessionRemainsUsable(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := establishRegisteredUE(t, gnbID)

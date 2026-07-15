@@ -5,8 +5,6 @@ package store
 
 import "testing"
 
-// TestENBContextMigrateUE asserts the UE leaves the source, arrives at the
-// target, and takes the given S1AP UE identities.
 func TestENBContextMigrateUE(t *testing.T) {
 	src := NewENBContext("e1", "001", "01", 1, 1, "src")
 	target := NewENBContext("e2", "001", "01", 1, 2, "target")
@@ -35,8 +33,6 @@ func TestENBContextMigrateUE(t *testing.T) {
 	}
 }
 
-// TestENBContextAllocateENBUES1APID asserts the eNB UE S1AP ID is monotonic, so
-// no two UE associations on an eNB share an identity.
 func TestENBContextAllocateENBUES1APID(t *testing.T) {
 	e := NewENBContext("e1", "001", "01", 1, 1, "enb")
 

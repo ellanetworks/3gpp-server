@@ -3,9 +3,6 @@
 
 //go:build integration
 
-// Security Mode Reject (TS 24.501 §5.4.2.5): the UE rejects a Security Mode
-// Command, and the AMF shall abort the ongoing (registration) procedure.
-
 package integration_test
 
 import (
@@ -36,9 +33,8 @@ func securityModePending(t *testing.T) (string, string) {
 	return gnbID, ueID
 }
 
-// TS 24.501 §5.4.2.5 makes the AMF abort the ongoing registration but mandates no
-// specific abort message, so either form (UE Context Release Command or
-// Registration Reject) is conformant and only completing it is disqualifying.
+// TS 24.501 §5.4.2.5 mandates no specific abort message, so only completing the
+// registration is disqualifying.
 func Test5GSecurityModeReject(t *testing.T) {
 	gnbID, ueID := securityModePending(t)
 
@@ -59,8 +55,6 @@ func Test5GSecurityModeReject(t *testing.T) {
 	}
 }
 
-// A forged AMF UE NGAP ID on the Uplink NAS Transport is an unknown local AP ID,
-// so the AMF shall initiate an Error Indication procedure (TS 38.413 §10.6).
 func Test5GSecurityModeReject_NGAPIDFuzz(t *testing.T) {
 	gnbID, ueID := securityModePending(t)
 

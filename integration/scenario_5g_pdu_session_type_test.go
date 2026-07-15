@@ -3,10 +3,6 @@
 
 //go:build integration
 
-// PDU session type negotiation (TS 24.501 §6.4.1.3, §9.11.4.2): the SMF resolves
-// the requested PDU session type against the data network's available pools,
-// accepting with a downgrade cause or rejecting with the reason it cannot serve.
-
 package integration_test
 
 import (

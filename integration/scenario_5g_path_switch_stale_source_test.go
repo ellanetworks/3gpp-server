@@ -3,12 +3,6 @@
 
 //go:build integration
 
-// State after an Xn handover: once a path switch moves a UE context to the
-// target NG-RAN node, the source node holds stale AP IDs. TS 38.413 §10.6
-// requires the AMF to answer UE-associated messages bearing those stale IDs with
-// an Error Indication and not act on them, so a stale or rogue source cannot
-// tear down or disturb the UE that now lives on the target.
-
 package integration_test
 
 import (
@@ -16,8 +10,7 @@ import (
 	"testing"
 )
 
-// movePathToTarget leaves the AMF holding the UE on targetGNB, so the source's
-// stored AP IDs are stale. The returned AMF UE NGAP ID is unchanged by the switch.
+// The returned AMF UE NGAP ID is unchanged by the switch; the source's AP IDs go stale.
 func movePathToTarget(t *testing.T, sourceGNB, targetGNB, supi string, newRanID int64) (string, int64) {
 	t.Helper()
 
@@ -31,7 +24,6 @@ func movePathToTarget(t *testing.T, sourceGNB, targetGNB, supi string, newRanID 
 	return ueID, amfID
 }
 
-// An acknowledged second path switch is what proves the UE context still exists.
 func assertUEStillSwitchable(t *testing.T, gnbID string, amfID, newRanID int64, context string) {
 	t.Helper()
 
@@ -40,8 +32,6 @@ func assertUEStillSwitchable(t *testing.T, gnbID string, amfID, newRanID int64, 
 	assertPathSwitchType(t, context, status, body, ngapPathSwitchRequestAcknowledge)
 }
 
-// §10.6: a UE Context Release Request bearing the source's stale RAN UE NGAP ID
-// must be answered with an Error Indication and must not release the UE.
 func Test5GPathSwitchStaleSourceUEContextReleaseRejected(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "000120", "ps-stale-rel-src")
 	targetGNB := createGnBWithID(t, "000121", "ps-stale-rel-tgt")
@@ -61,8 +51,6 @@ func Test5GPathSwitchStaleSourceUEContextReleaseRejected(t *testing.T) {
 	assertUEStillSwitchable(t, targetGNB, amfID, 211, "UE survives a stale source UE Context Release Request")
 }
 
-// §10.6: a NAS uplink from the stale source association carries the old AP IDs,
-// so the AMF must answer it with an Error Indication and not serve it.
 func Test5GPathSwitchStaleSourceUplinkNASRejected(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "000122", "ps-stale-nas-src")
 	targetGNB := createGnBWithID(t, "000123", "ps-stale-nas-tgt")
@@ -80,8 +68,7 @@ func Test5GPathSwitchStaleSourceUplinkNASRejected(t *testing.T) {
 	}
 }
 
-// §8.7.4: an NG Reset resets only the connections on the resetting association,
-// so a full NG Reset from the source must not release the moved UE.
+// An NG Reset resets only the resetting association's connections (TS 38.413 §8.7.4).
 func Test5GPathSwitchSourceNGResetPreservesMovedUE(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "000124", "ps-stale-reset-src")
 	targetGNB := createGnBWithID(t, "000125", "ps-stale-reset-tgt")

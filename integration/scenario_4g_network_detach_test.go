@@ -11,8 +11,6 @@ import (
 	"testing"
 )
 
-// networkDetachIMSI is dedicated to this test, which deletes it to trigger the
-// procedure, so the shared subscriber pool stays intact.
 const networkDetachIMSI = "001010000000102"
 
 func deleteSubscriber(t *testing.T, token, imsi string) {
@@ -29,8 +27,6 @@ func deleteSubscriber(t *testing.T, token, imsi string) {
 	_ = resp.Body.Close()
 }
 
-// Test4GNetworkInitiatedDetach deletes an attached subscriber: the MME must
-// detach it with a network-initiated DETACH REQUEST (TS 24.301 §5.4.4).
 func Test4GNetworkInitiatedDetach(t *testing.T) {
 	token, err := provisionEllaCore()
 	if err != nil {
@@ -40,7 +36,6 @@ func Test4GNetworkInitiatedDetach(t *testing.T) {
 	if err := createSubscriber(token, networkDetachIMSI); err != nil {
 		t.Fatalf("create subscriber: %v", err)
 	}
-	// Recreate the deleted subscriber so the env is left as found for re-runs.
 	t.Cleanup(func() {
 		if err := createSubscriber(token, networkDetachIMSI); err != nil {
 			t.Errorf("restore subscriber %s: %v", networkDetachIMSI, err)

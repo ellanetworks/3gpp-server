@@ -3,25 +3,18 @@
 
 //go:build integration
 
-// Fast sequences: the same UE driving procedures back-to-back with no settle
-// time, so a freed resource is reused on the very next step. These catch state
-// that lingers or corrupts across rapid reuse of one identity.
-
 package integration_test
 
 import (
 	"testing"
 )
 
-// The AMF must free the UE's context on each deregistration (TS 24.501 §5.5.2.2)
-// and serve a clean registration immediately after.
 func Test5GFastRegisterDeregisterChurn(t *testing.T) {
 	gnb := createGnBWithID(t, "00c004", "fast-churn")
 
 	const cycles = 10
 
-	// One subscriber across all cycles: the churn under test is the repeated
-	// reuse of a single UE's identity.
+	// One subscriber across all cycles: reuse of a single identity is the churn under test.
 	supi := claimSubscriber(t)
 
 	for c := 0; c < cycles; c++ {

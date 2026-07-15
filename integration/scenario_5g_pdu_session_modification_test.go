@@ -3,11 +3,6 @@
 
 //go:build integration
 
-// UE-requested PDU Session Modification (TS 23.502 §4.3.3.2, TS 24.501 §6.4.2).
-// The UE cannot set its own QoS — authorized QoS is network-determined — so the
-// network answers a PDU SESSION MODIFICATION REQUEST with a Modification Reject
-// (§6.4.2.4).
-
 package integration_test
 
 import (
@@ -17,7 +12,7 @@ import (
 
 func Test5GPDUSessionModification_Rejected(t *testing.T) {
 	gnbID := mustCreateGnB(t)
-	ueID := establishRegisteredUE(t, gnbID) // registered UE with an active PDU session
+	ueID := establishRegisteredUE(t, gnbID)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
 		`{"message_type":"pdu_session_modification_request"}`)
@@ -43,8 +38,6 @@ func Test5GPDUSessionModification_Rejected(t *testing.T) {
 	}
 }
 
-// With no PDU session context at the AMF there is nothing to forward the message
-// to, so TS 24.501 §7.3.2 c) requires 5GMM cause #90 "payload was not forwarded".
 func Test5GPDUSessionModification_NoActiveSession(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -68,8 +61,6 @@ func Test5GPDUSessionModification_NoActiveSession(t *testing.T) {
 	assertNASCause(t, body, "nas.cause_5gmm", cause5GMMPayloadWasNotForwarded)
 }
 
-// Request Type "existing PDU session" must be forwarded to the SMF (TS 24.501
-// §5.4.5.2.3 ii), which answers with a Modification Reject.
 func Test5GPDUSessionModification_ExistingPduSessionRequestType(t *testing.T) {
 	const requestTypeExistingPduSession = 2
 
@@ -88,8 +79,7 @@ func Test5GPDUSessionModification_ExistingPduSessionRequestType(t *testing.T) {
 	}
 }
 
-// Ella Core supports no emergency PDU sessions, so Request Type "initial
-// emergency request" has nothing to forward to and draws 5GMM cause #90.
+// Ella Core supports no emergency PDU sessions, so there is nothing to forward to.
 func Test5GPDUSessionModification_EmergencyRequestType(t *testing.T) {
 	const requestTypeInitialEmergency = 3
 

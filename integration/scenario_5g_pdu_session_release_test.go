@@ -3,11 +3,6 @@
 
 //go:build integration
 
-// UE-requested PDU session release (TS 24.501 §6.3.3): the UE sends a PDU
-// Session Release Request; the SMF answers with a Release Command (inside an
-// NGAP PDU Session Resource Release Command); the UE confirms with a Release
-// Complete.
-
 package integration_test
 
 import "testing"
@@ -52,8 +47,6 @@ func Test5GPDUSessionRelease_UERequested(t *testing.T) {
 	}
 }
 
-// A succeeding re-establishment is what proves the release freed the session's
-// state.
 func Test5GPDUSessionRelease_ThenReestablish(t *testing.T) {
 	gnbID, ueID := establishedPDUSession(t)
 
@@ -79,8 +72,6 @@ func Test5GPDUSessionRelease_ThenReestablish(t *testing.T) {
 	}
 }
 
-// A forged AMF UE NGAP ID on the Uplink NAS Transport is an unknown local AP ID,
-// so the AMF shall initiate an Error Indication procedure (TS 38.413 §10.6).
 func Test5GPDUSessionRelease_NGAPIDFuzz(t *testing.T) {
 	gnbID, ueID := establishedPDUSession(t)
 

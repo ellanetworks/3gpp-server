@@ -10,8 +10,6 @@ import (
 	"testing"
 )
 
-// Test4GUserPlane proves the default bearer carries data, so the MME/UPF
-// programmed the S1-U forwarding state from the attach.
 func Test4GUserPlane(t *testing.T) {
 	enbID := createGTPUENB(t, claimENBID(), "gtpu-enb", n3IPv4)
 	ueID := mustCreateENBUE(t, enbID)
@@ -40,8 +38,6 @@ func Test4GUserPlane(t *testing.T) {
 	}
 }
 
-// Test4GMultiPDNUserPlane proves an additional PDN connection carries data on its
-// own S1-U tunnel, distinct from the default bearer's.
 func Test4GMultiPDNUserPlane(t *testing.T) {
 	enbID := createGTPUENB(t, claimENBID(), "gtpu-multipdn-enb", n3IPv4)
 	ueID := mustCreateENBUE(t, enbID)

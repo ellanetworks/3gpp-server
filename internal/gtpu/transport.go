@@ -15,20 +15,16 @@ import (
 
 const readBufferSize = 65535
 
-// Endpoint is an N3 GTP-U socket. It demultiplexes received G-PDUs by TEID and
-// buffers path-management messages by type, so concurrent waiters can each claim
-// their own packet.
 type Endpoint struct {
 	conn   *net.UDPConn
 	closed atomic.Bool
 
 	mu      sync.Mutex
 	cond    *sync.Cond
-	gpdus   map[uint32][][]byte // TEID -> received T-PDUs (inner IP packets)
+	gpdus   map[uint32][][]byte
 	control map[uint8][]*Message
 }
 
-// Listen binds a GTP-U endpoint on localIP:2152.
 func Listen(localIP string) (*Endpoint, error) {
 	addr := &net.UDPAddr{IP: net.ParseIP(localIP), Port: Port}
 
@@ -104,8 +100,7 @@ func (e *Endpoint) SendUplink(remoteIP string, ulTeid uint32, qfi uint8, innerIP
 	return e.sendTo(remoteIP, EncodeGPDUWithQFI(ulTeid, qfi, innerIP))
 }
 
-// SendUplinkPlain omits the PDU Session Container: an eNB sends uplink user data
-// on S1-U (4G) without a QFI.
+// S1-U (4G) uplink carries no PDU Session Container, hence no QFI.
 func (e *Endpoint) SendUplinkPlain(remoteIP string, ulTeid uint32, innerIP []byte) error {
 	return e.sendTo(remoteIP, EncodeGPDU(ulTeid, innerIP))
 }
@@ -114,7 +109,6 @@ func (e *Endpoint) SendEchoRequest(remoteIP string, seq uint16) error {
 	return e.sendTo(remoteIP, EncodeEchoRequest(seq))
 }
 
-// WaitForDownlink blocks until a T-PDU arrives on dlTeid or ctx expires.
 func (e *Endpoint) WaitForDownlink(ctx context.Context, dlTeid uint32) ([]byte, error) {
 	stop := make(chan struct{})
 	defer close(stop)
@@ -152,8 +146,6 @@ func (e *Endpoint) WaitForDownlink(ctx context.Context, dlTeid uint32) ([]byte, 
 	}
 }
 
-// WaitForControl blocks until a path-management message of msgType arrives or
-// ctx expires.
 func (e *Endpoint) WaitForControl(ctx context.Context, msgType uint8) (*Message, error) {
 	stop := make(chan struct{})
 	defer close(stop)
@@ -187,7 +179,6 @@ func (e *Endpoint) WaitForControl(ctx context.Context, msgType uint8) (*Message,
 	}
 }
 
-// LocalIP is the gNB's N3 address.
 func (e *Endpoint) LocalIP() string {
 	if a, ok := netip.AddrFromSlice(e.conn.LocalAddr().(*net.UDPAddr).IP); ok {
 		return a.Unmap().String()

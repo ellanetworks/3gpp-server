@@ -3,10 +3,6 @@
 
 //go:build integration
 
-// S1 handover cancellation (TS 36.413 §8.4.5): the source eNB aborts a handover
-// it has prepared; the MME releases the reserved target resources and answers
-// with HANDOVER CANCEL ACKNOWLEDGE.
-
 package integration_test
 
 import (
@@ -14,8 +10,6 @@ import (
 	"testing"
 )
 
-// Test4GS1HandoverCancel cancels a prepared handover: the UE must remain served
-// by the source eNB.
 func Test4GS1HandoverCancel(t *testing.T) {
 	sourceENB := createENBWithID(t, 1, "source-enb")
 	targetENB := createENBWithID(t, 2, "target-enb")

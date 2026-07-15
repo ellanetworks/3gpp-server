@@ -3,12 +3,6 @@
 
 //go:build integration
 
-// NG Setup precondition (TS 38.413 §8.7.1.1): "This procedure shall be the
-// first NGAP procedure triggered after the TNL association has become
-// operational." Until NG Setup completes, the association has no NG-C interface
-// instance, so the AMF must not serve NGAP procedures on it — regardless of
-// message type.
-
 package integration_test
 
 import (
@@ -16,8 +10,6 @@ import (
 	"testing"
 )
 
-// Opening the SCTP association without an NG Setup Request models an NG-RAN node
-// that has not completed NG Setup.
 func createGnBWithoutNGSetup(t *testing.T, gnbID, name string) string {
 	t.Helper()
 
@@ -46,10 +38,8 @@ func createGnBWithoutNGSetup(t *testing.T, gnbID, name string) string {
 	return id
 }
 
-// The handler only ever surfaces the procedure's own response or an Error
-// Indication, so a served procedure shows up as a 200 whose message type is not
-// ErrorIndication. A drop (504) and a refused/closed association (502) both leave
-// the procedure unserved, so both conform to TS 38.413 §8.7.1.1.
+// A drop (504) and a refused association (502) both leave the procedure unserved,
+// so both conform to TS 38.413 §8.7.1.1.
 func assertNotServedBeforeNGSetup(t *testing.T, context string, status int, body []byte) {
 	t.Helper()
 
@@ -65,9 +55,6 @@ func assertNotServedBeforeNGSetup(t *testing.T, context string, status int, body
 	}
 }
 
-// The cases span the three message classes §8.7.1.1 covers: UE-associated
-// initiating (Initial UE Message), gNB-level UE-associated (Path Switch Request),
-// and interface management (NG Reset).
 func Test5GNGAPMessagesBeforeNGSetupRejected(t *testing.T) {
 	t.Run("InitialUEMessage", func(t *testing.T) {
 		gnb := createGnBWithoutNGSetup(t, "0000d0", "no-ngsetup-iue")

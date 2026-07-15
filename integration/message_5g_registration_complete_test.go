@@ -35,34 +35,28 @@ func Test5GRegistrationComplete_Fuzz(t *testing.T) {
 		},
 		{
 			name: "raw NAS: plain RegistrationComplete (no security)",
-			// 7E EPD, 00 SHT plain, 43 msg type = RegistrationComplete. A security
-			// context is active, and RegistrationComplete is not in the TS 24.501
-			// §4.4.4.3 list of messages processed without integrity protection, so
-			// the AMF shall discard it and keep T3550 running: no reply.
+			// 7E EPD, 00 SHT plain, 43 RegistrationComplete: unprotected under an active
+			// security context, so TS 24.501 §4.4.4.3 discards it — no reply.
 			body:     `{"message_type":"registration_complete","raw_nas_pdu":"7e0043"}`,
 			wantHTTP: 504,
 		},
 		{
 			name: "raw NAS: integrity header with zeroed MAC",
-			// 7E 04 (integrity protected, new context) MAC=00000000 SQN=00 then
-			// 7e0043. The integrity check fails and RegistrationComplete is not in
-			// the TS 24.501 §4.4.4.3 exempt list, so it shall be discarded: the AMF
-			// must not act on unauthenticated NAS, and sends no reply.
+			// 7E 04 integrity-protected new context, MAC=00000000, SQN=00, then 7e0043:
+			// integrity fails, so TS 24.501 §4.4.4.3 discards it — no reply.
 			body:     `{"message_type":"registration_complete","raw_nas_pdu":"7e0400000000000000007e0043"}`,
 			wantHTTP: 504,
 		},
 		{
 			name: "raw NAS: security wrapper with zeroed MAC, wrong inner message type 0xff",
-			// SHT=02 (integrity+cipher) with a zeroed MAC: the integrity check fails,
-			// so it is discarded per TS 24.501 §4.4.4.3 and the inner message type is
-			// never reached.
+			// SHT=02 integrity+cipher with a zeroed MAC: integrity fails per TS 24.501
+			// §4.4.4.3 before the inner message type is reached — no reply.
 			body:     `{"message_type":"registration_complete","raw_nas_pdu":"7e02000000000000007e00ff"}`,
 			wantHTTP: 504,
 		},
 		{
 			name: "raw NAS: single byte (truncated)",
-			// Too short to carry a complete message type IE, so it shall be
-			// ignored (TS 24.501 §7.2.1): no reply is the mandated outcome.
+			// TS 24.501 §7.2.1: too short for a message type IE, so it is ignored — no reply.
 			body:     `{"message_type":"registration_complete","raw_nas_pdu":"7e"}`,
 			wantHTTP: 504,
 		},
@@ -102,8 +96,6 @@ func Test5GRegistrationComplete_Fuzz(t *testing.T) {
 	}
 }
 
-// Mismatched UE NGAP IDs on the UL NAS TRANSPORT carrying RegistrationComplete
-// must draw an Error Indication (TS 38.413 §8.6.2).
 func Test5GRegistrationComplete_NGAPIDFuzz(t *testing.T) {
 	tests := []struct {
 		name            string

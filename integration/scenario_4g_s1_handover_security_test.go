@@ -3,11 +3,6 @@
 
 //go:build integration
 
-// S1 handover cross-association abuse (TS 36.413 §10.6): a rogue eNB must not be
-// able to start a handover of another eNB's UE by forging its S1AP ID pair on its
-// own association. The MME must answer the rogue with an Error Indication and
-// leave the victim's connection intact.
-
 package integration_test
 
 import (
@@ -15,8 +10,6 @@ import (
 	"testing"
 )
 
-// Test4GS1HandoverCrossENBHijack forges the victim's S1AP ID pair in a HANDOVER
-// REQUIRED on the attacker's own association.
 func Test4GS1HandoverCrossENBHijack(t *testing.T) {
 	victimENB := createENBWithID(t, 1, "victim-enb")
 	attackerENB := createENBWithID(t, 2, "attacker-enb")

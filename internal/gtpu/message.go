@@ -93,8 +93,6 @@ func Decode(b []byte) (*Message, error) {
 
 	length := int(binary.BigEndian.Uint16(b[2:4]))
 
-	// An optional 4-octet block (sequence number, N-PDU number, next-extension
-	// header type) is present when any of the S/PN/E flags are set.
 	payloadStart := 8
 
 	optional := flags&0x07 != 0
@@ -111,8 +109,6 @@ func Decode(b []byte) (*Message, error) {
 		nextExt := b[11]
 		payloadStart = 12
 
-		// Walk extension headers: each is length (4-octet units), content, and a
-		// next-extension-header type. The chain ends at type 0.
 		for nextExt != 0 {
 			if payloadStart >= len(b) {
 				break
@@ -128,7 +124,6 @@ func Decode(b []byte) (*Message, error) {
 		}
 	}
 
-	// length counts the octets after the first 8 (mandatory) header bytes.
 	end := 8 + length
 	if end > len(b) {
 		end = len(b)
