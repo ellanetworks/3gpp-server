@@ -15,9 +15,7 @@ type EPSBearer struct {
 	DLTeid uint32 // eNB downlink TEID
 }
 
-// UEEPSContext is an emulated UE's EPS attach state on an eNB: its credentials,
-// the S1AP UE-association identities, the last authentication challenge, and the
-// EPS NAS security context once established.
+// UEEPSContext is an emulated UE's EPS attach state on an eNB.
 type UEEPSContext struct {
 	ID   string
 	IMSI string // 15-digit IMSI

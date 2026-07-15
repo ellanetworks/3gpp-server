@@ -3,11 +3,9 @@
 
 //go:build integration
 
-// N3 / GTP-U user-plane: the emulated gNB terminates the data tunnel. These
-// tests validate the GTP-U path (TS 29.281) and end-to-end connectivity: a UE
-// uplink ICMP echo to a data-network host must round-trip back as a decapsulated
-// downlink reply, proving the UPF programmed the forwarding state from the
-// control-plane PDU session establishment.
+// N3 / GTP-U user-plane (TS 29.281): the emulated gNB terminates the data
+// tunnel, so a round-tripping uplink proves the UPF programmed its forwarding
+// state from the control-plane PDU session establishment.
 
 package integration_test
 
@@ -16,9 +14,8 @@ import (
 	"testing"
 )
 
-// createGTPUGnB creates a gNB that terminates the N3 GTP-U data path over the
-// given transport family. Only one gNB can bind a given N3 address:port, so
-// callers must let cleanup run before reusing the same transport.
+// Only one gNB can bind a given N3 address:port, so callers must let cleanup run
+// before reusing the same transport.
 func createGTPUGnB(t *testing.T, gnbID, name string, n3 n3Transport) string {
 	t.Helper()
 
@@ -43,16 +40,10 @@ func createGTPUGnB(t *testing.T, gnbID, name string, n3 n3Transport) string {
 	return id
 }
 
-// Test5GGTPU_ICMPRoundTrip: a UE uplink ICMP echo to a data-network host must come
-// back as a downlink ICMP echo reply, decapsulated from the N3 tunnel — proving
-// the UPF forwards user-plane traffic on the tunnel established over the control
-// plane.
 func Test5GGTPU_ICMPRoundTrip(t *testing.T) {
 	gnbID := createGTPUGnB(t, "00ec03", "gtpu-rt", n3IPv4)
 	ueID := establishRegisteredUEWithSUPI(t, gnbID, "imsi-001010000000001")
 
-	// The control plane must have captured the N3 tunnel: the UPF's uplink TEID
-	// and the UE's IP.
 	status, body := doRequest(t, "GET", "/gnb/"+gnbID+"/ue/"+ueID+"/tunnel", "")
 	if status != 200 {
 		t.Fatalf("get tunnel: HTTP %d\n  body: %s", status, body)
@@ -89,12 +80,9 @@ func Test5GGTPU_ICMPRoundTrip(t *testing.T) {
 	}
 }
 
-// Test5GGTPU_Echo: a GTP-U Echo Request — sequence-number flag set, no extension
-// header, the conformant path-management form — must be answered with an Echo
-// Response over both IPv4 and IPv6 N3 transport. A GTP-U peer "shall be prepared
-// to receive an Echo Request at any time and it shall reply with an Echo
-// Response" (TS 29.281 §7.2.1); a timeout means the UPF dropped a conformant
-// Echo Request.
+// A GTP-U peer "shall be prepared to receive an Echo Request at any time and it
+// shall reply with an Echo Response" (TS 29.281 §7.2.1). The request sent is the
+// conformant path-management form: sequence-number flag set, no extension header.
 func Test5GGTPU_Echo(t *testing.T) {
 	cases := []struct {
 		n3    n3Transport
@@ -121,10 +109,8 @@ func Test5GGTPU_Echo(t *testing.T) {
 	}
 }
 
-// gtpuAwaitDownlink sends one uplink ICMP echo to dst and waits for the
-// decapsulated downlink reply, returning the reply body and whether one arrived.
-// It returns as soon as the reply arrives; only a genuine forwarding failure
-// exhausts the timeout.
+// gtpuAwaitDownlink returns as soon as the decapsulated downlink reply arrives,
+// so only a genuine forwarding failure exhausts the timeout.
 func gtpuAwaitDownlink(t *testing.T, gnbID, ueID, dst string, id, seq int) ([]byte, bool) {
 	t.Helper()
 
@@ -139,25 +125,21 @@ func gtpuAwaitDownlink(t *testing.T, gnbID, ueID, dst string, id, seq int) ([]by
 	return body, status == 200
 }
 
-// Test5GGTPU_ReleaseStopsForwarding: once the PDU session is released, the UPF
-// must stop forwarding the UE's user plane. The test first proves the tunnel
-// forwards (an uplink ICMP echo round-trips), releases the session (TS 24.501
-// §6.3.3), then replays the same uplink and requires no downlink — the UPF must
-// drop it because the forwarding state was torn down.
+// Releasing the PDU session (TS 24.501 §6.3.3) tears down the UPF's forwarding
+// state, so the same uplink that round-tripped before the release must yield no
+// downlink after it.
 func Test5GGTPU_ReleaseStopsForwarding(t *testing.T) {
 	gnbID := createGTPUGnB(t, "00ec05", "gtpu-rel", n3IPv4)
 	ueID := establishRegisteredUEWithSUPI(t, gnbID, "imsi-001010000000002")
 
 	const icmpID, icmpSeq = 0x1234, 11
 
-	// Forwarding works while the session is up.
 	baseline := scrapeUPFCounters(t)
 	if _, ok := gtpuAwaitDownlink(t, gnbID, ueID, dnResponderIP, icmpID, icmpSeq); !ok {
 		t.Fatalf("no downlink before release — the tunnel should forward while the session is up\n%s",
 			upfDelta(t, baseline))
 	}
 
-	// Release the PDU session (TS 24.501 §6.3.3).
 	for _, step := range []string{"pdu_session_release_request", "pdu_session_release_complete"} {
 		if status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
 			`{"message_type":"`+step+`"}`); status != 200 {
@@ -165,7 +147,6 @@ func Test5GGTPU_ReleaseStopsForwarding(t *testing.T) {
 		}
 	}
 
-	// Forwarding must stop: the UPF drops the user plane for the torn-down session.
 	released := scrapeUPFCounters(t)
 	if _, ok := gtpuAwaitDownlink(t, gnbID, ueID, dnResponderIP, icmpID, icmpSeq); ok {
 		t.Fatalf("a downlink arrived after the session was released — the UPF kept forwarding torn-down user plane (TS 24.501 §6.3.3)\n%s",
@@ -173,9 +154,8 @@ func Test5GGTPU_ReleaseStopsForwarding(t *testing.T) {
 	}
 }
 
-// Test5GGTPU_UDPRoundTrip: a UE uplink UDP datagram to the data network must come
-// back as a decapsulated downlink datagram echoed by the responder — proving the
-// UPF forwards and NATs UDP user-plane traffic, not only ICMP.
+// Covers the UPF forwarding and NATing UDP user-plane traffic, which the ICMP
+// round-trip does not exercise.
 func Test5GGTPU_UDPRoundTrip(t *testing.T) {
 	gnbID := createGTPUGnB(t, "00ec06", "gtpu-udp", n3IPv4)
 	ueID := establishRegisteredUEWithSUPI(t, gnbID, "imsi-001010000000003")
@@ -206,8 +186,8 @@ func Test5GGTPU_UDPRoundTrip(t *testing.T) {
 	}
 }
 
-// Test5GGTPU_WrongTEID_Dropped: a G-PDU carrying a TEID for which the UPF has no
-// PDR must be discarded, not forwarded (TS 29.281 §7.3.1) — no downlink results.
+// A G-PDU carrying a TEID for which the UPF has no PDR must be discarded
+// (TS 29.281 §7.3.1), so no downlink results.
 func Test5GGTPU_WrongTEID_Dropped(t *testing.T) {
 	gnbID := createGTPUGnB(t, "00ec07", "gtpu-badteid", n3IPv4)
 	ueID := establishRegisteredUEWithSUPI(t, gnbID, "imsi-001010000000004")
@@ -224,10 +204,8 @@ func Test5GGTPU_WrongTEID_Dropped(t *testing.T) {
 	}
 }
 
-// Test5GGTPU_WrongTEID_ErrorIndication: a G-PDU carrying a non-zero TEID for which
-// the UPF has no PDR must be answered with a GTP-U Error Indication (TS 29.281
-// §7.3.1: the node "shall also return a GTP error indication to the originating
-// node").
+// For a G-PDU with a non-zero TEID it has no PDR for, the UPF "shall also return
+// a GTP error indication to the originating node" (TS 29.281 §7.3.1).
 func Test5GGTPU_WrongTEID_ErrorIndication(t *testing.T) {
 	gnbID := createGTPUGnB(t, "00ec08", "gtpu-errind", n3IPv4)
 	ueID := establishRegisteredUEWithSUPI(t, gnbID, "imsi-001010000000005")

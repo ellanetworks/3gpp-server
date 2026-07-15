@@ -10,8 +10,8 @@ import (
 	"testing"
 )
 
-// gtpuENBAttach creates a GTP-U eNB, attaches a UE, and confirms a baseline uplink
-// round-trip works (so a later "no downlink" is meaningful). Returns enbID, ueID.
+// gtpuENBAttach creates a GTP-U eNB and attaches a UE, confirming a baseline
+// uplink round-trip works so a later "no downlink" is meaningful.
 func gtpuENBAttach(t *testing.T) (string, string) {
 	t.Helper()
 
@@ -29,9 +29,9 @@ func gtpuENBAttach(t *testing.T) (string, string) {
 	return enbID, ueID
 }
 
-// uplinkRoundTrips sends one uplink ICMP echo (with an optional TEID override)
-// and reports whether a decapsulated downlink reply arrived. It returns as soon
-// as the reply arrives; only a genuine forwarding failure exhausts the timeout.
+// uplinkRoundTrips reports whether one uplink ICMP echo draws a decapsulated
+// downlink reply. It returns as soon as the reply arrives, so only a genuine
+// forwarding failure exhausts the timeout.
 func uplinkRoundTrips(t *testing.T, enbID, ueID string, teid *uint32, id, seq int) bool {
 	t.Helper()
 
@@ -50,8 +50,8 @@ func uplinkRoundTrips(t *testing.T, enbID, ueID string, teid *uint32, id, seq in
 	return s == 200
 }
 
-// drainDownlinks consumes any buffered downlink replies so a following negative
-// test does not pick up a stale one.
+// drainDownlinks consumes buffered downlink replies so a following negative
+// assertion does not pick up a stale one.
 func drainDownlinks(t *testing.T, enbID, ueID string) {
 	t.Helper()
 
@@ -89,12 +89,10 @@ func Test4GUserPlanePostRelease(t *testing.T) {
 	}
 }
 
-// Test4GUserPlaneDetachStopsForwarding is the full-teardown counterpart to
-// Test4GUserPlanePostRelease. A normal Detach deactivates the UE's EPS bearer and
-// the S-GW/P-GW release its context (TS 23.401 §5.3.8.2.1), so the UPF must stop
-// forwarding the UE's user plane entirely — not buffer it as it does for an idle
-// S1 release. A replayed uplink that still round-trips means the UPF kept
-// forwarding a torn-down bearer.
+// Test4GUserPlaneDetachStopsForwarding checks that a normal Detach deactivates
+// the UE's EPS bearer and the S-GW/P-GW release its context (TS 23.401
+// §5.3.8.2.1), so the UPF stops forwarding the UE's user plane entirely — unlike
+// an idle S1 release, which buffers it for paging.
 func Test4GUserPlaneDetachStopsForwarding(t *testing.T) {
 	enbID, ueID := gtpuENBAttach(t)
 

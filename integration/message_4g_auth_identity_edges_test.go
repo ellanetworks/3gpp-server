@@ -10,9 +10,9 @@ import (
 	"testing"
 )
 
-// Test4GAuthenticationRepeatedSynchFailure sends a synch failure (#21) twice in
-// a row. The first is mandatory to act on: per TS 24.301 §5.4.2.7 e) the network
-// re-synchronises with the returned AUTS and re-challenges with a fresh vector.
+// Test4GAuthenticationRepeatedSynchFailure sends a synch failure (#21) twice. On
+// the first, TS 24.301 §5.4.2.7 e) obliges the network to re-synchronise with the
+// returned AUTS and re-challenge with a fresh vector.
 //
 // For the second, NOTE 3 of the same subclause says the network "may terminate
 // the authentication procedure by sending an AUTHENTICATION REJECT message" —
@@ -38,10 +38,9 @@ func Test4GAuthenticationRepeatedSynchFailure(t *testing.T) {
 	}
 }
 
-// Test4GIdentityResponseMalformed checks the MME stays healthy when a UE in the
-// Identity procedure returns a malformed Identity Response: the message must be
-// discarded without crashing (TS 24.301 §5.4.4). Each PDU is an EMM plain header
-// (0x07) for an Identity Response (0x56) with a truncated or empty mobile
+// Test4GIdentityResponseMalformed checks a malformed Identity Response is
+// discarded without crashing the MME (TS 24.301 §5.4.4). Each PDU is an EMM plain
+// header (0x07) for an Identity Response (0x56) with a truncated or empty mobile
 // identity.
 func Test4GIdentityResponseMalformed(t *testing.T) {
 	enbID := mustCreateENB(t)
@@ -64,7 +63,6 @@ func Test4GIdentityResponseMalformed(t *testing.T) {
 		nasBody(t, enbID, ueID, fmt.Sprintf(`{"message_type":"inject_nas","raw_nas_pdu":%q,"timeout_ms":1500}`, raw))
 	}
 
-	// The MME must remain healthy: a fresh UE still attaches.
 	fresh := mustCreateENBUE(t, enbID)
 	fullAttach(t, enbID, fresh)
 }

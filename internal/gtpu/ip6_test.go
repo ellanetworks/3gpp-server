@@ -93,7 +93,6 @@ func TestBuildUDPv6_RoundTrip(t *testing.T) {
 	}
 }
 
-// TestBuildMismatchedFamilies rejects a mixed IPv4/IPv6 address pair.
 func TestBuildMismatchedFamilies(t *testing.T) {
 	v4 := mustAddr(t, "10.45.0.1")
 	v6 := mustAddr(t, "fd00:6::10")
@@ -106,7 +105,6 @@ func TestBuildMismatchedFamilies(t *testing.T) {
 	}
 }
 
-// TestParseInnerDispatch confirms version dispatch for IPv4 and IPv6.
 func TestParseInnerDispatch(t *testing.T) {
 	v4, err := BuildICMPEcho(mustAddr(t, "10.45.0.1"), mustAddr(t, "8.8.8.8"), 1, 1, nil)
 	if err != nil {

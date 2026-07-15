@@ -277,10 +277,9 @@ func BuildPDUSessionStatus5GSM(pduSessionID, pti, cause uint8) ([]byte, error) {
 }
 
 // BuildULNASTransportExisting wraps a 5GSM message for an existing PDU session
-// (release, modification) in a UL NAS TRANSPORT. Unlike BuildULNASTransport it
-// omits the Request Type, DNN and S-NSSAI IEs, which are establishment-only;
-// their absence makes the AMF forward the message to the SMF for the existing
-// session rather than treating it as a new/duplicate session (TS 24.501 §8.2.10).
+// (release, modification) in a UL NAS TRANSPORT (TS 24.501 §8.2.10). It omits the
+// establishment-only Request Type, DNN and S-NSSAI IEs; their absence makes the
+// AMF forward the message to the SMF for the existing session.
 func BuildULNASTransportExisting(pduSessionID uint8, requestType *uint8, payloadContainer []byte) ([]byte, error) {
 	m := gonas.NewMessage()
 	m.GmmMessage = gonas.NewGmmMessage()

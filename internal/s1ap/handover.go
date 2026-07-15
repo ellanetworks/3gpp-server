@@ -11,8 +11,9 @@ import (
 // (TS 36.413 §9.1.5), so one octet satisfies the mandatory IE.
 var handoverContainerStub = s1ap.TransparentContainer{0x00}
 
-// HandoverRequiredParams builds a HANDOVER REQUIRED (TS 36.413 §8.4.1). The
-// Target fields are the target eNB's own PLMN, TAC, and eNB-ID.
+// HandoverRequiredParams are the inputs to build a HANDOVER REQUIRED
+// (TS 36.413 §8.4.1). The Target fields are the target eNB's own PLMN, TAC, and
+// eNB-ID.
 type HandoverRequiredParams struct {
 	MMEUES1APID uint32
 	ENBUES1APID uint32
@@ -56,8 +57,9 @@ type HandoverAdmittedERAB struct {
 	DLAddr string
 }
 
-// HandoverRequestAcknowledgeParams builds a HANDOVER REQUEST ACKNOWLEDGE
-// (TS 36.413 §8.4.2). FailedERABIDs lists bearers the target did not admit.
+// HandoverRequestAcknowledgeParams are the inputs to build a HANDOVER REQUEST
+// ACKNOWLEDGE (TS 36.413 §8.4.2). FailedERABIDs lists bearers the target did
+// not admit.
 type HandoverRequestAcknowledgeParams struct {
 	MMEUES1APID   uint32
 	ENBUES1APID   uint32
@@ -100,8 +102,8 @@ func BuildHandoverRequestAcknowledge(p HandoverRequestAcknowledgeParams) ([]byte
 	return m.Marshal()
 }
 
-// HandoverNotifyParams builds a HANDOVER NOTIFY reporting the UE's new location
-// (TS 36.413 §8.4.3).
+// HandoverNotifyParams are the inputs to build a HANDOVER NOTIFY reporting the
+// UE's new location (TS 36.413 §8.4.3).
 type HandoverNotifyParams struct {
 	MMEUES1APID uint32
 	ENBUES1APID uint32
@@ -150,8 +152,8 @@ func BuildHandoverFailure(mmeUES1APID uint32, cause int) ([]byte, error) {
 	return m.Marshal()
 }
 
-// BuildENBStatusTransfer builds an eNB STATUS TRANSFER relaying PDCP status to
-// the target (TS 36.413 §8.4.6). The container is an opaque OCTET STRING.
+// BuildENBStatusTransfer builds an eNB STATUS TRANSFER (TS 36.413 §8.4.6). The
+// container is an opaque OCTET STRING, so one octet stands in for a nil one.
 func BuildENBStatusTransfer(mmeUES1APID, enbUES1APID uint32, container []byte) ([]byte, error) {
 	if container == nil {
 		container = []byte{0x00}

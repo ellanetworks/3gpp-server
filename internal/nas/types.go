@@ -4,16 +4,14 @@
 package nas
 
 // NASRequest is the JSON request for sending a NAS message via the /ngap endpoint.
-// Any field present overrides the default/stored value. The structured fields
-// cover the RegistrationRequest IEs that github.com/free5gc/nas can encode;
-// IEs it does not model (and any fully arbitrary message) are sent verbatim via
-// the RawNASPDU escape hatch.
+// Any field present overrides the default/stored value.
 type NASRequest struct {
 	MessageType      string `json:"message_type"`
 	RegistrationType *uint8 `json:"registration_type,omitempty"`
 
-	// Raw NAS PDU override — when set, skip all NAS building and security
-	// encoding. The hex bytes are stuffed directly into the NGAP wrapper.
+	// RawNASPDU is the escape hatch for IEs github.com/free5gc/nas cannot encode:
+	// when set, all NAS building and security encoding are skipped and the hex
+	// bytes go straight into the NGAP wrapper.
 	RawNASPDU *string `json:"raw_nas_pdu,omitempty"`
 
 	// NGAP-level overrides (apply to the NGAP wrapper, not the NAS PDU)
@@ -22,14 +20,13 @@ type NASRequest struct {
 	AmfUeNgapIDOverride           *int64 `json:"amf_ue_ngap_id_override,omitempty"`
 	RanUeNgapIDOverride           *int64 `json:"ran_ue_ngap_id_override,omitempty"`
 
-	// AuthenticationResponse override — replaces the computed RES*.
+	// ResStarOverride replaces the RES* computed for an AuthenticationResponse.
 	ResStarOverride *string `json:"res_star_override,omitempty"`
 
-	// PDU Session Establishment Request override — replaces the auto-built
-	// inner SM payload that goes into the UL NAS Transport's payload container.
-	// The outer UL NAS Transport, NAS security wrapping and NGAP encoding are
-	// applied as usual. Used to exercise the AMF→SMF SM-payload error paths
-	// without bypassing security.
+	// InnerSMPayload replaces the auto-built inner SM payload of the UL NAS
+	// Transport's payload container. The outer transport, NAS security wrapping
+	// and NGAP encoding still apply, so the AMF→SMF SM-payload error paths are
+	// reachable without bypassing security.
 	InnerSMPayload *string `json:"inner_sm_payload,omitempty"`
 
 	// UE Context Release Request — radio-network Cause value (TS 38.413
@@ -96,7 +93,6 @@ type NASRequest struct {
 	NASMessageContainer          *string      `json:"nas_message_container,omitempty"`
 	EPSBearerContextStatus       *string      `json:"eps_bearer_context_status,omitempty"`
 
-	// Follow-On Request indicator (FOR bit)
 	FollowOnRequest *uint8 `json:"follow_on_request,omitempty"`
 
 	// Cause5GMM is the 5GMM cause sent in a UE-originated reject/failure
@@ -128,10 +124,10 @@ type NASRequest struct {
 	// establishes, so a UE can hold more than one session.
 	PDUSessionIDOverride *uint8 `json:"pdu_session_id,omitempty"`
 
-	// ExistingConnection sends a registration_request over the UE's existing
-	// UE-associated connection (Uplink NAS Transport) instead of an Initial UE
-	// Message — used for a Mobility Registration Update after an N2 handover,
-	// when the UE is already CM-CONNECTED on the target.
+	// ExistingConnection sends a registration_request as an Uplink NAS Transport
+	// on the UE's existing UE-associated connection, for a Mobility Registration
+	// Update after an N2 handover when the UE is already CM-CONNECTED on the
+	// target.
 	ExistingConnection bool `json:"existing_connection,omitempty"`
 
 	// CorruptMAC flips a byte of the NAS-MAC on a security-protected message so
@@ -211,10 +207,8 @@ type NASResponse struct {
 	// PDU Session Establishment Reject
 	Cause5GSM *int `json:"cause_5gsm,omitempty"`
 
-	// DL NAS Transport inner message type
 	InnerNASMessageType string `json:"inner_nas_message_type,omitempty"`
 
-	// Raw hex of the NAS PDU
 	RawHex string `json:"raw_hex"`
 }
 

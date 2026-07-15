@@ -19,7 +19,6 @@ func Test5GNGSetup(t *testing.T) {
 		wantAbsent        string
 		wantFailCauseMisc int
 	}{
-		// --- Happy path ---
 		{
 			name:        "basic NGSetup MCC=001 MNC=01 SST=1",
 			body:        `{"amf_address":"10.3.0.2:38412","gnb_n2_address":"10.3.0.3","mcc":"001","mnc":"01","tac":"000001","gnb_id":"000001","name":"test-gnb-1","sst":1}`,
@@ -44,7 +43,6 @@ func Test5GNGSetup(t *testing.T) {
 			wantHTTP:    201,
 			wantContain: ngapNGSetupResponse,
 		},
-		// --- Wrong PLMN ---
 		{
 			name:              "wrong MCC (999/01) → NGSetupFailure",
 			body:              `{"amf_address":"10.3.0.2:38412","gnb_n2_address":"10.3.0.3","mcc":"999","mnc":"01","tac":"000001","gnb_id":"000006","name":"test-gnb-wrongmcc","sst":1}`,
@@ -66,7 +64,6 @@ func Test5GNGSetup(t *testing.T) {
 			wantContain:       ngapNGSetupFailure,
 			wantFailCauseMisc: causeMiscUnknownPLMNOrSNPN,
 		},
-		// --- Custom IE tests ---
 		{
 			name: "custom IEs valid NGSetup",
 			body: `{
@@ -83,8 +80,8 @@ func Test5GNGSetup(t *testing.T) {
 		},
 		{
 			// A missing mandatory (reject-criticality) IE must be rejected. TS 38.413
-			// §10.3.5 prefers NG SETUP FAILURE over Error Indication, so assert only
-			// that no NG Setup Response is produced, not the rejection form.
+			// §10.3.5 leaves the rejection form open between NG SETUP FAILURE and
+			// Error Indication, so only the absence of a response is asserted.
 			name: "custom IEs missing GlobalRANNodeID",
 			body: `{
 				"amf_address":"10.3.0.2:38412", "gnb_n2_address":"10.3.0.3",

@@ -21,18 +21,16 @@ type CreateGnBRequest struct {
 
 	Slices []SliceInput `json:"slices,omitempty"`
 
-	// Override: if provided, send these IEs instead of auto-building from the fields above.
+	// NGSetupIEs, when set, replaces the IEs auto-built from the fields above.
 	NGSetupIEs []ngap.IE `json:"ng_setup_ies,omitempty"`
 
-	// SkipNGSetup opens the SCTP association but does not send an NG Setup
-	// Request, modelling an NG-RAN node that has not completed NG Setup. The
-	// response carries no ng_setup_response. Used to test that the AMF refuses to
-	// serve NGAP procedures before NG Setup (TS 38.413 §8.7.1.1).
+	// SkipNGSetup opens the SCTP association without sending an NG Setup Request,
+	// modelling an NG-RAN node that has not completed NG Setup (TS 38.413
+	// §8.7.1.1). The response carries no ng_setup_response.
 	SkipNGSetup bool `json:"skip_ng_setup,omitempty"`
 
-	// EnableGTPU binds an N3 GTP-U endpoint so the gNB terminates the user-plane
-	// data path. GnBN3Address is the N3 IP it binds and advertises as its
-	// downlink GTP-U endpoint (defaults to gnb_n2_address).
+	// GnBN3Address is the IP the gNB binds and advertises as its downlink GTP-U
+	// endpoint (defaults to gnb_n2_address).
 	EnableGTPU   bool   `json:"enable_gtpu,omitempty"`
 	GnBN3Address string `json:"gnb_n3_address,omitempty"`
 }
@@ -47,26 +45,21 @@ type CreateGnBResponse struct {
 	NGSetupResponse *ngap.NGAPResponse `json:"ng_setup_response"`
 }
 
-// SendGnBNGAPRequest is the JSON body for a gNB-level (non-UE-associated) NGAP
-// message sent on the gNB's existing N2 association.
+// SendGnBNGAPRequest is the body for a non-UE-associated NGAP message.
 type SendGnBNGAPRequest struct {
 	MessageType string `json:"message_type"`
 
 	// RawNGAPPDU, when set, is written verbatim onto the N2 association with no
-	// encoding or validation, and message_type is ignored — letting a test send
-	// any NGAP PDU, well-formed or not. WaitFor lists downlink message types to
-	// block for (empty = fire-and-forget); TimeoutMs bounds that wait.
+	// encoding or validation, and message_type is ignored. An empty WaitFor is
+	// fire-and-forget.
 	RawNGAPPDU *string  `json:"raw_ngap_pdu,omitempty"`
 	WaitFor    []string `json:"wait_for,omitempty"`
 	TimeoutMs  int      `json:"timeout_ms,omitempty"`
 
-	// NG Reset: when ResetUEIDs is empty the whole NG interface is reset
-	// (ResetType nG-Interface); otherwise only the listed UEs' associations are
-	// reset (ResetType partOfNG-Interface).
+	// An empty ResetUEIDs resets the whole NG interface (ResetType nG-Interface);
+	// otherwise only the listed UEs' associations (ResetType partOfNG-Interface).
 	ResetUEIDs []string `json:"reset_ue_ids,omitempty"`
 
-	// Handover (target gNB side): the AMF/RAN UE NGAP IDs identifying the UE
-	// association, and the admitted PDU sessions for Handover Request Acknowledge.
 	// Path Switch Request reuses these: amf_ue_ngap_id is the existing context's
 	// Source AMF UE NGAP ID, ran_ue_ngap_id the new RAN UE NGAP ID, and
 	// pdu_sessions the PDU sessions to switch in the downlink.
@@ -80,13 +73,11 @@ type SendGnBNGAPRequest struct {
 	UESecurityCapabilities *UESecurityCapabilitiesInput `json:"ue_security_capabilities,omitempty"`
 
 	// OmitIEs lists protocol IE ids to drop from a built path_switch_request, for
-	// sending a structurally-incomplete message (e.g. missing a mandatory IE) to
-	// probe the AMF's error handling.
+	// sending a structurally-incomplete message.
 	OmitIEs []int64 `json:"omit_ies,omitempty"`
 
-	// FailedPDUSessions are PDU sessions reported as failed-to-setup in a
-	// Handover Request Acknowledge or Path Switch Request (partial-admission
-	// testing).
+	// FailedPDUSessions are reported as failed-to-setup in a Handover Request
+	// Acknowledge or Path Switch Request.
 	FailedPDUSessions []int64 `json:"failed_pdu_sessions,omitempty"`
 
 	// Cause is the radio-network Cause (TS 38.413 §9.3.1.2) a handover_failure
@@ -95,15 +86,14 @@ type SendGnBNGAPRequest struct {
 }
 
 // MigrateUERequest moves a UE's context to another gNB's association, modelling
-// the UE arriving at the target after an N2 handover. The RAN/AMF UE NGAP IDs
-// become the ones in use on the target.
+// the UE arriving at the target after an N2 handover. The NGAP IDs become the
+// ones in use on the target.
 type MigrateUERequest struct {
 	TargetGnbID string `json:"target_gnb_id"`
 	RanUeNgapID *int64 `json:"ran_ue_ngap_id,omitempty"`
 	AmfUeNgapID *int64 `json:"amf_ue_ngap_id,omitempty"`
 }
 
-// MigrateUEResponse reports the UE's NGAP ID pair on the target gNB.
 type MigrateUEResponse struct {
 	UEID        string `json:"ue_id"`
 	GnBID       string `json:"gnb_id"`
@@ -111,9 +101,8 @@ type MigrateUEResponse struct {
 	AmfUeNgapID int64  `json:"amf_ue_ngap_id"`
 }
 
-// HandoverPDUSession is an admitted PDU session in a Handover Request
-// Acknowledge, carrying the target gNB's downlink GTP tunnel. RawTransfer (hex)
-// overrides the built transfer verbatim, for crafting malformed transfers.
+// DLTeid and DLIP are the target gNB's downlink GTP tunnel. RawTransfer (hex)
+// replaces the built transfer verbatim.
 type HandoverPDUSession struct {
 	ID          int64   `json:"id"`
 	DLTeid      uint32  `json:"dl_teid,omitempty"`
@@ -132,9 +121,8 @@ type UESecurityCapabilitiesInput struct {
 	EUTRAIntegrity  string `json:"eutra_integrity,omitempty"`
 }
 
-// AwaitRequest waits for an unsolicited downlink NGAP message (one the core
-// sends without a triggering uplink, e.g. Handover Request, Handover Command,
-// UE Context Release Command) to arrive on the gNB's N2 association.
+// AwaitRequest waits for a downlink NGAP message the core sends without a
+// triggering uplink.
 type AwaitRequest struct {
 	MessageTypes []string `json:"message_types"`
 	TimeoutMs    int      `json:"timeout_ms,omitempty"`

@@ -10,20 +10,18 @@ import (
 	"net/netip"
 )
 
-// IP protocol numbers.
 const (
 	protoICMP = 1
 	protoUDP  = 17
 )
 
-// ICMP types.
 const (
 	icmpEchoReply   = 0
 	icmpEchoRequest = 8
 )
 
-// onesComplementSum computes the 16-bit one's-complement checksum used by IPv4
-// and ICMP.
+// onesComplementSum folds the end-around carry and pads a trailing odd byte as
+// the high-order byte of a zero-padded word (RFC 1071 §2).
 func onesComplementSum(b []byte) uint16 {
 	var sum uint32
 
@@ -42,8 +40,6 @@ func onesComplementSum(b []byte) uint16 {
 	return ^uint16(sum)
 }
 
-// BuildICMPEcho builds an ICMP/ICMPv6 Echo Request from src to dst, dispatching
-// on the address family.
 func BuildICMPEcho(src, dst netip.Addr, id, seq uint16, payload []byte) ([]byte, error) {
 	switch {
 	case src.Is4() && dst.Is4():
@@ -62,8 +58,6 @@ func BuildICMPEcho(src, dst netip.Addr, id, seq uint16, payload []byte) ([]byte,
 	}
 }
 
-// BuildUDP builds a UDP/UDP-over-IPv6 datagram from src:srcPort to dst:dstPort,
-// dispatching on the address family.
 func BuildUDP(src, dst netip.Addr, srcPort, dstPort uint16, payload []byte) ([]byte, error) {
 	switch {
 	case src.Is4() && dst.Is4():
@@ -72,7 +66,8 @@ func BuildUDP(src, dst netip.Addr, srcPort, dstPort uint16, payload []byte) ([]b
 		binary.BigEndian.PutUint16(udp[2:4], dstPort)
 		binary.BigEndian.PutUint16(udp[4:6], uint16(len(udp)))
 		copy(udp[8:], payload)
-		// UDP checksum is optional over IPv4; leave it zero.
+		// The UDP checksum is optional over IPv4 and an all-zero field marks it as
+		// not computed (RFC 768).
 
 		return buildIPv4(protoUDP, src, dst, udp), nil
 	case src.Is6() && dst.Is6():
@@ -101,28 +96,24 @@ func buildIPv4(proto uint8, src, dst netip.Addr, l4 []byte) []byte {
 	return ip
 }
 
-// InnerPacket is a decoded IPv4 packet, surfaced for assertions on a received
-// downlink T-PDU.
+// InnerPacket is a decoded inner IP packet, surfaced for assertions on a
+// received downlink T-PDU.
 type InnerPacket struct {
 	Src      string `json:"src"`
 	Dst      string `json:"dst"`
 	Protocol uint8  `json:"protocol"`
 
-	// ICMP fields (when Protocol is ICMP). ICMPType is always surfaced so an Echo
-	// Reply (type 0) is distinguishable.
+	// ICMPType has no omitempty so an Echo Reply (type 0) stays distinguishable.
 	ICMPType uint8  `json:"icmp_type"`
 	ICMPID   uint16 `json:"icmp_id,omitempty"`
 	ICMPSeq  uint16 `json:"icmp_seq,omitempty"`
 
-	// UDP fields (when Protocol is UDP).
 	UDPSrcPort uint16 `json:"udp_src_port,omitempty"`
 	UDPDstPort uint16 `json:"udp_dst_port,omitempty"`
 
 	Payload string `json:"payload,omitempty"` // hex of the L4 payload
 }
 
-// ParseIPv4 decodes an IPv4 packet for assertion. It returns an error for
-// non-IPv4 or truncated input.
 func ParseIPv4(b []byte) (*InnerPacket, error) {
 	if len(b) < 20 || b[0]>>4 != 4 {
 		return nil, fmt.Errorf("not an IPv4 packet")
@@ -162,8 +153,6 @@ func ParseIPv4(b []byte) (*InnerPacket, error) {
 	return p, nil
 }
 
-// IsICMPEchoReply reports whether the inner packet is an ICMP or ICMPv6 Echo
-// Reply.
 func (p *InnerPacket) IsICMPEchoReply() bool {
 	return (p.Protocol == protoICMP && p.ICMPType == icmpEchoReply) ||
 		(p.Protocol == protoICMPv6 && p.ICMPType == icmpv6EchoReply)

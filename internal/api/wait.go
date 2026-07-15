@@ -10,8 +10,6 @@ import (
 	"time"
 )
 
-// waitTimeout is how long a send or await blocks for its downlink: the request's
-// timeout_ms when set, otherwise 5s.
 func waitTimeout(timeoutMs int) time.Duration {
 	if timeoutMs > 0 {
 		return time.Duration(timeoutMs) * time.Millisecond
@@ -20,7 +18,6 @@ func waitTimeout(timeoutMs int) time.Duration {
 	return 5 * time.Second
 }
 
-// parsedAwaitRequest is an AwaitRequest with its timeout resolved.
 type parsedAwaitRequest struct {
 	MessageTypes []string
 	timeout      time.Duration

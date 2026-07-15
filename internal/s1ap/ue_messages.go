@@ -24,8 +24,8 @@ type InitialUEMessageParams struct {
 	STMSI       *STMSIParams // present when the UE re-establishes with an S-TMSI
 }
 
-// BuildInitialUEMessage builds an Initial UE Message with RRC establishment cause
-// mo-Signalling (an attach).
+// BuildInitialUEMessage builds an Initial UE Message with RRC establishment
+// cause mo-Signalling (an attach).
 func BuildInitialUEMessage(p InitialUEMessageParams) ([]byte, error) {
 	plmn, err := encodePLMN(p.MCC, p.MNC)
 	if err != nil {
@@ -47,9 +47,8 @@ func BuildInitialUEMessage(p InitialUEMessageParams) ([]byte, error) {
 	return m.Marshal()
 }
 
-// BuildUEContextReleaseRequest builds the eNB's request to release a UE's S1
-// context, e.g. on inactivity (TS 36.413 §9.1.4.5) — moving the UE to ECM-IDLE.
-// cause is the radio-network Cause value the eNB reports.
+// BuildUEContextReleaseRequest builds an eNB-initiated UE CONTEXT RELEASE
+// REQUEST (TS 36.413 §9.1.4.5). cause is a radio-network Cause value.
 func BuildUEContextReleaseRequest(mmeUEID, enbUEID uint32, cause int) ([]byte, error) {
 	m := &s1ap.UEContextReleaseRequest{
 		MMEUES1APID: s1ap.MMEUES1APID(mmeUEID),
@@ -60,8 +59,8 @@ func BuildUEContextReleaseRequest(mmeUEID, enbUEID uint32, cause int) ([]byte, e
 	return m.Marshal()
 }
 
-// BuildInitialContextSetupFailure builds the eNB's failure reply to an Initial
-// Context Setup Request (TS 36.413 §8.3.1.4).
+// BuildInitialContextSetupFailure builds an INITIAL CONTEXT SETUP FAILURE
+// (TS 36.413 §8.3.1.4).
 func BuildInitialContextSetupFailure(mmeUEID, enbUEID uint32, cause int) ([]byte, error) {
 	return (&s1ap.InitialContextSetupFailure{
 		MMEUES1APID: s1ap.MMEUES1APID(mmeUEID),
@@ -70,8 +69,7 @@ func BuildInitialContextSetupFailure(mmeUEID, enbUEID uint32, cause int) ([]byte
 	}).Marshal()
 }
 
-// BuildERABModifyResponse builds the eNB's response to an E-RAB Modify Request,
-// confirming the reconfigured bearers (TS 36.413 §8.2.2).
+// BuildERABModifyResponse builds an E-RAB MODIFY RESPONSE (TS 36.413 §8.2.2).
 func BuildERABModifyResponse(mmeUEID, enbUEID uint32, modified []uint8) ([]byte, error) {
 	items := make([]s1ap.ERABModifyItemBearerModRes, 0, len(modified))
 	for _, ebi := range modified {
@@ -85,8 +83,8 @@ func BuildERABModifyResponse(mmeUEID, enbUEID uint32, modified []uint8) ([]byte,
 	}).Marshal()
 }
 
-// BuildErrorIndication builds an eNB-originated ERROR INDICATION reporting a
-// protocol error for the UE-associated connection (TS 36.413 §8.7.2).
+// BuildErrorIndication builds an ERROR INDICATION for the UE-associated
+// connection (TS 36.413 §8.7.2). cause is a radio-network Cause value.
 func BuildErrorIndication(mmeUEID, enbUEID uint32, cause int) ([]byte, error) {
 	mme := s1ap.MMEUES1APID(mmeUEID)
 	enb := s1ap.ENBUES1APID(enbUEID)
@@ -99,8 +97,8 @@ func BuildErrorIndication(mmeUEID, enbUEID uint32, cause int) ([]byte, error) {
 	}).Marshal()
 }
 
-// BuildUEContextReleaseComplete builds the eNB's acknowledgement of a UE Context
-// Release Command (TS 36.413 §9.1.4.7).
+// BuildUEContextReleaseComplete builds a UE CONTEXT RELEASE COMPLETE
+// (TS 36.413 §9.1.4.7).
 func BuildUEContextReleaseComplete(mmeUEID, enbUEID uint32) ([]byte, error) {
 	return (&s1ap.UEContextReleaseComplete{
 		MMEUES1APID: s1ap.MMEUES1APID(mmeUEID),
@@ -108,9 +106,8 @@ func BuildUEContextReleaseComplete(mmeUEID, enbUEID uint32) ([]byte, error) {
 	}).Marshal()
 }
 
-// BuildUECapabilityInfoIndication builds the eNB's indication of the UE radio
-// capability to the MME (TS 36.413 §8.9). The MME stores it and replays it in a
-// later Initial Context Setup Request.
+// BuildUECapabilityInfoIndication builds a UE CAPABILITY INFO INDICATION
+// (TS 36.413 §8.9).
 func BuildUECapabilityInfoIndication(mmeUEID, enbUEID uint32, radioCapability []byte) ([]byte, error) {
 	return (&s1ap.UECapabilityInfoIndication{
 		MMEUES1APID:       s1ap.MMEUES1APID(mmeUEID),
@@ -130,7 +127,6 @@ type UplinkNASTransportParams struct {
 	CellID      uint32
 }
 
-// BuildUplinkNASTransport builds an Uplink NAS Transport message.
 func BuildUplinkNASTransport(p UplinkNASTransportParams) ([]byte, error) {
 	plmn, err := encodePLMN(p.MCC, p.MNC)
 	if err != nil {
@@ -148,8 +144,8 @@ func BuildUplinkNASTransport(p UplinkNASTransportParams) ([]byte, error) {
 	return m.Marshal()
 }
 
-// InitialContextSetupResponseParams are the inputs for the eNB's acknowledgement
-// of the default E-RAB setup (TS 36.413 §9.1.4.2).
+// InitialContextSetupResponseParams are the inputs to build an Initial Context
+// Setup Response (TS 36.413 §9.1.4.2).
 type InitialContextSetupResponseParams struct {
 	MMEUES1APID uint32
 	ENBUES1APID uint32
@@ -158,8 +154,8 @@ type InitialContextSetupResponseParams struct {
 	GTPTEID     uint32 // eNB-side downlink TEID
 }
 
-// BuildInitialContextSetupResponse builds the eNB's Initial Context Setup
-// Response, setting up the single default E-RAB with the eNB's S1-U endpoint.
+// BuildInitialContextSetupResponse builds an Initial Context Setup Response
+// acknowledging the single default E-RAB.
 func BuildInitialContextSetupResponse(p InitialContextSetupResponseParams) ([]byte, error) {
 	addr, err := parseTransportAddr(p.ENBN3Addr)
 	if err != nil {
@@ -179,8 +175,8 @@ func BuildInitialContextSetupResponse(p InitialContextSetupResponseParams) ([]by
 	return m.Marshal()
 }
 
-// BuildERABReleaseResponse builds the eNB's confirmation that it released the
-// named E-RAB (TS 36.413 §9.1.3.5).
+// BuildERABReleaseResponse builds an E-RAB RELEASE RESPONSE (TS 36.413
+// §9.1.3.5).
 func BuildERABReleaseResponse(mmeUEID, enbUEID uint32, erabID uint8) ([]byte, error) {
 	m := &s1ap.ERABReleaseResponse{
 		MMEUES1APID:  s1ap.MMEUES1APID(mmeUEID),
@@ -191,9 +187,8 @@ func BuildERABReleaseResponse(mmeUEID, enbUEID uint32, erabID uint8) ([]byte, er
 	return m.Marshal()
 }
 
-// BuildERABSetupResponse builds the eNB's acknowledgement of an E-RAB Setup
-// Request, setting up the additional E-RAB with the eNB's S1-U endpoint
-// (TS 36.413 §9.1.3.2).
+// BuildERABSetupResponse builds an E-RAB SETUP RESPONSE (TS 36.413 §9.1.3.2)
+// acknowledging one additional E-RAB.
 func BuildERABSetupResponse(p InitialContextSetupResponseParams) ([]byte, error) {
 	addr, err := parseTransportAddr(p.ENBN3Addr)
 	if err != nil {

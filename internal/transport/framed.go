@@ -19,8 +19,8 @@ import (
 const sctpReadBufferSize = 65535
 
 // ErrSend wraps a failure to write to the SCTP association; ErrTimeout wraps a
-// wait that expired before a matching downlink arrived. Callers classify these
-// to distinguish an upstream transport failure from an internal build error.
+// wait that expired before a matching downlink arrived. Both mark an upstream
+// transport failure, separating it from an internal build error.
 var (
 	ErrSend    = errors.New("sctp send")
 	ErrTimeout = errors.New("timeout waiting for message")
@@ -145,16 +145,14 @@ func (t *framed[T]) Send(data []byte, nonUE bool) error {
 	return nil
 }
 
-// WaitForMessage returns the next buffered downlink of one of messageTypes,
-// blocking until one arrives or ctx expires.
+// WaitForMessage blocks until a downlink of one of messageTypes arrives or ctx
+// expires.
 func (t *framed[T]) WaitForMessage(ctx context.Context, messageTypes ...string) (*T, error) {
 	return t.WaitForMessageMatching(ctx, nil, messageTypes...)
 }
 
 // WaitForMessageMatching returns the next buffered downlink of one of
-// messageTypes for which match returns true (a nil match accepts any). It lets
-// several concurrent waiters on one association each claim the frame for their
-// own UE without consuming another UE's downlink.
+// messageTypes for which match returns true; a nil match accepts any.
 func (t *framed[T]) WaitForMessageMatching(ctx context.Context, match func(*T) bool, messageTypes ...string) (*T, error) {
 	// Wake blocked waiters when ctx expires so they observe the deadline; the
 	// receiver only broadcasts on new frames.

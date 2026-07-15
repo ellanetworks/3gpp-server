@@ -31,9 +31,6 @@ type EPSAKAResult struct {
 // an EPS-AKA challenge (TS 33.401 §6.1, Annex A.2). mcc/mnc give the serving
 // network identity bound into K_ASME. It returns ErrMACFailure on a bad AUTN MAC
 // and ErrSQNOutOfRange when the challenge SQN is older than the stored value.
-//
-// EPS-AKA uses RES directly (not the 5G RES*), and K_ASME instead of K_AMF; this
-// is implemented independently of Ella Core so the derived keys validate the MME.
 func ComputeEPSAKA(k, opc, sqn, mcc, mnc string, rand, autn []byte) (*EPSAKAResult, error) {
 	opcBytes, err := hex.DecodeString(opc)
 	if err != nil {

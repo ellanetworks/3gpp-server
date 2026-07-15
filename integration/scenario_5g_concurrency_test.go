@@ -4,10 +4,8 @@
 //go:build integration
 
 // Concurrency: many UEs driving the same procedure at once on a shared gNB
-// association. These exercise the AMF/SMF allocators (AMF UE NGAP ID, 5G-GUTI,
-// UE IP) that a race could make hand the same identity to two simultaneous UEs.
-// A failure means Ella Core's per-UE state is not isolated under load, not a
-// quirk of how it sequences work.
+// association, to catch races in the AMF/SMF allocators (AMF UE NGAP ID,
+// 5G-GUTI, UE IP) that could hand the same identity to two simultaneous UEs.
 
 package integration_test
 
@@ -16,10 +14,8 @@ import (
 	"testing"
 )
 
-// Test5GConcurrentRegistration registers many distinct subscribers simultaneously
-// on one gNB. The AMF must assign each a unique AMF UE NGAP ID (unique per
-// AMF–RAN association, TS 38.413 §9.3.3.1) and a unique 5G-GUTI (TS 23.501
-// §5.9.4). A shared value betrays an allocator race.
+// The AMF must assign each UE an AMF UE NGAP ID unique per AMF–RAN association
+// (TS 38.413 §9.3.3.1) and a unique 5G-GUTI (TS 23.501 §5.9.4).
 func Test5GConcurrentRegistration(t *testing.T) {
 	gnb := createGnBWithID(t, "00c001", "conc-reg")
 
@@ -62,9 +58,7 @@ func Test5GConcurrentRegistration(t *testing.T) {
 	}
 }
 
-// Test5GConcurrentPDUSessionEstablishment has many registered UEs establish a PDU
-// session at the same time. The SMF must allocate each a distinct UE IP from the
-// pool (TS 23.501 §5.8.2.2); a duplicate means the IP allocator raced.
+// The SMF must allocate each UE a distinct IP from the pool (TS 23.501 §5.8.2.2).
 func Test5GConcurrentPDUSessionEstablishment(t *testing.T) {
 	gnb := createGnBWithID(t, "00c002", "conc-pdu")
 
@@ -110,16 +104,14 @@ func Test5GConcurrentPDUSessionEstablishment(t *testing.T) {
 	}
 }
 
-// Test5GConcurrentDeregistration registers many UEs, deregisters them all at once,
-// then re-registers them all at once. The identities freed by the simultaneous
-// release must be cleanly reusable: the second wave must again get distinct AMF
-// UE NGAP IDs, with no collision, leak, or double-assignment.
+// Identities freed by a simultaneous release must be cleanly reusable: the
+// second wave must again get distinct AMF UE NGAP IDs.
 func Test5GConcurrentDeregistration(t *testing.T) {
 	gnb := createGnBWithID(t, "00c003", "conc-dereg")
 
 	const n = 6
 
-	// Both waves register the same subscribers, so the second re-registers the
+	// Both waves use the same subscribers, so the second re-registers the
 	// identities the first released.
 	supis := claimSubscribers(t, n)
 	first := make([]regResult, n)

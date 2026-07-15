@@ -7,10 +7,10 @@ package integration_test
 
 import "testing"
 
-// Test4GPathSwitchSecurityCapabilityMatch checks that when the target eNB
-// reports the UE security capabilities the MME already holds, the path switch is
-// acknowledged (TS 36.413 §8.4.4.2). The UE Security Capabilities IE is optional
-// in the acknowledge (TS 36.413 §9.1.5.9), so its presence is not asserted.
+// Test4GPathSwitchSecurityCapabilityMatch has the target eNB report the UE
+// security capabilities the MME already holds: the path switch is acknowledged
+// (TS 36.413 §8.4.4.2). The UE Security Capabilities IE is optional in the
+// acknowledge (TS 36.413 §9.1.5.9), so its presence is not asserted.
 func Test4GPathSwitchSecurityCapabilityMatch(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -24,12 +24,12 @@ func Test4GPathSwitchSecurityCapabilityMatch(t *testing.T) {
 	}
 }
 
-// Test4GPathSwitchSecurityCapabilityMismatch checks that when the target eNB
-// reports UE security capabilities that differ from the MME's stored values, the
-// Path Switch Request Acknowledge replays the stored capabilities so the eNB
-// corrects its context (TS 33.401 §7.2.4.2.2). A default UE advertised EEA0/1/2
-// and EIA0/1/2, which the S1AP encoding (dropping the EEA0/EIA0 bit) stores as
-// 0xC000 for each bitmap.
+// Test4GPathSwitchSecurityCapabilityMismatch has the target eNB report UE
+// security capabilities differing from the MME's stored values: the Path Switch
+// Request Acknowledge must replay the stored capabilities for the eNB to correct
+// its context (TS 33.401 §7.2.4.2.2). The UE advertised EEA0/1/2 and EIA0/1/2,
+// which the S1AP encoding stores as 0xC000 per bitmap by dropping the EEA0/EIA0
+// bit.
 func Test4GPathSwitchSecurityCapabilityMismatch(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)

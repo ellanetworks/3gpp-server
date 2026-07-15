@@ -3,9 +3,8 @@
 
 //go:build integration
 
-// ESM STATUS handling (TS 24.301 §6.7): the MME must process a received ESM
-// STATUS rather than answer it with another STATUS, and act on its cause. A
-// failure of these tests means Ella Core deviates.
+// ESM STATUS handling (TS 24.301 §6.7): the MME must act on the cause of a
+// received ESM STATUS and must not answer it with another STATUS.
 
 package integration_test
 
@@ -13,10 +12,9 @@ import (
 	"testing"
 )
 
-// Test4GESMStatus_InvalidBearerReleases checks that an ESM STATUS #43 (invalid
-// EPS bearer identity) for the default bearer makes the MME deactivate it
-// locally; deactivating the default bearer releases the UE (TS 24.301 §6.7,
-// §6.4.4.2).
+// Test4GESMStatus_InvalidBearerReleases sends an ESM STATUS #43 (invalid EPS
+// bearer identity) for the default bearer: the MME must deactivate it locally,
+// and deactivating the default bearer releases the UE (TS 24.301 §6.7, §6.4.4.2).
 func Test4GESMStatus_InvalidBearerReleases(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -35,9 +33,9 @@ func Test4GESMStatus_InvalidBearerReleases(t *testing.T) {
 	}
 }
 
-// Test4GESMStatus_SessionRemainsUsable checks that a valid ESM STATUS is not
-// answered with an ESM STATUS #97 (TS 24.301 §6.7): the MME processes it and the
-// UE stays usable.
+// Test4GESMStatus_SessionRemainsUsable sends a valid ESM STATUS: the MME must
+// process it, leaving the UE usable, and must not answer with an ESM STATUS #97
+// (TS 24.301 §6.7).
 func Test4GESMStatus_SessionRemainsUsable(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)

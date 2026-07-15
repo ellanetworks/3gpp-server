@@ -20,13 +20,10 @@ func plainSecurityModeCommand() []byte {
 	}
 }
 
-// TestDecodeSurfacesIEsOfAnUnprotectedSecurityModeCommand checks the plain path
-// surfaces a SECURITY MODE COMMAND's IEs.
-//
-// TS 24.501 §4.4.4.2 requires the AMF to send this message integrity protected
-// (with a new 5G NAS security context, §5.4.2.2), so an unprotected one is a
-// deviation. Catching it needs the message's own IEs — the selected algorithms —
-// which the plain path must therefore decode, exactly as the secured path does.
+// TS 24.501 §4.4.4.2 requires the AMF to send a SECURITY MODE COMMAND integrity
+// protected (with a new 5G NAS security context, §5.4.2.2), so an unprotected one
+// is a deviation. Catching it needs the message's own IEs — the selected
+// algorithms — so the plain path must decode them.
 func TestDecodeSurfacesIEsOfAnUnprotectedSecurityModeCommand(t *testing.T) {
 	resp, err := Decode(plainSecurityModeCommand())
 	if err != nil {

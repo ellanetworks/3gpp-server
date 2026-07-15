@@ -9,9 +9,7 @@ import (
 	"testing"
 )
 
-// Test5GPDUSessionEstablishment_NGAPIDFuzz sends a PDU Session Establishment
-// Request on an established connection with a wrong UE NGAP ID and expects a
-// spec-compliant Error Indication (TS 38.413 §10.6, §8.7.5.2).
+// A wrong UE NGAP ID must draw an Error Indication (TS 38.413 §10.6, §8.7.5.2).
 func Test5GPDUSessionEstablishment_NGAPIDFuzz(t *testing.T) {
 	cases := []struct {
 		name string
@@ -37,8 +35,7 @@ func Test5GPDUSessionEstablishment_NGAPIDFuzz(t *testing.T) {
 	}
 }
 
-// Test5GPDUSessionEstablishment_ReservedPDUSessionID sends an establishment request
-// with a reserved PDU session identity value (16 is outside the 1-15 range). Per
+// PDU session identity 16 is reserved (outside the 1-15 range), so per
 // TS 24.501 §7.3.2 c) the AMF returns the message in a Downlink NAS Transport
 // with 5GMM cause #90 "payload was not forwarded".
 func Test5GPDUSessionEstablishment_ReservedPDUSessionID(t *testing.T) {
@@ -64,10 +61,9 @@ func Test5GPDUSessionEstablishment_ReservedPDUSessionID(t *testing.T) {
 	assertNASCause(t, body, "nas.cause_5gmm", cause5GMMPayloadWasNotForwarded)
 }
 
-// Test5GPDUSessionEstablishment_DuplicateReestablishes sends a second
-// establishment request for an already-active PDU session. Per TS 24.501
-// §5.4.5.2.5 item 12 the AMF locally releases it and re-establishes, so the gNB
-// receives a fresh PDU Session Resource Setup Request.
+// On a second establishment request for an already-active PDU session, per
+// TS 24.501 §5.4.5.2.5 item 12 the AMF locally releases it and re-establishes,
+// so the gNB receives a fresh PDU Session Resource Setup Request.
 func Test5GPDUSessionEstablishment_DuplicateReestablishes(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := establishRegisteredUE(t, gnbID) // registered UE with an active PDU session
@@ -83,17 +79,11 @@ func Test5GPDUSessionEstablishment_DuplicateReestablishes(t *testing.T) {
 	}
 }
 
-// Test5GPDUSessionEstablishment_Fuzz drives the PDU session establishment endpoint
-// with both well-formed and malformed top-level NAS payloads. When raw_nas_pdu
-// is supplied, the 3gpp-server sends those bytes as the NAS PDU IE of an
-// UplinkNASTransport (rather than wrapping them in a UL NAS TRANSPORT payload
-// container), so these cases exercise the AMF's outer NAS decoder, not the
-// SMF's GSM decoder.
-//
-// Expected AMF behaviour per TS 24.501 §4.4.4.3 and TS 38.413:
-//   - NGAP NAS-PDU IE empty       → ASN.1 reject → ErrorIndication
-//   - NAS payload undecodable     → 5GMM STATUS, cause #111 Protocol error, unspecified
-//   - Plain msg type not allowed  → 5GMM STATUS, cause #111
+// raw_nas_pdu bytes go on the wire as the NAS PDU IE of an UplinkNASTransport,
+// unwrapped by any UL NAS TRANSPORT payload container, so these cases exercise
+// the AMF's outer NAS decoder and not the SMF's GSM decoder. An undecodable NAS
+// payload draws 5GMM STATUS with cause #111 (TS 24.501 §4.4.4.3); an empty NGAP
+// NAS-PDU IE fails ASN.1 decoding and draws an Error Indication.
 func Test5GPDUSessionEstablishment_Fuzz(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -174,22 +164,9 @@ func Test5GPDUSessionEstablishment_Fuzz(t *testing.T) {
 	}
 }
 
-// Test5GPDUSessionEstablishment_InnerSMFuzz drives the AMF→SMF SM-payload path
-// with a malformed *inner* SM payload while keeping the outer UL NAS Transport
-// correctly built and security-wrapped. Unlike raw_nas_pdu (which bypasses
-// security and is rejected at the AMF 5GMM layer), inner_sm_payload exercises
-// the SMF's GsmMessageDecode + reject build path and the AMF's fallback per
-// TS 24.501 §5.4.5.3.
-//
-// Expected behaviour:
-//   - Inner SM payload undecodable as 5GSM
-//     → SMF builds PDU SESSION ESTABLISHMENT REJECT with 5GSM cause #111
-//     → AMF forwards inside DL NAS TRANSPORT
-//   - Inner SM payload decodes but message type is not "establishment request"
-//     → SMF builds reject with 5GSM cause #98
-//     → AMF forwards inside DL NAS TRANSPORT
-//   - Inner SM payload absent entirely (empty bytes)
-//     → SMF can't decode → reject with cause #111 (as above)
+// inner_sm_payload keeps the outer UL NAS Transport correctly built and
+// security-wrapped, so a malformed payload reaches the SMF's 5GSM decoder and
+// the AMF forwards the SMF's reject per TS 24.501 §5.4.5.3.
 func Test5GPDUSessionEstablishment_InnerSMFuzz(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -217,8 +194,8 @@ func Test5GPDUSessionEstablishment_InnerSMFuzz(t *testing.T) {
 			name: "inner SM: PDU SESSION ESTABLISHMENT ACCEPT (wrong direction, truncated)",
 			// 2E EPD, 01 PDU session ID, 01 PTI, C2 msg type = est accept.
 			// ACCEPT has mandatory IEs (Session AMBR, Authorized QoS rules, etc.)
-			// so the 4-byte input fails GsmMessageDecode before the message-type
-			// check fires. SMF therefore returns #111 (protocol error, unspecified).
+			// so the 4-byte input fails 5GSM decoding before the message-type
+			// check fires, yielding #111 (protocol error, unspecified).
 			innerSMPayload:   "2e0101c2",
 			wantNGAPMsgType:  ngapDownlinkNASTransport,
 			wantInnerNASType: nasPDUSessionEstablishmentReject,
@@ -278,10 +255,8 @@ func Test5GPDUSessionEstablishment_InnerSMFuzz(t *testing.T) {
 	}
 }
 
-// Test5GPDUSessionEstablishment_InnerSMRequestIEFuzz drives a well-formed
-// PDU SESSION ESTABLISHMENT REQUEST through the AMF→SMF path with various
-// edge-case IE values per TS 24.501 §8.3.1 / §9.6. These exercise the SMF
-// decoder and SM context allocation under unusual input.
+// Edge-case IE values of an otherwise well-formed PDU SESSION ESTABLISHMENT
+// REQUEST, per TS 24.501 §8.3.1 / §9.6.
 func Test5GPDUSessionEstablishment_InnerSMRequestIEFuzz(t *testing.T) {
 	tests := []struct {
 		name             string

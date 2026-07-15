@@ -13,13 +13,12 @@ import (
 	s1ap "github.com/ellanetworks/core/s1ap"
 )
 
-// Test4GCriticalityDiagnostics checks the MME answers an S1AP message whose body
-// fails to decode with an ERROR INDICATION carrying the transfer-syntax-error
-// Cause (TS 36.413 §10.2). A valid Uplink NAS Transport envelope wrapping a
-// malformed body is sent verbatim via the raw-S1AP path so the outer PDU decodes
-// but the body parser fails. CriticalityDiagnostics is optional for a
-// transfer-syntax error (it is mandated only for abstract-syntax / logical
-// errors, §9.2.1.21), so it is asserted only when the MME includes it.
+// Test4GCriticalityDiagnostics checks an S1AP message whose body fails to decode
+// draws an ERROR INDICATION carrying the transfer-syntax-error Cause
+// (TS 36.413 §10.2). The Uplink NAS Transport envelope is valid so the outer PDU
+// decodes and the body parser fails. CriticalityDiagnostics is optional for a
+// transfer-syntax error (§9.2.1.21 mandates it only for abstract-syntax /
+// logical errors), so it is asserted only when present.
 func Test4GCriticalityDiagnostics(t *testing.T) {
 	enbID := mustCreateENB(t)
 
@@ -46,7 +45,6 @@ func Test4GCriticalityDiagnostics(t *testing.T) {
 		t.Errorf("Error Indication cause = {%s,%s}, want {protocol,0} transfer-syntax-error (TS 36.413 §10.2)\n  body: %s", g, v, resp)
 	}
 
-	// CriticalityDiagnostics is optional here; assert its contents only when present.
 	if jsonGet(resp, "s1ap.criticality_diagnostics.procedure_code") != "" {
 		if got := jsonGet(resp, "s1ap.criticality_diagnostics.procedure_code"); got != "13" {
 			t.Errorf("criticality_diagnostics.procedure_code = %q, want 13 (UplinkNASTransport)\n  body: %s", got, resp)

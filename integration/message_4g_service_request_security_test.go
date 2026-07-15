@@ -45,7 +45,7 @@ func Test4GServiceRequestReplay(t *testing.T) {
 
 	nasStep(t, enbID, ueID, "release_request")
 
-	// Replay with a stale NAS COUNT (0): below the MME's current expected count.
+	// NAS COUNT 0 is below the MME's current expected count: a replay.
 	resp := nasBody(t, enbID, ueID, `{"message_type":"service_request","nas_count":0,"timeout_ms":3000}`)
 
 	if got := jsonGet(resp, "s1ap.message_type"); got == "InitialContextSetupRequest" {

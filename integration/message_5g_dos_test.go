@@ -13,7 +13,7 @@ import (
 
 // createGnBAssertingNGSetup creates a gNB on an allocated gNB ID, asserts the
 // AMF answered with an NG Setup Response (TS 38.413 §8.7.1), and returns its
-// store ID. Registers cleanup.
+// store ID.
 func createGnBAssertingNGSetup(t *testing.T, name string) string {
 	t.Helper()
 

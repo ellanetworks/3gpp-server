@@ -10,8 +10,6 @@ import (
 	"testing"
 )
 
-// attachChallenge creates a UE and sends the Attach Request, returning the UE ID
-// once the MME has issued the EPS-AKA challenge.
 func attachChallenge(t *testing.T, enbID string) string {
 	t.Helper()
 
@@ -25,7 +23,6 @@ func attachChallenge(t *testing.T, enbID string) string {
 	return ueID
 }
 
-// nasBody drives a NAS step with an explicit request body (for override fields).
 func nasBody(t *testing.T, enbID, ueID, body string) []byte {
 	t.Helper()
 
@@ -37,9 +34,8 @@ func nasBody(t *testing.T, enbID, ueID, body string) []byte {
 	return resp
 }
 
-// Test4GAuthenticationWrongRES checks the MME rejects a UE that returns an
-// incorrect RES with an Authentication Reject (TS 24.301 §5.4.2.5), rather than
-// proceeding to the Security Mode Command.
+// Test4GAuthenticationWrongRES checks a UE returning an incorrect RES draws an
+// Authentication Reject (TS 24.301 §5.4.2.5).
 func Test4GAuthenticationWrongRES(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := attachChallenge(t, enbID)
@@ -52,11 +48,10 @@ func Test4GAuthenticationWrongRES(t *testing.T) {
 	}
 }
 
-// Test4GAuthenticationFailureNoProceed checks that when the UE rejects the
-// challenge with an Authentication Failure (#20 MAC failure or #26 non-EPS), the
-// MME does not proceed to security activation. Per TS 24.301 §5.4.2.7 c/d it may
-// run the identity procedure or send an Authentication Reject; either is
-// compliant, but a Security Mode Command is not.
+// Test4GAuthenticationFailureNoProceed checks an Authentication Failure (#20 MAC
+// failure or #26 non-EPS) does not lead to security activation. Per TS 24.301
+// §5.4.2.7 c/d the MME may run the identity procedure or send an Authentication
+// Reject; either is compliant, a Security Mode Command is not.
 func Test4GAuthenticationFailureNoProceed(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -100,8 +95,7 @@ func Test4GAuthenticationSynchFailure(t *testing.T) {
 		t.Fatalf("after synch failure, nas.message_type = %q, want a fresh authentication_request; body: %s", got, resync)
 	}
 
-	// The fresh challenge must authenticate normally and reach the Security Mode
-	// Command, proving the re-sync produced a usable vector.
+	// Reaching the Security Mode Command proves the re-sync produced a usable vector.
 	smc := nasStep(t, enbID, ueID, "authentication_response")
 	if got := jsonGet(smc, "nas.message_type"); got != "security_mode_command" {
 		t.Fatalf("after re-sync, nas.message_type = %q, want security_mode_command; body: %s", got, smc)

@@ -15,9 +15,6 @@ const (
 	testOPc = "63bfa50ee6523365ff14c1f45f88737d"
 )
 
-// mustCreateENBUE creates a UE on the eNB, drawing a subscriber no other test
-// holds, and returns its store ID. Tests that need a specific subscriber call
-// createENBUEWithIMSI.
 func mustCreateENBUE(t *testing.T, enbID string) string {
 	t.Helper()
 
@@ -37,7 +34,6 @@ func mustCreateENBUE(t *testing.T, enbID string) string {
 	return ueID
 }
 
-// nasStep drives one EPS NAS procedure step and returns the response body.
 func nasStep(t *testing.T, enbID, ueID, messageType string) []byte {
 	t.Helper()
 
@@ -50,12 +46,6 @@ func nasStep(t *testing.T, enbID, ueID, messageType string) []byte {
 	return resp
 }
 
-// Test4GScenarioAttach drives a full EPS Attach against the live MME and asserts
-// each downlink is spec-compliant: an EPS-AKA challenge, a Security Mode Command
-// that replays the UE capabilities (TS 24.301 §5.4.3.2) and selects a real
-// integrity algorithm (not EIA0, §5.4.3.3 / TS 33.401 §5.1.4.1) with a NAS-MAC
-// that verifies under independently-derived keys, and an Attach Accept carrying a
-// GUTI (§5.5.1.2.4) and a default bearer.
 func Test4GScenarioAttach(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -88,8 +78,8 @@ func Test4GScenarioAttach(t *testing.T) {
 			t.Fatalf("MME selected NAS integrity algorithm %q for a normal attach; want non-EIA0; body: %s", got, resp)
 		}
 
-		// TS 24.301 §5.4.3.2: the MME must replay the UE's security capabilities
-		// verbatim (bidding-down protection). We advertised EEA0/1/2 + EIA0/1/2.
+		// The MME must replay the UE's security capabilities verbatim against
+		// bidding-down (TS 24.301 §5.4.3.2); the UE advertised EEA0/1/2 + EIA0/1/2.
 		if got := jsonGet(resp, "nas.replayed_ue_security_capabilities"); got != "e0e0" {
 			t.Fatalf("replayed UE security capabilities = %q, want e0e0; body: %s", got, resp)
 		}

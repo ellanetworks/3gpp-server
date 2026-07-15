@@ -10,9 +10,8 @@ import (
 	"testing"
 )
 
-// attachToSMC creates a UE (optionally advertising a specific EEA/EIA capability
-// bitmap) and drives it to the Security Mode Command, returning the UE ID and the
-// SMC response body.
+// attachToSMC drives a UE to the Security Mode Command, optionally advertising a
+// specific EEA/EIA capability bitmap.
 func attachToSMC(t *testing.T, enbID, ueNetworkCapability string) (string, []byte) {
 	t.Helper()
 
@@ -53,7 +52,7 @@ func Test4GSecurityModeAlgorithmSelection(t *testing.T) {
 	tests := []struct {
 		name     string
 		cap      string
-		wantInt  []string // acceptable selected integrity algorithm values
+		wantInt  []string
 		wantCiph []string
 	}{
 		{"EEA2/EIA2 only", "2020", []string{"2"}, []string{"2"}},

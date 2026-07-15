@@ -11,8 +11,7 @@ import (
 	"testing"
 )
 
-// The PDCP status the source reports. The values are arbitrary but distinct, so
-// the relayed container can be compared field by field.
+// Distinct values, so the relayed container can be compared field by field.
 const (
 	statusDRBID    = 3
 	statusULPDCPSN = 42
@@ -21,9 +20,6 @@ const (
 	statusDLHFN    = 3
 )
 
-// ngapRANStatusTransfer returns the RAN Status Transfer Transparent Container
-// from a decoded NGAP message, scanning the IEs so the assertion does not depend
-// on IE ordering.
 func ngapRANStatusTransfer(body []byte) (map[string]any, bool) {
 	var top map[string]any
 	if err := json.Unmarshal(body, &top); err != nil {
@@ -54,8 +50,6 @@ func ngapRANStatusTransfer(body []byte) (map[string]any, bool) {
 	return nil, false
 }
 
-// ngapFirstRanUeNgapID returns the first RAN UE NGAP ID carried in a decoded
-// NGAP message.
 func ngapFirstRanUeNgapID(body []byte) (int64, bool) {
 	var top map[string]any
 	if err := json.Unmarshal(body, &top); err != nil {
@@ -87,12 +81,9 @@ func ngapFirstRanUeNgapID(body []byte) (int64, bool) {
 }
 
 // assertRANStatusTransferRelayed drives the RAN status transfer of an in-progress
-// N2 handover and checks the AMF relays it per TS 38.413 §8.4.7.2: "The AMF
-// initiates the procedure by sending the DOWNLINK RAN STATUS TRANSFER message to
-// the target NG-RAN node." The container is a *transparent* container
-// (§9.3.1.108) carrying, for each DRB, the DRB ID with its UL and DL COUNT
-// (§8.4.6.2) — the AMF conveys it to the target, so what the target receives must
-// be what the source sent, addressed to the target's UE association (§9.2.3.14).
+// N2 handover. Per TS 38.413 §8.4.7.2 the AMF conveys the source's transparent
+// container (§9.3.1.108: per-DRB UL/DL COUNT, §8.4.6.2) to the target unchanged,
+// addressed to the target's UE association (§9.2.3.14).
 //
 // The handover must already be prepared (Handover Request Acknowledge sent):
 // §8.4.7.3 lets a target ignore the message when no prepared handover exists.
@@ -133,7 +124,6 @@ func assertRANStatusTransferRelayed(t *testing.T, sourceGNB, targetGNB, ueID str
 		t.Fatalf("relayed DRB is not an object: %v\n  body: %s", drbs[0], dl)
 	}
 
-	// The container is conveyed to the target unchanged (§8.4.7.2, §9.3.1.108).
 	num := func(path ...string) (float64, bool) {
 		cur := drb
 		for _, p := range path[:len(path)-1] {

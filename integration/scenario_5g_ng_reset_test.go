@@ -5,7 +5,6 @@
 
 // NG Reset (TS 38.413 §8.7.4): the gNB resets the whole NG interface or a
 // subset of UE associations; the AMF answers with NG Reset Acknowledge.
-// Assertions follow the spec; a failure means Ella Core deviates.
 
 package integration_test
 
@@ -15,8 +14,6 @@ import (
 	"testing"
 )
 
-// ngapHasConnection reports whether the response's NGAP IE list contains a
-// UE-associated NG-connection item with the given AMF and RAN UE NGAP IDs.
 func ngapHasConnection(body []byte, amfID, ranID int64) bool {
 	var top map[string]any
 	if err := json.Unmarshal(body, &top); err != nil {
@@ -49,8 +46,8 @@ func ngapHasConnection(body []byte, amfID, ranID int64) bool {
 	return false
 }
 
-// Test5GNGReset_All resets the whole NG interface. Per TS 38.413 §8.7.4.2.2 the
-// AMF releases the UE associations and answers with NG Reset Acknowledge.
+// On a full NG Reset the AMF releases the UE associations and answers with NG
+// Reset Acknowledge (TS 38.413 §8.7.4.2.2).
 func Test5GNGReset_All(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 
@@ -65,18 +62,15 @@ func Test5GNGReset_All(t *testing.T) {
 	}
 }
 
-// Test5GNGReset_Partial resets a single registered UE's association. Per TS 38.413
-// §8.7.4.2.2 the AMF shall include, for each reset connection, the AMF UE NGAP
-// ID and RAN UE NGAP ID in the NG Reset Acknowledge's UE-associated Logical
-// NG-connection List.
+// For each reset connection the AMF shall include the AMF UE NGAP ID and RAN UE
+// NGAP ID in the NG Reset Acknowledge's UE-associated Logical NG-connection List
+// (TS 38.413 §8.7.4.2.2).
 func Test5GNGReset_Partial(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	doRegistrationFlow(t, gnbID, ueID)
 
-	// The gNB lists this UE's NGAP IDs in the NG Reset, so the acknowledge must
-	// echo them back.
 	_, ueBody := doRequest(t, "GET", "/gnb/"+gnbID+"/ue/"+ueID, "")
 	amfID, err := strconv.ParseInt(jsonGet(ueBody, "amf_ue_ngap_id"), 10, 64)
 	if err != nil {

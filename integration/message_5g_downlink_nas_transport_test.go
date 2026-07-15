@@ -4,9 +4,6 @@
 //go:build integration
 
 // Tests for DownlinkNASTransport (TS 38.413 §9.2.5.2) decode.
-// We trigger a DownlinkNASTransport by sending an InitialUEMessage, then verify
-// that every IE the AMF includes in the response is properly decoded and surfaced
-// in the JSON.
 
 package integration_test
 

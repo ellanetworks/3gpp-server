@@ -52,7 +52,6 @@ type PDUSessionInfo struct {
 	UEIP   string `json:"ue_ip,omitempty"`
 }
 
-// GetPDUSession returns the stored session state for a UE's PDU session.
 func (g *GNBContext) GetPDUSession(ranUeID, pduSessionID int64) (*PDUSessionInfo, bool) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()

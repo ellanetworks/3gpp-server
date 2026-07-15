@@ -25,7 +25,7 @@ type RegistrationRequestOpts struct {
 
 // BuildRegistrationRequest builds a plain REGISTRATION REQUEST (TS 24.501
 // §8.2.6). The mobile identity is the GUTI when the UE holds one, else its SUCI
-// (§5.5.1.2.2); Overrides replace the built IEs field by field.
+// (§5.5.1.2.2).
 func BuildRegistrationRequest(opts *RegistrationRequestOpts) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
@@ -398,8 +398,8 @@ func BuildSecurityModeReject(cause uint8) ([]byte, error) {
 }
 
 // BuildIdentityResponse builds an IDENTITY RESPONSE carrying the given mobile
-// identity contents (TS 24.501 §8.2.22). The caller supplies the identity bytes
-// matching the type the AMF requested (e.g. the UE's SUCI).
+// identity contents (TS 24.501 §8.2.22), which must match the identity type the
+// AMF requested (e.g. the UE's SUCI).
 func BuildIdentityResponse(mobileIdentity []byte) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()

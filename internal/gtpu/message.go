@@ -34,10 +34,8 @@ const (
 	port = 2152
 )
 
-// Port is the GTP-U UDP port.
 const Port = port
 
-// Message is a decoded GTP-U message.
 type Message struct {
 	Type    uint8
 	TEID    uint32
@@ -46,8 +44,6 @@ type Message struct {
 	Payload []byte // T-PDU for a G-PDU; IE bytes for path-management messages
 }
 
-// EncodeGPDU wraps an inner IP packet (T-PDU) in a GTP-U G-PDU for the given
-// TEID.
 func EncodeGPDU(teid uint32, tpdu []byte) []byte {
 	out := make([]byte, 8+len(tpdu))
 	out[0] = flagsGPDU
@@ -71,10 +67,10 @@ func EncodeGPDUWithQFI(teid uint32, qfi uint8, tpdu []byte) []byte {
 	// out[8:11] are sequence + N-PDU (zero); out[11] is the next-extension type.
 	out[11] = extPDUSessionContainer
 	// PDU Session Container extension header (4 octets): length, content, next.
-	out[12] = 0x01         // length in 4-octet units
-	out[13] = pscPDUTypeUL // PDU Type 1 (UL PDU Session Information) in the high nibble
-	out[14] = qfi & 0x3f   // QFI
-	out[15] = 0x00         // no further extension header
+	out[12] = 0x01 // length in 4-octet units
+	out[13] = pscPDUTypeUL
+	out[14] = qfi & 0x3f
+	out[15] = 0x00 // no further extension header
 	copy(out[16:], tpdu)
 
 	return out

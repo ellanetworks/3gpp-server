@@ -10,9 +10,9 @@ import (
 	"testing"
 )
 
-// createGTPUENB creates an eNB that terminates the S1-U GTP-U data path over the
-// given transport family. Only one eNB can bind a given S1-U address:port, so
-// callers must let cleanup run before reusing the same transport.
+// createGTPUENB creates an eNB terminating the S1-U data path. Only one eNB can
+// bind a given S1-U address:port, so callers must let cleanup run before reusing
+// the same transport.
 func createGTPUENB(t *testing.T, enbID int, name string, n3 n3Transport) string {
 	t.Helper()
 
@@ -35,11 +35,10 @@ func createGTPUENB(t *testing.T, enbID int, name string, n3 n3Transport) string 
 	return id
 }
 
-// Test4GGTPUEcho: a GTP-U Echo Request the eNB sends on S1-U — the path-management
-// form with no extension header — must be answered with an Echo Response over
-// both IPv4 and IPv6 S1-U transport. A GTP-U peer "shall be prepared to receive
-// an Echo Request at any time and it shall reply with an Echo Response" (TS
-// 29.281 §7.2.1); a timeout means the UPF dropped a conformant Echo Request.
+// Test4GGTPUEcho sends the path-management form of the GTP-U Echo Request (no
+// extension header) over both S1-U transport families. A GTP-U peer "shall be
+// prepared to receive an Echo Request at any time and it shall reply with an Echo
+// Response" (TS 29.281 §7.2.1).
 func Test4GGTPUEcho(t *testing.T) {
 	for _, n3 := range []n3Transport{n3IPv4, n3IPv6} {
 		t.Run(n3.name, func(t *testing.T) {
@@ -58,10 +57,9 @@ func Test4GGTPUEcho(t *testing.T) {
 	}
 }
 
-// Test4GGTPUWrongTEIDErrorIndication: a G-PDU carrying a non-zero TEID for which
-// the UPF has no PDR must be answered with a GTP-U Error Indication on S1-U
-// (TS 29.281 §7.3.1: the node "shall also return a GTP error indication to the
-// originating node").
+// Test4GGTPUWrongTEIDErrorIndication sends a G-PDU on a non-zero TEID for which
+// the UPF has no PDR. The UPF "shall also return a GTP error indication to the
+// originating node" (TS 29.281 §7.3.1).
 func Test4GGTPUWrongTEIDErrorIndication(t *testing.T) {
 	enbID := createGTPUENB(t, claimENBID(), "gtpu-errind-enb", n3IPv4)
 	ueID := mustCreateENBUE(t, enbID)
@@ -79,9 +77,8 @@ func Test4GGTPUWrongTEIDErrorIndication(t *testing.T) {
 	}
 }
 
-// Test4GGTPU_UDPRoundTrip proves the S1-U data path carries UDP, not only ICMP: a
-// UE uplink UDP datagram to the data-network responder returns as a decapsulated
-// downlink datagram echoed back — the UPF forwards and NATs UDP user-plane traffic.
+// Test4GGTPU_UDPRoundTrip proves the S1-U data path carries UDP, not only ICMP:
+// the UPF must forward and NAT UDP user-plane traffic.
 func Test4GGTPU_UDPRoundTrip(t *testing.T) {
 	enbID := createGTPUENB(t, claimENBID(), "gtpu-udp-enb", n3IPv4)
 	ueID := mustCreateENBUE(t, enbID)

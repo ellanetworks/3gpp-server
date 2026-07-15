@@ -7,8 +7,6 @@ package integration_test
 
 import "testing"
 
-// Test4GScenarioDetach drives a UE-originating normal Detach after a full attach
-// and asserts the MME replies with a Detach Accept (TS 24.301 §5.5.2.2.2).
 func Test4GScenarioDetach(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -21,9 +19,8 @@ func Test4GScenarioDetach(t *testing.T) {
 	}
 }
 
-// Test4GDetachSwitchOff drives a switch-off Detach and asserts the MME does NOT
-// send a Detach Accept (TS 24.301 §5.5.2.2.2) and instead releases the S1
-// connection, then stays healthy.
+// Test4GDetachSwitchOff drives a switch-off Detach: the MME releases the S1
+// connection and sends no Detach Accept (TS 24.301 §5.5.2.2.2).
 func Test4GDetachSwitchOff(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)

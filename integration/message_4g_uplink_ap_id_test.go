@@ -10,8 +10,8 @@ import (
 	"testing"
 )
 
-// Test4GUplinkForgedAPID checks the MME's reaction to a UE-associated uplink
-// whose AP IDs name a logical connection it does not know.
+// Test4GUplinkForgedAPID sends a UE-associated uplink whose AP IDs name a logical
+// connection the MME does not know.
 //
 // TS 36.413 §10.6: "If a node receives a message (other than the first or first
 // returned messages) that includes AP ID(s) identifying a logical connection
@@ -20,8 +20,8 @@ import (
 // appropriate cause value."
 //
 // The UE is attached first, so the Tracking Area Update below is neither the
-// first nor the last message of the connection; forging the MME UE S1AP ID makes
-// it name a connection the MME never allocated.
+// first nor the first returned message of the connection; forging the MME UE
+// S1AP ID makes it name a connection the MME never allocated.
 func Test4GUplinkForgedAPID(t *testing.T) {
 	const forgedMMEID = 4294967000
 

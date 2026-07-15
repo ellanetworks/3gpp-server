@@ -10,8 +10,6 @@ import (
 	"testing"
 )
 
-// attachWithPDNType drives a fresh UE through attach requesting a PDN type and
-// returns the Attach Accept response body.
 func attachWithPDNType(t *testing.T, enbID string, pdnType int) []byte {
 	t.Helper()
 
@@ -53,8 +51,7 @@ func Test4GPDNTypeNegotiation(t *testing.T) {
 				t.Fatalf("no default bearer established for PDN type %d; body: %s", tt.pdnType, accept)
 			}
 
-			// A network that narrows the requested PDN type must say so with ESM
-			// cause #50 (IPv4 only) or #51 (IPv6 only).
+			// #50 = IPv4 only, #51 = IPv6 only.
 			if c := jsonGet(accept, "nas.bearer_esm_cause"); c != "" && c != "50" && c != "51" {
 				t.Fatalf("bearer ESM cause = %q, want a PDN-type downgrade cause (50/51) or none; body: %s", c, accept)
 			}

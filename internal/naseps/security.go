@@ -4,7 +4,7 @@
 // Package naseps builds and decodes EPS NAS (TS 24.301) messages for the
 // emulated UE, wrapping the github.com/ellanetworks/core/nas/eps codec. NAS keys
 // are derived independently (internal/crypto), so a decoded downlink validates
-// the MME rather than mirroring it.
+// the MME's own computation.
 package naseps
 
 import (
@@ -31,8 +31,8 @@ const (
 )
 
 // integrityFor maps an EIA identity to its algorithm (TS 33.401 §5). The
-// primitives are reused from nas/common (themselves RFC 4493 / KAT validated);
-// the keys they run on are derived independently.
+// primitives come from nas/common (RFC 4493 / KAT validated); the keys they run
+// on are derived independently.
 func integrityFor(eia uint8) (common.Integrity, error) {
 	switch eia {
 	case 0:

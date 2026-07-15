@@ -19,13 +19,12 @@ const (
 	enbS1Address = "10.3.0.3"
 )
 
-// createENBRaw opens an S1-MME association and sends rawHex verbatim as the first
-// PDU, then returns the HTTP status and body. Registers cleanup of the eNB.
+// createENBRaw sends rawHex verbatim as the first PDU of a fresh S1-MME
+// association. A malformed PDU is usually dropped without reply, so the wait is
+// capped low to keep the adversarial sweep within the suite timeout.
 func createENBRaw(t *testing.T, rawHex string) (int, []byte) {
 	t.Helper()
 
-	// A malformed PDU is usually dropped without reply, so cap the wait low to
-	// keep the adversarial sweep within the suite timeout.
 	body := fmt.Sprintf(`{
 		"mme_address": %q,
 		"enb_s1_address": %q,
@@ -41,8 +40,6 @@ func createENBRaw(t *testing.T, rawHex string) (int, []byte) {
 	return status, resp
 }
 
-// validS1SetupPDU returns a well-formed S1 Setup Request as hex, used as the seed
-// for byte-level corruption.
 func validS1SetupPDU(t *testing.T) []byte {
 	t.Helper()
 
@@ -56,10 +53,9 @@ func validS1SetupPDU(t *testing.T) []byte {
 	return b
 }
 
-// sendS1SetupPDU builds an S1 Setup Request from p, sends it on a fresh
-// association, and returns the response body. The wait is long enough for a
-// definite MME reply (these PDUs are well-formed, so the MME must answer).
-// Registers cleanup of the eNB.
+// sendS1SetupPDU sends an S1 Setup Request built from p on a fresh association.
+// These PDUs are well-formed, so the MME must answer: the wait is long enough for
+// a definite reply.
 func sendS1SetupPDU(t *testing.T, p *s1ap.S1SetupRequestParams) []byte {
 	t.Helper()
 
@@ -83,8 +79,8 @@ func sendS1SetupPDU(t *testing.T, p *s1ap.S1SetupRequestParams) []byte {
 	return resp
 }
 
-// assertS1SetupAccepted checks the MME returned an S1 Setup Response carrying its
-// mandatory Served GUMMEIs IE (TS 36.413 §9.1.8.5).
+// assertS1SetupAccepted checks for an S1 Setup Response carrying its mandatory
+// Served GUMMEIs IE (TS 36.413 §9.1.8.5).
 func assertS1SetupAccepted(t *testing.T, resp []byte) {
 	t.Helper()
 
@@ -97,9 +93,9 @@ func assertS1SetupAccepted(t *testing.T, resp []byte) {
 	}
 }
 
-// assertS1SetupRejected checks the MME returned an S1 Setup Failure carrying its
-// mandatory Cause IE (TS 36.413 §9.1.8.6). The specific cause is left unchecked:
-// §8.7.3.4 gives "Unknown PLMN" only as an example ("e.g.").
+// assertS1SetupRejected checks for an S1 Setup Failure carrying its mandatory
+// Cause IE (TS 36.413 §9.1.8.6). The specific cause is left unchecked: §8.7.3.4
+// gives "Unknown PLMN" only as an example ("e.g.").
 func assertS1SetupRejected(t *testing.T, resp []byte) {
 	t.Helper()
 
@@ -113,11 +109,9 @@ func assertS1SetupRejected(t *testing.T, resp []byte) {
 }
 
 // Test4GS1SetupHappyVariations checks the MME accepts a range of valid eNB
-// configurations with an S1 Setup Response. An eNB broadcasting a served PLMN
-// but a TAC this MME does not serve is rejected with an S1 Setup Failure: the
-// integration operator serves only TAC 000001, and the MME declines an eNB with
-// no served TAI just as its AMF declines such a gNB on NG Setup (TS 36.413
-// §8.7.3.3).
+// configurations with an S1 Setup Response. The integration operator serves only
+// TAC 000001, so an eNB broadcasting a served PLMN on any other TAC has no served
+// TAI and draws an S1 Setup Failure (TS 36.413 §8.7.3.3).
 func Test4GS1SetupHappyVariations(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -188,12 +182,10 @@ func Test4GS1SetupWrongPLMN(t *testing.T) {
 	}
 }
 
-// Test4GS1SetupMalformed throws PDUs that cannot be a valid S1 Setup at the MME
-// and verifies it never mistakes one for a Response. These inputs are either
-// incomplete (truncated) or not S1AP at all, so the only correct outcomes are a
-// silent drop (null response), an Error Indication, or a Failure. Ambiguous
-// corruptions that might still decode to a valid Setup are exercised by
-// TestS1SetupResilience instead.
+// Test4GS1SetupMalformed checks the MME never mistakes a PDU that cannot be a
+// valid S1 Setup for one. These inputs are either incomplete (truncated) or not
+// S1AP at all, so the only correct outcomes are a drop (null response), an Error
+// Indication, or a Failure.
 func Test4GS1SetupMalformed(t *testing.T) {
 	seed := validS1SetupPDU(t)
 
@@ -222,10 +214,9 @@ func Test4GS1SetupMalformed(t *testing.T) {
 	}
 }
 
-// Test4GS1SetupResilience drives a barrage of corrupted and oversized PDUs — any
-// MME outcome is acceptable, including accepting a flip that happens to stay
-// valid — then confirms a fresh eNB still completes S1 Setup, proving the MME
-// stayed on its feet.
+// Test4GS1SetupResilience drives a barrage of corrupted and oversized PDUs, then
+// confirms a fresh eNB still completes S1 Setup. A flip may happen to leave the
+// PDU valid, so no outcome of the barrage itself is asserted.
 func Test4GS1SetupResilience(t *testing.T) {
 	seed := validS1SetupPDU(t)
 
@@ -236,8 +227,8 @@ func Test4GS1SetupResilience(t *testing.T) {
 		bytesRepeat(0x41, 4096),
 	}
 
-	// Sample byte positions across the seed rather than every byte, keeping the
-	// barrage bounded while still hitting the envelope, IE headers, and payload.
+	// Sampling byte positions keeps the barrage bounded while still hitting the
+	// envelope, IE headers, and payload.
 	for n := 0; n < len(seed); n += max(1, len(seed)/12) {
 		barrage = append(barrage, flipByte(seed, n))
 	}

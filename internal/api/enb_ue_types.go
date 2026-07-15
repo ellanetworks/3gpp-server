@@ -25,12 +25,10 @@ type CreateENBUEResponse struct {
 	ENBUES1APID uint32 `json:"enb_ue_s1ap_id"`
 }
 
-// SendENBNASRequest drives one step of an EPS procedure from the emulated UE.
-// message_type selects the uplink message; the response carries the MME's reply.
 type SendENBNASRequest struct {
 	MessageType string `json:"message_type"`
 
-	// PDNType selects the requested PDN type for the attach (default IPv4).
+	// PDNType defaults to IPv4.
 	PDNType uint8 `json:"pdn_type,omitempty"`
 
 	// AttachType selects the EPS attach type (1=EPS, 2=combined EPS/IMSI,
@@ -38,24 +36,22 @@ type SendENBNASRequest struct {
 	AttachType uint8 `json:"attach_type,omitempty"`
 
 	// ForeignGUTI makes attach_request use a GUTI mobile identity the MME does not
-	// know (instead of the IMSI), to drive the Identity procedure (§5.4.4).
+	// know, driving the Identity procedure (TS 24.301 §5.4.4).
 	ForeignGUTI bool `json:"foreign_guti,omitempty"`
 
-	// RawNASPDU, on attach_request, sends these hex bytes verbatim as the Initial
-	// UE Message's NAS PDU in place of a built Attach Request — for malformed-NAS
-	// robustness tests. A reply that times out yields a null response, not an error.
+	// RawNASPDU, on attach_request, is sent verbatim as the Initial UE Message's
+	// NAS PDU with no encoding or validation. A reply that times out yields a null
+	// response, not an error.
 	RawNASPDU *string `json:"raw_nas_pdu,omitempty"`
 
 	// CorruptMAC, on security_mode_complete, flips a byte of the NAS-MAC so the
 	// MME's integrity check fails; the MME must discard the message (§4.4.4).
 	CorruptMAC bool `json:"corrupt_mac,omitempty"`
 
-	// S1AP-level overrides (apply to the S1AP wrapper, not the NAS PDU): they
-	// replace the UE's stored S1AP ID pair on every uplink message this UE sends
-	// (Uplink NAS Transport, UE Capability Info Indication, UE Context Release
-	// Request). Set an arbitrary, stale or another UE's value to test the MME's
-	// UE-association validation (TS 36.413 §10.6); ENBUES1APIDOverride alone pairs
-	// a valid MME-UE-S1AP-ID with an inconsistent eNB-UE-S1AP-ID.
+	// These apply to the S1AP wrapper, not the NAS PDU: they replace the UE's
+	// stored S1AP ID pair on every uplink message this UE sends, exercising the
+	// MME's UE-association validation (TS 36.413 §10.6). ENBUES1APIDOverride alone
+	// pairs a valid MME-UE-S1AP-ID with an inconsistent eNB-UE-S1AP-ID.
 	MMEUES1APIDOverride *uint32 `json:"mme_ue_s1ap_id,omitempty"`
 	ENBUES1APIDOverride *uint32 `json:"enb_ue_s1ap_id,omitempty"`
 
@@ -72,20 +68,19 @@ type SendENBNASRequest struct {
 	// echoes it in the Release Command. Defaults to user-inactivity (20).
 	ReleaseCause *int `json:"release_cause,omitempty"`
 
-	// ResetAll, on reset, resets the whole S1 interface (s1-Interface reset-all)
-	// rather than only this UE's connection (partOfS1-Interface) — TS 36.413 §8.7.1.
+	// ResetAll, on reset, resets the whole S1 interface (s1-Interface reset-all);
+	// otherwise only this UE's connection (partOfS1-Interface). TS 36.413 §8.7.1.
 	ResetAll bool `json:"reset_all,omitempty"`
 
 	// UERadioCapability, on ue_capability_info, is the hex radio capability the eNB
 	// reports; the MME should replay it in a later Initial Context Setup Request.
 	UERadioCapability string `json:"ue_radio_capability,omitempty"`
 
-	// MTMSIOverride, on service_request, sets the S-TMSI's M-TMSI to an arbitrary
-	// value (e.g. one the MME never assigned) for unknown-UE tests.
+	// MTMSIOverride, on service_request, sets the S-TMSI's M-TMSI.
 	MTMSIOverride *uint32 `json:"mtmsi,omitempty"`
 
-	// NASCountOverride, on service_request and tracking_area_update, forces the
-	// uplink NAS COUNT (e.g. a stale value) for replay tests.
+	// NASCountOverride forces the uplink NAS COUNT on service_request and
+	// tracking_area_update.
 	NASCountOverride *uint32 `json:"nas_count,omitempty"`
 
 	// EPSUpdateType, on tracking_area_update, selects the TAU type: 0=TA, 1/2=
@@ -132,8 +127,7 @@ type SendENBNASRequest struct {
 	// (TS 24.301 §9.9.4.4). Defaults to #111 protocol error, unspecified.
 	ESMCause *uint8 `json:"esm_cause,omitempty"`
 
-	// RESOverride, when set, replaces the computed RES with these hex bytes —
-	// for the wrong-RES authentication tests.
+	// RESOverride replaces the computed RES with these hex bytes.
 	RESOverride *string `json:"res_override,omitempty"`
 
 	// Cause is the EMM cause for an authentication_failure step (TS 24.301
@@ -160,17 +154,14 @@ type SendENBNASRequest struct {
 	TimeoutMs int `json:"timeout_ms,omitempty"`
 }
 
-// SendENBS1APRequest drives a non-UE-associated S1AP message on the eNB's S1-MME
-// association — the target-eNB side of S1 handover. The S1AP ID pair addresses a
-// UE the target eNB does not own; the MME assigned the MME UE S1AP ID and the
-// eNB chooses its own eNB UE S1AP ID.
+// The S1AP ID pair addresses a UE the target eNB does not own: the MME assigned
+// the MME UE S1AP ID and the eNB chooses its own eNB UE S1AP ID.
 type SendENBS1APRequest struct {
 	MessageType string `json:"message_type"`
 
-	// RawS1APPDU, when set, is written verbatim onto the S1-MME association with no
-	// encoding or validation, and message_type is ignored — letting a test send
-	// any S1AP PDU, well-formed or not. WaitFor lists downlink message types to
-	// block for (empty = fire-and-forget); TimeoutMs bounds that wait.
+	// RawS1APPDU, when set, is written verbatim onto the S1-MME association with
+	// no encoding or validation, and message_type is ignored. An empty WaitFor is
+	// fire-and-forget.
 	RawS1APPDU *string  `json:"raw_s1ap_pdu,omitempty"`
 	WaitFor    []string `json:"wait_for,omitempty"`
 	TimeoutMs  int      `json:"timeout_ms,omitempty"`
@@ -192,17 +183,16 @@ type SendENBS1APRequest struct {
 	CellID *uint32 `json:"cell_id,omitempty"`
 }
 
-// HandoverERAB is one E-RAB the target eNB admits, with the downlink S1-U
-// endpoint it will receive user data on. DLIP defaults to the eNB's S1-U
-// address; DLTeid defaults to a synthesized value.
+// DLIP and DLTeid are the downlink S1-U endpoint the target eNB receives user
+// data on. DLIP defaults to the eNB's S1-U address, DLTeid to a synthesized
+// value.
 type HandoverERAB struct {
 	ID     uint8  `json:"id"`
 	DLTeid uint32 `json:"dl_teid,omitempty"`
 	DLIP   string `json:"dl_ip,omitempty"`
 }
 
-// MigrateENBUERequest relocates a UE context to the target eNB after an S1
-// handover, optionally overriding its S1AP ID pair to the target's values.
+// The S1AP ID pair, when set, overrides the UE's to the target's values.
 type MigrateENBUERequest struct {
 	TargetENBID string  `json:"target_enb_id"`
 	MMEUES1APID *uint32 `json:"mme_ue_s1ap_id,omitempty"`
@@ -227,7 +217,6 @@ type ENBUEStateResponse struct {
 	Bearers        []ENBUEBearer `json:"bearers"`
 }
 
-// MigrateENBUEResponse reports the UE's S1AP ID pair on the target eNB.
 type MigrateENBUEResponse struct {
 	UEID        string `json:"ue_id"`
 	ENBID       string `json:"enb_id"`

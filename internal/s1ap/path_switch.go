@@ -31,7 +31,7 @@ type PathSwitchRequestParams struct {
 }
 
 // BuildPathSwitchRequest builds a PATH SWITCH REQUEST switching a single E-RAB's
-// downlink to the target eNB endpoint it carries.
+// downlink to the target eNB.
 func BuildPathSwitchRequest(p PathSwitchRequestParams) ([]byte, error) {
 	plmn, err := encodePLMN(p.MCC, p.MNC)
 	if err != nil {

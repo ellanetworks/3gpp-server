@@ -16,8 +16,7 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/store"
 )
 
-// UplinkRequest crafts an inner IP packet and sends it uplink through the N3
-// tunnel. Exactly one of icmp_echo / udp is used.
+// Exactly one of icmp_echo / udp is used.
 type UplinkRequest struct {
 	PDUSessionID int64 `json:"pdu_session_id,omitempty"`
 
@@ -38,19 +37,15 @@ type UplinkRequest struct {
 		PayloadHex string `json:"payload_hex,omitempty"`
 	} `json:"udp,omitempty"`
 
-	// Src overrides the inner source IP (default the session's UE IP) — for
-	// source-spoofing tests.
+	// Src defaults to the session's UE IP.
 	Src *string `json:"src,omitempty"`
 }
 
-// AwaitDownlinkRequest blocks for a downlink T-PDU on a session's DL TEID.
 type AwaitDownlinkRequest struct {
 	PDUSessionID int64 `json:"pdu_session_id,omitempty"`
 	TimeoutMs    int   `json:"timeout_ms,omitempty"`
 }
 
-// gtpuSession resolves the GTP-U endpoint and tunnel state for a UE-associated
-// data-plane request, writing the appropriate error on failure.
 func (h *Handler) gtpuSession(w http.ResponseWriter, r *http.Request, pduSessionID int64) (*gtpu.Endpoint, *store.PDUSessionInfo, bool) {
 	gnbID := r.PathValue("gnb_id")
 	ueID := r.PathValue("ue_id")
@@ -89,8 +84,6 @@ func (h *Handler) gtpuSession(w http.ResponseWriter, r *http.Request, pduSession
 	return gt, info, true
 }
 
-// SendUplink encapsulates a crafted inner IP packet (sourced from the UE IP) and
-// sends it to the UPF on the session's uplink tunnel.
 func (h *Handler) SendUplink(w http.ResponseWriter, r *http.Request) {
 	var req UplinkRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -177,8 +170,6 @@ func (h *Handler) SendUplink(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"sent_bytes": len(inner)})
 }
 
-// AwaitDownlink blocks for a downlink T-PDU on the session's DL TEID and returns
-// the decoded inner packet.
 func (h *Handler) AwaitDownlink(w http.ResponseWriter, r *http.Request) {
 	var req AwaitDownlinkRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -208,7 +199,6 @@ func (h *Handler) AwaitDownlink(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-// GetTunnel returns the stored N3 tunnel state for a UE's PDU session.
 func (h *Handler) GetTunnel(w http.ResponseWriter, r *http.Request) {
 	pduSessionID := int64(0)
 	if v := r.URL.Query().Get("pdu_session_id"); v != "" {
@@ -225,8 +215,6 @@ func (h *Handler) GetTunnel(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, info)
 }
 
-// SendGTPUEcho sends a GTP-U Echo Request to the UPF and returns its Echo
-// Response (TS 29.281 §7.2.1).
 func (h *Handler) SendGTPUEcho(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 
@@ -264,8 +252,8 @@ func (h *Handler) SendGTPUEcho(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"echo_response": true, "seq": msg.Seq})
 }
 
-// AwaitErrorIndication blocks for a GTP-U Error Indication from the UPF, sent
-// when the UPF receives a G-PDU for a TEID with no context (TS 29.281 §7.3.1).
+// The UPF sends an Error Indication on receiving a G-PDU for a TEID with no
+// context (TS 29.281 §7.3.1).
 func (h *Handler) AwaitErrorIndication(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 

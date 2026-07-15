@@ -6,7 +6,7 @@
 // 5G NAS security negative tests: a message failing integrity must be discarded
 // (TS 24.501 §4.4.4.3), a stale/replayed NAS COUNT must not be accepted
 // (§4.4.3), and a NAS PDU carrying a forged UE NGAP ID must draw an Error
-// Indication (TS 38.413 §8.7.5.2). A failure means Ella Core deviates.
+// Indication (TS 38.413 §8.7.5.2).
 
 package integration_test
 
@@ -14,9 +14,8 @@ import (
 	"testing"
 )
 
-// Test5GBadMACSecurityModeComplete checks the AMF discards a Security Mode
-// Complete whose NAS-MAC is corrupted (TS 24.501 §4.4.4.3): it must not proceed
-// to Initial Context Setup.
+// A Security Mode Complete whose NAS-MAC is corrupted must be discarded
+// (TS 24.501 §4.4.4.3): the AMF must not proceed to Initial Context Setup.
 func Test5GBadMACSecurityModeComplete(t *testing.T) {
 	gnbID, ueID := securityModePending(t)
 
@@ -34,8 +33,8 @@ func Test5GBadMACSecurityModeComplete(t *testing.T) {
 	doRegistrationFlow(t, freshGnB, mustCreateUE(t, freshGnB))
 }
 
-// Test5GBadMACServiceRequest checks that a Service Request failing the integrity
-// check is rejected with SERVICE REJECT #9 (TS 24.501 §4.4.4.3): "If a SERVICE
+// A Service Request failing the integrity check must be rejected with SERVICE
+// REJECT #9 (TS 24.501 §4.4.4.3): "If a SERVICE
 // REQUEST ... fails the integrity check and the UE has only non-emergency PDU
 // sessions established, the AMF shall send the SERVICE REJECT message with 5GMM
 // cause #9 'UE identity cannot be derived by the network'."
@@ -57,9 +56,9 @@ func Test5GBadMACServiceRequest(t *testing.T) {
 	}
 }
 
-// Test5GServiceRequestStaleNASCount checks a Service Request carrying a stale
-// uplink NAS COUNT does not re-establish (TS 24.501 §4.4.3.1: the estimated
-// COUNT must be higher than the stored value).
+// A Service Request carrying a stale uplink NAS COUNT must not re-establish
+// (TS 24.501 §4.4.3.1: the estimated COUNT must be higher than the stored
+// value).
 func Test5GServiceRequestStaleNASCount(t *testing.T) {
 	gnbID, ueID := idleRegisteredUE(t)
 
@@ -90,9 +89,9 @@ func Test5GServiceRequestStaleNASCount(t *testing.T) {
 	}
 }
 
-// Test5GForgedNGAPIDInjection injects a NAS PDU on the existing association with
-// a forged AMF UE NGAP ID naming no known connection; the AMF must answer with
-// an Error Indication (TS 38.413 §8.7.5.2), not route it.
+// A NAS PDU injected on the existing association with a forged AMF UE NGAP ID
+// names no known connection, so the AMF must answer with an Error Indication
+// (TS 38.413 §8.7.5.2) and must not route it.
 func Test5GForgedNGAPIDInjection(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -111,8 +110,8 @@ func Test5GForgedNGAPIDInjection(t *testing.T) {
 	assertSpecCompliantErrorIndication(t, body)
 }
 
-// Test5GNASReplay replays the last secured uplink NAS PDU verbatim (same NAS
-// COUNT); the AMF must not re-process it (TS 24.501 §4.4.3.2).
+// The last secured uplink NAS PDU replayed verbatim carries the same NAS COUNT,
+// so the AMF must not re-process it (TS 24.501 §4.4.3.2).
 func Test5GNASReplay(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)

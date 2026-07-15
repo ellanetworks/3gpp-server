@@ -42,8 +42,7 @@ func Test5GDeregistration_Fuzz(t *testing.T) {
 			// TS 24.501 §8.2.12 — DeregistrationRequestUEOriginating
 			// EPD=7E SHT=00 plain, msg type=45, then deregistration-type octet:
 			//   access type=01 (3GPP), re-reg=0, switch-off=1 → 0x09
-			// followed by Mobile identity (5GS).
-			// Empty mobile identity → AMF should respond.
+			// followed by an empty Mobile identity (5GS).
 			name:     "raw NAS: plain deregistration with switch-off bit set",
 			body:     `{"message_type":"deregistration_request","raw_nas_pdu":"7e0045090000"}`,
 			wantHTTP: 200,
@@ -61,41 +60,37 @@ func Test5GDeregistration_Fuzz(t *testing.T) {
 			wantHTTP: 200,
 		},
 		{
-			// re-registration-required bit set
 			name:     "raw NAS: plain deregistration with re-registration-required",
 			body:     `{"message_type":"deregistration_request","raw_nas_pdu":"7e0045110000"}`,
 			wantHTTP: 200,
 		},
 		{
-			// truncated — missing mobile identity octet entirely
 			name:     "raw NAS: truncated (missing mobile identity)",
 			body:     `{"message_type":"deregistration_request","raw_nas_pdu":"7e004509"}`,
 			wantHTTP: 200,
 		},
 		{
-			// 0x46 = DeregistrationAcceptUEOriginating, a downlink type sent
-			// uplink. Per TS 24.501 §7.4 NOTE, "a message type not defined for
-			// the EPD in the given direction is regarded by the receiver as a
-			// message type not defined for the EPD". Reception of an unsolicited
-			// 5GMM message from the UE is foreseen, so §7.4's implementation-
-			// dependent branch does not apply: the AMF "shall ignore the message
-			// except that it should return a status message ... with cause #97
-			// 'message type non-existent or not implemented'".
-			name:             "raw NAS: deregistration accept type (wrong direction)",
-			body:             `{"message_type":"deregistration_request","raw_nas_pdu":"7e0046"}`,
-			wantHTTP:         200,
-			wantNASMsgType:   nasStatus5GMM,
-			wantNASCause5GMM: cause5GMMMessageTypeNonExistent,
+			// 0x46 = Deregistration accept (UE originating), a downlink type sent
+			// uplink, and sent plain: raw_nas_pdu goes on the wire unwrapped. The
+			// registration flow has established secure exchange, so TS 24.501
+			// §4.4.4.3 governs before §7.4's unknown-message-type handling: "If
+			// any NAS signalling message is received, as not integrity protected
+			// even though the secure exchange of NAS messages has been
+			// established, then the NAS shall discard this message." Discarding
+			// without a reply is the mandated outcome.
+			name:     "raw NAS: deregistration accept type (wrong direction, unprotected)",
+			body:     `{"message_type":"deregistration_request","raw_nas_pdu":"7e0046"}`,
+			wantHTTP: 504,
 		},
 		{
 			name: "raw NAS: missing security header (single byte EPD)",
-			// Too short to contain a complete message type IE → shall be ignored
-			// (TS 24.501 §7.2.1). Silent drop is the mandated behaviour (504).
+			// Too short to carry a complete message type IE, so it shall be
+			// ignored (TS 24.501 §7.2.1): no reply is the mandated outcome.
 			body:     `{"message_type":"deregistration_request","raw_nas_pdu":"7e"}`,
 			wantHTTP: 504,
 		},
 		{
-			// NGAP-level: stale AMF UE NGAP ID — unknown local AP ID (TS 38.413 §10.6)
+			// Unknown local AP ID (TS 38.413 §10.6).
 			name:            "NGAP override: AMF UE NGAP ID = 0",
 			body:            `{"message_type":"deregistration_request","amf_ue_ngap_id_override":0}`,
 			wantHTTP:        200,

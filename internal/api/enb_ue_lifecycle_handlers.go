@@ -10,10 +10,7 @@ import (
 	"strconv"
 )
 
-// PatchENBUERequest mutates a UE's stored context before a send, so a test can
-// drive a step with altered credentials or identifiers. Any field present
-// overrides the stored value. There is no slice (SST/SD) counterpart: slicing is
-// 5GS-only (TS 23.501 §5.15).
+// There is no slice (SST/SD) counterpart: slicing is 5GS-only (TS 23.501 §5.15).
 type PatchENBUERequest struct {
 	K           *string `json:"k,omitempty"`
 	OPc         *string `json:"opc,omitempty"`
@@ -80,8 +77,8 @@ func (h *Handler) DeleteENBUE(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// ENBTunnelResponse is a UE's S1-U user-plane state for one EPS bearer: the
-// S-GW endpoint the eNB sends uplink to, and the eNB's own downlink TEID.
+// UPFIP and ULTeid are the S-GW endpoint the eNB sends uplink to; DLTeid is the
+// eNB's own.
 type ENBTunnelResponse struct {
 	EBI    uint8  `json:"ebi"`
 	APN    string `json:"apn,omitempty"`
@@ -91,8 +88,7 @@ type ENBTunnelResponse struct {
 	DLTeid uint32 `json:"dl_teid,omitempty"`
 }
 
-// GetENBTunnel reports the S1-U tunnel of the selected EPS bearer (the default
-// bearer when ebi is absent), the 4G counterpart of the per-PDU-session tunnel.
+// An absent ebi query parameter selects the default bearer.
 func (h *Handler) GetENBTunnel(w http.ResponseWriter, r *http.Request) {
 	enb, err := h.Store.GetENB(r.PathValue("enb_id"))
 	if err != nil {

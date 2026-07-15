@@ -19,11 +19,10 @@ func tacInBytes(tacStr string) ([]byte, error) {
 	return resu, nil
 }
 
-// encodePLMN encodes an MCC/MNC pair into the 3-octet BCD PLMN identity
+// encodePLMN packs an MCC/MNC pair into the 3-octet BCD PLMN identity
 // (TS 23.003 §2.2 / TS 24.008 §10.5.1.3): octet 1 = MCC2|MCC1, octet 2 =
-// MNC3|MCC3, octet 3 = MNC2|MNC1, with a 2-digit MNC taking the 0xF filler in
-// its third digit. It validates lengths and digits so malformed input yields an
-// error, not a panic or a silently-empty mandatory IE.
+// MNC3|MCC3, octet 3 = MNC2|MNC1. A 2-digit MNC takes the 0xF filler in its
+// third digit.
 func encodePLMN(mcc, mnc string) ([]byte, error) {
 	if len(mcc) != 3 {
 		return nil, fmt.Errorf("mcc must be 3 digits, got %q", mcc)

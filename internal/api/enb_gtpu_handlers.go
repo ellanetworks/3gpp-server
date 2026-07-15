@@ -15,10 +15,9 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/store"
 )
 
-// ENBUplinkRequest crafts an inner IP packet to send uplink on an EPS bearer.
 type ENBUplinkRequest struct {
-	// Ebi selects the bearer; 0 or the default EBI uses the default bearer, else
-	// an additional PDN's bearer (TS 24.301 §6.5.1).
+	// An Ebi of 0 or the default EBI selects the default bearer, else an
+	// additional PDN's bearer (TS 24.301 §6.5.1).
 	Ebi uint8 `json:"ebi,omitempty"`
 
 	ICMPEcho *struct {
@@ -34,16 +33,12 @@ type ENBUplinkRequest struct {
 		PayloadHex string `json:"payload_hex,omitempty"`
 	} `json:"udp,omitempty"`
 
-	// Src overrides the inner source IP (default the selected bearer's UE IP) — for
-	// source-spoofing tests. TEID overrides the uplink TEID — for invalid-tunnel
-	// tests.
+	// Src defaults to the selected bearer's UE IP, TEID to its uplink TEID.
 	Src  *string `json:"src,omitempty"`
 	TEID *uint32 `json:"teid,omitempty"`
 }
 
-// enbBearer resolves the S1-U tunnel for the selected EPS bearer identity: the
-// default bearer when ebi is 0 or the default EBI, else an additional PDN's
-// bearer. The inner packet must be sourced from the returned ueIP or the UPF's
+// An inner packet must be sourced from the returned ueIP or the UPF's
 // anti-spoofing filter drops it.
 func enbBearer(ue *store.UEEPSContext, ebi uint8) (ulTeid, dlTeid uint32, upfIP, ueIP string, ok bool) {
 	if ebi == 0 || ebi == ue.EPSBearerID {
@@ -58,8 +53,6 @@ func enbBearer(ue *store.UEEPSContext, ebi uint8) (ulTeid, dlTeid uint32, upfIP,
 	return b.ULTeid, b.DLTeid, b.UPFIP, b.UEIP, true
 }
 
-// enbGTPU resolves the eNB, UE, and the eNB's S1-U GTP-U endpoint for a
-// user-plane request.
 func (h *Handler) enbGTPU(w http.ResponseWriter, r *http.Request) (*store.UEEPSContext, *gtpu.Endpoint, bool) {
 	enb, err := h.Store.GetENB(r.PathValue("enb_id"))
 	if err != nil {
@@ -82,9 +75,6 @@ func (h *Handler) enbGTPU(w http.ResponseWriter, r *http.Request) (*store.UEEPSC
 	return ue, gt, true
 }
 
-// SendENBUplink encapsulates a crafted inner IP packet (sourced from the bearer's
-// UE IP) in a plain S1-U G-PDU and sends it to the S-GW/UPF on the selected
-// bearer's uplink TEID.
 func (h *Handler) SendENBUplink(w http.ResponseWriter, r *http.Request) {
 	ue, gt, ok := h.enbGTPU(w, r)
 	if !ok {
@@ -171,8 +161,6 @@ func (h *Handler) SendENBUplink(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"sent_bytes": len(inner)})
 }
 
-// SendENBGTPUEcho sends a GTP-U Echo Request to the S-GW/UPF on S1-U and returns
-// its Echo Response (TS 29.281 §7.2.1).
 func (h *Handler) SendENBGTPUEcho(w http.ResponseWriter, r *http.Request) {
 	enb, err := h.Store.GetENB(r.PathValue("enb_id"))
 	if err != nil {
@@ -214,9 +202,8 @@ func (h *Handler) SendENBGTPUEcho(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"echo_response": true, "seq": msg.Seq})
 }
 
-// AwaitENBErrorIndication blocks for a GTP-U Error Indication from the S-GW/UPF,
-// sent when it receives a G-PDU on S1-U for a TEID with no context (TS 29.281
-// §7.3.1).
+// The S-GW/UPF sends an Error Indication on receiving a G-PDU on S1-U for a TEID
+// with no context (TS 29.281 §7.3.1).
 func (h *Handler) AwaitENBErrorIndication(w http.ResponseWriter, r *http.Request) {
 	enb, err := h.Store.GetENB(r.PathValue("enb_id"))
 	if err != nil {
@@ -246,8 +233,6 @@ func (h *Handler) AwaitENBErrorIndication(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, map[string]any{"error_indication": true})
 }
 
-// AwaitENBDownlink blocks for a downlink T-PDU on the selected bearer's eNB TEID
-// and returns the decoded inner packet.
 func (h *Handler) AwaitENBDownlink(w http.ResponseWriter, r *http.Request) {
 	ue, gt, ok := h.enbGTPU(w, r)
 	if !ok {

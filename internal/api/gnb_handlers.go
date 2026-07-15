@@ -80,8 +80,9 @@ func (h *Handler) CreateGNB(w http.ResponseWriter, r *http.Request) {
 		h.GTPU[gnb.ID] = gt
 	}
 
-	// Leave the association without an NG-C interface instance: NG Setup is the
-	// first NGAP procedure on an operational TNL association (TS 38.413 §8.7.1.1).
+	// NG Setup is the first NGAP procedure on an operational TNL association
+	// (TS 38.413 §8.7.1.1), so the association is left with no NG-C interface
+	// instance.
 	if req.SkipNGSetup {
 		writeJSON(w, http.StatusCreated, CreateGnBResponse{GnBID: gnb.ID})
 		return

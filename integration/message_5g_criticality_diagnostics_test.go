@@ -9,22 +9,19 @@ import (
 	"testing"
 )
 
-// ngapTransferSyntaxErrorPDU is an Uplink NAS Transport (procedure code 46 =
-// 0x2e, criticality "ignore" = 0x40 — TS 38.413 §9.4.5) whose open-type body is
-// prefixed with the length determinant 0xff. Bits 8 and 7 of 0xff select the
-// fragmented form, whose bits 6-1 must encode 1..4 sixteen-K fragments but read
-// 63, so the determinant is not a legal APER length (ITU-T X.691 §11.9). The
-// outer PDU is well formed while the body cannot be decoded — the "receiver is
-// not able to decode the received physical message" case of TS 38.413 §10.2.
-const ngapTransferSyntaxErrorPDU = "002e40ffdeadbeef"
+// An Uplink NAS Transport (procedure code 46 = 0x2e, criticality "ignore" =
+// 0x40 — TS 38.413 §9.4.5) carrying a legal 4-octet open-type length
+// determinant over a body of garbage: the outer PDU is well formed while its
+// contents cannot be decoded, the "receiver is not able to decode the received
+// physical message" case of TS 38.413 §10.2. Test4GCriticalityDiagnostics
+// builds the same class of error on S1AP, feeding both RATs one stimulus.
+const ngapTransferSyntaxErrorPDU = "002e4004deadbeef"
 
-// Test5GCriticalityDiagnostics feeds the AMF an NGAP message whose body fails to
-// decode. TS 38.413 §10.2: the receiver "should initiate Error Indication
-// procedure with appropriate cause value for the Transfer Syntax protocol error".
-// The Error Indication must carry the §10.2 cause and satisfy TS 38.413 §8.7.5.2
-// ("The ERROR INDICATION message shall contain at least either the Cause IE or
-// the Criticality Diagnostics IE"), and the AMF must survive. Test4GCriticality-
-// Diagnostics asserts the same against the word-identical TS 36.413 §10.2.
+// TS 38.413 §10.2: on a body that fails to decode the receiver "should initiate
+// Error Indication procedure with appropriate cause value for the Transfer
+// Syntax protocol error". The Error Indication must carry the §10.2 cause and
+// satisfy §8.7.5.2 ("The ERROR INDICATION message shall contain at least either
+// the Cause IE or the Criticality Diagnostics IE"), and the AMF must survive.
 func Test5GCriticalityDiagnostics(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 
@@ -36,13 +33,12 @@ func Test5GCriticalityDiagnostics(t *testing.T) {
 
 	assertTransferSyntaxErrorIndication(t, resp)
 
-	// The AMF stayed on its feet: a fresh gNB still completes NG Setup.
+	// A fresh gNB completing NG Setup proves the AMF survived the stimulus.
 	mustCreateGnB(t)
 }
 
-// assertTransferSyntaxErrorIndication checks an ERROR INDICATION reporting a
-// transfer syntax error carries the IEs TS 38.413 §8.7.5.2 requires and the
-// cause §10.2 names.
+// assertTransferSyntaxErrorIndication checks the IEs TS 38.413 §8.7.5.2
+// requires and the cause §10.2 names.
 func assertTransferSyntaxErrorIndication(t *testing.T, body []byte) {
 	t.Helper()
 

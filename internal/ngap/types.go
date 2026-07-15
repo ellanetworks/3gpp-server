@@ -17,8 +17,7 @@ type IE struct {
 	Criticality string          `json:"criticality,omitempty"`
 	Value       json.RawMessage `json:"value,omitempty"`
 
-	// Typed fields — at most one is set per IE. The encode layer
-	// checks these first; if none match, it falls back to Value.
+	// Typed fields — at most one is set per IE; with none set, encoding uses Value.
 	GlobalRANNodeID         *GlobalRANNodeIDJSON         `json:"global_ran_node_id,omitempty"`
 	RANNodeName             *string                      `json:"ran_node_name,omitempty"`
 	SupportedTAList         *SupportedTAListJSON         `json:"supported_ta_list,omitempty"`
@@ -51,46 +50,41 @@ type IE struct {
 	IndexToRFSP             *int64                       `json:"index_to_rfsp,omitempty"`
 	UEAggregateMaxBitRate   *UEAggregateMaxBitRateJSON   `json:"ue_aggregate_max_bit_rate,omitempty"`
 
-	// UERadioCapability is the UE radio capability the AMF replays in an Initial
-	// Context Setup Request (hex, TS 38.413 §9.3.1.74).
+	// Hex-encoded (TS 38.413 §9.3.1.74).
 	UERadioCapability *string `json:"ue_radio_capability,omitempty"`
 
-	// PDUSessionSetupItems surface, per session in a PDU Session Resource Setup
-	// Request, the UPF's uplink GTP-U tunnel (decoded from the per-session
-	// transfer) so the emulated gNB can terminate the N3 data path.
+	// Per session of a PDU Session Resource Setup Request, the UPF's uplink GTP-U
+	// tunnel decoded from the per-session transfer.
 	PDUSessionSetupItems []PDUSessionSetupItemJSON `json:"pdu_session_setup_items,omitempty"`
 
 	// PDU session IDs carried by a handover PDU-session list (e.g. the setup
 	// list in a Handover Request, the handover list in a Handover Command).
 	PDUSessionIDs []int64 `json:"pdu_session_ids,omitempty"`
 
-	// ReleasePDUSessionIDs are the PDU sessions a Handover Command tells the
-	// source to release (those the target did not admit).
+	// The PDU sessions a Handover Command tells the source to release: those the
+	// target did not admit.
 	ReleasePDUSessionIDs []int64 `json:"release_pdu_session_ids,omitempty"`
 
-	// NextHopChainingCount from a Handover Request's Security Context IE; its
-	// presence confirms the AMF passed the security context to the target.
+	// From a Handover Request's Security Context IE.
 	NextHopChainingCount *int64 `json:"next_hop_chaining_count,omitempty"`
 
-	// UESecurityCapabilities from a Path Switch Request Acknowledge: the AMF's
-	// locally stored UE 5G security capabilities, returned on a mismatch with the
-	// values the target gNB reported (TS 33.501 §6.7.3.1).
+	// Set on a Path Switch Request Acknowledge: the AMF's stored UE 5G security
+	// capabilities, returned on a mismatch with those the target gNB reported
+	// (TS 33.501 §6.7.3.1).
 	UESecurityCapabilities *UESecurityCapabilitiesJSON `json:"ue_security_capabilities,omitempty"`
 
-	// RANStatusTransfer is the RAN Status Transfer Transparent Container the AMF
-	// relays to the target NG-RAN node (TS 38.413 §8.4.7.2).
+	// The container the AMF relays to the target NG-RAN node (TS 38.413 §8.4.7.2).
 	RANStatusTransfer *RANStatusTransferJSON `json:"ran_status_transfer,omitempty"`
 }
 
-// COUNTValueJSON is a PDCP COUNT: the sequence number and its hyper-frame number
-// (TS 38.413 §9.3.1.108).
+// COUNTValueJSON is a PDCP COUNT (TS 38.413 §9.3.1.108).
 type COUNTValueJSON struct {
 	PDCPSN int64 `json:"pdcp_sn"`
 	HFN    int64 `json:"hfn"`
 }
 
-// DRBStatusTransferItemJSON is one DRB's preserved PDCP state within a RAN Status
-// Transfer Transparent Container (TS 38.413 §9.3.1.108).
+// DRBStatusTransferItemJSON is one DRB's preserved PDCP state within a RAN
+// Status Transfer Transparent Container (TS 38.413 §9.3.1.108).
 type DRBStatusTransferItemJSON struct {
 	DRBID   int64           `json:"drb_id"`
 	ULCount *COUNTValueJSON `json:"ul_count,omitempty"`
@@ -98,15 +92,13 @@ type DRBStatusTransferItemJSON struct {
 }
 
 // RANStatusTransferJSON is the RAN Status Transfer Transparent Container
-// (TS 38.413 §9.3.1.108), carried unchanged from the source NG-RAN node to the
-// target.
+// (TS 38.413 §9.3.1.108), opaque to the AMF and relayed unchanged.
 type RANStatusTransferJSON struct {
 	DRBs []DRBStatusTransferItemJSON `json:"drbs_subject_to_status_transfer"`
 }
 
-// UESecurityCapabilitiesJSON holds the NR/E-UTRA encryption and integrity
-// algorithm bitmaps of a UE Security Capabilities IE (TS 38.413 §9.3.1.86), each
-// as a hex-encoded big-endian bitmap.
+// UESecurityCapabilitiesJSON holds the algorithm bitmaps of a UE Security
+// Capabilities IE (TS 38.413 §9.3.1.86), each hex-encoded big-endian.
 type UESecurityCapabilitiesJSON struct {
 	NREncryption    string `json:"nr_encryption"`
 	NRIntegrity     string `json:"nr_integrity"`
@@ -114,8 +106,6 @@ type UESecurityCapabilitiesJSON struct {
 	EUTRAIntegrity  string `json:"eutra_integrity"`
 }
 
-// PDUSessionSetupItemJSON is one session in a PDU Session Resource Setup
-// Request, with the UPF's uplink N3 GTP-U tunnel.
 type PDUSessionSetupItemJSON struct {
 	PDUSessionID int64  `json:"pdu_session_id"`
 	ULTeid       uint32 `json:"ul_teid,omitempty"`

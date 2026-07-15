@@ -4,14 +4,7 @@
 //go:build integration
 
 // Tests for InitialUEMessage (TS 38.413 §9.2.5.1) and the NAS RegistrationRequest
-// (TS 24.501 §8.2.6) it carries. Each row crafts a specific IE combination and verifies
-// the AMF response.
-//
-// Tests are grouped:
-//   - Valid: correct IEs, verify AMF responds with authentication_request
-//   - IE variations: each optional NAS IE individually, confirm AMF tolerance
-//   - Fuzz: malformed, oversized, truncated, conflicting, or spec-violating IEs
-//     that probe AMF robustness
+// (TS 24.501 §8.2.6) it carries.
 
 package integration_test
 
@@ -154,19 +147,13 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 
 	tests := []struct {
-		name string
-		body string
-		// What we expect from the AMF. For fuzz tests the AMF should either
-		// respond with a valid NAS message (reject or auth request) or we
-		// get a DownlinkNASTransport. It must NOT crash or hang.
+		name            string
+		body            string
 		wantHTTP        int
 		wantNGAPMsgType string
-		// If set, assert the NAS message type. Empty means "any NAS response is fine".
-		wantNASMsgType string
-		// If set, assert this NAS field has this value.
-		wantNASFields map[string]fieldCheck
+		wantNASMsgType  string
+		wantNASFields   map[string]fieldCheck
 	}{
-		// --- Unknown / wrong subscriber ---
 		{
 			name:            "unknown subscriber SUPI (not provisioned in AMF)",
 			body:            `{"message_type":"registration_request","mobile_identity_override":"0100f110f00000000001"}`,
@@ -174,7 +161,6 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 			wantNGAPMsgType: ngapDownlinkNASTransport,
 			wantNASMsgType:  nasRegistrationReject,
 		},
-		// --- Wrong registration types for unknown UE ---
 		{
 			name:            "registration_type=2 (mobility updating) for fresh UE",
 			body:            fmt.Sprintf(`{"message_type":"registration_request","registration_type":%d}`, registrationTypeMobility),
@@ -193,7 +179,6 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 			wantHTTP:        200,
 			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
-		// --- Malformed mobile identity ---
 		{
 			name:            "mobile identity override: single zero byte",
 			body:            `{"message_type":"registration_request","mobile_identity_override":"00"}`,
@@ -219,7 +204,6 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 			wantHTTP:        200,
 			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
-		// --- UE security capability edge cases ---
 		{
 			name: "security capability: only null algorithms (EA0+IA0)",
 			body: `{
@@ -277,7 +261,6 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 			wantNGAPMsgType: ngapDownlinkNASTransport,
 			wantNASMsgType:  nasAuthenticationRequest,
 		},
-		// --- NSSAI edge cases ---
 		{
 			name: "requested NSSAI with SST the AMF does not serve",
 			body: `{
@@ -328,7 +311,6 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 			wantNGAPMsgType: ngapDownlinkNASTransport,
 			wantNASMsgType:  nasAuthenticationRequest,
 		},
-		// --- ngKSI edge cases ---
 		{
 			name: "ng_ksi=0 (implies existing security context)",
 			body: `{
@@ -347,7 +329,6 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 			wantHTTP:        200,
 			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
-		// --- Conflicting / nonsensical IE combinations ---
 		{
 			name: "PDU session status set when no sessions exist",
 			body: `{
@@ -400,7 +381,6 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 			wantNGAPMsgType: ngapDownlinkNASTransport,
 			wantNASMsgType:  nasAuthenticationRequest,
 		},
-		// --- NAS message container (nested NAS) ---
 		{
 			name: "NAS message container with garbage payload",
 			body: `{
@@ -411,7 +391,6 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 			wantNGAPMsgType: ngapDownlinkNASTransport,
 			wantNASMsgType:  nasAuthenticationRequest,
 		},
-		// --- Kitchen sink: every optional IE at once ---
 		{
 			name: "all optional IEs set simultaneously",
 			body: `{
@@ -437,7 +416,6 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 			wantNGAPMsgType: ngapDownlinkNASTransport,
 			wantNASMsgType:  nasAuthenticationRequest,
 		},
-		// --- NGAP-level overrides ---
 		{
 			name: "RRC establishment cause: high-priority-access",
 			body: fmt.Sprintf(`{
@@ -486,7 +464,6 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 			wantHTTP:        200,
 			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
-		// --- raw_nas_pdu overrides ---
 		{
 			name:            "raw NAS: completely empty PDU → ErrorIndication",
 			body:            `{"message_type":"registration_request","raw_nas_pdu":""}`,
@@ -495,15 +472,15 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 		},
 		{
 			name: "raw NAS: single byte 0x7e (5GMM EPD only)",
-			// Too short to contain a complete message type IE → shall be ignored
-			// (TS 24.501 §7.2.1). Silent drop is the mandated behaviour (504).
+			// Too short to carry a complete message type IE, so it shall be
+			// ignored (TS 24.501 §7.2.1): no reply is the mandated outcome.
 			body:     `{"message_type":"registration_request","raw_nas_pdu":"7e"}`,
 			wantHTTP: 504,
 		},
 		{
 			name: "raw NAS: two bytes (EPD + security header, no message type)",
-			// Still too short to contain a message type IE → shall be ignored
-			// (TS 24.501 §7.2.1). Silent drop is the mandated behaviour (504).
+			// Still too short to carry a message type IE, so it shall be
+			// ignored (TS 24.501 §7.2.1): no reply is the mandated outcome.
 			body:     `{"message_type":"registration_request","raw_nas_pdu":"7e00"}`,
 			wantHTTP: 504,
 		},

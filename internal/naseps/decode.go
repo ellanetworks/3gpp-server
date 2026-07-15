@@ -10,8 +10,6 @@ import (
 	"github.com/ellanetworks/core/nas/eps"
 )
 
-// SecurityHeader returns the security-header type of a downlink NAS message so
-// the caller knows whether to Unprotect it before decoding.
 func SecurityHeader(b []byte) (SecurityHeaderType, error) {
 	if len(b) == 0 {
 		return 0, fmt.Errorf("naseps: empty NAS message")
@@ -25,9 +23,9 @@ func SecurityHeader(b []byte) (SecurityHeaderType, error) {
 }
 
 // PeekProtectedPayload returns the inner payload of a security-protected message
-// without verifying the MAC. It is used to read the algorithms from a Security
-// Mode Command (integrity-protected, not ciphered) before the NAS keys — which
-// depend on those algorithms — can be derived.
+// without verifying the MAC: the algorithms in a Security Mode Command
+// (integrity-protected, not ciphered) must be read before the NAS keys, which
+// depend on those algorithms, can be derived.
 func PeekProtectedPayload(b []byte) ([]byte, error) {
 	m, err := eps.ParseSecurityProtectedMessage(b)
 	if err != nil {
@@ -37,8 +35,7 @@ func PeekProtectedPayload(b []byte) ([]byte, error) {
 	return m.Payload, nil
 }
 
-// Decode decodes a plain (unprotected) downlink EMM message into JSON. The caller
-// unwraps any security protection (Unprotect) first.
+// Decode decodes a plain (unprotected) downlink EMM message into JSON.
 func Decode(plain []byte) (*NASResponse, error) {
 	resp := &NASResponse{RawHex: hex.EncodeToString(plain)}
 
@@ -110,8 +107,6 @@ func Decode(plain []byte) (*NASResponse, error) {
 	}
 }
 
-// decodeESM decodes a standalone EPS Session Management message (PD = ESM): the
-// bearer-management messages exchanged for additional PDN connections.
 func decodeESM(plain []byte, resp *NASResponse) (*NASResponse, error) {
 	mt, err := eps.PeekESMMessageType(plain)
 	if err != nil {
@@ -184,8 +179,6 @@ func decodeESM(plain []byte, resp *NASResponse) (*NASResponse, error) {
 	return resp, nil
 }
 
-// setESM records the EPS bearer identity, PTI, and ESM cause shared by the
-// bearer-management reject and deactivation messages.
 func setESM(resp *NASResponse, ebi, pti int, cause *uint8) {
 	resp.EPSBearerIdentity = &ebi
 	resp.BearerPTI = &pti
@@ -261,8 +254,6 @@ func decodeAttachAccept(b []byte, resp *NASResponse) error {
 	return nil
 }
 
-// decodeDefaultBearer extracts the default-bearer parameters from an Activate
-// Default EPS Bearer Context Request.
 func decodeDefaultBearer(container []byte, resp *NASResponse) error {
 	m, err := eps.ParseActivateDefaultEPSBearerContextRequest(container)
 	if err != nil {

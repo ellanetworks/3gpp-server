@@ -193,8 +193,7 @@ func parseCriticality(s string) aper.Enumerated {
 }
 
 // BuildNGSetupRequestFromStore builds the IE-level NGAPMessage for an
-// NGSetupRequest using stored gNB context values. This is the convenience
-// path — the caller can override any IE afterward.
+// NGSetupRequest from stored gNB context values.
 func BuildNGSetupRequestFromStore(mcc, mnc, tac, gnbID, name string, sst int32, sd string, slices []struct {
 	SST int32
 	SD  string

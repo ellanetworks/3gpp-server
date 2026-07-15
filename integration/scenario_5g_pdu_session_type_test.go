@@ -3,12 +3,9 @@
 
 //go:build integration
 
-// PDU session type negotiation (TS 24.501 §6.4.1.3, §9.11.4.2). The SMF resolves
-// the requested PDU session type against the data network's pools: an IPv4v6
-// request is accepted with a downgrade cause (#50/#51) when only one stack is
-// available, a single-stack request that can't be served is rejected with the
-// "only allowed" cause, and an unsupported type is rejected with #28. A failing
-// test means Ella Core's negotiation deviates from the spec.
+// PDU session type negotiation (TS 24.501 §6.4.1.3, §9.11.4.2): the SMF resolves
+// the requested PDU session type against the data network's available pools,
+// accepting with a downgrade cause or rejecting with the reason it cannot serve.
 
 package integration_test
 
@@ -23,7 +20,7 @@ func Test5GPDUSessionTypeNegotiation(t *testing.T) {
 		dnn         string
 		reqType     int
 		accept      bool
-		wantSelType int // selected PDU session type in the Accept
+		wantSelType int
 		wantCause   int // 0 means the cause IE must be absent
 	}{
 		{
@@ -134,8 +131,6 @@ func assertTypeReject(t *testing.T, body []byte, wantCause int) {
 	assertNASCause(t, body, "nas.cause_5gsm", wantCause)
 }
 
-// mustCreateUETypeDNN creates a UE that requests the given DNN and PDU session
-// type, so a single establishment drives a specific negotiation outcome.
 func mustCreateUETypeDNN(t *testing.T, gnbID, dnn string, pduType int) string {
 	t.Helper()
 

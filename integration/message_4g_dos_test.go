@@ -12,8 +12,6 @@ import (
 	"testing"
 )
 
-// createENBID creates an eNB with a specific eNB ID, asserts S1 Setup succeeds,
-// and returns the store handle (registers cleanup).
 func createENBID(t *testing.T, enbID int) string {
 	t.Helper()
 
@@ -34,8 +32,6 @@ func createENBID(t *testing.T, enbID int) string {
 	return id
 }
 
-// Test4GAssociationFlood opens many eNB S1-MME associations at once and checks
-// the MME completes S1 Setup for all of them and remains responsive to one more.
 func Test4GAssociationFlood(t *testing.T) {
 	const n = 50
 
@@ -43,12 +39,10 @@ func Test4GAssociationFlood(t *testing.T) {
 		createENBID(t, claimENBID())
 	}
 
-	// The MME is still serving new associations.
+	// One more association after the flood: the MME is still serving.
 	createENBID(t, claimENBID())
 }
 
-// Test4GAttachFlood attaches many distinct subscribers concurrently on one eNB
-// and checks they all register and that the MME stays responsive to a fresh UE.
 func Test4GAttachFlood(t *testing.T) {
 	enbID := mustCreateENB(t)
 
@@ -83,10 +77,9 @@ func Test4GAttachFlood(t *testing.T) {
 	fullAttach(t, enbID, fresh)
 }
 
-// Test4GOversizedPDU sends oversized S1AP and NAS PDUs (near the SCTP read
-// buffer) and checks the MME does not crash — a clean attach still completes.
+// Test4GOversizedPDU checks S1AP and NAS PDUs sized near the SCTP read buffer do
+// not crash the MME.
 func Test4GOversizedPDU(t *testing.T) {
-	// ~60 KB of bytes as a raw S1AP PDU.
 	if status, resp := createENBRaw(t, strings.Repeat("ab", 60000)); status != 201 {
 		t.Fatalf("oversized S1AP: server failed to handle it (HTTP %d): %s", status, resp)
 	}
@@ -94,14 +87,12 @@ func Test4GOversizedPDU(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
 
-	// ~8 KB NAS: a large garbage NAS PDU within the S1AP OCTET STRING encoder's
-	// 16 K bound (NAS messages are never this big in practice).
+	// ~8 KB stays within the S1AP OCTET STRING encoder's 16 K bound.
 	body := fmt.Sprintf(`{"message_type":"attach_request","raw_nas_pdu":%q,"timeout_ms":800}`, strings.Repeat("cd", 8000))
 	if status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas", body); status != 200 {
 		t.Fatalf("oversized NAS: server failed to handle it (HTTP %d): %s", status, resp)
 	}
 
-	// The MME stayed on its feet: a fresh clean attach completes.
 	fresh := mustCreateENBUE(t, enbID)
 	fullAttach(t, enbID, fresh)
 }

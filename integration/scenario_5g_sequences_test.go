@@ -3,9 +3,6 @@
 
 //go:build integration
 
-// Tier-1 procedure-sequence tests: multi-step 5G flows that exercise the core's
-// state machine beyond single-message handling. Assertions follow the spec.
-
 package integration_test
 
 import (
@@ -13,9 +10,8 @@ import (
 	"testing"
 )
 
-// completeRegistration drives request→auth→smc→complete with a given 5GS
-// registration type, returning the security-mode-complete response (which
-// carries the Registration Accept inside the Initial Context Setup Request).
+// completeRegistration returns the security-mode-complete response, which carries
+// the Registration Accept inside the Initial Context Setup Request.
 func completeRegistration(t *testing.T, gnbID, ueID string, regType int) []byte {
 	t.Helper()
 
@@ -58,8 +54,8 @@ func completeRegistration(t *testing.T, gnbID, ueID string, regType int) []byte 
 	return last
 }
 
-// registerThenIdle does a full initial registration, then releases the UE to
-// CM-IDLE — the precondition for a mobility/periodic registration update.
+// registerThenIdle leaves the UE in CM-IDLE, the precondition for a
+// mobility/periodic registration update.
 func registerThenIdle(t *testing.T, gnbID, ueID string) {
 	t.Helper()
 

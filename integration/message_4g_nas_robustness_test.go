@@ -12,7 +12,7 @@ import (
 )
 
 // attachUEConcurrent runs a full attach without a *testing.T, so it is safe to
-// call from a goroutine. It returns an error on the first non-compliant step.
+// call from a goroutine.
 func attachUEConcurrent(enbID, imsi string) error {
 	createBody := fmt.Sprintf(`{"imsi":%q,"k":%q,"opc":%q,"amf":"8000","sqn":"000000000000"}`, imsi, testK, testOPc)
 
@@ -54,9 +54,8 @@ func attachUEConcurrent(enbID, imsi string) error {
 	return nil
 }
 
-// Test4GConcurrentAttach attaches several distinct subscribers at once on one
-// eNB, checking the MME keeps their UE contexts, security contexts, and GUTIs
-// separate and registers them all.
+// Test4GConcurrentAttach checks the MME keeps concurrent UEs' contexts, security
+// contexts, and GUTIs separate, registering them all.
 func Test4GConcurrentAttach(t *testing.T) {
 	enbID := mustCreateENB(t)
 
@@ -88,16 +87,15 @@ func Test4GConcurrentAttach(t *testing.T) {
 	}
 }
 
-// Test4GMalformedNAS throws garbage NAS PDUs at the MME inside an Initial UE
-// Message and verifies it never mistakes one for a valid attach, then confirms a
-// clean attach still completes — proof the MME stayed on its feet.
+// Test4GMalformedNAS checks the MME never mistakes a garbage NAS PDU carried in
+// an Initial UE Message for a valid attach.
 func Test4GMalformedNAS(t *testing.T) {
 	enbID := mustCreateENB(t)
 
 	garbage := []string{
-		"00",         // single byte
-		"ff",         // single byte
-		"deadbeef",   // not NAS
+		"00",
+		"ff",
+		"deadbeef",
 		"0741",       // EMM Attach Request header, then nothing
 		"0741ffffff", // EMM Attach Request header, then garbage
 	}
@@ -126,9 +124,8 @@ func Test4GMalformedNAS(t *testing.T) {
 	})
 }
 
-// Test4GBadMACSecurityModeComplete sends a Security Mode Complete with a
-// corrupted NAS-MAC and checks the MME discards it (TS 24.301 §4.4.4) rather than
-// completing the attach, then confirms the MME remains healthy.
+// Test4GBadMACSecurityModeComplete checks the MME discards a Security Mode
+// Complete whose NAS-MAC does not verify (TS 24.301 §4.4.4).
 func Test4GBadMACSecurityModeComplete(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)

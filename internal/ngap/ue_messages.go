@@ -199,7 +199,6 @@ func buildInitialUEMessageIE(ie *IE) (*ngapType.InitialUEMessageIEs, error) {
 	return &out, nil
 }
 
-// BuildInitialUEMessageFromState creates the NGAP InitialUEMessage using gNB and UE state.
 type InitialUEMessageOverrides struct {
 	RRCEstablishmentCause *int64
 	UEContextRequest      *int64
@@ -370,8 +369,7 @@ func BuildUplinkNASTransport(amfUeNgapID, ranUeNgapID int64, nasPDU []byte, mcc,
 }
 
 // buildPDUSessionResourceSetupResponseTransfer encodes the gNB's downlink GTP
-// tunnel for an admitted PDU session (TS 38.413 §9.3.4.10), reported in the
-// PDU Session Resource Setup Response.
+// tunnel for an admitted PDU session (TS 38.413 §9.3.4.10).
 func buildPDUSessionResourceSetupResponseTransfer(teid uint32, ip string) ([]byte, error) {
 	addr, err := netip.ParseAddr(ip)
 	if err != nil {
@@ -438,7 +436,6 @@ func BuildPDUSessionResourceSetupResponse(amfUeNgapID, ranUeNgapID, pduSessionID
 	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentIgnore,
 		ngapType.PDUSessionResourceSetupResponseIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
 
-	// Downlink GTP tunnel for the admitted PDU session (TS 38.413 §9.2.1.2).
 	transfer, err := buildPDUSessionResourceSetupResponseTransfer(dlTeid, dlIP)
 	if err != nil {
 		return nil, err
@@ -457,8 +454,7 @@ func BuildPDUSessionResourceSetupResponse(amfUeNgapID, ranUeNgapID, pduSessionID
 }
 
 // BuildUERadioCapabilityInfoIndication builds a UE RADIO CAPABILITY INFO
-// INDICATION (TS 38.413 §8.14.1); the AMF stores the capability and replays it
-// in a later Initial Context Setup Request.
+// INDICATION (TS 38.413 §8.14.1).
 func BuildUERadioCapabilityInfoIndication(amfUeNgapID, ranUeNgapID int64, radioCapability []byte) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
@@ -492,9 +488,9 @@ func BuildUERadioCapabilityInfoIndication(amfUeNgapID, ranUeNgapID int64, radioC
 	return ngap.Encoder(pdu)
 }
 
-// BuildErrorIndication builds an ERROR INDICATION (TS 38.413 §8.7.5) reporting a
-// protocol error for the UE-associated connection. The Cause is a radio-network
-// value (TS 38.413 §9.3.1.2).
+// BuildErrorIndication builds an ERROR INDICATION for the UE-associated
+// connection (TS 38.413 §8.7.5). causeRadioNetwork is a radio-network Cause
+// value.
 func BuildErrorIndication(amfUeNgapID, ranUeNgapID, causeRadioNetwork int64) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
@@ -625,8 +621,7 @@ func BuildUEContextReleaseComplete(amfUeNgapID, ranUeNgapID int64) ([]byte, erro
 }
 
 // BuildUEContextReleaseRequest builds a gNB-initiated UE CONTEXT RELEASE REQUEST
-// (TS 38.413 §8.3.2). It carries the AMF/RAN UE NGAP IDs and a radio-network
-// cause. The AMF answers with a UE CONTEXT RELEASE COMMAND.
+// (TS 38.413 §8.3.2). causeRadioNetwork is a radio-network Cause value.
 func BuildUEContextReleaseRequest(amfUeNgapID, ranUeNgapID int64, causeRadioNetwork int64) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage

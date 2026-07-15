@@ -10,10 +10,9 @@ import (
 	"github.com/ellanetworks/core/s1ap"
 )
 
-// parseTransportAddr validates a transport-layer address for the mandatory
-// TransportLayerAddress IE (TS 36.413 §9.2.2.1), returning the 4-byte form for
-// IPv4. An empty or malformed input is an error, keeping a bad address out of
-// an otherwise-valid message.
+// parseTransportAddr parses a TransportLayerAddress IE value (TS 36.413
+// §9.2.2.1), returning the 4-byte form for IPv4 so the IE keeps its 32-bit
+// width.
 func parseTransportAddr(s string) (net.IP, error) {
 	ip := net.ParseIP(s)
 	if ip == nil {
@@ -27,9 +26,9 @@ func parseTransportAddr(s string) (net.IP, error) {
 	return ip, nil
 }
 
-// encodePLMN packs an MCC (3 digits) and MNC (2 or 3 digits) into the 3-octet
-// TBCD PLMN identity of TS 23.003 §2.6. A 2-digit MNC sets the spare nibble to
-// 0xF.
+// encodePLMN packs an MCC/MNC pair into the 3-octet TBCD PLMN identity
+// (TS 23.003 §2.6): octet 1 = MCC2|MCC1, octet 2 = MNC3|MCC3, octet 3 =
+// MNC2|MNC1. A 2-digit MNC takes the 0xF filler in its third digit.
 func encodePLMN(mcc, mnc string) (s1ap.PLMNIdentity, error) {
 	if len(mcc) != 3 {
 		return s1ap.PLMNIdentity{}, fmt.Errorf("mcc must be 3 digits, got %q", mcc)

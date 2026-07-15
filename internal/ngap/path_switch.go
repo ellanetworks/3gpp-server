@@ -15,8 +15,8 @@ import (
 
 // PathSwitchSession is a PDU session whose downlink GTP-U tunnel a PATH SWITCH
 // REQUEST asks the AMF to switch toward the new NG-RAN node (TS 38.413
-// §9.2.3.8). RawTransfer, when set, replaces the built Path Switch Request
-// Transfer verbatim — for crafting malformed transfers.
+// §9.2.3.8). RawTransfer, when set, replaces the built transfer verbatim, so a
+// malformed transfer can be crafted.
 type PathSwitchSession struct {
 	PDUSessionID int64
 	DLTeid       uint32
@@ -34,13 +34,10 @@ type UESecurityCapabilities struct {
 	EUTRAIntegrity  []byte
 }
 
-// BuildPathSwitchRequest builds a PATH SWITCH REQUEST (TS 38.413 §8.4.4) sent by
-// an NG-RAN node to switch a UE's downlink user-plane path toward itself.
+// BuildPathSwitchRequest builds a PATH SWITCH REQUEST (TS 38.413 §8.4.4).
 // sourceAmfUeNgapID identifies the existing UE context; ranUeNgapID is the
 // NG-RAN node's newly assigned RAN UE NGAP ID. omitIEs lists protocol IE ids to
-// drop from the built message, so a test can send a structurally-incomplete
-// request (e.g. missing a mandatory IE) to probe the AMF's error handling; for
-// fully arbitrary bytes use the raw_ngap_pdu path instead.
+// drop from the built message, so a structurally-incomplete request can be sent.
 func BuildPathSwitchRequest(ranUeNgapID, sourceAmfUeNgapID int64, mcc, mnc, tac, gnbID string, secCaps UESecurityCapabilities, sessions []PathSwitchSession, failed []int64, omitIEs []int64) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
@@ -202,8 +199,7 @@ func buildPathSwitchRequestTransfer(teid uint32, ip string) ([]byte, error) {
 }
 
 // buildPathSwitchRequestSetupFailedTransfer encodes the per-session failure
-// transfer carried for each PDU session the NG-RAN node reports as failed to
-// set up (TS 38.413 §9.3.4.15).
+// transfer carried for each failed-to-setup PDU session (TS 38.413 §9.3.4.15).
 func buildPathSwitchRequestSetupFailedTransfer() ([]byte, error) {
 	transfer := ngapType.PathSwitchRequestSetupFailedTransfer{
 		Cause: ngapType.Cause{

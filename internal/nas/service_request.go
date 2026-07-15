@@ -15,8 +15,8 @@ import (
 
 // ServiceRequestOpts configures a 5GMM Service Request (TS 24.501 §8.2.16).
 type ServiceRequestOpts struct {
-	ServiceType uint8           // nasMessage.ServiceType* (default Data)
-	NgKsi       uint8           // NAS key set identifier of the current 5G security context
+	ServiceType uint8 // nasMessage.ServiceType* (default Data)
+	NgKsi       uint8
 	Guti        *nasType.GUTI5G // source of the 5G-S-TMSI mobile identity
 
 	// PDUSessionStatus, when non-nil, sets the PDU Session Status IE (bit i =
@@ -26,11 +26,9 @@ type ServiceRequestOpts struct {
 	PDUSessionStatus *[16]bool
 }
 
-// BuildServiceRequest builds a plain (unprotected) Service Request NAS PDU. The
-// caller wraps it with EncodeNasPduWithSecurity (when a security context
-// exists) before transport. When Guti is nil the 5G-S-TMSI is zeroed — this is
-// intentionally permitted so an unregistered/unknown UE can still emit a
-// Service Request for the AMF to reject.
+// BuildServiceRequest builds a plain (unprotected) Service Request NAS PDU. A nil
+// Guti zeroes the 5G-S-TMSI, which is intentionally permitted so an
+// unregistered/unknown UE can still emit a Service Request for the AMF to reject.
 func BuildServiceRequest(opts *ServiceRequestOpts) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()

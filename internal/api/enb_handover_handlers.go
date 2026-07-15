@@ -15,9 +15,8 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/transport"
 )
 
-// SendENBS1AP drives a non-UE-associated S1AP message on the eNB's S1-MME
-// association — the target-eNB side of S1 handover, addressing a UE the eNB does
-// not own by the S1AP ID pair the MME assigned.
+// These messages are non-UE-associated because the target eNB addresses a UE it
+// does not own, by the S1AP ID pair the MME assigned.
 func (h *Handler) SendENBS1AP(w http.ResponseWriter, r *http.Request) {
 	enb, err := h.Store.GetENB(r.PathValue("enb_id"))
 	if err != nil {
@@ -37,7 +36,6 @@ func (h *Handler) SendENBS1AP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// raw_s1ap_pdu bypasses message_type entirely.
 	if req.RawS1APPDU != nil {
 		h.handleRawS1AP(w, r, t, &req)
 		return
@@ -68,8 +66,6 @@ func (h *Handler) SendENBS1AP(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-// handleRawS1AP writes a verbatim S1AP PDU onto the eNB's S1-MME association and
-// optionally blocks for a downlink of one of req.WaitFor's types.
 func (h *Handler) handleRawS1AP(w http.ResponseWriter, r *http.Request, t *transport.S1APTransport, req *SendENBS1APRequest) {
 	pdu, err := hex.DecodeString(*req.RawS1APPDU)
 	if err != nil {
@@ -273,10 +269,8 @@ func (h *Handler) enbStatusTransfer(ue *store.UEEPSContext, t *transport.S1APTra
 	return &SendENBNASResponse{}, nil
 }
 
-// sourceMMEID and sourceENBID resolve the S1AP ID pair a source-eNB handover
-// message carries: the request override when present, else the UE's stored IDs.
-// handoverRequiredCause is the radio-network Cause a handover_required reports
-// (TS 36.413 §9.2.1.3), defaulting to handover-desirable-for-radio-reasons.
+// The radio-network Cause a handover_required reports (TS 36.413 §9.2.1.3),
+// defaulting to handover-desirable-for-radio-reasons.
 func handoverRequiredCause(req *SendENBNASRequest) int {
 	if req != nil && req.HandoverRequiredCause != nil {
 		return *req.HandoverRequiredCause
@@ -303,7 +297,7 @@ func sourceENBID(ue *store.UEEPSContext, req *SendENBNASRequest) uint32 {
 
 // MigrateENBUE moves a UE context to the target eNB's association, modelling the
 // UE arriving at the target after an S1 handover. The UE keeps its security
-// context; its S1AP ID pair becomes the target's values.
+// context; its S1AP ID pair becomes the target's.
 func (h *Handler) MigrateENBUE(w http.ResponseWriter, r *http.Request) {
 	src, err := h.Store.GetENB(r.PathValue("enb_id"))
 	if err != nil {

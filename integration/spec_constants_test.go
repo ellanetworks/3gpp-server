@@ -4,9 +4,7 @@
 //go:build integration
 
 // Human-readable names for the 3GPP coded values used across the integration
-// tests, so assertions and request bodies read in terms of the spec rather than
-// raw integers. Values are taken from the referenced TS 24.501 / TS 38.413
-// tables.
+// tests. Values are taken from the referenced TS 24.501 / TS 38.413 tables.
 
 package integration_test
 
@@ -68,8 +66,7 @@ const (
 	serviceTypeOutOfRange = 7
 )
 
-// NGAP message-type names as decoded by the server (internal/ngap/decode.go),
-// used as assertion targets for ngap.message_type.
+// NGAP message-type names as decoded by internal/ngap/decode.go.
 const (
 	ngapDownlinkNASTransport             = "DownlinkNASTransport"
 	ngapErrorIndication                  = "ErrorIndication"
@@ -90,8 +87,7 @@ const (
 	ngapDownlinkRANStatusTransfer        = "DownlinkRANStatusTransfer"
 )
 
-// NAS message-type names as decoded by the server (internal/nas/decode.go),
-// used as assertion targets for nas.message_type / nas.inner_nas_message_type.
+// NAS message-type names as decoded by internal/nas/decode.go.
 const (
 	nasAuthenticationRequest         = "authentication_request"
 	nasAuthenticationReject          = "authentication_reject"
@@ -135,8 +131,8 @@ const (
 	ngapProcedureCodeUplinkNASTransport = 46
 )
 
-// 5GS identity types — TS 24.501 §9.11.3.3, Table 9.11.3.3.1. Rendered as the
-// decimal string the server emits for nas.identity_type.
+// 5GS identity types — TS 24.501 §9.11.3.3, Table 9.11.3.3.1. A string: the
+// server emits nas.identity_type in decimal.
 const identityTypeSUCI = "1"
 
 // NAS registration types — TS 24.501 §9.11.3.7, Table 9.11.3.7.1.
@@ -156,8 +152,7 @@ const (
 	rrcEstablishmentCauseOutOfRange = 99
 )
 
-// assertNASCause checks that the NAS cause at the given JSON path equals the
-// expected (named) value. A want of 0 means "do not check".
+// assertNASCause treats a want of 0 as "do not check".
 func assertNASCause(t *testing.T, body []byte, path string, want int) {
 	t.Helper()
 
@@ -170,10 +165,9 @@ func assertNASCause(t *testing.T, body []byte, path string, want int) {
 	}
 }
 
-// ngapCause extracts the NGAP Cause carried in the IE list of the response
-// object at responseKey (e.g. "ng_setup_response"). It returns the Cause group
-// ("misc", "radioNetwork", …) and the integer value within that group, or
-// ("", 0) if no Cause IE is present.
+// ngapCause returns the Cause group ("misc", "radioNetwork", …) and the value
+// within that group, or ("", 0) if the response at responseKey (e.g.
+// "ng_setup_response") carries no Cause IE.
 func ngapCause(body []byte, responseKey string) (string, int) {
 	var top map[string]any
 	if err := json.Unmarshal(body, &top); err != nil {
@@ -212,8 +206,7 @@ func ngapCause(body []byte, responseKey string) (string, int) {
 	return "", 0
 }
 
-// assertNGAPCauseMisc checks the response carries an NGAP Misc Cause equal to
-// the expected value. A want of 0 means "do not check".
+// assertNGAPCauseMisc treats a want of 0 as "do not check".
 func assertNGAPCauseMisc(t *testing.T, body []byte, responseKey string, want int) {
 	t.Helper()
 
@@ -228,10 +221,10 @@ func assertNGAPCauseMisc(t *testing.T, body []byte, responseKey string, want int
 	}
 }
 
-// assertUnpredictableTMSIs checks that temporary identities are not handed out
-// in a predictable sequence. Sequential allocation packs n values into a span of
-// n-1; a span far wider is evidence of the unpredictable generation the security
-// specs call for (TS 33.401 §7.1 for M-TMSI, TS 33.501 §6.12.3 for 5G-TMSI).
+// assertUnpredictableTMSIs judges allocation by span: sequential allocation
+// packs n values into a span of n-1, so a far wider span is evidence of the
+// unpredictable generation the security specs call for (TS 33.401 §7.1 for
+// M-TMSI, TS 33.501 §6.12.3 for 5G-TMSI).
 func assertUnpredictableTMSIs(t *testing.T, values []uint64, name, cite string) {
 	t.Helper()
 

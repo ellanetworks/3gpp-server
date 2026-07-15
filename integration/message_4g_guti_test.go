@@ -10,8 +10,6 @@ import (
 	"testing"
 )
 
-// attachToAccept drives a fresh UE through the full attach and returns the Attach
-// Accept response body (which carries the assigned GUTI).
 func attachToAccept(t *testing.T, enbID string) []byte {
 	t.Helper()
 
@@ -25,8 +23,7 @@ func attachToAccept(t *testing.T, enbID string) []byte {
 // Test4GGUTIReallocation checks the MME assigns a fresh GUTI on each attach
 // (TS 24.301 §5.5.1.2.4) and that M-TMSI allocation is unpredictable:
 // "M-TMSI generation should be following the best practices of unpredictable
-// identifier generation" (TS 33.401 §7.1). Test5GGUTIReallocation asserts the
-// same against TS 33.501 §6.12.3.
+// identifier generation" (TS 33.401 §7.1).
 func Test4GGUTIReallocation(t *testing.T) {
 	enbID := mustCreateENB(t)
 

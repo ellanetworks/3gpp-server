@@ -82,7 +82,7 @@ func TestComputeResStarAUTNTooShort(t *testing.T) {
 
 // AUTS round-trip: milenage.ValidateAUTS recovers the SQN sealed by ComputeAUTS
 // (TS 33.102 §6.3.3). No spec vector pins AUTS for Test Set 1, so this asserts
-// the resynch property rather than a fixed output.
+// the resynch property, not a fixed output.
 func TestComputeAUTSRoundTrip(t *testing.T) {
 	const sqn = "000000000021"
 

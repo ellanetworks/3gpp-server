@@ -21,7 +21,7 @@ const (
 )
 
 // encodeGUTIIdentity encodes a GUTI as the 11-octet EPS mobile identity
-// (TS 24.301 §9.9.3.12), mirroring the codec's GUTI layout.
+// (TS 24.301 §9.9.3.12).
 func encodeGUTIIdentity(guti GUTIParams) ([]byte, error) {
 	plmn, err := common.EncodePLMN(guti.MCC, guti.MNC)
 	if err != nil {
@@ -99,8 +99,8 @@ type PDNConnectivityParams struct {
 	APN               string
 }
 
-// BuildPDNConnectivityRequest builds a PDN CONNECTIVITY REQUEST, standalone or
-// piggybacked, with an optional APN (TS 24.301 §8.3.20).
+// BuildPDNConnectivityRequestWith builds a PDN CONNECTIVITY REQUEST, standalone
+// or piggybacked, with an optional APN (TS 24.301 §8.3.20).
 func BuildPDNConnectivityRequestWith(p PDNConnectivityParams) ([]byte, error) {
 	pdnType := p.PDNType
 	if pdnType == 0 {
@@ -181,7 +181,6 @@ type GUTIParams struct {
 	MTMSI      uint32
 }
 
-// AttachRequestParams are the inputs to build an EPS Attach Request.
 type AttachRequestParams struct {
 	IMSI                string
 	GUTI                *GUTIParams // when set, the mobile identity is this GUTI, not the IMSI

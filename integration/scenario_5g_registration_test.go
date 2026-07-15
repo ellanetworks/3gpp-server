@@ -3,10 +3,6 @@
 
 //go:build integration
 
-// Scenario tests exercise multi-step 5G procedures end to end.
-// Unlike message tests (which verify individual NGAP messages in isolation),
-// scenario tests care about state transitions across steps.
-
 package integration_test
 
 import (

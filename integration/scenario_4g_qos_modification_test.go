@@ -12,11 +12,10 @@ import (
 	"testing"
 )
 
-// qosModIMSI is a dedicated subscriber for the QCI/ARP modification test.
 const qosModIMSI = "001010000000104"
 
-// setPolicyQoS sets the default policy's 5QI and ARP via the Ella Core admin API,
-// leaving the session-AMBR at its seeded value.
+// setPolicyQoS sets the default policy's 5QI and ARP, leaving the session-AMBR at
+// its seeded value.
 func setPolicyQoS(t *testing.T, token string, var5qi, arp int) {
 	t.Helper()
 
@@ -34,11 +33,10 @@ func setPolicyQoS(t *testing.T, token string, var5qi, arp int) {
 	_ = resp.Body.Close()
 }
 
-// Test4GQoSModification: changing the 5QI/ARP of an attached UE's policy must
-// reconfigure the radio bearer in place — the MME sends an S1AP E-RAB Modify
-// Request (TS 36.413 §8.2.2) carrying the new E-RAB-level QoS, with the Modify
-// EPS Bearer Context Request piggybacked as the NAS-PDU (TS 24.301 §6.4.3),
-// without re-establishing the bearer.
+// Test4GQoSModification changes the 5QI/ARP of an attached UE's policy: the MME
+// must reconfigure the radio bearer in place with an E-RAB Modify Request
+// (TS 36.413 §8.2.2), piggybacking the Modify EPS Bearer Context Request as the
+// NAS-PDU (TS 24.301 §6.4.3), and must not re-establish the bearer.
 func Test4GQoSModification(t *testing.T) {
 	token, err := provisionEllaCore()
 	if err != nil {

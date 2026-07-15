@@ -3,12 +3,11 @@
 
 //go:build integration
 
-// User-plane diagnostics. A user-plane assertion that fails ("no downlink
-// arrived") says nothing about where the packet went. Ella Core already counts
-// every XDP verdict, FIB-lookup result and byte volume; sampling those counters
-// around the step under test turns such a failure into evidence: whether the
-// packet was dropped, by which guard, on which interface, and whether it ever
-// reached the data network.
+// User-plane diagnostics. A failed user-plane assertion ("no downlink arrived")
+// says nothing about where the packet went. Ella Core counts every XDP verdict,
+// FIB-lookup result and byte volume; sampling those counters around the step
+// under test names the packet's fate: which guard dropped it, on which
+// interface, and whether it reached the data network.
 
 package integration_test
 
@@ -33,11 +32,11 @@ var upfCounterPrefixes = []string{
 	"app_downlink_bytes",
 }
 
-// upfCounters maps a metric's full `name{labels}` identity to its value.
+// upfCounters keys a metric by its full `name{labels}` identity.
 type upfCounters map[string]float64
 
-// scrapeUPFCounters reads Ella Core's Prometheus endpoint. It never fails the
-// test: diagnostics must not turn a real failure into a confusing one.
+// scrapeUPFCounters never fails the test: diagnostics must not turn a real
+// failure into a confusing one.
 func scrapeUPFCounters(t *testing.T) upfCounters {
 	t.Helper()
 
@@ -86,8 +85,6 @@ func scrapeUPFCounters(t *testing.T) upfCounters {
 	return out
 }
 
-// upfDelta reports the UPF counters that moved since before, so a failing
-// user-plane assertion names the packet's fate, not only its absence.
 func upfDelta(t *testing.T, before upfCounters) string {
 	t.Helper()
 

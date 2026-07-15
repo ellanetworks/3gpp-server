@@ -13,26 +13,21 @@ import (
 	"github.com/free5gc/nas/nasType"
 )
 
-// UEContext is an emulated UE's 5GS registration state on a gNB: its identity
-// and concealed SUCI, credentials, the NGAP UE-association identities, the last
-// authentication challenge, and the 5G NAS security context once established.
+// UEContext is an emulated UE's 5GS registration state on a gNB.
 type UEContext struct {
 	ID string
 
-	// Identity
 	Supi             string
 	Msin             string
 	MCC              string
 	MNC              string
 	RoutingIndicator string
 
-	// Credentials
 	K   string
 	OPc string
 	Amf string
 	Sqn string
 
-	// SUCI
 	ProtectionScheme string
 	PublicKeyID      string
 	PublicKeyHex     string
@@ -40,7 +35,6 @@ type UEContext struct {
 	Suci       nasType.MobileIdentity5GS
 	SuciString string
 
-	// NGAP IDs
 	RanUeNgapID int64
 	AmfUeNgapID int64
 
@@ -69,7 +63,6 @@ type UEContext struct {
 	// Serving network name
 	Snn string
 
-	// Session config
 	DNN            string
 	PDUSessionID   uint8
 	PDUSessionType uint8

@@ -14,8 +14,8 @@ import (
 
 // kdf is the 3GPP generic key derivation function (TS 33.220 §B.2): the input
 // S is FC ‖ P0 ‖ L0 ‖ P1 ‖ L1 ‖ … with each Li the 2-octet big-endian length of
-// Pi, and the output is HMAC-SHA256(key, S). Reimplemented here, independent of
-// the production code, so the test validates the derivation rather than mirror it.
+// Pi, and the output is HMAC-SHA256(key, S). Reimplemented from the spec so the
+// assertions stay independent of the production derivation.
 func kdf(t *testing.T, key []byte, fc byte, params ...[]byte) []byte {
 	t.Helper()
 

@@ -14,8 +14,8 @@ import (
 	"github.com/free5gc/ngap/ngapType"
 )
 
-// NGAP Cause values (TS 38.413 §9.3.1.2). A value is scoped to its Cause CHOICE
-// group, so each is grouped under the group it belongs to.
+// NGAP Cause values (TS 38.413 §9.3.1.2). A value is meaningful only within its
+// Cause CHOICE group.
 const (
 	// radioNetwork group.
 	CauseRadioNetworkHandoverDesirableForRadioReason int64 = int64(ngapType.CauseRadioNetworkPresentHandoverDesirableForRadioReason)
@@ -27,9 +27,9 @@ const (
 	CauseMiscOMIntervention int64 = int64(ngapType.CauseMiscPresentOmIntervention)
 )
 
-// HandoverAdmittedSession is a PDU session admitted by the target gNB in a
-// Handover Request Acknowledge, with its downlink GTP tunnel. RawTransfer, when
-// set, replaces the built transfer verbatim — for crafting malformed transfers.
+// HandoverAdmittedSession is a PDU session admitted by the target gNB, with its
+// downlink GTP tunnel. RawTransfer, when set, replaces the built transfer
+// verbatim, so a malformed transfer can be crafted.
 type HandoverAdmittedSession struct {
 	PDUSessionID int64
 	DLTeid       uint32
@@ -130,7 +130,7 @@ func BuildHandoverRequired(amfUeNgapID, ranUeNgapID int64, targetGnbID, mcc, mnc
 }
 
 // BuildHandoverRequestAcknowledge builds a HANDOVER REQUEST ACKNOWLEDGE
-// (TS 38.413 §8.4.2) sent by the target gNB.
+// (TS 38.413 §8.4.2).
 func BuildHandoverRequestAcknowledge(amfUeNgapID, ranUeNgapID int64, sessions []HandoverAdmittedSession, failed []int64) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome
@@ -263,9 +263,8 @@ func buildHandoverRequestAcknowledgeTransfer(teid uint32, ip string) ([]byte, er
 	return buf, nil
 }
 
-// BuildHandoverFailure builds a HANDOVER FAILURE (TS 38.413 §8.4.2.3) sent by
-// the target gNB when it cannot admit a handover. It carries the AMF UE NGAP ID
-// and a radio-network Cause (§9.2.3.6).
+// BuildHandoverFailure builds a HANDOVER FAILURE (TS 38.413 §8.4.2.3; IEs in
+// §9.2.3.6). causeRadioNetwork is a radio-network Cause value.
 func BuildHandoverFailure(amfUeNgapID, causeRadioNetwork int64) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentUnsuccessfulOutcome
@@ -300,9 +299,9 @@ func BuildHandoverFailure(amfUeNgapID, causeRadioNetwork int64) ([]byte, error) 
 	return ngap.Encoder(pdu)
 }
 
-// BuildHandoverCancel builds a HANDOVER CANCEL (TS 38.413 §8.4.5) sent by the
-// source gNB to abort an ongoing or already-prepared handover. The Cause is a
-// radio-network value (TS 38.413 §9.3.1.2).
+// BuildHandoverCancel builds a HANDOVER CANCEL (TS 38.413 §8.4.5) aborting an
+// ongoing or already-prepared handover. causeRadioNetwork is a radio-network
+// Cause value.
 func BuildHandoverCancel(amfUeNgapID, ranUeNgapID, causeRadioNetwork int64) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
@@ -340,8 +339,7 @@ func BuildHandoverCancel(amfUeNgapID, ranUeNgapID, causeRadioNetwork int64) ([]b
 }
 
 // DRBStatusTransferItem is one DRB's preserved PDCP state for an UPLINK RAN
-// STATUS TRANSFER (TS 38.413 §8.4.6.2): the source NG-RAN node reports the DRB
-// ID with its UL and DL COUNT for every DRB subject to status transfer.
+// STATUS TRANSFER (TS 38.413 §8.4.6.2).
 type DRBStatusTransferItem struct {
 	DRBID    int64
 	ULPDCPSN int64
@@ -351,9 +349,8 @@ type DRBStatusTransferItem struct {
 }
 
 // BuildUplinkRANStatusTransfer builds an UPLINK RAN STATUS TRANSFER (TS 38.413
-// §8.4.6) sent by the source NG-RAN node to hand the AMF the PDCP SN/HFN status
-// the target needs for a lossless handover. The COUNT values use the 12-bit
-// PDCP-SN alternative (TS 38.413 §9.3.1.108).
+// §8.4.6). The COUNT values use the 12-bit PDCP-SN alternative
+// (TS 38.413 §9.3.1.108).
 func BuildUplinkRANStatusTransfer(amfUeNgapID, ranUeNgapID int64, drbs []DRBStatusTransferItem) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
@@ -407,8 +404,7 @@ func BuildUplinkRANStatusTransfer(amfUeNgapID, ranUeNgapID int64, drbs []DRBStat
 	return ngap.Encoder(pdu)
 }
 
-// BuildHandoverNotify builds a HANDOVER NOTIFY (TS 38.413 §8.4.3) sent by the
-// target gNB once the UE has arrived.
+// BuildHandoverNotify builds a HANDOVER NOTIFY (TS 38.413 §8.4.3).
 func BuildHandoverNotify(amfUeNgapID, ranUeNgapID int64, mcc, mnc, tac, gnbID string) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage

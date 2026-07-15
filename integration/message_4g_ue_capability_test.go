@@ -23,8 +23,6 @@ func Test4GUECapabilityInfoReplay(t *testing.T) {
 
 	nasBody(t, enbID, ueID, fmt.Sprintf(`{"message_type":"ue_capability_info","ue_radio_capability":%q}`, radioCap))
 
-	// Idle, then Service Request: the re-establishment ICS Request should carry the
-	// stored radio capability.
 	nasStep(t, enbID, ueID, "release_request")
 
 	sr := nasStep(t, enbID, ueID, "service_request")

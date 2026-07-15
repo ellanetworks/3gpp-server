@@ -184,8 +184,8 @@ func (h *Handler) DeleteUE(w http.ResponseWriter, r *http.Request) {
 }
 
 // MigrateUE moves a UE's context to another gNB's association, modelling the UE
-// arriving at the target gNB after an N2 handover. The UE keeps its security
-// context; its RAN/AMF UE NGAP IDs become the ones used on the target.
+// arriving at the target after an N2 handover. The UE keeps its security
+// context; its NGAP IDs become the ones in use on the target.
 func (h *Handler) MigrateUE(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 	ueID := r.PathValue("ue_id")

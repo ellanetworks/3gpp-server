@@ -3,10 +3,8 @@
 
 //go:build integration
 
-// Tests for the gNB-initiated UE Context Release Request (TS 38.413 §8.3.2).
-// The gNB asks the AMF to release the UE's logical NG connection; the AMF
-// answers with a UE Context Release Command, the gNB replies with Complete,
-// and the UE transitions to CM-IDLE while remaining RM-REGISTERED.
+// Tests for the gNB-initiated UE Context Release Request (TS 38.413 §8.3.2):
+// the UE transitions to CM-IDLE while remaining RM-REGISTERED.
 
 package integration_test
 
@@ -16,9 +14,6 @@ import (
 	"testing"
 )
 
-// Test5GUEContextReleaseRequest covers the happy path and valid cause variations.
-// In every case a registered UE's release request must elicit a UE Context
-// Release Command from the AMF.
 func Test5GUEContextReleaseRequest(t *testing.T) {
 	// releaseCause of -1 omits the IE so the server applies its default.
 	tests := []struct {
@@ -55,8 +50,6 @@ func Test5GUEContextReleaseRequest(t *testing.T) {
 	}
 }
 
-// Test5GUEContextReleaseRequest_AfterPDUSession releases a UE that has an active
-// PDU session. The AMF should still release the whole UE context.
 func Test5GUEContextReleaseRequest_AfterPDUSession(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -80,11 +73,11 @@ func Test5GUEContextReleaseRequest_AfterPDUSession(t *testing.T) {
 	}
 }
 
-// Test5GUEContextReleaseRequest_ThenReregister verifies the release frees only the
-// NG/N2 logical connection: the UE stays RM-REGISTERED and the AMF keeps its
-// context, so returning from CM-IDLE is a Mobility Registration Update that the
-// AMF accepts by reusing the retained 5G NAS security context — no fresh
-// authentication (TS 24.501 §5.5.1.3, TS 23.501 §5.3.2).
+// The release frees only the NG/N2 logical connection: the UE stays
+// RM-REGISTERED and the AMF keeps its context, so returning from CM-IDLE is a
+// Mobility Registration Update the AMF accepts by reusing the retained 5G NAS
+// security context — no fresh authentication (TS 24.501 §5.5.1.3, TS 23.501
+// §5.3.2).
 func Test5GUEContextReleaseRequest_ThenReregister(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -100,9 +93,6 @@ func Test5GUEContextReleaseRequest_ThenReregister(t *testing.T) {
 		t.Fatalf("release ngap.message_type = %q, want UEContextReleaseCommand\n  body: %s", got, body)
 	}
 
-	// Return from CM-IDLE: a Mobility Registration Update on a fresh NG connection,
-	// integrity-protected with the retained security context. The AMF reuses the
-	// context and accepts directly.
 	status, body = doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
 		`{"message_type":"registration_request","registration_type":2}`)
 	if status != 200 {
@@ -113,9 +103,8 @@ func Test5GUEContextReleaseRequest_ThenReregister(t *testing.T) {
 	}
 }
 
-// Test5GUEContextReleaseRequest_NGAPIDFuzz mutates the AMF/RAN UE NGAP IDs. Per
-// TS 38.413 §8.7.5.2 an incorrect ID must elicit an Error Indication, not a
-// release command.
+// Per TS 38.413 §8.7.5.2 an incorrect UE NGAP ID must elicit an Error
+// Indication, not a release command.
 func Test5GUEContextReleaseRequest_NGAPIDFuzz(t *testing.T) {
 	tests := []struct {
 		name            string
@@ -167,9 +156,8 @@ func Test5GUEContextReleaseRequest_NGAPIDFuzz(t *testing.T) {
 	}
 }
 
-// Test5GUEContextReleaseRequest_BeforeRegistration sends a release request for a
-// UE the AMF has never seen (no Initial UE Message yet). The AMF has no context
-// for the RAN UE NGAP ID and must answer with Error Indication.
+// Without a preceding Initial UE Message the AMF holds no context for the RAN
+// UE NGAP ID, so it must answer with an Error Indication.
 func Test5GUEContextReleaseRequest_BeforeRegistration(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -185,9 +173,8 @@ func Test5GUEContextReleaseRequest_BeforeRegistration(t *testing.T) {
 	}
 }
 
-// Test5GUEContextReleaseRequest_DoubleRelease releases twice. The second request
-// references a context the AMF already tore down, so it must answer with Error
-// Indication rather than a second release command.
+// The second release references a context the AMF already tore down, so it must
+// answer with an Error Indication.
 func Test5GUEContextReleaseRequest_DoubleRelease(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -213,9 +200,9 @@ func Test5GUEContextReleaseRequest_DoubleRelease(t *testing.T) {
 	}
 }
 
-// Test5GUEContextReleaseRequest_OutOfRangeCause sends a radio-network Cause value
-// outside the enumerated range. The server must not hang or 5xx — the AMF
-// should still process the request (the Cause IE is informational).
+// The Cause IE is informational, so a radio-network value outside the
+// enumerated range leaves the AMF free either to process the request or to
+// reject the encoding; both outcomes are accepted.
 func Test5GUEContextReleaseRequest_OutOfRangeCause(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -235,8 +222,6 @@ func Test5GUEContextReleaseRequest_OutOfRangeCause(t *testing.T) {
 	}
 }
 
-// Test5GUEContextReleaseRequest_CommandCarriesCause confirms the AMF's release
-// command carries a Cause IE (decoded into the response).
 func Test5GUEContextReleaseRequest_CommandCarriesCause(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)

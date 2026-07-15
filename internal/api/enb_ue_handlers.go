@@ -22,9 +22,9 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/transport"
 )
 
-// erabUPFIP picks the S-GW S1-U endpoint the eNB sends uplink user data to: the
-// address matching the eNB's own S1-U family, falling back to the other when the
-// S-GW signalled only one. A dual-stack S-GW signals both (TS 36.414 §5.3).
+// Prefers the address matching the eNB's own S1-U family, falling back to the
+// other when the S-GW signalled only one. A dual-stack S-GW signals both
+// (TS 36.414 §5.3).
 func erabUPFIP(enb *store.ENBContext, e s1ap.ERABSetupItemJSON) string {
 	if a, err := netip.ParseAddr(enb.N3Addr); err == nil && a.Is6() {
 		return firstNonEmpty(e.TransportLayerAddressIPv6, e.TransportLayerAddress)
@@ -33,8 +33,7 @@ func erabUPFIP(enb *store.ENBContext, e s1ap.ERABSetupItemJSON) string {
 	return firstNonEmpty(e.TransportLayerAddress, e.TransportLayerAddressIPv6)
 }
 
-// ksiNoKey is the NAS key set identifier value "no key available" (TS 24.301
-// §9.9.3.21), used in the initial Attach Request.
+// The NAS key set identifier value "no key available" (TS 24.301 §9.9.3.21).
 const ksiNoKey uint8 = 7
 
 // EMM causes for an Authentication Failure (TS 24.301 §9.9.3.9, §5.4.2.6).
@@ -280,7 +279,7 @@ func (h *Handler) attachRequest(ctx context.Context, enb *store.ENBContext, ue *
 		return nil, err
 	}
 
-	// Stash the challenge so authentication_response can compute RES.
+	// The challenge is retained for the following authentication_response's RES.
 	ue.RAND, _ = hex.DecodeString(nas.RAND)
 	ue.AUTN, _ = hex.DecodeString(nas.AUTN)
 	if nas.KSI != nil {
@@ -290,8 +289,8 @@ func (h *Handler) attachRequest(ctx context.Context, enb *store.ENBContext, ue *
 	return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
 }
 
-// attachRequestRaw sends an arbitrary NAS PDU in the Initial UE Message. The MME
-// may drop a malformed PDU without reply, so a wait timeout is not an error.
+// The MME may drop a malformed PDU without replying, so a wait timeout is not an
+// error.
 func (h *Handler) attachRequestRaw(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, rawHex string) (*SendENBNASResponse, error) {
 	raw, err := hex.DecodeString(rawHex)
 	if err != nil {
@@ -522,8 +521,8 @@ func (h *Handler) securityModeComplete(ctx context.Context, enb *store.ENBContex
 		return nil, err
 	}
 
-	// A discarded message yields no Initial Context Setup; report what (if
-	// anything) arrived so the caller can assert the MME did not proceed.
+	// A discarded message yields no Initial Context Setup, so a timeout here is a
+	// valid outcome.
 	if req.CorruptMAC {
 		return &SendENBNASResponse{S1AP: h.waitDownlinkTolerant(ctx, t, ue, "InitialContextSetupRequest")}, nil
 	}
@@ -574,17 +573,16 @@ func (h *Handler) securityModeComplete(ctx context.Context, enb *store.ENBContex
 		ue.UPFIP = erabUPFIP(enb, e)
 	}
 
-	// The eNB advertises its own downlink TEID in the Initial Context Setup
-	// Response (we use the eNB UE S1AP ID); the UE IP comes from the Attach Accept.
+	// The eNB's own downlink TEID, advertised in the Initial Context Setup
+	// Response, is its eNB UE S1AP ID.
 	ue.DLTeid = ue.ENBUES1APID
 	ue.UEIP = ueIPFromPDNAddress(nas.PDNAddress)
 
 	return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
 }
 
-// ueIPFromPDNAddress extracts the UE IPv4 from an Attach Accept PDN address (hex):
-// a PDN-type octet (1 = IPv4) followed by the 4 address octets (TS 24.301
-// §9.9.4.9). Returns "" if not an IPv4 address.
+// An Attach Accept PDN address is a PDN-type octet followed by the address
+// octets (TS 24.301 §9.9.4.9).
 func ueIPFromPDNAddress(pdnHex string) string {
 	b, err := hex.DecodeString(pdnHex)
 	if err != nil || len(b) < 5 || b[0] != naseps.PDNTypeIPv4 {
@@ -594,8 +592,7 @@ func ueIPFromPDNAddress(pdnHex string) string {
 	return net.IP(b[1:5]).String()
 }
 
-// emmCauseSecurityCapMismatch is EMM cause #23 (UE security capabilities
-// mismatch) for a Security Mode Reject (TS 24.301 §5.4.3.5).
+// EMM cause #23, UE security capabilities mismatch (TS 24.301 §5.4.3.5).
 const emmCauseSecurityCapMismatch uint8 = 23
 
 func (h *Handler) securityModeReject(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
@@ -656,9 +653,8 @@ func (h *Handler) attachComplete(ctx context.Context, enb *store.ENBContext, ue 
 		return nil, err
 	}
 
-	// Once it has the Attach Complete, the MME may send an EMM Information message
-	// (the operator network name). Consume it so the downlink NAS COUNT stays in
-	// step for any following procedure; its absence is fine.
+	// The MME may follow the Attach Complete with an optional EMM Information
+	// message. Consuming it keeps the downlink NAS COUNT in step.
 	wctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
@@ -692,9 +688,8 @@ func (h *Handler) sendUplink(enb *store.ENBContext, ue *store.UEEPSContext, t *t
 	return t.Send(ul, false)
 }
 
-// ueCapabilityInfo sends a UE Capability Info Indication (one-way; no MME reply).
-// The MME stores the radio capability for replay in a later Initial Context Setup
-// Request (TS 23.401 §5.11.2).
+// One-way: the MME stores the radio capability for replay in a later Initial
+// Context Setup Request (TS 23.401 §5.11.2) and sends no reply.
 func (h *Handler) ueCapabilityInfo(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	cap := []byte{0x01, 0x02, 0x03, 0x04, 0x05}
 	if req.UERadioCapability != "" {
@@ -718,8 +713,8 @@ func (h *Handler) ueCapabilityInfo(ctx context.Context, enb *store.ENBContext, u
 	}
 
 	// No response is expected on success; a forged or inconsistent UE S1AP ID must
-	// draw an Error Indication (TS 36.413 §10.6). Match by type, since the
-	// indication echoes the forged IDs rather than this UE's.
+	// draw an Error Indication (TS 36.413 §10.6). The indication echoes the forged
+	// IDs, so match by message type only.
 	wctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 
@@ -728,8 +723,8 @@ func (h *Handler) ueCapabilityInfo(ctx context.Context, enb *store.ENBContext, u
 	return &SendENBNASResponse{S1AP: resp}, nil
 }
 
-// forgeIDs returns the UE's MME- and eNB-UE-S1AP-IDs, each replaced by its
-// override when the request sets one (for AP-ID fuzzing, TS 36.413 §10.6).
+// Each ID is replaced by its request override, for AP-ID fuzzing (TS 36.413
+// §10.6).
 func forgeIDs(ue *store.UEEPSContext, req *SendENBNASRequest) (uint32, uint32) {
 	mmeID, enbID := ue.MMEUES1APID, ue.ENBUES1APID
 	if req == nil {
@@ -747,11 +742,10 @@ func forgeIDs(ue *store.UEEPSContext, req *SendENBNASRequest) (uint32, uint32) {
 	return mmeID, enbID
 }
 
-// pathSwitch emulates a target eNB issuing a PATH SWITCH REQUEST after an X2
-// handover: it switches the UE's default-bearer downlink to a fresh endpoint and
-// expects a PATH SWITCH REQUEST ACKNOWLEDGE carrying a fresh {NH, NCC}, or a
-// PATH SWITCH REQUEST FAILURE when the path cannot be switched (TS 36.413
-// §9.1.5.8, key chain per TS 33.401 §7.2.8).
+// Emulates a target eNB after an X2 handover, switching the UE's default-bearer
+// downlink to a fresh endpoint. The MME answers with a Path Switch Request
+// Acknowledge carrying a fresh {NH, NCC}, or a Path Switch Request Failure
+// (TS 36.413 §9.1.5.8; key chain per TS 33.401 §7.2.8).
 func (h *Handler) pathSwitch(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	if !ue.SecurityActive {
 		return nil, fmt.Errorf("no UE context; complete an attach first")

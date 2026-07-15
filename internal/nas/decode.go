@@ -56,10 +56,6 @@ func Decode(data []byte) (*NASResponse, error) {
 	return resp, nil
 }
 
-// decodeGmm names a decoded plain 5GMM message and surfaces its IEs. Both the
-// plain path and the unwrapped-secured path dispatch through this one table: a
-// message carries the same IEs whichever way it arrived, so a message the core
-// sends unprotected still yields the fields that show what it sent.
 func decodeGmm(m *gonas.Message, resp *NASResponse) error {
 	msgType := m.GmmMessage.GetMessageType()
 	resp.MessageType = gmmMessageTypeName(msgType)
@@ -86,10 +82,10 @@ func decodeGmm(m *gonas.Message, resp *NASResponse) error {
 	return nil
 }
 
-// unknownMessageType labels a decoded downlink the dispatch tables do not cover,
-// keeping the numeric 5GS message type (TS 24.501 §9.7) so a malformed downlink
-// stays identifiable. A nil GmmMessage means PlainNasDecode parsed a top-level
-// 5GSM message; the extended protocol discriminator (§9.2) admits no third case.
+// unknownMessageType keeps the numeric 5GS message type (TS 24.501 §9.7) so a
+// downlink outside the dispatch tables stays identifiable. A nil GmmMessage means
+// PlainNasDecode parsed a top-level 5GSM message; the extended protocol
+// discriminator (§9.2) admits no third case.
 func unknownMessageType(m *gonas.Message) (string, error) {
 	if m.GsmMessage == nil {
 		return "", fmt.Errorf("nas: decoded message carries neither a 5GMM nor a 5GSM message")

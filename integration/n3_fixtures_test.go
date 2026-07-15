@@ -27,7 +27,6 @@ var (
 // ICMP echo and echoes UDP on udpEchoPort.
 const dnResponderIP = "10.6.0.10"
 
-// udpEchoPort is the port the dn-responder echoes UDP datagrams on (socat).
 const udpEchoPort = 7
 
 // badTEID is a non-zero TEID with no PDR at the UPF.

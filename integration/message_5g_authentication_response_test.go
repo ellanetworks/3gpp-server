@@ -68,8 +68,8 @@ func Test5GAuthenticationResponse(t *testing.T) {
 		},
 		{
 			name: "raw NAS PDU: single byte",
-			// Too short to contain a complete message type IE → shall be ignored
-			// (TS 24.501 §7.2.1); the AMF keeps T3560 running. Silent drop (504).
+			// Too short to carry a complete message type IE, so it shall be ignored
+			// (TS 24.501 §7.2.1): the AMF keeps T3560 running and sends no reply.
 			body:     `{"message_type":"authentication_response","raw_nas_pdu":"7e"}`,
 			wantHTTP: 504,
 		},
@@ -118,15 +118,13 @@ func Test5GAuthenticationResponse(t *testing.T) {
 	}
 }
 
-// Test5GAuthenticationResponse_WithoutChallenge sends an Authentication Response
-// before any registration challenge was received. The server must still put it
-// on the wire (zeroed RES*, no local 400) so the AMF can react — it must not be
-// refused locally and must not hang.
+// An Authentication Response sent before any challenge has no stored RAND/AUTN
+// to answer. The server must still put it on the wire with a zeroed RES* so the
+// AMF is the one that reacts to it.
 func Test5GAuthenticationResponse_WithoutChallenge(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
 
-	// No registration_request first — there is no stored RAND/AUTN.
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
 		`{"message_type":"authentication_response"}`)
 	if status == 504 {
@@ -137,9 +135,9 @@ func Test5GAuthenticationResponse_WithoutChallenge(t *testing.T) {
 	}
 }
 
-// Test5GAuthenticationResponse_TruncatedRESStar sends an 8-octet RES*, which is
-// a syntactically incorrect mandatory IE (TS 24.501 §9.11.3.17 fixes RES* at 16
-// octets). TS 24.501 §7.5.1 lets the network "either: 1) try to treat the
+// An 8-octet RES* is a syntactically incorrect mandatory IE (TS 24.501
+// §9.11.3.17 fixes RES* at 16 octets). TS 24.501 §7.5.1 lets the network
+// "either: 1) try to treat the
 // message (the exact further actions are implementation dependent); or 2) ignore
 // the message except that it should return a status message ... with cause #96
 // 'invalid mandatory information'." Option 1 leaves the treatment open, so the

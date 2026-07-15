@@ -4,9 +4,8 @@
 //go:build integration
 
 // Authentication Failure (TS 24.501 §5.4.1.3.6 / §5.4.1.3.7): the UE rejects an
-// Authentication Request with a 5GMM cause. The network's mandated reaction
-// depends on the cause. Assertions follow the spec; a failure means Ella Core
-// deviates from TS 24.501.
+// Authentication Request with a 5GMM cause, and the network's mandated reaction
+// depends on that cause.
 
 package integration_test
 
@@ -15,8 +14,6 @@ import (
 	"testing"
 )
 
-// authChallengePending registers a UE and returns once the AMF has sent the
-// Authentication Request (the UE is in the authentication phase).
 func authChallengePending(t *testing.T) (string, string) {
 	t.Helper()
 
@@ -40,9 +37,8 @@ func sendAuthFailure(t *testing.T, gnbID, ueID string, cause int) (int, []byte) 
 	return doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap", body)
 }
 
-// Test5GAuthenticationFailure_SynchFailure sends cause #21 with a valid AUTS. Per
-// TS 24.501 §5.4.1.3.7 f) the network shall re-synchronise (fetch new vectors)
-// and initiate authentication again — i.e. send a new Authentication Request.
+// On cause #21 with a valid AUTS the network shall re-synchronise and initiate
+// authentication again (TS 24.501 §5.4.1.3.7 f).
 func Test5GAuthenticationFailure_SynchFailure(t *testing.T) {
 	gnbID, ueID := authChallengePending(t)
 
@@ -56,17 +52,10 @@ func Test5GAuthenticationFailure_SynchFailure(t *testing.T) {
 	}
 }
 
-// Test5GAuthenticationFailure_RepeatedSynchFailure sends cause #21 twice in a
-// row. The first is mandatory to act on: per TS 24.501 §5.4.1.3.7 f) "Upon the
-// first receipt of an AUTHENTICATION FAILURE message from the UE with the 5GMM
-// cause #21 'synch failure', the network shall use the returned AUTS parameter
-// [...] to re-synchronise", then "shall initiate the 5G AKA based primary
-// authentication and key agreement procedure" — a fresh Authentication Request.
-//
-// For the second, NOTE 4 of the same subclause says the network "may terminate
-// the 5G AKA based primary authentication and key agreement procedure by sending
-// an AUTHENTICATION REJECT message" — permission, not obligation, so
-// re-synchronising once more is equally conformant. The binding invariant is
+// On the first cause #21 the network shall re-synchronise from the AUTS and
+// initiate authentication again (TS 24.501 §5.4.1.3.7 f). On a repeat, NOTE 4 of
+// the same subclause only permits terminating with an AUTHENTICATION REJECT, so
+// re-synchronising once more is equally conformant; the binding invariant is
 // that an unauthenticated UE must not reach security activation.
 func Test5GAuthenticationFailure_RepeatedSynchFailure(t *testing.T) {
 	gnbID, ueID := authChallengePending(t)
@@ -93,9 +82,8 @@ func Test5GAuthenticationFailure_RepeatedSynchFailure(t *testing.T) {
 	}
 }
 
-// Test5GAuthenticationFailure_NgKSIAlreadyInUse sends cause #71. Per TS 24.501
-// §5.4.1.3.7 e) the network selects a new ngKSI and re-sends the challenge — a
-// new Authentication Request.
+// On cause #71 the network selects a new ngKSI and re-sends the challenge
+// (TS 24.501 §5.4.1.3.7 e).
 func Test5GAuthenticationFailure_NgKSIAlreadyInUse(t *testing.T) {
 	gnbID, ueID := authChallengePending(t)
 
@@ -109,11 +97,9 @@ func Test5GAuthenticationFailure_NgKSIAlreadyInUse(t *testing.T) {
 	}
 }
 
-// Test5GAuthenticationFailure_MACFailure covers the causes (#20 MAC failure, #26
-// non-5G unacceptable) where TS 24.501 §5.4.1.3.7 c)/d) leave the network a
-// choice: re-identify, re-authenticate, or reject. The binding requirement is
-// that the network must NOT proceed with the procedure — so the response must
-// be one of those rejection/retry reactions, never a Security Mode Command.
+// For causes #20 and #26, TS 24.501 §5.4.1.3.7 c)/d) leave the network a choice:
+// re-identify, re-authenticate, or reject. The binding requirement is that it
+// must not proceed with the procedure, so a Security Mode Command is never valid.
 func Test5GAuthenticationFailure_MACFailure(t *testing.T) {
 	for _, cause := range []int{cause5GMMMACFailure, cause5GMMNon5GAuthenticationUnacceptable} {
 		t.Run(fmt.Sprintf("cause-%d", cause), func(t *testing.T) {
@@ -134,9 +120,8 @@ func Test5GAuthenticationFailure_MACFailure(t *testing.T) {
 	}
 }
 
-// Test5GAuthenticationFailure_NGAPIDFuzz forges the AMF UE NGAP ID on the
-// Authentication Failure's Uplink NAS Transport. The AMF does not recognise the
-// ID and answers with an Error Indication (TS 38.413 §8.6.3).
+// A forged AMF UE NGAP ID on the Uplink NAS Transport is an unknown local AP ID,
+// which the AMF must answer with an Error Indication (TS 38.413 §8.6.3).
 func Test5GAuthenticationFailure_NGAPIDFuzz(t *testing.T) {
 	gnbID, ueID := authChallengePending(t)
 

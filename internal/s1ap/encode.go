@@ -7,10 +7,7 @@ import (
 	"github.com/ellanetworks/core/s1ap"
 )
 
-// BuildS1SetupRequest encodes an S1 Setup Request PDU for the given eNB
-// parameters. With no explicit SupportedTAs it advertises one supported TA whose
-// only broadcast PLMN is the eNB's own PLMN; ENBIDKind defaults to a macro
-// eNB-ID.
+// BuildS1SetupRequest encodes an S1 Setup Request PDU (TS 36.413 §9.1.8.4).
 func BuildS1SetupRequest(p *S1SetupRequestParams) ([]byte, error) {
 	enbPLMN, err := encodePLMN(p.MCC, p.MNC)
 	if err != nil {

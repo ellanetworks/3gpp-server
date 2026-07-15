@@ -7,12 +7,11 @@ package integration_test
 
 import "testing"
 
-// Test4GInitialContextSetupFailure checks that when the eNB fails the Initial
-// Context Setup instead of completing the attach, the MME releases the UE's S1
-// context (TS 36.413 §8.3.1.4, TS 23.401 §5.3.2.1). The context being gone is
-// observed through a following UE Context Release Request: the MME must not
-// answer it with a Release Command, since there is no longer a context to
-// release (TS 36.413 §10.6).
+// Test4GInitialContextSetupFailure checks that an Initial Context Setup Failure
+// from the eNB makes the MME release the UE's S1 context (TS 36.413 §8.3.1.4,
+// TS 23.401 §5.3.2.1). The context being gone is observed through a following UE
+// Context Release Request: with no context left to release, the MME must not
+// answer it with a Release Command (TS 36.413 §10.6).
 func Test4GInitialContextSetupFailure(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -42,6 +41,5 @@ func Test4GInitialContextSetupFailure(t *testing.T) {
 		t.Fatalf("MME answered a release with a Release Command after an Initial Context Setup Failure — the context must already be released (TS 36.413 §8.3.1.4, TS 23.401 §5.3.2.1)\n  body: %s", resp)
 	}
 
-	// The MME stays healthy: a fresh UE still attaches.
 	fullAttach(t, enbID, mustCreateENBUE(t, enbID))
 }

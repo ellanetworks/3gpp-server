@@ -9,7 +9,7 @@
 // can be caused by the other. The allocators here hand every caller an identity
 // no other caller holds, which keeps that coupling out of the suite.
 //
-// Two regions exist per identity space:
+// Each identity space has two regions:
 //   - reserved: fixed values a test names explicitly, because the value itself
 //     is under test (an S1 Setup asserting its own eNB ID) or because the test
 //     needs several UEs in a known relation (a spoofing victim and attacker).
@@ -47,10 +47,9 @@ var (
 	gnbIDCounter      atomic.Int64
 )
 
-// claimSubscriber returns the SUPI of a subscriber no other caller holds,
-// provisioning it in the core on first use. The reserved pool TestMain
-// provisions up front is too small to give all ~150 UE-creating call sites a
-// distinct subscriber, so allocated subscribers are provisioned on demand.
+// claimSubscriber returns the SUPI of a subscriber no other caller holds. The
+// reserved pool TestMain provisions up front is too small to give every
+// UE-creating call site a distinct subscriber, so it provisions on demand.
 func claimSubscriber(t *testing.T) string {
 	t.Helper()
 
@@ -64,7 +63,6 @@ func claimSubscriber(t *testing.T) string {
 	return supi
 }
 
-// claimSubscribers returns n SUPIs no other caller holds.
 func claimSubscribers(t *testing.T, n int) []string {
 	t.Helper()
 
@@ -76,13 +74,11 @@ func claimSubscribers(t *testing.T, n int) []string {
 	return supis
 }
 
-// claimENBID returns an eNB ID no other caller holds.
 func claimENBID() int {
 	return allocatedENBIDBase + int(enbIDCounter.Add(1)) - 1
 }
 
-// claimGnBID returns a gNB ID no other caller holds, in the 6-hex-digit form the
-// API takes.
+// claimGnBID renders the ID to the 6-hex-digit form the API takes.
 func claimGnBID() string {
 	return fmt.Sprintf("%06x", allocatedGnBIDBase+int(gnbIDCounter.Add(1))-1)
 }
