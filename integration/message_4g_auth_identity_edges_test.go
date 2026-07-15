@@ -10,15 +10,6 @@ import (
 	"testing"
 )
 
-// Test4GAuthenticationRepeatedSynchFailure sends a synch failure (#21) twice. On
-// the first, TS 24.301 §5.4.2.7 e) obliges the network to re-synchronise with the
-// returned AUTS and re-challenge with a fresh vector.
-//
-// For the second, NOTE 3 of the same subclause says the network "may terminate
-// the authentication procedure by sending an AUTHENTICATION REJECT message" —
-// permission, not obligation, so re-synchronising once more is equally
-// conformant. The binding invariant is that an unauthenticated UE must not reach
-// security activation.
 func Test4GAuthenticationRepeatedSynchFailure(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := attachChallenge(t, enbID)
@@ -38,22 +29,18 @@ func Test4GAuthenticationRepeatedSynchFailure(t *testing.T) {
 	}
 }
 
-// Test4GIdentityResponseMalformed checks a malformed Identity Response is
-// discarded without crashing the MME (TS 24.301 §5.4.4). Each PDU is an EMM plain
-// header (0x07) for an Identity Response (0x56) with a truncated or empty mobile
-// identity.
 func Test4GIdentityResponseMalformed(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
 
-	// A foreign GUTI drives the MME to run the Identity procedure (§5.4.4).
 	resp := nasBody(t, enbID, ueID, `{"message_type":"attach_request","foreign_guti":true}`)
 	if got := jsonGet(resp, "nas.message_type"); got != "identity_request" {
 		t.Fatalf("foreign-GUTI attach: nas.message_type = %q, want identity_request; body: %s", got, resp)
 	}
 
+	// 0756 = EMM plain header, Identity Response.
 	malformed := []string{
-		"0756",             // header only, no mobile identity
+		"0756",             // no mobile identity
 		"075608",           // identity length 8 declared, none present
 		"075600",           // identity length 0
 		"0756ffffffffffff", // garbage identity octets

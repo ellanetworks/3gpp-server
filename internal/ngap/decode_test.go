@@ -51,7 +51,6 @@ func encodeNGSetupFailureWithTimeToWait(t *testing.T, ttw aper.Enumerated) []byt
 	return data
 }
 
-// TS 38.413 §9.3.1.53: the TimeToWait enum names the back-off in seconds.
 func TestDecodeTimeToWaitNames(t *testing.T) {
 	cases := map[aper.Enumerated]string{
 		ngapType.TimeToWaitPresentV1s:  "v1s",
@@ -86,8 +85,6 @@ func TestDecodeTimeToWaitNames(t *testing.T) {
 	}
 }
 
-// TS 38.413 §9.3.3.19: UE-NGAP-IDs is a CHOICE; a release identified by the
-// bare AMF-UE-NGAP-ID alternative carries no RAN-UE-NGAP-ID.
 func TestDecodeUEContextReleaseCommandBareAMFID(t *testing.T) {
 	const amfID int64 = 4242
 

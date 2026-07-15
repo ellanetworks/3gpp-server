@@ -3,11 +3,6 @@
 
 //go:build integration
 
-// Path Switch Request (Xn-handover) procedural conformance: normal operation,
-// partial/total failure, and abnormal inputs (TS 38.413 §8.4.4, §9.2.3.9–10).
-// A path switch is the NGAP side of an Xn handover — the AMF switches a UE
-// context's downlink path to the requesting NG-RAN node.
-
 package integration_test
 
 import (
@@ -16,7 +11,6 @@ import (
 	"testing"
 )
 
-// fields is the JSON between message_type and the wait/timeout.
 func sendPathSwitch(t *testing.T, gnbID, fields string) (int, []byte) {
 	t.Helper()
 
@@ -60,8 +54,6 @@ func ngapReleasedPDUSessionIDs(body []byte) []int64 {
 	return ids
 }
 
-// §8.4.4: a Source AMF UE NGAP ID matching no UE context must be answered with a
-// Path Switch Request Failure.
 func Test5GPathSwitchRequestUnknownUEFails(t *testing.T) {
 	gnb := createGnBWithID(t, "0000e0", "ps-unknown")
 
@@ -70,8 +62,6 @@ func Test5GPathSwitchRequestUnknownUEFails(t *testing.T) {
 	assertPathSwitchType(t, "path switch for unknown AMF UE NGAP ID", status, body, ngapPathSwitchRequestFailure)
 }
 
-// §8.4.4.3: when the 5GC can switch none of the requested PDU sessions, the AMF
-// must send a Path Switch Request Failure and leave the UE context intact.
 func Test5GPathSwitchRequestNoSwitchableSessionFails(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "0000e1", "ps-none-src")
 	targetGNB := createGnBWithID(t, "0000e2", "ps-none-tgt")
@@ -86,9 +76,6 @@ func Test5GPathSwitchRequestNoSwitchableSessionFails(t *testing.T) {
 	assertUEStillConnected(t, sourceGNB, ueID)
 }
 
-// §9.2.3.10 / §8.4.4.3: the failure must carry a PDU Session Resource Released
-// List naming the sessions that could not be switched, so the NG-RAN node knows
-// which to release.
 func Test5GPathSwitchRequestFailureReportsReleasedSessions(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "0000e3", "ps-rel-src")
 	targetGNB := createGnBWithID(t, "0000e4", "ps-rel-tgt")
@@ -107,8 +94,6 @@ func Test5GPathSwitchRequestFailureReportsReleasedSessions(t *testing.T) {
 	}
 }
 
-// §8.4.4.2: several held PDU sessions all switch, each present in the
-// acknowledge's PDU Session Resource Switched List.
 func Test5GPathSwitchRequestMultipleSessions(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "0000e5", "ps-multi-src")
 	targetGNB := createGnBWithID(t, "0000e6", "ps-multi-tgt")
@@ -124,8 +109,7 @@ func Test5GPathSwitchRequestMultipleSessions(t *testing.T) {
 	assertCarriesPDUSessions(t, body, []int64{1, 2}, "PathSwitchRequestAcknowledge switched list")
 }
 
-// §8.4.4.3: a path switch is acknowledged as long as at least one PDU session
-// switches; the unswitchable session is absent from the switched list.
+// One switchable session is enough for an acknowledge (TS 38.413 §8.4.4.3).
 func Test5GPathSwitchRequestPartialSuccess(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "0000e7", "ps-part-src")
 	targetGNB := createGnBWithID(t, "0000e8", "ps-part-tgt")
@@ -140,8 +124,6 @@ func Test5GPathSwitchRequestPartialSuccess(t *testing.T) {
 	assertCarriesPDUSessions(t, body, []int64{1}, "PathSwitchRequestAcknowledge switched list (only the held session)")
 }
 
-// §9.2.3.8: a path switch may carry a PDU Session Resource Failed to Setup List
-// for sessions the target could not set up; the AMF still acknowledges the rest.
 func Test5GPathSwitchRequestFailedToSetupList(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "0000e9", "ps-fail-src")
 	targetGNB := createGnBWithID(t, "0000ea", "ps-fail-tgt")
@@ -157,8 +139,7 @@ func Test5GPathSwitchRequestFailedToSetupList(t *testing.T) {
 	assertCarriesPDUSessions(t, body, []int64{1}, "PathSwitchRequestAcknowledge switched list")
 }
 
-// A PDU Session ID outside the valid NAS range (1..15, TS 24.007) can switch no
-// session, so §8.4.4.3 requires the AMF to fail the procedure.
+// PDU Session ID 16 is outside the valid 1..15 range (TS 24.007 §11.2.3.1b).
 func Test5GPathSwitchRequestInvalidPDUSessionIDFails(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "0000eb", "ps-badid-src")
 	targetGNB := createGnBWithID(t, "0000ec", "ps-badid-tgt")
@@ -173,7 +154,7 @@ func Test5GPathSwitchRequestInvalidPDUSessionIDFails(t *testing.T) {
 	assertUEStillConnected(t, sourceGNB, ueID)
 }
 
-// TS 38.413 §9.3.1.x.
+// TS 38.413 §9.4.7.
 const (
 	ieRANUENGAPID                          = 85
 	ieSourceAMFUENGAPID                    = 100
@@ -183,8 +164,6 @@ const (
 	ieAllowedNSSAI                         = 0
 )
 
-// §9.2.3.9: the acknowledge must carry the Security Context (fresh {NH, NCC}) and
-// the Allowed NSSAI, both mandatory.
 func Test5GPathSwitchRequestAcknowledgeCarriesMandatoryIEs(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "0000f0", "ps-ackies-src")
 	targetGNB := createGnBWithID(t, "0000f1", "ps-ackies-tgt")
@@ -225,9 +204,6 @@ func pathSwitchNCC(t *testing.T, body []byte) int64 {
 	return int64(v)
 }
 
-// TS 33.501 §6.9.2.3.2: on each PATH SWITCH REQUEST the AMF shall increase its
-// locally kept NCC by one and return the fresh {NH, NCC}, so two consecutive
-// switches for one UE must yield NCC values differing by exactly one (mod 8).
 func Test5GPathSwitchRequestNCCIncrements(t *testing.T) {
 	gnbA := createGnBWithID(t, "000126", "ps-ncc-a")
 	gnbB := createGnBWithID(t, "000127", "ps-ncc-b")
@@ -252,10 +228,8 @@ func Test5GPathSwitchRequestNCCIncrements(t *testing.T) {
 	}
 }
 
-// §10.3.5: a missing mandatory reject-criticality IE leaves the AMF unable to
-// build a Path Switch Request Failure (which itself needs those IEs), so it must
-// terminate with an Error Indication; a missing ignore-criticality IE must be
-// ignored and the procedure must continue.
+// A missing reject-criticality IE leaves the AMF unable to build the Path Switch
+// Request Failure itself, so TS 38.413 §10.3.5 requires an Error Indication.
 func Test5GPathSwitchRequestMissingMandatoryIE(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -283,8 +257,6 @@ func Test5GPathSwitchRequestMissingMandatoryIE(t *testing.T) {
 	}
 }
 
-// Bytes that are not a valid §9.3.4.8 transfer cannot be applied, so the session
-// does not switch and §8.4.4.3 requires the AMF to fail the procedure.
 func Test5GPathSwitchRequestMalformedTransferFails(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "0000ed", "ps-badxfer-src")
 	targetGNB := createGnBWithID(t, "0000ee", "ps-badxfer-tgt")

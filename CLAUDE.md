@@ -56,11 +56,20 @@ The spec at `internal/api/openapi.yaml` is embedded at compile time and served a
 
 ## Code comments
 
-Default to **no comment** — prefer precise names and obvious structure; rewrite unclear code before commenting it. When one is unavoidable:
+Default to **no comment**. Comments rot; code does not. Prose is a story someone has to maintain.
 
-- Explain *why*, never *what*; concise and precise.
-- Present state only — no prior/alternative/future implementations, no "was a bug".
-- No caller or flow narration; comment the code in front of you.
-- Anchor rationale to the spec (e.g. `TS 24.501 §6.4.2.4`); keep it true; no commented-out code or `TODO`s.
+**Fix the code before commenting it.** A constant that needs explaining should be derived from what constrains it (`allocatedSubscriberBase = subscriptionChangeIMSI + 100`, not `= 200` plus four lines saying what it sits above). A symbol that needs explaining should be renamed.
+
+A comment survives only if it passes **both** tests:
+
+1. it states a fact **not derivable from the code in front of it**, and
+2. a reader who did not know that fact would **write a bug**.
+
+"It's useful context" fails both. When a comment survives, it is **one line**. Two is a smell; a paragraph is prose.
+
+- **Cite the spec, never quote it**: `TS 24.501 §7.5.1`, not a transcription of the clause. The citation is a pointer that cannot drift; a quotation is a copy that can.
+- Explain *why*, never *what*. Present state only — no prior/alternative/future implementations, no "was a bug".
+- No caller or flow narration. No file headers describing what a file holds. No restating a symbol's own name.
+- No commented-out code, no `TODO`s. Every citation must be true — verify it against the spec, never from memory.
 
 Applies to doc/inline comments, test names, and failure messages (state expected vs. actual, don't editorialize). Banned: "rather than", "instead of", "no longer", "used to", "previously", "now (does/responds)", "would mean", "silently drop(ped)".

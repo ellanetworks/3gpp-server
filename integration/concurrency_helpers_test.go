@@ -13,19 +13,12 @@ import (
 	"testing"
 )
 
-// numTestSubscribers sizes the reserved subscriber pool TestMain provisions up
-// front, for tests that name an index explicitly via testSUPI (indices 1..25 are
-// in use). Allocated subscribers sit above this block — see
-// allocation_helpers_test.go.
 const numTestSubscribers = 40
 
-// testSUPI indexes the pooled subscribers from 1.
 func testSUPI(i int) string {
 	return fmt.Sprintf("imsi-00101%010d", i)
 }
 
-// post takes no *testing.T, so it is safe to call from a goroutine (t.Fatalf
-// must only run on the test's own goroutine).
 func post(path, body string) (int, []byte, error) {
 	resp, err := doHTTP("POST", testerURL+path, body)
 	if err != nil {
@@ -42,7 +35,6 @@ func post(path, body string) (int, []byte, error) {
 	return resp.StatusCode, b, nil
 }
 
-// createUEForSUPI returns the UE's store id. Goroutine-safe.
 func createUEForSUPI(gnbID, supi string) (string, error) {
 	body := fmt.Sprintf(`{
 		"supi": "%s",
@@ -76,8 +68,6 @@ type regResult struct {
 	guti string
 }
 
-// registerSUPI runs a full initial registration, returning the UE's store id and
-// the 5G-GUTI the AMF assigned. Goroutine-safe.
 func registerSUPI(gnbID, supi string) (regResult, error) {
 	ueID, err := createUEForSUPI(gnbID, supi)
 	if err != nil {
@@ -117,8 +107,6 @@ func registerSUPI(gnbID, supi string) (regResult, error) {
 	return regResult{ueID: ueID, guti: guti}, nil
 }
 
-// establishSession returns the UE IP address the SMF allocated, read from the
-// PDU Session Establishment Accept. Goroutine-safe.
 func establishSession(gnbID, ueID string, sessionID int) (string, error) {
 	status, body, err := post("/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
 		fmt.Sprintf(`{"message_type":"pdu_session_establishment_request","pdu_session_id":%d}`, sessionID))
@@ -133,7 +121,7 @@ func establishSession(gnbID, ueID string, sessionID int) (string, error) {
 	return jsonGet(body, "nas.pdu_address"), nil
 }
 
-// deregister sends a switch-off Deregistration Request. Goroutine-safe.
+// The server defaults to switch-off, which draws no Deregistration Accept.
 func deregister(gnbID, ueID string) error {
 	status, body, err := post("/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
 		`{"message_type":"deregistration_request"}`)
@@ -148,8 +136,7 @@ func deregister(gnbID, ueID string) error {
 	return nil
 }
 
-// runParallel runs fn(i) for i in [0,n) concurrently. fn must be goroutine-safe
-// — it must not touch *testing.T.
+// fn runs on its own goroutine and must not touch *testing.T.
 func runParallel(t *testing.T, n int, fn func(i int) error) {
 	t.Helper()
 

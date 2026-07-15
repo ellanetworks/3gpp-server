@@ -1,10 +1,7 @@
 // SPDX-FileCopyrightText: Ella Networks Inc.
 // SPDX-License-Identifier: BUSL-1.1
 
-// Package gtpu implements the minimal GTP-U (TS 29.281) encode/decode and an
-// N3 endpoint so the emulated gNB can terminate the user-plane tunnel: send
-// uplink G-PDUs to the UPF, receive downlink G-PDUs, and exchange path-
-// management messages (Echo, Error Indication).
+// Package gtpu implements GTP-U (TS 29.281) encode/decode and an N3 endpoint.
 package gtpu
 
 import (
@@ -12,7 +9,6 @@ import (
 	"fmt"
 )
 
-// GTP-U message types (TS 29.281 §7.1, table 6.1-1).
 const (
 	MsgEchoRequest     = 1
 	MsgEchoResponse    = 2
@@ -21,15 +17,12 @@ const (
 )
 
 const (
-	// Version 1, Protocol Type GTP (1), no extension/sequence/N-PDU flags.
-	flagsGPDU = 0x30
-	// Same flags with the sequence-number flag set (S=1).
+	flagsGPDU    = 0x30
 	flagsWithSeq = 0x32
-	// Same flags with the extension-header flag set (E=1).
 	flagsWithExt = 0x34
 
-	extPDUSessionContainer = 0x85 // next-extension-header type (TS 29.281)
-	pscPDUTypeUL           = 0x10 // PDU Type 1 (UL PDU Session Information) in the high nibble
+	extPDUSessionContainer = 0x85
+	pscPDUTypeUL           = 0x10
 
 	port = 2152
 )
@@ -41,55 +34,48 @@ type Message struct {
 	TEID    uint32
 	Seq     uint16
 	HasSeq  bool
-	Payload []byte // T-PDU for a G-PDU; IE bytes for path-management messages
+	Payload []byte
 }
 
 func EncodeGPDU(teid uint32, tpdu []byte) []byte {
 	out := make([]byte, 8+len(tpdu))
 	out[0] = flagsGPDU
 	out[1] = MsgGPDU
-	binary.BigEndian.PutUint16(out[2:4], uint16(len(tpdu)))
+	binary.BigEndian.PutUint16(out[2:4], uint16(len(out)-8))
 	binary.BigEndian.PutUint32(out[4:8], teid)
 	copy(out[8:], tpdu)
 
 	return out
 }
 
-// EncodeGPDUWithQFI wraps an inner IP packet in a G-PDU carrying the uplink PDU
-// Session Container extension header (TS 38.415) with the QFI — the form an
-// NG-RAN node sends uplink user data, and what a 5G UPF expects on N3.
+// The uplink PDU Session Container (TS 38.415) is what a 5G UPF expects on N3.
 func EncodeGPDUWithQFI(teid uint32, qfi uint8, tpdu []byte) []byte {
 	out := make([]byte, 16+len(tpdu))
 	out[0] = flagsWithExt
 	out[1] = MsgGPDU
-	binary.BigEndian.PutUint16(out[2:4], uint16(8+len(tpdu))) // 4-octet optional block + 4-octet PSC ext + T-PDU
+	binary.BigEndian.PutUint16(out[2:4], uint16(len(out)-8))
 	binary.BigEndian.PutUint32(out[4:8], teid)
-	// out[8:11] are sequence + N-PDU (zero); out[11] is the next-extension type.
 	out[11] = extPDUSessionContainer
-	// PDU Session Container extension header (4 octets): length, content, next.
-	out[12] = 0x01 // length in 4-octet units
+	out[12] = 0x01
 	out[13] = pscPDUTypeUL
 	out[14] = qfi & 0x3f
-	out[15] = 0x00 // no further extension header
+	out[15] = 0x00
 	copy(out[16:], tpdu)
 
 	return out
 }
 
-// EncodeEchoRequest builds a GTP-U Echo Request (TEID 0) with a sequence number
-// (TS 29.281 §7.2.1: Echo messages set the S flag).
 func EncodeEchoRequest(seq uint16) []byte {
 	out := make([]byte, 12)
 	out[0] = flagsWithSeq
 	out[1] = MsgEchoRequest
-	binary.BigEndian.PutUint16(out[2:4], 4) // length: TEID-trailing octets (seq + npdu + next-ext)
-	// TEID is 0 for path management.
+	binary.BigEndian.PutUint16(out[2:4], uint16(len(out)-8))
 	binary.BigEndian.PutUint16(out[8:10], seq)
 
 	return out
 }
 
-// Decode parses a GTP-U message header (TS 29.281 §5.1).
+// TS 29.281 §5.1
 func Decode(b []byte) (*Message, error) {
 	if len(b) < 8 {
 		return nil, fmt.Errorf("gtp-u message too short: %d bytes", len(b))

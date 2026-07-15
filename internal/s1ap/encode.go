@@ -7,7 +7,6 @@ import (
 	"github.com/ellanetworks/core/s1ap"
 )
 
-// BuildS1SetupRequest encodes an S1 Setup Request PDU (TS 36.413 §9.1.8.4).
 func BuildS1SetupRequest(p *S1SetupRequestParams) ([]byte, error) {
 	enbPLMN, err := encodePLMN(p.MCC, p.MNC)
 	if err != nil {

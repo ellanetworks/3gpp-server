@@ -12,25 +12,19 @@ import (
 	"github.com/free5gc/util/ueauth"
 )
 
-// EPS-AKA key-derivation constants (TS 33.401 Annex A). The FC values are hex
-// strings, the form ueauth.GetKDFValue expects.
+// The fc* values are hex strings, the form ueauth.GetKDFValue expects (TS 33.401 Annex A).
 const (
-	fcKasme             = "10" // KASME derivation (A.2)
-	fcAlgorithmKD       = "15" // K_NASenc / K_NASint derivation (A.7)
-	algTypeNASEnc uint8 = 0x01 // NAS encryption algorithm distinguisher (A.7)
-	algTypeNASInt uint8 = 0x02 // NAS integrity algorithm distinguisher (A.7)
+	fcKasme             = "10"
+	fcAlgorithmKD       = "15"
+	algTypeNASEnc uint8 = 0x01
+	algTypeNASInt uint8 = 0x02
 )
 
-// EPSAKAResult holds the outputs of a successful EPS-AKA challenge.
 type EPSAKAResult struct {
-	RES   []byte // 8-octet response, sent verbatim in the EPS Auth Response
-	Kasme []byte // 256-bit K_ASME (TS 33.401 §6.1)
+	RES   []byte
+	Kasme []byte
 }
 
-// ComputeEPSAKA verifies the AUTN, recovers SQN, and derives RES and K_ASME for
-// an EPS-AKA challenge (TS 33.401 §6.1, Annex A.2). mcc/mnc give the serving
-// network identity bound into K_ASME. It returns ErrMACFailure on a bad AUTN MAC
-// and ErrSQNOutOfRange when the challenge SQN is older than the stored value.
 func ComputeEPSAKA(k, opc, sqn, mcc, mnc string, rand, autn []byte) (*EPSAKAResult, error) {
 	opcBytes, err := hex.DecodeString(opc)
 	if err != nil {
@@ -65,8 +59,6 @@ func ComputeEPSAKA(k, opc, sqn, mcc, mnc string, rand, autn []byte) (*EPSAKAResu
 		return nil, err
 	}
 
-	// AUTN = (SQN⊕AK) ‖ AMF ‖ MAC, so its first 6 octets are the SQN⊕AK input
-	// K_ASME binds to (TS 33.401 §A.2).
 	sqnXorAK := autn[:6]
 
 	key := make([]byte, 0, len(CK)+len(IK))
@@ -83,9 +75,6 @@ func ComputeEPSAKA(k, opc, sqn, mcc, mnc string, rand, autn []byte) (*EPSAKAResu
 	return &EPSAKAResult{RES: RES, Kasme: kasme}, nil
 }
 
-// DeriveEPSNASKeys derives the 128-bit NAS encryption and integrity keys from
-// K_ASME for the selected EEA and EIA algorithm identities (TS 33.401 §A.7). The
-// lower 128 bits of each 256-bit KDF output are taken.
 func DeriveEPSNASKeys(kasme []byte, encAlg, intAlg uint8) (knasEnc, knasInt [16]byte, err error) {
 	enc, err := ueauth.GetKDFValue(kasme, fcAlgorithmKD,
 		[]byte{algTypeNASEnc}, ueauth.KDFLen([]byte{algTypeNASEnc}),
@@ -107,8 +96,6 @@ func DeriveEPSNASKeys(kasme []byte, encAlg, intAlg uint8) (knasEnc, knasInt [16]
 	return knasEnc, knasInt, nil
 }
 
-// tbcdPLMN encodes MCC/MNC into the 3-octet TBCD serving-network identity
-// (TS 23.003 §2.6); a 2-digit MNC sets the spare nibble to 0xF.
 func tbcdPLMN(mcc, mnc string) ([]byte, error) {
 	if len(mcc) != 3 || (len(mnc) != 2 && len(mnc) != 3) {
 		return nil, fmt.Errorf("invalid PLMN mcc=%q mnc=%q", mcc, mnc)

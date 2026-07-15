@@ -8,8 +8,6 @@ import (
 	"sync/atomic"
 )
 
-// GNBContext is an emulated gNB's NG-C association state, including the UE
-// contexts attached through it.
 type GNBContext struct {
 	ID    string
 	MCC   string
@@ -20,8 +18,6 @@ type GNBContext struct {
 	GNBID string
 	Name  string
 
-	// N3Addr is the gNB's N3 transport address, advertised as the downlink
-	// endpoint in the PDU Session Resource Setup Response.
 	N3Addr string
 
 	Slices []SliceConfig
@@ -44,9 +40,6 @@ type PDUSessionInfo struct {
 	DLTeid       uint32 `json:"dl_teid"`
 	QFI          uint8  `json:"qfi"`
 
-	// User-plane (N3 GTP-U) state, populated when the gNB terminates the data
-	// path: the UPF's uplink tunnel (learned from the PDU Session Resource Setup
-	// Request transfer) and the UE's assigned IP (from the Establishment Accept).
 	ULTeid uint32 `json:"ul_teid,omitempty"`
 	UPFIP  string `json:"upf_ip,omitempty"`
 	UEIP   string `json:"ue_ip,omitempty"`
@@ -128,11 +121,7 @@ func (g *GNBContext) deleteUELocked(ueID string) bool {
 	return true
 }
 
-// MigrateUE moves a UE context from this gNB to target, modelling the UE
-// arriving at the target after an N2 handover. The context keeps its identity,
-// credentials, and 5G NAS security state; non-nil IDs replace its NGAP UE
-// identities on the target. The source's ranUeID-keyed session state is purged
-// under the UE's current RAN-UE-NGAP-ID, before any new ID is applied.
+// The source's session state is keyed by the UE's current RAN-UE-NGAP-ID, so the purge must precede any rekey.
 func (g *GNBContext) MigrateUE(target *GNBContext, ue *UEContext, ranUeNgapID, amfUeNgapID *int64) {
 	g.mu.Lock()
 	g.deleteUELocked(ue.ID)

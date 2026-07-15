@@ -31,7 +31,6 @@ func NewRouter(h *Handler) *http.ServeMux {
 	mux.HandleFunc("POST /enb/{enb_id}/await", h.AwaitENBMessage)
 	mux.HandleFunc("POST /enb/{enb_id}/ue/{ue_id}/await", h.AwaitENBUEMessage)
 
-	// Requires the eNB created with enable_gtpu.
 	mux.HandleFunc("POST /enb/{enb_id}/ue/{ue_id}/uplink", h.SendENBUplink)
 	mux.HandleFunc("POST /enb/{enb_id}/ue/{ue_id}/downlink/await", h.AwaitENBDownlink)
 	mux.HandleFunc("POST /enb/{enb_id}/gtpu/echo", h.SendENBGTPUEcho)
@@ -49,7 +48,6 @@ func NewRouter(h *Handler) *http.ServeMux {
 	mux.HandleFunc("POST /gnb/{gnb_id}/ue/{ue_id}/ngap", h.SendNGAP)
 	mux.HandleFunc("POST /gnb/{gnb_id}/ue/{ue_id}/await", h.AwaitUEMessage)
 
-	// Requires the gNB created with enable_gtpu.
 	mux.HandleFunc("POST /gnb/{gnb_id}/gtpu/echo", h.SendGTPUEcho)
 	mux.HandleFunc("POST /gnb/{gnb_id}/gtpu/error-indication/await", h.AwaitErrorIndication)
 	mux.HandleFunc("GET /gnb/{gnb_id}/ue/{ue_id}/tunnel", h.GetTunnel)

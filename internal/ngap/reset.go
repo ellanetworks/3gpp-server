@@ -9,16 +9,11 @@ import (
 	"github.com/free5gc/ngap/ngapType"
 )
 
-// NGResetConnection identifies a UE-associated logical NG-connection to reset
-// (TS 38.413 §9.2.6.6). At least one of the AMF/RAN UE NGAP IDs is set.
 type NGResetConnection struct {
 	AmfUeNgapID *int64
 	RanUeNgapID *int64
 }
 
-// BuildNGReset builds an NG RESET (TS 38.413 §8.7.4) initiated by the NG-RAN
-// node. With no connections it resets the whole NG interface; otherwise it
-// resets the listed UE-associated logical NG-connections (partOfNG-Interface).
 func BuildNGReset(connections []NGResetConnection) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage

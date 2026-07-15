@@ -9,8 +9,6 @@ import (
 	"testing"
 )
 
-// Test4GAttachAcceptRetransmission withholds the Attach Complete: the MME's
-// T3450 guard must retransmit the Attach Accept (TS 24.301 §5.6.2).
 func Test4GAttachAcceptRetransmission(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)

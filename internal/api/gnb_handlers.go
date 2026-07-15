@@ -13,13 +13,14 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/ngap"
 	"github.com/ellanetworks/3gpp-server/internal/store"
 	"github.com/ellanetworks/3gpp-server/internal/transport"
+	"github.com/free5gc/ngap/ngapType"
 )
 
 type Handler struct {
 	Store          *store.Store
-	Transports     map[string]*transport.NGAPTransport // gnb store ID -> N2 transport
-	GTPU           map[string]*gtpu.Endpoint           // gnb store ID -> N3 GTP-U endpoint
-	S1APTransports map[string]*transport.S1APTransport // enb store ID -> S1-MME transport
+	Transports     map[string]*transport.NGAPTransport
+	GTPU           map[string]*gtpu.Endpoint
+	S1APTransports map[string]*transport.S1APTransport
 }
 
 func NewHandler(s *store.Store) *Handler {
@@ -80,9 +81,6 @@ func (h *Handler) CreateGNB(w http.ResponseWriter, r *http.Request) {
 		h.GTPU[gnb.ID] = gt
 	}
 
-	// NG Setup is the first NGAP procedure on an operational TNL association
-	// (TS 38.413 §8.7.1.1), so the association is left with no NG-C interface
-	// instance.
 	if req.SkipNGSetup {
 		writeJSON(w, http.StatusCreated, CreateGnBResponse{GnBID: gnb.ID})
 		return
@@ -91,7 +89,7 @@ func (h *Handler) CreateGNB(w http.ResponseWriter, r *http.Request) {
 	var msg *ngap.NGAPMessage
 	if len(req.NGSetupIEs) > 0 {
 		msg = &ngap.NGAPMessage{
-			ProcedureCode: 21, // NGSetup
+			ProcedureCode: ngapType.ProcedureCodeNGSetup,
 			PDUType:       "initiating_message",
 			Criticality:   "reject",
 			IEs:           req.NGSetupIEs,

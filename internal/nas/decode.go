@@ -82,10 +82,6 @@ func decodeGmm(m *gonas.Message, resp *NASResponse) error {
 	return nil
 }
 
-// unknownMessageType keeps the numeric 5GS message type (TS 24.501 §9.7) so a
-// downlink outside the dispatch tables stays identifiable. A nil GmmMessage means
-// PlainNasDecode parsed a top-level 5GSM message; the extended protocol
-// discriminator (§9.2) admits no third case.
 func unknownMessageType(m *gonas.Message) (string, error) {
 	if m.GsmMessage == nil {
 		return "", fmt.Errorf("nas: decoded message carries neither a 5GMM nor a 5GSM message")
@@ -204,8 +200,6 @@ func decodeDLNASTransport(m *gonas.Message, resp *NASResponse) error {
 		return nil
 	}
 
-	// The payload container holds a 5GSM message only when its type is N1 SM
-	// information (TS 24.501 §9.11.3.40); other container types are not NAS.
 	if m.DLNASTransport.GetPayloadContainerType() != nasMessage.PayloadContainerTypeN1SMInfo {
 		return nil
 	}

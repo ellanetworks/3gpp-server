@@ -7,9 +7,6 @@ package integration_test
 
 import "testing"
 
-// Test4GServiceRequestUnknownUE checks the MME refuses a Service Request whose
-// S-TMSI it never assigned: it must not re-establish, and replies with a Service
-// Reject (TS 24.301 §5.6.1.5).
 func Test4GServiceRequestUnknownUE(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -17,7 +14,6 @@ func Test4GServiceRequestUnknownUE(t *testing.T) {
 	fullAttach(t, enbID, ueID)
 	nasStep(t, enbID, ueID, "release_request")
 
-	// M-TMSI 0x12345678 was never allocated by the MME.
 	resp := nasBody(t, enbID, ueID, `{"message_type":"service_request","mtmsi":305419896,"timeout_ms":3000}`)
 
 	if got := jsonGet(resp, "s1ap.message_type"); got == "InitialContextSetupRequest" {
@@ -29,9 +25,6 @@ func Test4GServiceRequestUnknownUE(t *testing.T) {
 	}
 }
 
-// Test4GServiceRequestReplay checks the MME refuses a Service Request carrying a
-// stale uplink NAS COUNT (a replay): it must not re-establish the connection
-// (TS 24.301 §4.4.3.5).
 func Test4GServiceRequestReplay(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -45,7 +38,6 @@ func Test4GServiceRequestReplay(t *testing.T) {
 
 	nasStep(t, enbID, ueID, "release_request")
 
-	// NAS COUNT 0 is below the MME's current expected count: a replay.
 	resp := nasBody(t, enbID, ueID, `{"message_type":"service_request","nas_count":0,"timeout_ms":3000}`)
 
 	if got := jsonGet(resp, "s1ap.message_type"); got == "InitialContextSetupRequest" {

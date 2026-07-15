@@ -10,9 +10,6 @@ import (
 	"testing"
 )
 
-// Test4GUECapabilityInfoReplay checks the MME stores the UE radio capability
-// reported via UE Capability Info Indication and replays it in a later Initial
-// Context Setup Request (TS 23.401 §5.11.2), so the eNB need not re-fetch it.
 func Test4GUECapabilityInfoReplay(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)

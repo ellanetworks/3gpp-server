@@ -22,10 +22,7 @@ func SecurityHeader(b []byte) (SecurityHeaderType, error) {
 	return SecurityHeaderType(b[0] >> 4), nil
 }
 
-// PeekProtectedPayload returns the inner payload of a security-protected message
-// without verifying the MAC: the algorithms in a Security Mode Command
-// (integrity-protected, not ciphered) must be read before the NAS keys, which
-// depend on those algorithms, can be derived.
+// PeekProtectedPayload skips MAC verification: a Security Mode Command's algorithms must be read before the keys that depend on them exist.
 func PeekProtectedPayload(b []byte) ([]byte, error) {
 	m, err := eps.ParseSecurityProtectedMessage(b)
 	if err != nil {
@@ -35,7 +32,6 @@ func PeekProtectedPayload(b []byte) ([]byte, error) {
 	return m.Payload, nil
 }
 
-// Decode decodes a plain (unprotected) downlink EMM message into JSON.
 func Decode(plain []byte) (*NASResponse, error) {
 	resp := &NASResponse{RawHex: hex.EncodeToString(plain)}
 
@@ -229,8 +225,6 @@ func decodeAttachAccept(b []byte, resp *NASResponse) error {
 	result := int(m.EPSAttachResult)
 	resp.EPSAttachResult = &result
 
-	// An EMM cause in an Attach Accept reports a partial result, e.g. #18 when a
-	// combined attach gets EPS-only service (TS 24.301 §5.5.1.2.4).
 	if m.EMMCause != nil {
 		c := int(*m.EMMCause)
 		resp.EMMCause = &c

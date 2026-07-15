@@ -11,8 +11,7 @@ import (
 	"testing"
 )
 
-// attachUEConcurrent runs a full attach without a *testing.T, so it is safe to
-// call from a goroutine.
+// Errors are returned, not fatalled: this runs on goroutines, where t.Fatal is illegal.
 func attachUEConcurrent(enbID, imsi string) error {
 	createBody := fmt.Sprintf(`{"imsi":%q,"k":%q,"opc":%q,"amf":"8000","sqn":"000000000000"}`, imsi, testK, testOPc)
 
@@ -54,8 +53,6 @@ func attachUEConcurrent(enbID, imsi string) error {
 	return nil
 }
 
-// Test4GConcurrentAttach checks the MME keeps concurrent UEs' contexts, security
-// contexts, and GUTIs separate, registering them all.
 func Test4GConcurrentAttach(t *testing.T) {
 	enbID := mustCreateENB(t)
 
@@ -87,8 +84,6 @@ func Test4GConcurrentAttach(t *testing.T) {
 	}
 }
 
-// Test4GMalformedNAS checks the MME never mistakes a garbage NAS PDU carried in
-// an Initial UE Message for a valid attach.
 func Test4GMalformedNAS(t *testing.T) {
 	enbID := mustCreateENB(t)
 
@@ -124,8 +119,6 @@ func Test4GMalformedNAS(t *testing.T) {
 	})
 }
 
-// Test4GBadMACSecurityModeComplete checks the MME discards a Security Mode
-// Complete whose NAS-MAC does not verify (TS 24.301 §4.4.4).
 func Test4GBadMACSecurityModeComplete(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)

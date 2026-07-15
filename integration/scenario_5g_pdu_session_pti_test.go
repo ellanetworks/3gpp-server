@@ -3,11 +3,6 @@
 
 //go:build integration
 
-// 5GSM Procedure Transaction Identity error handling (TS 24.501 §7.3.1): the
-// network must police the PTI of every 5GSM message it receives, responding with
-// a 5GSM STATUS for a mismatched (#47) or unassigned (#81) PTI, and ignoring a
-// reserved PTI.
-
 package integration_test
 
 import (
@@ -16,13 +11,12 @@ import (
 	"testing"
 )
 
+// TS 24.501 §9.6.
 const (
-	ptiUnassigned uint8 = 0   // "no procedure transaction identity assigned" (TS 24.501 §9.6)
-	ptiReserved   uint8 = 255 // reserved value (TS 24.501 §9.6)
+	ptiUnassigned uint8 = 0
+	ptiReserved   uint8 = 255
 )
 
-// The network started no release procedure, so the assigned PTI matches none in
-// use and §7.3.1 a) requires a 5GSM STATUS with cause #47 "PTI mismatch".
 func Test5GPDUSessionReleaseComplete_PTIMismatch(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := establishRegisteredUE(t, gnbID)
@@ -42,8 +36,6 @@ func Test5GPDUSessionReleaseComplete_PTIMismatch(t *testing.T) {
 	assertNASCause(t, resp, "nas.cause_5gsm", cause5GSMPTIMismatch)
 }
 
-// On the unassigned PTI, §7.3.1 c) requires a 5GSM STATUS with cause #81 "invalid
-// PTI value" and no session.
 func Test5GPDUSessionEstablishment_UnassignedPTI(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -70,8 +62,6 @@ func Test5GPDUSessionEstablishment_UnassignedPTI(t *testing.T) {
 	assertNASCause(t, body, "nas.cause_5gsm", cause5GSMInvalidPTIValue)
 }
 
-// On the reserved PTI, §7.3.1 d) requires the network to ignore the message, so
-// the expected outcome is a timeout and a response of any kind is a violation.
 func Test5GPDUSessionEstablishment_ReservedPTI(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -85,8 +75,6 @@ func Test5GPDUSessionEstablishment_ReservedPTI(t *testing.T) {
 	}
 }
 
-// The PTI check precedes the modification outcome: §7.3.1 c) requires a 5GSM
-// STATUS with cause #81, so a Modification Reject is not conformant here.
 func Test5GPDUSessionModificationRequest_UnassignedPTI(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := establishRegisteredUE(t, gnbID)
@@ -108,8 +96,6 @@ func Test5GPDUSessionModificationRequest_UnassignedPTI(t *testing.T) {
 	assertNASCause(t, body, "nas.cause_5gsm", cause5GSMInvalidPTIValue)
 }
 
-// The PTI check precedes the release: §7.3.1 c) requires a 5GSM STATUS with cause
-// #81 and the session must survive.
 func Test5GPDUSessionReleaseRequest_UnassignedPTI(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := establishRegisteredUE(t, gnbID)
@@ -131,8 +117,6 @@ func Test5GPDUSessionReleaseRequest_UnassignedPTI(t *testing.T) {
 	assertNASCause(t, body, "nas.cause_5gsm", cause5GSMInvalidPTIValue)
 }
 
-// On the reserved PTI, §7.3.1 d) requires the SMF to ignore the message, so the
-// expected outcome is a timeout.
 func Test5GPDUSessionModificationRequest_ReservedPTI(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := establishRegisteredUE(t, gnbID)
@@ -145,8 +129,6 @@ func Test5GPDUSessionModificationRequest_ReservedPTI(t *testing.T) {
 	}
 }
 
-// The network started no modification procedure, so §7.3.1 a) requires a 5GSM
-// STATUS with cause #47 "PTI mismatch".
 func Test5GPDUSessionModificationComplete_PTIMismatch(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := establishRegisteredUE(t, gnbID)

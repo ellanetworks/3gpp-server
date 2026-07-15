@@ -34,8 +34,6 @@ func nasBody(t *testing.T, enbID, ueID, body string) []byte {
 	return resp
 }
 
-// Test4GAuthenticationWrongRES checks a UE returning an incorrect RES draws an
-// Authentication Reject (TS 24.301 §5.4.2.5).
 func Test4GAuthenticationWrongRES(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := attachChallenge(t, enbID)
@@ -48,10 +46,8 @@ func Test4GAuthenticationWrongRES(t *testing.T) {
 	}
 }
 
-// Test4GAuthenticationFailureNoProceed checks an Authentication Failure (#20 MAC
-// failure or #26 non-EPS) does not lead to security activation. Per TS 24.301
-// §5.4.2.7 c/d the MME may run the identity procedure or send an Authentication
-// Reject; either is compliant, a Security Mode Command is not.
+// TS 24.301 §5.4.2.7 c/d leaves the identity procedure and an Authentication
+// Reject both compliant.
 func Test4GAuthenticationFailureNoProceed(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -81,9 +77,6 @@ func Test4GAuthenticationFailureNoProceed(t *testing.T) {
 	}
 }
 
-// Test4GAuthenticationSynchFailure checks the MME handles a #21 synch failure by
-// re-synchronising with the HSS and re-challenging with a fresh vector
-// (TS 24.301 §5.4.2.7 e), after which the attach can complete.
 func Test4GAuthenticationSynchFailure(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := attachChallenge(t, enbID)
@@ -95,7 +88,6 @@ func Test4GAuthenticationSynchFailure(t *testing.T) {
 		t.Fatalf("after synch failure, nas.message_type = %q, want a fresh authentication_request; body: %s", got, resync)
 	}
 
-	// Reaching the Security Mode Command proves the re-sync produced a usable vector.
 	smc := nasStep(t, enbID, ueID, "authentication_response")
 	if got := jsonGet(smc, "nas.message_type"); got != "security_mode_command" {
 		t.Fatalf("after re-sync, nas.message_type = %q, want security_mode_command; body: %s", got, smc)

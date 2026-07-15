@@ -10,10 +10,6 @@ import (
 	"github.com/free5gc/util/milenage"
 )
 
-// ComputeAUTS derives the re-synchronisation token AUTS (TS 33.102 §6.3.5)
-// from the UE's credentials and the RAND from the Authentication Request. It is
-// returned in an Authentication Failure with EMM cause #21 (TS 24.301 §5.4.2.6 c)
-// or 5GMM cause #21 (TS 24.501 §5.4.1.3.7 f), both "synch failure".
 func ComputeAUTS(k, opc, sqn string, rand []byte) ([]byte, error) {
 	opcBytes, err := hex.DecodeString(opc)
 	if err != nil {

@@ -19,9 +19,8 @@ const (
 	enbS1Address = "10.3.0.3"
 )
 
-// createENBRaw sends rawHex verbatim as the first PDU of a fresh S1-MME
-// association. A malformed PDU is usually dropped without reply, so the wait is
-// capped low to keep the adversarial sweep within the suite timeout.
+// A malformed PDU usually draws no reply, so timeout_ms is capped low to keep
+// the adversarial sweep within the suite timeout.
 func createENBRaw(t *testing.T, rawHex string) (int, []byte) {
 	t.Helper()
 
@@ -53,9 +52,6 @@ func validS1SetupPDU(t *testing.T) []byte {
 	return b
 }
 
-// sendS1SetupPDU sends an S1 Setup Request built from p on a fresh association.
-// These PDUs are well-formed, so the MME must answer: the wait is long enough for
-// a definite reply.
 func sendS1SetupPDU(t *testing.T, p *s1ap.S1SetupRequestParams) []byte {
 	t.Helper()
 
@@ -79,8 +75,6 @@ func sendS1SetupPDU(t *testing.T, p *s1ap.S1SetupRequestParams) []byte {
 	return resp
 }
 
-// assertS1SetupAccepted checks for an S1 Setup Response carrying its mandatory
-// Served GUMMEIs IE (TS 36.413 §9.1.8.5).
 func assertS1SetupAccepted(t *testing.T, resp []byte) {
 	t.Helper()
 
@@ -93,9 +87,8 @@ func assertS1SetupAccepted(t *testing.T, resp []byte) {
 	}
 }
 
-// assertS1SetupRejected checks for an S1 Setup Failure carrying its mandatory
-// Cause IE (TS 36.413 §9.1.8.6). The specific cause is left unchecked: §8.7.3.4
-// gives "Unknown PLMN" only as an example ("e.g.").
+// TS 36.413 §8.7.3.4 names Unknown PLMN only as an example, so the cause value
+// itself is unchecked.
 func assertS1SetupRejected(t *testing.T, resp []byte) {
 	t.Helper()
 
@@ -108,10 +101,8 @@ func assertS1SetupRejected(t *testing.T, resp []byte) {
 	}
 }
 
-// Test4GS1SetupHappyVariations checks the MME accepts a range of valid eNB
-// configurations with an S1 Setup Response. The integration operator serves only
-// TAC 000001, so an eNB broadcasting a served PLMN on any other TAC has no served
-// TAI and draws an S1 Setup Failure (TS 36.413 §8.7.3.3).
+// The integration operator serves only TAC 000001, so a served PLMN on any other
+// TAC yields no served TAI and draws a Failure (TS 36.413 §8.7.3.3).
 func Test4GS1SetupHappyVariations(t *testing.T) {
 	tests := []struct {
 		name       string
@@ -148,11 +139,6 @@ func Test4GS1SetupHappyVariations(t *testing.T) {
 	}
 }
 
-// Test4GS1SetupWrongPLMN checks the MME refuses an eNB none of whose PLMNs it
-// serves. TS 36.413 §8.7.3.4 mandates this: "none of the PLMNs provided by the
-// eNB is identified by the MME, then the MME shall reject the eNB S1 Setup
-// Request procedure with the appropriate cause value, e.g. 'Unknown PLMN'." The
-// cause is exemplary ("e.g."), so only the S1 Setup Failure outcome is asserted.
 func Test4GS1SetupWrongPLMN(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -182,10 +168,6 @@ func Test4GS1SetupWrongPLMN(t *testing.T) {
 	}
 }
 
-// Test4GS1SetupMalformed checks the MME never mistakes a PDU that cannot be a
-// valid S1 Setup for one. These inputs are either incomplete (truncated) or not
-// S1AP at all, so the only correct outcomes are a drop (null response), an Error
-// Indication, or a Failure.
 func Test4GS1SetupMalformed(t *testing.T) {
 	seed := validS1SetupPDU(t)
 
@@ -214,9 +196,7 @@ func Test4GS1SetupMalformed(t *testing.T) {
 	}
 }
 
-// Test4GS1SetupResilience drives a barrage of corrupted and oversized PDUs, then
-// confirms a fresh eNB still completes S1 Setup. A flip may happen to leave the
-// PDU valid, so no outcome of the barrage itself is asserted.
+// A flip may leave the PDU valid, so no outcome of the barrage itself is asserted.
 func Test4GS1SetupResilience(t *testing.T) {
 	seed := validS1SetupPDU(t)
 
@@ -227,8 +207,6 @@ func Test4GS1SetupResilience(t *testing.T) {
 		bytesRepeat(0x41, 4096),
 	}
 
-	// Sampling byte positions keeps the barrage bounded while still hitting the
-	// envelope, IE headers, and payload.
 	for n := 0; n < len(seed); n += max(1, len(seed)/12) {
 		barrage = append(barrage, flipByte(seed, n))
 	}
@@ -245,10 +223,7 @@ func Test4GS1SetupResilience(t *testing.T) {
 	}
 }
 
-// Test4GS1SetupPLMNFlex exercises the precise boundary of TS 36.413 §8.7.3.4,
-// which rejects only when *none* of the eNB's broadcast PLMNs is served. An eNB
-// broadcasting several PLMNs of which one is served (S1-flex / RAN sharing) must
-// be accepted; one broadcasting only unserved PLMNs must be rejected.
+// TS 36.413 §8.7.3.4 rejects only when none of the broadcast PLMNs is served.
 func Test4GS1SetupPLMNFlex(t *testing.T) {
 	served := s1ap.PLMNParams{MCC: "001", MNC: "01"}
 	foreignA := s1ap.PLMNParams{MCC: "310", MNC: "410"}
@@ -277,9 +252,6 @@ func Test4GS1SetupPLMNFlex(t *testing.T) {
 	})
 }
 
-// Test4GS1SetupENBIDVariants checks the MME accepts every Global eNB ID encoding
-// (TS 36.413 §9.2.1.37): macro (20-bit), home (28-bit), short-macro (18-bit),
-// and long-macro (21-bit), each at its maximum value.
 func Test4GS1SetupENBIDVariants(t *testing.T) {
 	tests := []struct {
 		name string
@@ -303,9 +275,6 @@ func Test4GS1SetupENBIDVariants(t *testing.T) {
 	}
 }
 
-// Test4GS1SetupSupportedTAs checks the MME accepts an eNB advertising several
-// supported TAs and a maximum-length eNB Name (TS 36.413 §9.1.8.4; the eNB Name
-// is a PrintableString of SIZE(1..150)).
 func Test4GS1SetupSupportedTAs(t *testing.T) {
 	t.Run("multiple TAs", func(t *testing.T) {
 		resp := sendS1SetupPDU(t, &s1ap.S1SetupRequestParams{

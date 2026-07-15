@@ -15,8 +15,6 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/store"
 )
 
-// EncodeOption tweaks the security wrapping of an uplink NAS message for
-// negative testing.
 type EncodeOption func(*encodeOptions)
 
 type encodeOptions struct {
@@ -24,14 +22,11 @@ type encodeOptions struct {
 	countOverride *uint32
 }
 
-// WithCorruptMAC flips a byte of the NAS-MAC so the AMF's integrity check fails;
-// the AMF must discard the message (TS 24.501 §4.4.4.3).
 func WithCorruptMAC() EncodeOption {
 	return func(o *encodeOptions) { o.corruptMAC = true }
 }
 
-// WithNASCountOverride forces the uplink NAS COUNT written into the message,
-// leaving the UE's real counter to advance normally.
+// WithNASCountOverride sets the COUNT written into the message; the UE's own counter still advances.
 func WithNASCountOverride(count uint32) EncodeOption {
 	return func(o *encodeOptions) { o.countOverride = &count }
 }

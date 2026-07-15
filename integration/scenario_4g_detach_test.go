@@ -19,8 +19,6 @@ func Test4GScenarioDetach(t *testing.T) {
 	}
 }
 
-// Test4GDetachSwitchOff drives a switch-off Detach: the MME releases the S1
-// connection and sends no Detach Accept (TS 24.301 §5.5.2.2.2).
 func Test4GDetachSwitchOff(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)

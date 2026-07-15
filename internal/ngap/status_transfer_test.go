@@ -10,10 +10,6 @@ import (
 	"github.com/free5gc/ngap/ngapType"
 )
 
-// TestBuildUplinkRANStatusTransfer checks the built PDU carries the IEs
-// TS 38.413 §9.2.3.13 makes mandatory — the UE NGAP IDs and a RAN Status
-// Transfer Transparent Container whose DRB list reports the DRB ID with its UL
-// and DL COUNT (§8.4.6.2).
 func TestBuildUplinkRANStatusTransfer(t *testing.T) {
 	data, err := BuildUplinkRANStatusTransfer(7, 9, []DRBStatusTransferItem{
 		{DRBID: 3, ULPDCPSN: 42, ULHFN: 7, DLPDCPSN: 99, DLHFN: 3},
@@ -87,8 +83,6 @@ func TestBuildUplinkRANStatusTransfer(t *testing.T) {
 	}
 }
 
-// TestDecodeDownlinkRANStatusTransfer checks the decoder surfaces the target's
-// UE NGAP IDs and the relayed container (TS 38.413 §9.2.3.14).
 func TestDecodeDownlinkRANStatusTransfer(t *testing.T) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage

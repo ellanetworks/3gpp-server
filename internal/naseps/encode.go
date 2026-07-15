@@ -14,14 +14,12 @@ import (
 
 // EPS update types (TS 24.301 §9.9.3.14).
 const (
-	EPSUpdateTypeTA               uint8 = 0 // TA updating
-	EPSUpdateTypeCombinedTALA     uint8 = 1 // combined TA/LA updating
-	EPSUpdateTypeCombinedTALAImsi uint8 = 2 // combined TA/LA with IMSI attach
-	EPSUpdateTypePeriodic         uint8 = 3 // periodic updating
+	EPSUpdateTypeTA               uint8 = 0
+	EPSUpdateTypeCombinedTALA     uint8 = 1
+	EPSUpdateTypeCombinedTALAImsi uint8 = 2
+	EPSUpdateTypePeriodic         uint8 = 3
 )
 
-// encodeGUTIIdentity encodes a GUTI as the 11-octet EPS mobile identity
-// (TS 24.301 §9.9.3.12).
 func encodeGUTIIdentity(guti GUTIParams) ([]byte, error) {
 	plmn, err := common.EncodePLMN(guti.MCC, guti.MNC)
 	if err != nil {
@@ -38,8 +36,7 @@ func encodeGUTIIdentity(guti GUTIParams) ([]byte, error) {
 	return out, nil
 }
 
-// BuildTrackingAreaUpdateRequest builds a plain TAU Request with the EPS update
-// type, NAS KSI, and the UE's old GUTI (TS 24.301 §8.2.29).
+// BuildTrackingAreaUpdateRequest builds a plain TAU REQUEST (TS 24.301 §8.2.29).
 func BuildTrackingAreaUpdateRequest(updateType uint8, activeFlag bool, ksi uint8, guti GUTIParams) ([]byte, error) {
 	gutiID, err := encodeGUTIIdentity(guti)
 	if err != nil {
@@ -65,13 +62,12 @@ func BuildTrackingAreaUpdateRequest(updateType uint8, activeFlag bool, ksi uint8
 	return w.Bytes(), nil
 }
 
-// BuildTrackingAreaUpdateComplete builds a plain TAU Complete (TS 24.301 §8.2.28).
+// BuildTrackingAreaUpdateComplete builds a plain TAU COMPLETE (TS 24.301 §8.2.28).
 func BuildTrackingAreaUpdateComplete() ([]byte, error) {
 	return (&eps.TrackingAreaUpdateComplete{}).Marshal()
 }
 
-// DefaultUENetworkCapability advertises support for EEA0/1/2 and EIA0/1/2
-// (TS 24.301 §9.9.3.34): bit 7 = algorithm 0, bit 6 = 1, bit 5 = 2.
+// EEA0/1/2 and EIA0/1/2; bit 7 = algorithm 0, bit 6 = 1, bit 5 = 2 (TS 24.301 §9.9.3.34).
 var DefaultUENetworkCapability = []byte{0xE0, 0xE0}
 
 // PDN types (TS 24.301 §9.9.4.10).
@@ -81,17 +77,12 @@ const (
 	PDNTypeIPv4v6 uint8 = 3
 )
 
-// BuildPDNConnectivityRequest builds the ESM PDN CONNECTIVITY REQUEST that the UE
-// piggybacks in the Attach Request's ESM container (TS 24.301 §8.3.20). pti is
-// the procedure transaction identity; the bearer identity is 0 before assignment.
+// BuildPDNConnectivityRequest builds an ESM PDN CONNECTIVITY REQUEST (TS 24.301 §8.3.20).
 func BuildPDNConnectivityRequest(pti, pdnType uint8) ([]byte, error) {
 	return BuildPDNConnectivityRequestWith(PDNConnectivityParams{PTI: pti, PDNType: pdnType})
 }
 
-// PDNConnectivityParams are the inputs to a standalone PDN CONNECTIVITY REQUEST
-// (TS 24.301 §8.3.20). EPSBearerIdentity is 0 in a valid request (no bearer is
-// assigned yet); a non-zero value drives the §7.3.2 invalid-EBI handling. APN,
-// when set, requests an additional PDN connection to that access point.
+// PDNConnectivityParams drives a PDN CONNECTIVITY REQUEST; EPSBearerIdentity is 0 in a valid request, non-zero exercising the invalid-EBI path (TS 24.301 §7.3.2).
 type PDNConnectivityParams struct {
 	PTI               uint8
 	EPSBearerIdentity uint8
@@ -99,8 +90,7 @@ type PDNConnectivityParams struct {
 	APN               string
 }
 
-// BuildPDNConnectivityRequestWith builds a PDN CONNECTIVITY REQUEST, standalone
-// or piggybacked, with an optional APN (TS 24.301 §8.3.20).
+// BuildPDNConnectivityRequestWith builds a PDN CONNECTIVITY REQUEST (TS 24.301 §8.3.20).
 func BuildPDNConnectivityRequestWith(p PDNConnectivityParams) ([]byte, error) {
 	pdnType := p.PDNType
 	if pdnType == 0 {
@@ -118,8 +108,7 @@ func BuildPDNConnectivityRequestWith(p PDNConnectivityParams) ([]byte, error) {
 	return m.Marshal()
 }
 
-// encodeAPN encodes an APN as the access-point-name value part: a sequence of
-// labels, each a length octet followed by its characters (TS 23.003 §9.1).
+// encodeAPN emits each label prefixed by its length octet (TS 23.003 §9.1).
 func encodeAPN(apn string) []byte {
 	if apn == "" {
 		return nil
@@ -134,9 +123,7 @@ func encodeAPN(apn string) []byte {
 	return out
 }
 
-// BuildPDNDisconnectRequest builds a PDN DISCONNECT REQUEST identifying the PDN to
-// release by its linked default EPS bearer identity (TS 24.301 §8.3.19). The ESM
-// header bearer identity is 0 (no bearer is assigned to the procedure).
+// BuildPDNDisconnectRequest builds a PDN DISCONNECT REQUEST (TS 24.301 §8.3.19).
 func BuildPDNDisconnectRequest(pti, linkedEBI uint8) ([]byte, error) {
 	return (&eps.PDNDisconnectRequest{
 		EPSBearerIdentity:            0,
@@ -145,8 +132,7 @@ func BuildPDNDisconnectRequest(pti, linkedEBI uint8) ([]byte, error) {
 	}).Marshal()
 }
 
-// BuildDeactivateEPSBearerContextAccept builds the UE's acknowledgement of a
-// network-initiated bearer deactivation (TS 24.301 §8.3.8).
+// BuildDeactivateEPSBearerContextAccept builds a DEACTIVATE EPS BEARER CONTEXT ACCEPT (TS 24.301 §8.3.8).
 func BuildDeactivateEPSBearerContextAccept(ebi, pti uint8) ([]byte, error) {
 	return (&eps.DeactivateEPSBearerContextAccept{
 		EPSBearerIdentity:            ebi,
@@ -154,8 +140,7 @@ func BuildDeactivateEPSBearerContextAccept(ebi, pti uint8) ([]byte, error) {
 	}).Marshal()
 }
 
-// BuildModifyEPSBearerContextAccept builds the UE's acknowledgement of a
-// network-initiated bearer modification (TS 24.301 §8.3.10).
+// BuildModifyEPSBearerContextAccept builds a MODIFY EPS BEARER CONTEXT ACCEPT (TS 24.301 §8.3.10).
 func BuildModifyEPSBearerContextAccept(ebi, pti uint8) ([]byte, error) {
 	return (&eps.ModifyEPSBearerContextAccept{
 		EPSBearerIdentity:            ebi,
@@ -163,8 +148,7 @@ func BuildModifyEPSBearerContextAccept(ebi, pti uint8) ([]byte, error) {
 	}).Marshal()
 }
 
-// BuildESMStatus builds an ESM STATUS reporting an ESM protocol error for a
-// bearer (TS 24.301 §8.3.15).
+// BuildESMStatus builds an ESM STATUS (TS 24.301 §8.3.15).
 func BuildESMStatus(ebi, pti, cause uint8) ([]byte, error) {
 	return (&eps.ESMStatus{
 		EPSBearerIdentity:            ebi,
@@ -183,15 +167,14 @@ type GUTIParams struct {
 
 type AttachRequestParams struct {
 	IMSI                string
-	GUTI                *GUTIParams // when set, the mobile identity is this GUTI, not the IMSI
-	AttachType          uint8       // eps.AttachTypeEPS / Combined / Emergency
+	GUTI                *GUTIParams
+	AttachType          uint8
 	NASKeySetIdentifier uint8
-	UENetworkCapability []byte // defaults to DefaultUENetworkCapability
-	ESMContainer        []byte // the PDN Connectivity Request
+	UENetworkCapability []byte
+	ESMContainer        []byte
 }
 
-// BuildAttachRequest builds a plain EPS Attach Request carrying an IMSI (or, when
-// GUTI is set, a GUTI) mobile identity and the ESM container (TS 24.301 §8.2.4).
+// BuildAttachRequest builds a plain ATTACH REQUEST (TS 24.301 §8.2.4).
 func BuildAttachRequest(p AttachRequestParams) ([]byte, error) {
 	cap := p.UENetworkCapability
 	if cap == nil {
@@ -226,8 +209,7 @@ func BuildAttachRequest(p AttachRequestParams) ([]byte, error) {
 	return m.Marshal()
 }
 
-// BuildIdentityResponse builds a plain Identity Response carrying the UE's IMSI
-// as a TS 24.008 §10.5.1.4 mobile identity (TS 24.301 §8.2.19).
+// BuildIdentityResponse builds a plain IDENTITY RESPONSE carrying the IMSI as a mobile identity (TS 24.301 §8.2.19, TS 24.008 §10.5.1.4).
 func BuildIdentityResponse(imsi string) ([]byte, error) {
 	if imsi == "" || imsi[0] < '0' || imsi[0] > '9' {
 		return nil, fmt.Errorf("naseps: invalid IMSI %q", imsi)
@@ -245,33 +227,27 @@ func BuildIdentityResponse(imsi string) ([]byte, error) {
 	return (&eps.IdentityResponse{MobileIdentity: mobid}).Marshal()
 }
 
-// BuildAuthenticationResponse builds a plain Authentication Response carrying RES
-// (TS 24.301 §8.2.8).
+// BuildAuthenticationResponse builds a plain AUTHENTICATION RESPONSE (TS 24.301 §8.2.8).
 func BuildAuthenticationResponse(res []byte) ([]byte, error) {
 	return (&eps.AuthenticationResponse{RES: res}).Marshal()
 }
 
-// BuildAuthenticationFailure builds a plain Authentication Failure with an EMM
-// cause and optional AUTS (TS 24.301 §8.2.5) — cause #20 (MAC), #21 (synch,
-// with AUTS), or #26 (non-EPS).
+// BuildAuthenticationFailure builds a plain AUTHENTICATION FAILURE (TS 24.301 §8.2.5).
 func BuildAuthenticationFailure(cause uint8, auts []byte) ([]byte, error) {
 	return (&eps.AuthenticationFailure{Cause: cause, AUTS: auts}).Marshal()
 }
 
-// BuildSecurityModeComplete builds a plain Security Mode Complete, including the
-// IMEISV when the MME requested it (TS 24.301 §8.2.21).
+// BuildSecurityModeComplete builds a plain SECURITY MODE COMPLETE (TS 24.301 §8.2.21).
 func BuildSecurityModeComplete(imeisv []byte) ([]byte, error) {
 	return (&eps.SecurityModeComplete{IMEISV: imeisv}).Marshal()
 }
 
-// BuildSecurityModeReject builds a plain Security Mode Reject with an EMM cause
-// (TS 24.301 §8.2.22) — #23 (capabilities mismatch) or #24 (unspecified).
+// BuildSecurityModeReject builds a plain SECURITY MODE REJECT (TS 24.301 §8.2.22).
 func BuildSecurityModeReject(cause uint8) ([]byte, error) {
 	return (&eps.SecurityModeReject{Cause: cause}).Marshal()
 }
 
-// BuildActivateDefaultEPSBearerContextAccept builds the ESM acceptance the UE
-// returns in the Attach Complete container (TS 24.301 §8.3.2).
+// BuildActivateDefaultEPSBearerContextAccept builds an ACTIVATE DEFAULT EPS BEARER CONTEXT ACCEPT (TS 24.301 §8.3.2).
 func BuildActivateDefaultEPSBearerContextAccept(ebi, pti uint8) ([]byte, error) {
 	return (&eps.ActivateDefaultEPSBearerContextAccept{
 		EPSBearerIdentity:            ebi,
@@ -279,16 +255,12 @@ func BuildActivateDefaultEPSBearerContextAccept(ebi, pti uint8) ([]byte, error) 
 	}).Marshal()
 }
 
-// BuildAttachComplete builds a plain Attach Complete wrapping the ESM acceptance
-// container (TS 24.301 §8.2.2).
+// BuildAttachComplete builds a plain ATTACH COMPLETE (TS 24.301 §8.2.2).
 func BuildAttachComplete(esmContainer []byte) ([]byte, error) {
 	return (&eps.AttachComplete{ESMMessageContainer: esmContainer}).Marshal()
 }
 
-// BuildServiceRequest builds the 4-octet Service Request (TS 24.301 §8.2.25): the
-// security-header/PD octet (SHT 12), the KSI and 5-bit truncated uplink NAS
-// sequence number, and the 2-octet short MAC over the first two octets, computed
-// with the independently-derived NAS integrity key.
+// BuildServiceRequest builds the 4-octet SERVICE REQUEST: SHT/PD, KSI | 5-bit truncated COUNT, then a short MAC over those two octets (TS 24.301 §8.2.25).
 func BuildServiceRequest(ksi uint8, count uint32, knasInt [16]byte, eia uint8) ([]byte, error) {
 	integ, err := integrityFor(eia)
 	if err != nil {
@@ -306,9 +278,7 @@ func BuildServiceRequest(ksi uint8, count uint32, knasInt [16]byte, eia uint8) (
 	return []byte{octet0, octet1, mac[0], mac[1]}, nil
 }
 
-// BuildDetachRequest builds a UE-originating plain Detach Request with the UE's
-// GUTI as the mobile identity (TS 24.301 §8.2.11). switchOff suppresses the
-// network's Detach Accept.
+// BuildDetachRequest builds a UE-originating plain DETACH REQUEST (TS 24.301 §8.2.11).
 func BuildDetachRequest(switchOff bool, ksi uint8, guti GUTIParams) ([]byte, error) {
 	return (&eps.DetachRequestUE{
 		SwitchOff:           switchOff,

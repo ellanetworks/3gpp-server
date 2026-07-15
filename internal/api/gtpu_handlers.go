@@ -16,12 +16,9 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/store"
 )
 
-// Exactly one of icmp_echo / udp is used.
 type UplinkRequest struct {
 	PDUSessionID int64 `json:"pdu_session_id,omitempty"`
 
-	// TEID overrides the session's uplink TEID, to exercise the UPF's handling
-	// of a G-PDU for a TEID with no PDR (TS 29.281 §7.3.1).
 	TEID *uint32 `json:"teid,omitempty"`
 
 	ICMPEcho *struct {
@@ -37,7 +34,6 @@ type UplinkRequest struct {
 		PayloadHex string `json:"payload_hex,omitempty"`
 	} `json:"udp,omitempty"`
 
-	// Src defaults to the session's UE IP.
 	Src *string `json:"src,omitempty"`
 }
 
@@ -252,8 +248,6 @@ func (h *Handler) SendGTPUEcho(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"echo_response": true, "seq": msg.Seq})
 }
 
-// The UPF sends an Error Indication on receiving a G-PDU for a TEID with no
-// context (TS 29.281 §7.3.1).
 func (h *Handler) AwaitErrorIndication(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 

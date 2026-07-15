@@ -11,9 +11,6 @@ import (
 	"github.com/ellanetworks/core/s1ap"
 )
 
-// Decode decodes a received S1AP PDU into its JSON form. Only the messages the
-// server drives are mapped to typed fields; any other PDU is reported by its
-// outcome and procedure code with the raw hex preserved.
 func Decode(data []byte) (*S1APResponse, error) {
 	pdu, err := s1ap.Unmarshal(data)
 	if err != nil {
@@ -189,7 +186,6 @@ func decodeInitialContextSetupRequest(value []byte, resp *S1APResponse) error {
 
 		resp.ERABSetupItems = append(resp.ERABSetupItems, item)
 
-		// The Attach Accept rides as the NAS-PDU of the default E-RAB item.
 		if len(it.NASPDU) > 0 && resp.NASPDU == nil {
 			nas := hex.EncodeToString(it.NASPDU)
 			resp.NASPDU = &nas
@@ -218,7 +214,6 @@ func decodeERABReleaseCommand(value []byte, resp *S1APResponse) error {
 		resp.ERABSetupItems = append(resp.ERABSetupItems, ERABSetupItemJSON{ERABID: int(it.ERABID)})
 	}
 
-	// The Deactivate EPS Bearer Context Request rides as the NAS-PDU.
 	if len(m.NASPDU) > 0 {
 		nas := hex.EncodeToString([]byte(m.NASPDU))
 		resp.NASPDU = &nas
@@ -244,7 +239,6 @@ func decodeERABModifyRequest(value []byte, resp *S1APResponse) error {
 			ARPPriorityLevel: int(it.QoS.ARP.PriorityLevel),
 		})
 
-		// The Modify EPS Bearer Context Request rides as the default bearer's NAS-PDU.
 		if len(it.NASPDU) > 0 && resp.NASPDU == nil {
 			nas := hex.EncodeToString([]byte(it.NASPDU))
 			resp.NASPDU = &nas
@@ -295,7 +289,6 @@ func decodeERABSetupRequest(value []byte, resp *S1APResponse) error {
 		item.TransportLayerAddress, item.TransportLayerAddressIPv6 = transportLayerIPs(it.TransportLayerAddress)
 		resp.ERABSetupItems = append(resp.ERABSetupItems, item)
 
-		// The Activate Default EPS Bearer Context Request rides as the E-RAB's NAS-PDU.
 		if len(it.NASPDU) > 0 && resp.NASPDU == nil {
 			nas := hex.EncodeToString([]byte(it.NASPDU))
 			resp.NASPDU = &nas
@@ -313,7 +306,6 @@ func decodeUEContextReleaseCommand(value []byte, resp *S1APResponse) error {
 
 	setUnknownIEs(resp, m)
 
-	// UE-S1AP-IDs is a CHOICE: the ID pair, or a bare MME UE S1AP ID.
 	mme := int64(m.UES1APIDs.MMEUES1APID)
 	resp.MMEUES1APID = &mme
 
@@ -506,9 +498,7 @@ func cnDomainName(d s1ap.CNDomain) string {
 	}
 }
 
-// transportLayerIPs renders an S1AP Transport Layer Address (TS 36.414 §5.3): 32
-// bits for IPv4, 128 bits for IPv6, or 160 bits when both are signalled, in which
-// case the IPv4 address is contained in the first 32 bits.
+// TransportLayerAddress: 32-bit IPv4, 128-bit IPv6, or 160-bit carrying the IPv4 in the first 32 bits (TS 36.414 §5.3).
 func transportLayerIPs(b []byte) (ipv4, ipv6 string) {
 	switch len(b) {
 	case 4:
@@ -527,8 +517,6 @@ func setUEIDs(resp *S1APResponse, mme, enb int64) {
 	resp.ENBUES1APID = &enb
 }
 
-// unknownIECarrier is a parsed message reporting the ProtocolIEs its type does
-// not model.
 type unknownIECarrier interface {
 	UnknownIEs() []s1ap.RawIE
 }
@@ -583,9 +571,6 @@ func mapS1SetupFailure(sf *s1ap.S1SetupFailure) *S1SetupFailureJSON {
 	return out
 }
 
-// procedureName maps an S1AP procedure code to a stable message name, so an
-// unexpected downlink stays awaitable by message_type. Procedures with distinct
-// outcomes (e.g. S1 Setup) are refined per outcome.
 func procedureName(pc s1ap.ProcedureCode) string {
 	switch pc {
 	case s1ap.ProcS1Setup:

@@ -10,16 +10,6 @@ import (
 	"testing"
 )
 
-// The 4G NAS (nas/eps) and S1AP codecs are separate from the 5G (nas/5gs, ngap)
-// ones, so a fix on the 5G side does not cover them: these tests check the 4G
-// control plane against the denial-of-service classes in Ella Core's published 5G
-// advisories. The MME has no panic recovery, so any unguarded parse crashes the
-// whole core — each test asserts the core survives by attaching a fresh UE
-// afterward.
-
-// Test4GMalformedAuthNASNoCrash is the 4G analogue of GHSA-55q8-2gwx-29pc (panic
-// on NAS auth messages with missing IEs): the MME must discard them without
-// crashing.
 func Test4GMalformedAuthNASNoCrash(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := attachChallenge(t, enbID)
@@ -41,10 +31,6 @@ func Test4GMalformedAuthNASNoCrash(t *testing.T) {
 	fullAttach(t, enbID, fresh)
 }
 
-// Test4GShortProtectedNASNoCrash is the 4G analogue of GHSA-m9pm-w3gv-c68f
-// (panic on a short integrity-protected NAS payload): the MME must reject a NAS
-// message shorter than a full security header (header, 4-octet MAC, sequence)
-// without an out-of-bounds read.
 func Test4GShortProtectedNASNoCrash(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -62,10 +48,6 @@ func Test4GShortProtectedNASNoCrash(t *testing.T) {
 	fullAttach(t, enbID, fresh)
 }
 
-// Test4GPathSwitchEmptySecCapNoCrash is the 4G analogue of GHSA-j478-p7vq-3347
-// (panic on empty NR security capability in PathSwitchRequest). The 4G S1AP
-// encoding uses fixed 16-bit bitmaps, so the MME must handle zeroed UE security
-// capabilities without crashing.
 func Test4GPathSwitchEmptySecCapNoCrash(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)

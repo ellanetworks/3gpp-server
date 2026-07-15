@@ -37,8 +37,6 @@ func ngapErrorIndicationIDs(body []byte) (amf, ran *int64) {
 	return amf, ran
 }
 
-// criticalityDiagnosticsJSON mirrors the Criticality Diagnostics IE the server
-// decodes (TS 38.413 §9.3.1.3); every field is optional there.
 type criticalityDiagnosticsJSON struct {
 	ProcedureCode        *int64  `json:"procedure_code"`
 	TriggeringMessage    *string `json:"triggering_message"`
@@ -67,12 +65,8 @@ func ngapCriticalityDiagnostics(body []byte) *criticalityDiagnosticsJSON {
 	return nil
 }
 
-// assertSpecCompliantErrorIndication checks the IEs TS 38.413 §10.6 and
-// §8.7.5.2 require of an Error Indication answering a UE-associated message
-// with a wrong AMF/RAN UE NGAP ID: UE-associated signalling (both UE NGAP IDs
-// echoed) and a Cause. Which of the two §10.6 causes applies (Unknown local or
-// Inconsistent remote UE NGAP ID) depends on the mutated ID, so only the
-// presence of a Cause is asserted.
+// Which of the two TS 38.413 §10.6 causes applies depends on the mutated ID, so
+// only the presence of a Cause is asserted.
 func assertSpecCompliantErrorIndication(t *testing.T, body []byte) {
 	t.Helper()
 

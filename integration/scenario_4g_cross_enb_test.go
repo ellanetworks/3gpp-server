@@ -10,8 +10,6 @@ import (
 	"testing"
 )
 
-// createENBWithID creates an eNB on a caller-chosen Global eNB ID, opening its
-// own S1 association.
 func createENBWithID(t *testing.T, enbID int, name string) string {
 	t.Helper()
 
@@ -38,8 +36,6 @@ func createENBWithID(t *testing.T, enbID int, name string) string {
 	return id
 }
 
-// enbUES1APIDs returns the UE's S1AP ID pair as decimal strings, ready to splice
-// into a JSON number field.
 func enbUES1APIDs(t *testing.T, enbID, ueID string) (mme, enb string) {
 	t.Helper()
 
@@ -56,10 +52,6 @@ func enbUES1APIDs(t *testing.T, enbID, ueID string) (mme, enb string) {
 	return mme, enb
 }
 
-// Test4GCrossENBReleaseHijack forges the victim's S1AP ID pair in a UE Context
-// Release Request on the attacker's own association. The pair names a
-// UE-associated connection unknown on that association, so the MME must answer
-// with an Error Indication (TS 36.413 §10.6) and leave the victim served.
 func Test4GCrossENBReleaseHijack(t *testing.T) {
 	victimENB := createENBWithID(t, 1, "victim-enb")
 	attackerENB := createENBWithID(t, 2, "attacker-enb")
@@ -82,11 +74,6 @@ func Test4GCrossENBReleaseHijack(t *testing.T) {
 	assertEPSErrorIndication(t, resp)
 }
 
-// Test4GCrossENBUECapabilityHijack forges the victim's S1AP ID pair in a UE
-// Capability Info Indication, which carries no integrity protection: only the
-// binding of the UE-associated connection to its own association stops the MME
-// storing attacker-chosen capability bytes against the victim. The MME must
-// reject it with an Error Indication (TS 36.413 §10.6).
 func Test4GCrossENBUECapabilityHijack(t *testing.T) {
 	victimENB := createENBWithID(t, 1, "victim-enb")
 	attackerENB := createENBWithID(t, 2, "attacker-enb")

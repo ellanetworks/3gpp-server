@@ -80,8 +80,7 @@ func (h *Handler) AwaitENBUEMessage(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, SendENBNASResponse{S1AP: resp, NAS: decodeENBDownlinkNAS(ue, resp)})
 }
 
-// The DL NAS COUNT of a protected message is taken from its sequence number; the
-// overflow counter stays 0 below 256 downlinks.
+// b[5] is the sequence number, which is the DL NAS COUNT until the first overflow.
 func decodeENBDownlinkNAS(ue *store.UEEPSContext, resp *s1ap.S1APResponse) *naseps.NASResponse {
 	if resp == nil || resp.NASPDU == nil {
 		return nil
@@ -116,10 +115,7 @@ func decodeENBDownlinkNAS(ue *store.UEEPSContext, resp *s1ap.S1APResponse) *nase
 	return nas
 }
 
-// Matching by S1AP ID pair keeps concurrent waiters on one eNB association from
-// consuming each other's downlink. The MME UE S1AP ID is the MME's to assign, so
-// an mmeID of 0 means "not yet known" and is skipped. A PDU carrying neither ID
-// matches any waiter.
+// An mmeID of 0 means the MME has not assigned one yet, so it cannot match.
 func s1apUEMatcher(mmeID, enbID uint32) func(*s1ap.S1APResponse) bool {
 	return func(resp *s1ap.S1APResponse) bool {
 		if resp.MMEUES1APID == nil && resp.ENBUES1APID == nil {

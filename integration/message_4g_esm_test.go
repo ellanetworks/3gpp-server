@@ -25,9 +25,6 @@ func attachWithPDNType(t *testing.T, enbID string, pdnType int) []byte {
 	return nasStep(t, enbID, ueID, "security_mode_complete")
 }
 
-// Test4GPDNTypeNegotiation checks the MME sets up a default bearer for an IPv4
-// and an IPv4v6 request, and that any narrowing of the PDN type is signalled with
-// an ESM cause #50/#51 (TS 24.301 §6.4.1.3).
 func Test4GPDNTypeNegotiation(t *testing.T) {
 	enbID := mustCreateENB(t)
 

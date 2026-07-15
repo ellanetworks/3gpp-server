@@ -8,8 +8,6 @@ import (
 	"sync/atomic"
 )
 
-// ENBContext is an emulated eNB's S1-MME association state, including the UE
-// contexts attached through it.
 type ENBContext struct {
 	ID    string
 	MCC   string
@@ -18,8 +16,6 @@ type ENBContext struct {
 	ENBID uint32
 	Name  string
 
-	// N3Addr is the eNB's S1-U transport address, advertised as the E-RAB
-	// endpoint in the Initial Context Setup Response.
 	N3Addr string
 
 	mu          sync.RWMutex
@@ -75,10 +71,6 @@ func (e *ENBContext) deleteUELocked(ueID string) bool {
 	return true
 }
 
-// MigrateUE moves a UE context from this eNB to target, modelling the UE
-// arriving at the target after an S1 handover. The context keeps its identity,
-// credentials, and EPS NAS security state; non-nil IDs replace its S1AP UE
-// identities on the target.
 func (e *ENBContext) MigrateUE(target *ENBContext, ue *UEEPSContext, mmeUES1APID, enbUES1APID *uint32) {
 	e.mu.Lock()
 	e.deleteUELocked(ue.ID)

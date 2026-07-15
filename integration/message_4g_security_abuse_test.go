@@ -10,7 +10,6 @@ import (
 	"testing"
 )
 
-// fullAttach drives a UE all the way to EMM-REGISTERED.
 func fullAttach(t *testing.T, enbID, ueID string) {
 	t.Helper()
 
@@ -29,9 +28,6 @@ func fullAttach(t *testing.T, enbID, ueID string) {
 	nasStep(t, enbID, ueID, "attach_complete")
 }
 
-// Test4GPreS1SetupGating checks the MME refuses a UE-associated procedure on an
-// association that has not completed S1 Setup (TS 36.413 §8.7.1): it must not
-// authenticate the UE.
 func Test4GPreS1SetupGating(t *testing.T) {
 	body := fmt.Sprintf(`{
 		"mme_address": "10.3.0.2:36412",
@@ -54,16 +50,12 @@ func Test4GPreS1SetupGating(t *testing.T) {
 	status, resp = doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas",
 		`{"message_type":"attach_request","timeout_ms":1500}`)
 
-	// A drop (gateway timeout) or an Error Indication is compliant; issuing an
-	// Authentication Request is not.
+	// TS 36.413 §8.7.1 leaves a drop and an Error Indication both compliant.
 	if status == 200 && jsonGet(resp, "nas.message_type") == "authentication_request" {
 		t.Fatalf("MME authenticated a UE before S1 Setup completed (TS 36.413 §8.7.1); body: %s", resp)
 	}
 }
 
-// Test4GForgedS1APIDInjection checks the MME does not act on a UE-associated NAS
-// message that references an MME-UE-S1AP-ID it never assigned (a forged UE
-// association, TS 36.413 §10.6), and stays healthy afterwards.
 func Test4GForgedS1APIDInjection(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -71,8 +63,7 @@ func Test4GForgedS1APIDInjection(t *testing.T) {
 	resp := nasBody(t, enbID, ueID,
 		`{"message_type":"inject_nas","mme_ue_s1ap_id":4294967000,"raw_nas_pdu":"00","timeout_ms":1500}`)
 
-	// An Error Indication or silence is acceptable; a Downlink NAS Transport means
-	// the MME routed the NAS into a context.
+	// TS 36.413 §10.6 leaves silence and an Error Indication both compliant.
 	if got := jsonGet(resp, "s1ap.message_type"); got == "DownlinkNASTransport" {
 		t.Fatalf("MME routed NAS for a forged MME-UE-S1AP-ID; body: %s", resp)
 	}
@@ -81,8 +72,6 @@ func Test4GForgedS1APIDInjection(t *testing.T) {
 	fullAttach(t, enbID, fresh)
 }
 
-// Test4GNASReplay replays a UE's last protected uplink (its Attach Complete, at a
-// stale NAS COUNT) and checks the MME discards it (TS 24.301 §4.4.3.5).
 func Test4GNASReplay(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)

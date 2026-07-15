@@ -21,6 +21,7 @@ import (
 	gonas "github.com/free5gc/nas"
 	"github.com/free5gc/nas/nasMessage"
 	"github.com/free5gc/nas/nasType"
+	"github.com/free5gc/ngap/ngapType"
 )
 
 func (h *Handler) SendNGAP(w http.ResponseWriter, r *http.Request) {
@@ -145,8 +146,6 @@ func (h *Handler) SendGnBNGAP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// The IDs these return go on the wire, and the downlink echoes them, so they are
-// the keys that correlate a response back to this UE.
 func effectiveRanID(req *SendNGAPRequest, ue *store.UEContext) int64 {
 	if req != nil && req.RanUeNgapIDOverride != nil {
 		return *req.RanUeNgapIDOverride
@@ -163,12 +162,7 @@ func effectiveAmfID(req *SendNGAPRequest, ue *store.UEContext) int64 {
 	return ue.AmfUeNgapID
 }
 
-// Matching by NGAP IDs keeps concurrent waiters on one gNB association from
-// consuming each other's downlink. The RAN UE NGAP ID is mandatory in every
-// UE-associated message, so it is matched exactly, including the legitimate
-// value 0. The AMF UE NGAP ID is a secondary key: it is the AMF's to assign, so
-// an amfID of 0 means "not yet known" and is skipped. A PDU carrying no UE NGAP
-// ID matches any waiter.
+// An amfID of 0 means the AMF has not assigned one yet, so it cannot match.
 func ueNGAPMatcher(ranID, amfID int64) func(*ngap.NGAPResponse) bool {
 	return func(resp *ngap.NGAPResponse) bool {
 		var msgRan, msgAmf *int64
@@ -288,8 +282,6 @@ func (h *Handler) AwaitGnBMessage(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
 }
 
-// Send-only: the Handover Command the AMF returns arrives asynchronously on the
-// source gNB's association (TS 38.413 §8.4.1).
 func handleHandoverRequired(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) {
 	if req.TargetGnbID == nil {
 		writeError(w, http.StatusBadRequest, "target_gnb_id is required for handover_required")
@@ -333,10 +325,6 @@ func handleHandoverRequired(w http.ResponseWriter, r *http.Request, gnb *store.G
 	writeJSON(w, http.StatusOK, SendNGAPResponse{})
 }
 
-// An UPLINK RAN STATUS TRANSFER hands the AMF the PDCP status the target needs
-// for a lossless handover (TS 38.413 §8.4.6). Send-only: the AMF relays it to
-// the target as a DOWNLINK RAN STATUS TRANSFER (§8.4.7.2), which the target gNB
-// observes on its own association.
 func handleRANStatusTransfer(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) {
 	drbs := make([]ngap.DRBStatusTransferItem, 0, len(req.StatusTransferDRBs))
 	for _, d := range req.StatusTransferDRBs {
@@ -367,8 +355,6 @@ func handleRANStatusTransfer(w http.ResponseWriter, r *http.Request, gnb *store.
 	writeJSON(w, http.StatusOK, SendNGAPResponse{})
 }
 
-// The AMF answers a HANDOVER CANCEL with a Handover Cancel Acknowledge, or an
-// Error Indication (TS 38.413 §8.4.5).
 func handleHandoverCancel(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) {
 	amfUeNgapID := ue.AmfUeNgapID
 	if req.AmfUeNgapIDOverride != nil {
@@ -408,7 +394,6 @@ func handleHandoverCancel(w http.ResponseWriter, r *http.Request, gnb *store.GNB
 	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
 }
 
-// Send-only, from the target gNB (TS 38.413 §8.4.2).
 func handleHandoverRequestAcknowledge(w http.ResponseWriter, t *transport.NGAPTransport, req *SendGnBNGAPRequest) {
 	if req.AmfUeNgapID == nil || req.RanUeNgapID == nil {
 		writeError(w, http.StatusBadRequest, "amf_ue_ngap_id and ran_ue_ngap_id are required")
@@ -462,7 +447,6 @@ func handleHandoverRequestAcknowledge(w http.ResponseWriter, t *transport.NGAPTr
 	writeJSON(w, http.StatusOK, SendNGAPResponse{})
 }
 
-// Send-only, from the target gNB once the UE has arrived (TS 38.413 §8.4.3).
 func handleHandoverNotify(w http.ResponseWriter, gnb *store.GNBContext, t *transport.NGAPTransport, req *SendGnBNGAPRequest) {
 	if req.AmfUeNgapID == nil || req.RanUeNgapID == nil {
 		writeError(w, http.StatusBadRequest, "amf_ue_ngap_id and ran_ue_ngap_id are required")
@@ -483,8 +467,6 @@ func handleHandoverNotify(w http.ResponseWriter, gnb *store.GNBContext, t *trans
 	writeJSON(w, http.StatusOK, SendNGAPResponse{})
 }
 
-// Switches the downlink path of the UE context identified by amf_ue_ngap_id
-// toward the supplied GTP-U tunnels (TS 38.413 §8.4.4).
 func handlePathSwitchRequest(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, t *transport.NGAPTransport, req *SendGnBNGAPRequest) {
 	if req.AmfUeNgapID == nil || req.RanUeNgapID == nil {
 		writeError(w, http.StatusBadRequest, "amf_ue_ngap_id and ran_ue_ngap_id are required")
@@ -558,7 +540,6 @@ func handlePathSwitchRequest(w http.ResponseWriter, r *http.Request, gnb *store.
 	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
 }
 
-// NR defaults to NEA1-3 / NIA1-3, E-UTRA to none.
 func pathSwitchSecurityCapabilities(in *UESecurityCapabilitiesInput) (ngap.UESecurityCapabilities, error) {
 	parse := func(name, s string, def []byte) ([]byte, error) {
 		if s == "" {
@@ -605,8 +586,6 @@ func pathSwitchSecurityCapabilities(in *UESecurityCapabilitiesInput) (ngap.UESec
 	return caps, nil
 }
 
-// Send-only: the AMF's Handover Preparation Failure, or Error Indication,
-// arrives asynchronously (TS 38.413 §8.4.2.3).
 func handleHandoverFailure(w http.ResponseWriter, t *transport.NGAPTransport, req *SendGnBNGAPRequest) {
 	if req.AmfUeNgapID == nil {
 		writeError(w, http.StatusBadRequest, "amf_ue_ngap_id is required for handover_failure")
@@ -661,9 +640,6 @@ func handleRawNGAP(w http.ResponseWriter, r *http.Request, t *transport.NGAPTran
 	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
 }
 
-// A gNB-initiated NG RESET: full when no UEs are listed, otherwise partial over
-// the listed UEs' associations. The AMF answers with NG RESET ACKNOWLEDGE
-// (TS 38.413 §8.7.4).
 func handleNGReset(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, t *transport.NGAPTransport, req *SendGnBNGAPRequest) {
 	var connections []ngap.NGResetConnection
 
@@ -770,14 +746,11 @@ func handleRegistrationRequest(w http.ResponseWriter, r *http.Request, gnb *stor
 		regType = *req.RegistrationType
 	}
 
-	// A mobility or periodic registration update from a UE holding a 5G NAS
-	// security context is integrity-protected with that context and carries its
-	// ngKSI, letting the AMF reuse it and accept directly (TS 24.501 §5.5.1.3).
-	// Initial registration is cleartext.
+	// A mobility or periodic update reuses its security context (TS 24.501 §5.5.1.3).
 	mobilityOrPeriodic := regType == nasCodec.RegistrationTypeMobility || regType == nasCodec.RegistrationTypePeriodic
 	secured := mobilityOrPeriodic && len(ue.Kamf) > 0
 
-	ngKsi := uint8(7) // "no key available"
+	ngKsi := ksiNoKey
 	if secured {
 		ngKsi = ue.NgKsi
 	}
@@ -803,8 +776,6 @@ func handleRegistrationRequest(w http.ResponseWriter, r *http.Request, gnb *stor
 		}
 	}
 
-	// After an N2 handover the UE is CM-CONNECTED on the target, so a Mobility
-	// Registration Update travels on the existing UE-associated connection.
 	if req.ExistingConnection {
 		sendUplinkAndWait(w, r, gnb, ue, t, req, nasPDU, "DownlinkNASTransport", "ErrorIndication")
 		return
@@ -845,9 +816,6 @@ func handleAuthenticationResponse(w http.ResponseWriter, r *http.Request, gnb *s
 				return
 			}
 		} else if len(ue.LastRAND) == 0 || len(ue.LastAUTN) == 0 {
-			// With no stored challenge, as when the response is sent before any
-			// registration, a zeroed RES* still reaches the AMF, which decides how
-			// to react.
 			resStar = make([]byte, 16)
 		} else {
 			akaResult, err := crypto.ComputeResStar(ue.K, ue.OPc, ue.Sqn, ue.Supi, ue.Snn, ue.LastRAND, ue.LastAUTN)
@@ -884,8 +852,6 @@ func handleSecurityModeComplete(w http.ResponseWriter, r *http.Request, gnb *sto
 
 		nasPDU = raw
 	} else {
-		// The NAS message container replays the registration request the UE sent,
-		// so its registration type must stay consistent with that request.
 		innerRegType := uint8(nasCodec.RegistrationTypeInitial)
 		if req.RegistrationType != nil {
 			innerRegType = *req.RegistrationType
@@ -977,8 +943,6 @@ func captureTunnel(gnb *store.GNBContext, ue *store.UEContext, pduSessionID int6
 		QFI:          1,
 	}
 
-	// The UPF may advertise an N3 endpoint in both families; the uplink must use
-	// the address matching the gNB's own N3 socket.
 	gnbN3IsV6 := false
 	if a, err := netip.ParseAddr(gnb.N3Addr); err == nil {
 		gnbN3IsV6 = a.Is6()
@@ -1105,10 +1069,7 @@ func handlePDUSessionEstablishmentRequest(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	// A reject or Error Indication establishes no session, so a setup response
-	// would refer to a non-existent PDU session.
 	if ngapResp.MessageType == "PDUSessionResourceSetupRequest" {
-		// Unique per session, so concurrent sessions don't collide.
 		dlTeid := uint32(ue.RanUeNgapID)<<8 | uint32(pduSessionID)
 
 		pduSetupResp, err := ngap.BuildPDUSessionResourceSetupResponse(
@@ -1214,10 +1175,7 @@ func handleDeregistrationRequest(w http.ResponseWriter, r *http.Request, gnb *st
 	})
 }
 
-// The gNB-initiated release transitions the UE to CM-IDLE while it stays
-// RM-REGISTERED.
 func handleUEContextReleaseRequest(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) {
-	// Radio-network cause user-inactivity (TS 38.413 §9.3.1.2).
 	cause := int64(20)
 	if req.ReleaseCause != nil {
 		cause = *req.ReleaseCause
@@ -1264,9 +1222,6 @@ func handleUEContextReleaseRequest(w http.ResponseWriter, r *http.Request, gnb *
 	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
 }
 
-// Answers an AMF IDENTITY REQUEST with the UE's SUCI, or the
-// mobile_identity_override (TS 24.501 §5.4.3). The response is plain before a
-// security context exists, secured otherwise.
 func handleIdentityResponse(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) {
 	var nasPDU []byte
 
@@ -1310,7 +1265,6 @@ func handleIdentityResponse(w http.ResponseWriter, r *http.Request, gnb *store.G
 	sendUplinkAndWait(w, r, gnb, ue, t, req, nasPDU, "DownlinkNASTransport", "InitialContextSetupRequest", "ErrorIndication")
 }
 
-// Defaults to the assigned PTI value 1 (TS 24.501 §9.6).
 func ptiFor(req *SendNGAPRequest) uint8 {
 	if req != nil && req.PTIOverride != nil {
 		return *req.PTIOverride
@@ -1327,8 +1281,6 @@ func pduSessionIDForRelease(ue *store.UEContext) uint8 {
 	return 1
 }
 
-// The SMF answers with a PDU Session Resource Release Command carrying the NAS
-// Release Command (TS 24.501 §6.3.3).
 func handlePDUSessionReleaseRequest(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) {
 	pduSessionID := pduSessionIDForRelease(ue)
 
@@ -1367,8 +1319,6 @@ func handlePDUSessionReleaseRequest(w http.ResponseWriter, r *http.Request, gnb 
 	sendUplinkAndWait(w, r, gnb, ue, t, req, secured, "PDUSessionResourceReleaseCommand", "DownlinkNASTransport", "ErrorIndication")
 }
 
-// The network answers with a Modification Command or a Modification Reject
-// (TS 24.501 §6.4.2.3, §6.4.2.4), or a 5GSM STATUS for a PTI error (§7.3.1).
 func handlePDUSessionModificationRequest(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) {
 	pduSessionID := pduSessionIDForRelease(ue)
 
@@ -1407,7 +1357,6 @@ func handlePDUSessionModificationRequest(w http.ResponseWriter, r *http.Request,
 	sendUplinkAndWait(w, r, gnb, ue, t, req, secured, "PDUSessionResourceModifyRequest", "DownlinkNASTransport", "ErrorIndication")
 }
 
-// Fire-and-forget: the network does not answer (TS 24.501 §6.3.3).
 func handlePDUSessionReleaseComplete(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) {
 	pduSessionID := pduSessionIDForRelease(ue)
 
@@ -1460,9 +1409,6 @@ func handlePDUSessionReleaseComplete(w http.ResponseWriter, r *http.Request, gnb
 	writeJSON(w, http.StatusOK, SendNGAPResponse{})
 }
 
-// Fire-and-forget: the network does not answer a well-formed complete
-// (TS 24.501 §6.3.2.3). A PTI-mismatched complete draws a 5GSM STATUS (§7.3.1 a)
-// observable on the UE's await endpoint.
 func handlePDUSessionModificationComplete(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) {
 	pduSessionID := pduSessionIDForRelease(ue)
 
@@ -1515,7 +1461,6 @@ func handlePDUSessionModificationComplete(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, SendNGAPResponse{})
 }
 
-// Defaults to 5GSM cause #111, protocol error unspecified (TS 24.501 §9.11.4.2).
 func cause5GSMFor(req *SendNGAPRequest) uint8 {
 	if req != nil && req.Cause5GSMOverride != nil {
 		return *req.Cause5GSMOverride
@@ -1524,8 +1469,6 @@ func cause5GSMFor(req *SendNGAPRequest) uint8 {
 	return nasMessage.Cause5GSMProtocolErrorUnspecified
 }
 
-// Fire-and-forget: any network response arrives asynchronously and is observed
-// on the UE's await endpoint.
 func sendInner5GSM(w http.ResponseWriter, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest, inner []byte) {
 	pduSessionID := pduSessionIDForRelease(ue)
 
@@ -1558,8 +1501,6 @@ func sendInner5GSM(w http.ResponseWriter, gnb *store.GNBContext, ue *store.UECon
 	writeJSON(w, http.StatusOK, SendNGAPResponse{})
 }
 
-// TS 24.501 §6.3.2.4. A reject whose PTI matches no procedure in use draws a
-// 5GSM STATUS #47 (§7.3.1 a) on the UE's await endpoint.
 func handlePDUSessionModificationCommandReject(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) {
 	pduSessionID := pduSessionIDForRelease(ue)
 
@@ -1586,7 +1527,6 @@ func handlePDUSessionModificationCommandReject(w http.ResponseWriter, r *http.Re
 	sendInner5GSM(w, gnb, ue, t, req, inner)
 }
 
-// TS 24.501 §8.3.13.
 func handleStatus5GSM(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) {
 	pduSessionID := pduSessionIDForRelease(ue)
 
@@ -1613,8 +1553,6 @@ func handleStatus5GSM(w http.ResponseWriter, r *http.Request, gnb *store.GNBCont
 	sendInner5GSM(w, gnb, ue, t, req, inner)
 }
 
-// TS 24.501 §5.4.1.3.6. The 5GMM cause defaults to #20 MAC failure; #21 synch
-// failure carries an AUTS computed from the UE's credentials and last RAND.
 func handleAuthenticationFailure(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) {
 	var nasPDU []byte
 
@@ -1656,9 +1594,6 @@ func handleAuthenticationFailure(w http.ResponseWriter, r *http.Request, gnb *st
 	sendUplinkAndWait(w, r, gnb, ue, t, req, nasPDU, "DownlinkNASTransport", "ErrorIndication")
 }
 
-// TS 24.501 §5.4.2.5. The 5GMM cause defaults to #23 UE security capabilities
-// mismatch. The message uses the security context in use before the SMC
-// procedure — none for initial registration, hence plain.
 func handleSecurityModeReject(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) {
 	var nasPDU []byte
 
@@ -1688,15 +1623,14 @@ func handleSecurityModeReject(w http.ResponseWriter, r *http.Request, gnb *store
 	sendUplinkAndWait(w, r, gnb, ue, t, req, nasPDU, "UEContextReleaseCommand", "DownlinkNASTransport", "ErrorIndication")
 }
 
-// The AMF Set ID is a 10-bit field and the AMF Pointer a 6-bit field; the NGAP
-// BitString encoding left-aligns both into their octets.
+// NGAP BitString left-aligns the 10-bit Set ID and 6-bit Pointer into their octets.
 func fiveGSTMSIFromGUTI(guti *nasType.GUTI5G) *ngap.FiveGSTMSIFromGUTI {
 	if guti == nil {
 		return nil
 	}
 
-	setID := guti.GetAMFSetID()     // 10-bit value, right-aligned
-	pointer := guti.GetAMFPointer() // 6-bit value, right-aligned
+	setID := guti.GetAMFSetID()
+	pointer := guti.GetAMFPointer()
 	tmsi := guti.GetTMSI5G()
 
 	setIDBytes := []byte{byte(setID >> 2), byte((setID & 0x3) << 6)}
@@ -1709,8 +1643,6 @@ func fiveGSTMSIFromGUTI(guti *nasType.GUTI5G) *ngap.FiveGSTMSIFromGUTI {
 	}
 }
 
-// The PDUSessionStatus override is a 2-byte IE buffer, little-endian. A nil
-// return omits the IE entirely.
 func serviceRequestPDUStatus(ue *store.UEContext, req *SendNGAPRequest) (*[16]bool, error) {
 	if req.PDUSessionStatus != nil {
 		raw, err := hex.DecodeString(*req.PDUSessionStatus)
@@ -1738,11 +1670,7 @@ func serviceRequestPDUStatus(ue *store.UEContext, req *SendNGAPRequest) (*[16]bo
 	return &status, nil
 }
 
-// Brings a CM-IDLE UE back to CM-CONNECTED (TS 24.501 §5.6.1) and drives the
-// resulting Initial Context Setup so the AMF re-activates the UE context.
 func handleServiceRequest(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) {
-	// A Service Request starts a new RRC/NG connection, which needs a fresh RAN UE
-	// NGAP ID.
 	ue.RanUeNgapID = gnb.AllocateRanUeNgapID()
 
 	var nasPDU []byte
@@ -1756,7 +1684,7 @@ func handleServiceRequest(w http.ResponseWriter, r *http.Request, gnb *store.GNB
 
 		nasPDU = raw
 	} else {
-		serviceType := uint8(1) // nasMessage.ServiceTypeData
+		serviceType := nasMessage.ServiceTypeData
 		if req.ServiceType != nil {
 			serviceType = *req.ServiceType
 		}
@@ -1778,8 +1706,6 @@ func handleServiceRequest(w http.ResponseWriter, r *http.Request, gnb *store.GNB
 			return
 		}
 
-		// Without a security context the Service Request goes plain, so it still
-		// reaches the AMF, which must reject an unprotected or unknown-UE one.
 		if len(ue.Kamf) > 0 {
 			nasPDU, err = nasCodec.EncodeNasPduWithSecurity(ue, srPDU, gonas.SecurityHeaderTypeIntegrityProtected, securityOpts(req)...)
 			if err != nil {
@@ -1793,7 +1719,7 @@ func handleServiceRequest(w http.ResponseWriter, r *http.Request, gnb *store.GNB
 
 	overrides := initialUEOverrides(req)
 	if overrides == nil || overrides.RRCEstablishmentCause == nil {
-		moData := int64(4) // RRCEstablishmentCausePresentMoData
+		moData := int64(ngapType.RRCEstablishmentCausePresentMoData)
 		if overrides == nil {
 			overrides = &ngap.InitialUEMessageOverrides{}
 		}
@@ -1833,8 +1759,7 @@ func handleServiceRequest(w http.ResponseWriter, r *http.Request, gnb *store.GNB
 	var nasResp *nasCodec.NASResponse
 
 	for _, ie := range ngapResp.IEs {
-		// An Error Indication echoes back the AP IDs that were sent (TS 38.413
-		// §10.6); it does not assign one, so it must not overwrite the UE's.
+		// An Error Indication echoes the AP IDs it was sent; it assigns none.
 		if ie.AmfUeNgapID != nil && ngapResp.MessageType != "ErrorIndication" {
 			ue.AmfUeNgapID = *ie.AmfUeNgapID
 		}
@@ -1862,8 +1787,6 @@ func handleServiceRequest(w http.ResponseWriter, r *http.Request, gnb *store.GNB
 	})
 }
 
-// The wait is un-matched and tolerant: forged AP-IDs won't echo this UE's IDs,
-// and a discarded replay draws no reply.
 func handleInjectNAS(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) {
 	var nasPDU []byte
 
@@ -1914,8 +1837,6 @@ func handleInjectNAS(w http.ResponseWriter, r *http.Request, gnb *store.GNBConte
 	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
 }
 
-// The AMF stores the capability and replays it in a later Initial Context Setup
-// Request (TS 38.413 §8.14.1).
 func handleUECapabilityInfo(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) {
 	radioCap := []byte{0x01, 0x02, 0x03, 0x04, 0x05}
 
@@ -1940,8 +1861,6 @@ func handleUECapabilityInfo(w http.ResponseWriter, r *http.Request, gnb *store.G
 		return
 	}
 
-	// A one-way indication, but a brief wait lets a forged or inconsistent UE NGAP
-	// ID surface as an Error Indication (TS 38.413 §8.7.5.2).
 	ctx, cancel := context.WithTimeout(r.Context(), time.Second)
 	defer cancel()
 
@@ -1954,10 +1873,8 @@ func handleUECapabilityInfo(w http.ResponseWriter, r *http.Request, gnb *store.G
 	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
 }
 
-// TS 38.413 §8.7.5 leaves the AMF's reaction to an Error Indication
-// implementation-specific.
 func handleErrorIndication(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) {
-	encoded, err := ngap.BuildErrorIndication(effectiveAmfID(req, ue), effectiveRanID(req, ue), 0) // radio-network unspecified
+	encoded, err := ngap.BuildErrorIndication(effectiveAmfID(req, ue), effectiveRanID(req, ue), causeRadioNetworkUnspecified)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build ErrorIndication: %v", err))
 		return
@@ -2007,8 +1924,7 @@ func sendRawAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GNBContex
 	var nasResp *nasCodec.NASResponse
 
 	for _, ie := range ngapResp.IEs {
-		// An Error Indication echoes back the AP IDs that were sent (TS 38.413
-		// §10.6); it does not assign one, so it must not overwrite the UE's.
+		// An Error Indication echoes the AP IDs it was sent; it assigns none.
 		if ie.AmfUeNgapID != nil && ngapResp.MessageType != "ErrorIndication" {
 			ue.AmfUeNgapID = *ie.AmfUeNgapID
 		}

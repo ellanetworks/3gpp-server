@@ -13,10 +13,6 @@ import (
 	"github.com/free5gc/ngap/ngapType"
 )
 
-// PathSwitchSession is a PDU session whose downlink GTP-U tunnel a PATH SWITCH
-// REQUEST asks the AMF to switch toward the new NG-RAN node (TS 38.413
-// §9.2.3.8). RawTransfer, when set, replaces the built transfer verbatim, so a
-// malformed transfer can be crafted.
 type PathSwitchSession struct {
 	PDUSessionID int64
 	DLTeid       uint32
@@ -24,9 +20,7 @@ type PathSwitchSession struct {
 	RawTransfer  []byte
 }
 
-// UESecurityCapabilities holds the NR/E-UTRA encryption and integrity algorithm
-// bitmaps a PATH SWITCH REQUEST reports for the UE (TS 38.413 §9.3.1.86). Each
-// is a 16-bit big-endian bitmap.
+// Each bitmap is 16 bits, big-endian (TS 38.413 §9.3.1.86).
 type UESecurityCapabilities struct {
 	NREncryption    []byte
 	NRIntegrity     []byte
@@ -34,10 +28,6 @@ type UESecurityCapabilities struct {
 	EUTRAIntegrity  []byte
 }
 
-// BuildPathSwitchRequest builds a PATH SWITCH REQUEST (TS 38.413 §8.4.4).
-// sourceAmfUeNgapID identifies the existing UE context; ranUeNgapID is the
-// NG-RAN node's newly assigned RAN UE NGAP ID. omitIEs lists protocol IE ids to
-// drop from the built message, so a structurally-incomplete request can be sent.
 func BuildPathSwitchRequest(ranUeNgapID, sourceAmfUeNgapID int64, mcc, mnc, tac, gnbID string, secCaps UESecurityCapabilities, sessions []PathSwitchSession, failed []int64, omitIEs []int64) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
@@ -158,9 +148,6 @@ func BuildPathSwitchRequest(ranUeNgapID, sourceAmfUeNgapID int64, mcc, mnc, tac,
 	return ngap.Encoder(pdu)
 }
 
-// buildPathSwitchRequestTransfer encodes the per-session Path Switch Request
-// Transfer (TS 38.413 §9.3.4.8) carrying the NG-RAN node's downlink GTP-U
-// tunnel endpoint and a single accepted QoS flow.
 func buildPathSwitchRequestTransfer(teid uint32, ip string) ([]byte, error) {
 	addr, err := netip.ParseAddr(ip)
 	if err != nil {
@@ -198,8 +185,6 @@ func buildPathSwitchRequestTransfer(teid uint32, ip string) ([]byte, error) {
 	return buf, nil
 }
 
-// buildPathSwitchRequestSetupFailedTransfer encodes the per-session failure
-// transfer carried for each failed-to-setup PDU session (TS 38.413 §9.3.4.15).
 func buildPathSwitchRequestSetupFailedTransfer() ([]byte, error) {
 	transfer := ngapType.PathSwitchRequestSetupFailedTransfer{
 		Cause: ngapType.Cause{

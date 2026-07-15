@@ -9,9 +9,6 @@ import (
 	"testing"
 )
 
-// Test4GInitialContextSetup_UEAMBR checks the MME's Initial Context Setup Request
-// carries the UE-AMBR (TS 36.413 §9.2.1.20). The Attach Accept rides in the ICS
-// Request, so the security_mode_complete reply carries both.
 func Test4GInitialContextSetup_UEAMBR(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -35,18 +32,8 @@ func Test4GInitialContextSetup_UEAMBR(t *testing.T) {
 	nasStep(t, enbID, ueID, "attach_complete")
 }
 
-// Test4GInitialContextSetup_TransportLayerAddress checks the S-GW S1-U endpoint
-// in the Initial Context Setup Request's E-RAB To Be Setup Item. The Transport
-// Layer Address is mandatory there (TS 36.413 §9.1.4.1) and is encoded per
-// TS 36.414 §5.3: "32 bits in case of IPv4 address; 128 bits in case
-// of IPv6 address; or 160 bits if both IPv4 and IPv6 addresses are signalled, in
-// which case the IPv4 address is contained in the first 32 bits."
-//
-// All three forms are conformant, so the test does not demand a particular one:
-// it requires that at least one family decodes (a length outside 32/128/160 bits
-// yields none) and that every family present names the S-GW's S1-U address for
-// that family — a swapped or truncated 160-bit encoding hands back a v4 address
-// read out of the v6 half, or the reverse.
+// TS 36.414 §5.3 makes the 32-, 128- and 160-bit forms all conformant, so no
+// particular address family is demanded.
 func Test4GInitialContextSetup_TransportLayerAddress(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)

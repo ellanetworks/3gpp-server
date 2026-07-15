@@ -18,15 +18,12 @@ import (
 	"regexp"
 )
 
-// SUCI component values (TS 23.003 §2.2B) as they appear in the character-string
-// form of TS 29.503 Annex C. The protection scheme identifiers are those of
-// TS 33.501 Annex C.1.
 const (
 	PrefixSUCI     = "suci"
 	SupiTypeIMSI   = "0"
-	NullScheme     = "0" // null-scheme, TS 33.501 §C.2
-	ProfileAScheme = "1" // ECIES Profile A, TS 33.501 §C.3.4.1
-	ProfileBScheme = "2" // ECIES Profile B, TS 33.501 §C.3.4.2
+	NullScheme     = "0"
+	ProfileAScheme = "1"
+	ProfileBScheme = "2"
 
 	profileAMacKeyLen = 32
 	profileAEncKeyLen = 16
@@ -41,17 +38,12 @@ const (
 	profileBHashLen   = 32
 )
 
-// HomeNetworkPublicKey is the home network public key the UE conceals the SUPI
-// with, together with the protection scheme it belongs to and its identifier
-// (TS 23.003 §2.2B items 4 and 5). PublicKey is nil for NullScheme.
 type HomeNetworkPublicKey struct {
 	ProtectionScheme string
-	PublicKey        *ecdh.PublicKey
+	PublicKey        *ecdh.PublicKey // nil for NullScheme
 	PublicKeyID      string
 }
 
-// Suci holds the components of a Subscription Concealed Identifier
-// (TS 23.003 §2.2B), with Raw the character-string form (TS 29.503 Annex C).
 // Mcc and Mnc are empty unless SupiType is SupiTypeIMSI.
 type Suci struct {
 	SupiType         string
@@ -68,8 +60,6 @@ var suciRegex = regexp.MustCompile(
 	`^suci-(?P<supi_type>(?P<imsiType>0-(?P<mcc>\d{3})-(?P<mnc>\d{2,3}))|(?P<naiType>1-.*))-(?P<routing_indicator>\d{1,4})-(?P<protection_scheme_id>[0-2])-(?P<public_key_id>(?:\d{1,2}|1\d{2}|2[0-4]\d|25[0-5]))-(?P<scheme_output>[A-Fa-f0-9]+)$`,
 )
 
-// ParseSuci splits a SUCI in the character-string form of TS 29.503 Annex C into
-// its TS 23.003 §2.2B components. It returns nil when input does not match.
 func ParseSuci(input string) *Suci {
 	matches := suciRegex.FindStringSubmatch(input)
 	if matches == nil {
@@ -88,9 +78,7 @@ func ParseSuci(input string) *Suci {
 	}
 }
 
-// Tbcd swaps value into the BCD nibble order the MSIN is coded in
-// (TS 24.501 §9.11.3.4), padding an odd number of digits with the "1111" filler.
-// The result is the ECIES plaintext for a concealed SUPI (TS 33.501 §C.3.2).
+// TS 24.501 §9.11.3.4
 func Tbcd(value string) string {
 	valueBytes := []byte(value)
 	for (len(valueBytes) % 2) != 0 {
@@ -109,10 +97,6 @@ func Tbcd(value string) string {
 	return string(valueBytes)
 }
 
-// CipherSuci conceals msin under the home network public key and assembles the
-// SUCI (TS 33.501 §6.12.2, Annex C.3.2). The null scheme carries the MSIN in the
-// clear; profiles A and B produce an ECIES scheme output of the ephemeral public
-// key, the ciphertext, and the MAC tag (TS 33.501 §C.3.4.1, §C.3.4.2).
 func CipherSuci(msin, mcc, mnc, routingIndicator string, profile HomeNetworkPublicKey) (*Suci, error) {
 	if len(msin)+len(mcc)+len(mnc) < 14 {
 		return nil, fmt.Errorf("supi length must be 15")
@@ -259,19 +243,12 @@ func aes128ctr(input, encKey, icb []byte) ([]byte, error) {
 	return output, nil
 }
 
-// ECDHPublicKey is the home network public key type carried in
-// HomeNetworkPublicKey, aliased so callers need not import crypto/ecdh.
 type ECDHPublicKey = ecdh.PublicKey
 
-// ParseX25519PublicKey accepts a home network public key on Curve25519, the
-// 32-byte u-coordinate ECIES profile A uses (TS 33.501 §C.3.4.1).
 func ParseX25519PublicKey(raw []byte) (*ecdh.PublicKey, error) {
 	return ecdh.X25519().NewPublicKey(raw)
 }
 
-// ParseP256PublicKey accepts a home network public key on secp256r1, the curve
-// ECIES profile B uses (TS 33.501 §C.3.4.2), in either uncompressed SEC1 form
-// (65 bytes, 0x04 prefix) or compressed form (33 bytes, 0x02/0x03 prefix).
 func ParseP256PublicKey(raw []byte) (*ecdh.PublicKey, error) {
 	if len(raw) == 33 && (raw[0] == 0x02 || raw[0] == 0x03) {
 		x, y := elliptic.UnmarshalCompressed(elliptic.P256(), raw)

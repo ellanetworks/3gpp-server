@@ -17,7 +17,6 @@ type IE struct {
 	Criticality string          `json:"criticality,omitempty"`
 	Value       json.RawMessage `json:"value,omitempty"`
 
-	// Typed fields — at most one is set per IE; with none set, encoding uses Value.
 	GlobalRANNodeID         *GlobalRANNodeIDJSON         `json:"global_ran_node_id,omitempty"`
 	RANNodeName             *string                      `json:"ran_node_name,omitempty"`
 	SupportedTAList         *SupportedTAListJSON         `json:"supported_ta_list,omitempty"`
@@ -38,67 +37,40 @@ type IE struct {
 	CriticalityDiagnostics  *CriticalityDiagnosticsJSON  `json:"criticality_diagnostics,omitempty"`
 	TimeToWait              *string                      `json:"time_to_wait,omitempty"`
 
-	// InitialUEMessage optional IEs (TS 38.413 §9.2.5.1)
 	AMFSetID             *string                `json:"amf_set_id_ie,omitempty"`
 	AllowedNSSAI         []AllowedNSSAIItemJSON `json:"allowed_nssai,omitempty"`
 	SelectedPLMNIdentity *string                `json:"selected_plmn_identity,omitempty"`
 
-	// DownlinkNASTransport optional IEs (TS 38.413 §9.2.5.2)
 	OldAMF                  *string                      `json:"old_amf,omitempty"`
 	RANPagingPriority       *int64                       `json:"ran_paging_priority,omitempty"`
 	MobilityRestrictionList *MobilityRestrictionListJSON `json:"mobility_restriction_list,omitempty"`
 	IndexToRFSP             *int64                       `json:"index_to_rfsp,omitempty"`
 	UEAggregateMaxBitRate   *UEAggregateMaxBitRateJSON   `json:"ue_aggregate_max_bit_rate,omitempty"`
 
-	// Hex-encoded (TS 38.413 §9.3.1.74).
-	UERadioCapability *string `json:"ue_radio_capability,omitempty"`
-
-	// Per session of a PDU Session Resource Setup Request, the UPF's uplink GTP-U
-	// tunnel decoded from the per-session transfer.
-	PDUSessionSetupItems []PDUSessionSetupItemJSON `json:"pdu_session_setup_items,omitempty"`
-
-	// PDU session IDs carried by a handover PDU-session list (e.g. the setup
-	// list in a Handover Request, the handover list in a Handover Command).
-	PDUSessionIDs []int64 `json:"pdu_session_ids,omitempty"`
-
-	// The PDU sessions a Handover Command tells the source to release: those the
-	// target did not admit.
-	ReleasePDUSessionIDs []int64 `json:"release_pdu_session_ids,omitempty"`
-
-	// From a Handover Request's Security Context IE.
-	NextHopChainingCount *int64 `json:"next_hop_chaining_count,omitempty"`
-
-	// Set on a Path Switch Request Acknowledge: the AMF's stored UE 5G security
-	// capabilities, returned on a mismatch with those the target gNB reported
-	// (TS 33.501 §6.7.3.1).
+	UERadioCapability      *string                     `json:"ue_radio_capability,omitempty"`
+	PDUSessionSetupItems   []PDUSessionSetupItemJSON   `json:"pdu_session_setup_items,omitempty"`
+	PDUSessionIDs          []int64                     `json:"pdu_session_ids,omitempty"`
+	ReleasePDUSessionIDs   []int64                     `json:"release_pdu_session_ids,omitempty"`
+	NextHopChainingCount   *int64                      `json:"next_hop_chaining_count,omitempty"`
 	UESecurityCapabilities *UESecurityCapabilitiesJSON `json:"ue_security_capabilities,omitempty"`
-
-	// The container the AMF relays to the target NG-RAN node (TS 38.413 §8.4.7.2).
-	RANStatusTransfer *RANStatusTransferJSON `json:"ran_status_transfer,omitempty"`
+	RANStatusTransfer      *RANStatusTransferJSON      `json:"ran_status_transfer,omitempty"`
 }
 
-// COUNTValueJSON is a PDCP COUNT (TS 38.413 §9.3.1.108).
 type COUNTValueJSON struct {
 	PDCPSN int64 `json:"pdcp_sn"`
 	HFN    int64 `json:"hfn"`
 }
 
-// DRBStatusTransferItemJSON is one DRB's preserved PDCP state within a RAN
-// Status Transfer Transparent Container (TS 38.413 §9.3.1.108).
 type DRBStatusTransferItemJSON struct {
 	DRBID   int64           `json:"drb_id"`
 	ULCount *COUNTValueJSON `json:"ul_count,omitempty"`
 	DLCount *COUNTValueJSON `json:"dl_count,omitempty"`
 }
 
-// RANStatusTransferJSON is the RAN Status Transfer Transparent Container
-// (TS 38.413 §9.3.1.108), opaque to the AMF and relayed unchanged.
 type RANStatusTransferJSON struct {
 	DRBs []DRBStatusTransferItemJSON `json:"drbs_subject_to_status_transfer"`
 }
 
-// UESecurityCapabilitiesJSON holds the algorithm bitmaps of a UE Security
-// Capabilities IE (TS 38.413 §9.3.1.86), each hex-encoded big-endian.
 type UESecurityCapabilitiesJSON struct {
 	NREncryption    string `json:"nr_encryption"`
 	NRIntegrity     string `json:"nr_integrity"`

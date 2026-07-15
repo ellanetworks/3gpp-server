@@ -3,10 +3,6 @@
 
 //go:build integration
 
-// N2 handover edge cases: each feeds the AMF a handover message bearing an AP ID
-// it never assigned. Per TS 38.413 §10.6 the AMF must answer with an Error
-// Indication carrying the received AP IDs, so a timeout is a conformance defect.
-
 package integration_test
 
 import (
@@ -14,8 +10,7 @@ import (
 	"testing"
 )
 
-// unknownAmfUeNgapID is far above the AMF's sequential allocation, so it never
-// matches a live UE association.
+// Far above the AMF's sequential allocation, so it never matches a live association.
 const unknownAmfUeNgapID = 4294967295
 
 func establishRegisteredUE(t *testing.T, gnbID string) string {
@@ -51,8 +46,6 @@ func expectHandoverPreparationFailure(t *testing.T, gnbID, context string) {
 	}
 }
 
-// An unknown AMF UE NGAP ID is an unknown local AP ID; §10.6 requires the AMF to
-// answer the source with an Error Indication.
 func Test5GN2HandoverRequiredUnknownAmfUeNgapID(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "000003", "ho-edge-src")
 	createGnBWithID(t, "000004", "ho-edge-tgt")
@@ -68,8 +61,6 @@ func Test5GN2HandoverRequiredUnknownAmfUeNgapID(t *testing.T) {
 	expectErrorIndication(t, sourceGNB, "HandoverRequired with unknown AMF UE NGAP ID")
 }
 
-// A RAN UE NGAP ID not matching the one stored for the UE is an inconsistent
-// remote AP ID; §10.6 requires an Error Indication to the source.
 func Test5GN2HandoverRequiredInconsistentRanUeNgapID(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "000009", "ho-edge-src")
 	createGnBWithID(t, "00000a", "ho-edge-tgt")
@@ -85,13 +76,11 @@ func Test5GN2HandoverRequiredInconsistentRanUeNgapID(t *testing.T) {
 	expectErrorIndication(t, sourceGNB, "HandoverRequired with inconsistent RAN UE NGAP ID")
 }
 
-// A UE that never registered is one the AMF has no context for; §10.6 requires
-// an Error Indication to the source.
 func Test5GN2HandoverRequiredUnregisteredUE(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "00000b", "ho-edge-src")
 	createGnBWithID(t, "00000c", "ho-edge-tgt")
 
-	ueID := mustCreateUE(t, sourceGNB) // created but never registered
+	ueID := mustCreateUE(t, sourceGNB)
 
 	status, body := doRequest(t, "POST", "/gnb/"+sourceGNB+"/ue/"+ueID+"/ngap",
 		`{"message_type":"handover_required","target_gnb_id":"00000c"}`)
@@ -102,15 +91,11 @@ func Test5GN2HandoverRequiredUnregisteredUE(t *testing.T) {
 	expectErrorIndication(t, sourceGNB, "HandoverRequired for an unregistered UE")
 }
 
-// Naming a target gNB the AMF does not know is a failure during handover
-// preparation; §8.4.1.3 requires a HANDOVER PREPARATION FAILURE to the source
-// (cause unknown-targetID).
 func Test5GN2HandoverRequiredUnknownTarget(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "00000d", "ho-edge-src")
 
 	ueID := establishRegisteredUE(t, sourceGNB)
 
-	// Target gNB ffffff was never set up on the AMF.
 	status, body := doRequest(t, "POST", "/gnb/"+sourceGNB+"/ue/"+ueID+"/ngap",
 		`{"message_type":"handover_required","target_gnb_id":"ffffff"}`)
 	if status != 200 {
@@ -120,15 +105,12 @@ func Test5GN2HandoverRequiredUnknownTarget(t *testing.T) {
 	expectHandoverPreparationFailure(t, sourceGNB, "HandoverRequired to an unknown target gNB")
 }
 
-// A PDU session the UE does not have leaves the AMF/SMF unable to prepare any
-// resource; §8.4.1.3 requires a HANDOVER PREPARATION FAILURE to the source.
 func Test5GN2HandoverRequiredUnknownPDUSession(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "00000e", "ho-edge-src")
 	createGnBWithID(t, "00000f", "ho-edge-tgt")
 
 	ueID := establishRegisteredUE(t, sourceGNB)
 
-	// Session 9 was never established for this UE.
 	status, body := doRequest(t, "POST", "/gnb/"+sourceGNB+"/ue/"+ueID+"/ngap",
 		`{"message_type":"handover_required","target_gnb_id":"00000f","pdu_session_ids":[9]}`)
 	if status != 200 {
@@ -138,8 +120,6 @@ func Test5GN2HandoverRequiredUnknownPDUSession(t *testing.T) {
 	expectHandoverPreparationFailure(t, sourceGNB, "HandoverRequired for a non-existent PDU session")
 }
 
-// An unknown AMF UE NGAP ID in the acknowledge is an unknown local AP ID, so
-// §10.6 requires an Error Indication to the target.
 func Test5GN2HandoverRequestAcknowledgeUnknownAmfUeNgapID(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "000005", "ho-edge-src")
 	targetGNB := createGnBWithID(t, "000006", "ho-edge-tgt")
@@ -165,9 +145,6 @@ func Test5GN2HandoverRequestAcknowledgeUnknownAmfUeNgapID(t *testing.T) {
 	expectErrorIndication(t, targetGNB, "HandoverRequestAcknowledge with unknown AMF UE NGAP ID")
 }
 
-// Even once the target's RAN UE NGAP ID is known from a valid acknowledge, an
-// unknown AMF UE NGAP ID in the Notify is still an unknown local AP ID, so
-// §10.6 requires an Error Indication to the target.
 func Test5GN2HandoverNotifyUnknownAmfUeNgapID(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "000007", "ho-edge-src")
 	targetGNB := createGnBWithID(t, "000008", "ho-edge-tgt")

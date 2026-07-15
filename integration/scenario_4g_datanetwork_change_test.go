@@ -14,8 +14,6 @@ import (
 
 const dnChangeIMSI = "001010000000105"
 
-// dnReactName is dedicated to this test so the MTU change never disturbs the
-// data networks other tests rely on.
 const dnReactName = "modreact"
 
 func setDataNetworkMTU(t *testing.T, token string, mtu int) {
@@ -35,11 +33,6 @@ func setDataNetworkMTU(t *testing.T, token string, mtu int) {
 	_ = resp.Body.Close()
 }
 
-// Test4GDataNetworkChangeReactivatesBearer changes the MTU of an active
-// session's data network. An active session cannot adopt it in place, so the MME
-// must deactivate the bearer with ESM cause #39 "reactivation requested" for the
-// UE to re-establish the PDN connection (TS 24.301 §6.4.4.2). The change targets
-// an additional PDN so the UE stays attached.
 func Test4GDataNetworkChangeReactivatesBearer(t *testing.T) {
 	token, err := provisionEllaCore()
 	if err != nil {
@@ -94,8 +87,7 @@ func Test4GDataNetworkChangeReactivatesBearer(t *testing.T) {
 		t.Fatalf("deactivate esm_cause = %q, want 39 (reactivation requested, TS 24.301 §9.9.4.4)\n  body: %s", got, body2)
 	}
 
-	// The accept is mandatory for the MME to complete the deactivation
-	// (TS 24.301 §6.4.4.3).
+	// The accept is mandatory for the MME to complete the deactivation (TS 24.301 §6.4.4.3).
 	accept := fmt.Sprintf(`{"message_type":"deactivate_eps_bearer_context_accept","eps_bearer_identity":%s,"pti":%s}`,
 		jsonGet(body2, "nas.eps_bearer_identity"), jsonGet(body2, "nas.bearer_pti"))
 	if s, ab := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas", accept); s != 200 {

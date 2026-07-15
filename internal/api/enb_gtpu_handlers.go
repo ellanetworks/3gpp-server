@@ -16,8 +16,6 @@ import (
 )
 
 type ENBUplinkRequest struct {
-	// An Ebi of 0 or the default EBI selects the default bearer, else an
-	// additional PDN's bearer (TS 24.301 §6.5.1).
 	Ebi uint8 `json:"ebi,omitempty"`
 
 	ICMPEcho *struct {
@@ -33,13 +31,10 @@ type ENBUplinkRequest struct {
 		PayloadHex string `json:"payload_hex,omitempty"`
 	} `json:"udp,omitempty"`
 
-	// Src defaults to the selected bearer's UE IP, TEID to its uplink TEID.
 	Src  *string `json:"src,omitempty"`
 	TEID *uint32 `json:"teid,omitempty"`
 }
 
-// An inner packet must be sourced from the returned ueIP or the UPF's
-// anti-spoofing filter drops it.
 func enbBearer(ue *store.UEEPSContext, ebi uint8) (ulTeid, dlTeid uint32, upfIP, ueIP string, ok bool) {
 	if ebi == 0 || ebi == ue.EPSBearerID {
 		return ue.ULTeid, ue.DLTeid, ue.UPFIP, ue.UEIP, ue.ULTeid != 0
@@ -202,8 +197,6 @@ func (h *Handler) SendENBGTPUEcho(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"echo_response": true, "seq": msg.Seq})
 }
 
-// The S-GW/UPF sends an Error Indication on receiving a G-PDU on S1-U for a TEID
-// with no context (TS 29.281 §7.3.1).
 func (h *Handler) AwaitENBErrorIndication(w http.ResponseWriter, r *http.Request) {
 	enb, err := h.Store.GetENB(r.PathValue("enb_id"))
 	if err != nil {

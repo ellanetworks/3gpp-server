@@ -22,9 +22,6 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/transport"
 )
 
-// Prefers the address matching the eNB's own S1-U family, falling back to the
-// other when the S-GW signalled only one. A dual-stack S-GW signals both
-// (TS 36.414 §5.3).
 func erabUPFIP(enb *store.ENBContext, e s1ap.ERABSetupItemJSON) string {
 	if a, err := netip.ParseAddr(enb.N3Addr); err == nil && a.Is6() {
 		return firstNonEmpty(e.TransportLayerAddressIPv6, e.TransportLayerAddress)
@@ -33,10 +30,13 @@ func erabUPFIP(enb *store.ENBContext, e s1ap.ERABSetupItemJSON) string {
 	return firstNonEmpty(e.TransportLayerAddress, e.TransportLayerAddressIPv6)
 }
 
-// The NAS key set identifier value "no key available" (TS 24.301 §9.9.3.21).
+// TS 24.301 §9.9.3.21.
 const ksiNoKey uint8 = 7
 
-// EMM causes for an Authentication Failure (TS 24.301 §9.9.3.9, §5.4.2.6).
+// TS 36.413 §9.2.1.3.
+const causeRadioNetworkUnspecified = 0
+
+// TS 24.301 §9.9.3.9.
 const (
 	emmCauseMACFailure   uint8 = 20
 	emmCauseSynchFailure uint8 = 21
@@ -241,8 +241,6 @@ func (h *Handler) attachRequest(ctx context.Context, enb *store.ENBContext, ue *
 	}
 
 	if req.ForeignGUTI {
-		// A GUTI from this PLMN with an M-TMSI the MME never allocated: it cannot be
-		// mapped to an IMSI, so the MME must run the Identity procedure (§5.4.4).
 		params.GUTI = &naseps.GUTIParams{MCC: enb.MCC, MNC: enb.MNC, MMEGroupID: 1, MMECode: 1, MTMSI: 0x0BADF00D}
 	}
 
@@ -279,7 +277,6 @@ func (h *Handler) attachRequest(ctx context.Context, enb *store.ENBContext, ue *
 		return nil, err
 	}
 
-	// The challenge is retained for the following authentication_response's RES.
 	ue.RAND, _ = hex.DecodeString(nas.RAND)
 	ue.AUTN, _ = hex.DecodeString(nas.AUTN)
 	if nas.KSI != nil {
@@ -289,8 +286,6 @@ func (h *Handler) attachRequest(ctx context.Context, enb *store.ENBContext, ue *
 	return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
 }
 
-// The MME may drop a malformed PDU without replying, so a wait timeout is not an
-// error.
 func (h *Handler) attachRequestRaw(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, rawHex string) (*SendENBNASResponse, error) {
 	raw, err := hex.DecodeString(rawHex)
 	if err != nil {
@@ -364,9 +359,6 @@ func (h *Handler) authenticationResponse(ctx context.Context, enb *store.ENBCont
 		return nil, err
 	}
 
-	// A plain downlink means the MME did not accept the response: an
-	// Authentication Reject (wrong RES, §5.4.2.5) or an Identity Request. Return
-	// it as-is — no security context is established.
 	if sht == naseps.SHTPlain {
 		nas, derr := naseps.Decode(nasBytes)
 		if derr != nil {
@@ -376,8 +368,7 @@ func (h *Handler) authenticationResponse(ctx context.Context, enb *store.ENBCont
 		return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
 	}
 
-	// The Security Mode Command is integrity-protected but not ciphered, so read
-	// the selected algorithms from the inner payload before deriving the keys.
+	// The Security Mode Command is not ciphered, so the algorithms it selects are readable before their keys exist.
 	inner, err := naseps.PeekProtectedPayload(nasBytes)
 	if err != nil {
 		return nil, err
@@ -403,7 +394,6 @@ func (h *Handler) authenticationResponse(ctx context.Context, enb *store.ENBCont
 	ue.ULCount = 0
 	ue.DLCount = 0
 
-	// Verify the MME's NAS-MAC under our independently-derived keys (DL COUNT 0).
 	_, verr := naseps.Unprotect(nasBytes, ue.NextDL(), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
 	verified := verr == nil
 
@@ -435,8 +425,6 @@ func (h *Handler) identityResponse(ctx context.Context, enb *store.ENBContext, u
 		return nil, err
 	}
 
-	// With the IMSI in hand the MME challenges; adopt the challenge for the
-	// following authentication_response.
 	if nas.MessageType == "authentication_request" {
 		ue.RAND, _ = hex.DecodeString(nas.RAND)
 		ue.AUTN, _ = hex.DecodeString(nas.AUTN)
@@ -452,8 +440,6 @@ func (h *Handler) authenticationFailure(ctx context.Context, enb *store.ENBConte
 
 	cause := uint8(*req.Cause)
 
-	// A synch failure carries the AUTS re-synchronisation token (TS 24.301
-	// §5.4.2.6 c); the MME forwards it to the HSS to re-sync the SQN.
 	var auts []byte
 	if cause == emmCauseSynchFailure {
 		var err error
@@ -486,8 +472,6 @@ func (h *Handler) authenticationFailure(ctx context.Context, enb *store.ENBConte
 		return nil, err
 	}
 
-	// On a synch-failure re-sync the MME re-challenges with a fresh vector; adopt
-	// the new challenge so a following authentication_response uses it.
 	if nas.MessageType == "authentication_request" {
 		ue.RAND, _ = hex.DecodeString(nas.RAND)
 		ue.AUTN, _ = hex.DecodeString(nas.AUTN)
@@ -512,8 +496,7 @@ func (h *Handler) securityModeComplete(ctx context.Context, enb *store.ENBContex
 	}
 
 	if req.CorruptMAC {
-		// Flip the first octet of the 4-octet NAS-MAC (the message is
-		// header‖MAC‖seq‖payload). The MME must discard it (§4.4.4).
+		// protected[1] is the first octet of the NAS-MAC (header‖MAC‖seq‖payload).
 		protected[1] ^= 0xff
 	}
 
@@ -521,8 +504,6 @@ func (h *Handler) securityModeComplete(ctx context.Context, enb *store.ENBContex
 		return nil, err
 	}
 
-	// A discarded message yields no Initial Context Setup, so a timeout here is a
-	// valid outcome.
 	if req.CorruptMAC {
 		return &SendENBNASResponse{S1AP: h.waitDownlinkTolerant(ctx, t, ue, "InitialContextSetupRequest")}, nil
 	}
@@ -573,16 +554,12 @@ func (h *Handler) securityModeComplete(ctx context.Context, enb *store.ENBContex
 		ue.UPFIP = erabUPFIP(enb, e)
 	}
 
-	// The eNB's own downlink TEID, advertised in the Initial Context Setup
-	// Response, is its eNB UE S1AP ID.
 	ue.DLTeid = ue.ENBUES1APID
 	ue.UEIP = ueIPFromPDNAddress(nas.PDNAddress)
 
 	return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
 }
 
-// An Attach Accept PDN address is a PDN-type octet followed by the address
-// octets (TS 24.301 §9.9.4.9).
 func ueIPFromPDNAddress(pdnHex string) string {
 	b, err := hex.DecodeString(pdnHex)
 	if err != nil || len(b) < 5 || b[0] != naseps.PDNTypeIPv4 {
@@ -592,7 +569,7 @@ func ueIPFromPDNAddress(pdnHex string) string {
 	return net.IP(b[1:5]).String()
 }
 
-// EMM cause #23, UE security capabilities mismatch (TS 24.301 §5.4.3.5).
+// TS 24.301 §9.9.3.9.
 const emmCauseSecurityCapMismatch uint8 = 23
 
 func (h *Handler) securityModeReject(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
@@ -601,8 +578,6 @@ func (h *Handler) securityModeReject(ctx context.Context, enb *store.ENBContext,
 		cause = uint8(*req.Cause)
 	}
 
-	// The Security Mode Reject is sent unprotected: the UE could not take the new
-	// security context into use (TS 24.301 §5.4.3.5).
 	pdu, err := naseps.BuildSecurityModeReject(cause)
 	if err != nil {
 		return nil, err
@@ -612,7 +587,6 @@ func (h *Handler) securityModeReject(ctx context.Context, enb *store.ENBContext,
 		return nil, err
 	}
 
-	// The MME must abort and release the NAS signalling connection (§5.4.3.5).
 	dl, err := h.waitDownlink(ctx, t, ue, "UEContextReleaseCommand")
 	if err != nil {
 		return nil, err
@@ -653,8 +627,7 @@ func (h *Handler) attachComplete(ctx context.Context, enb *store.ENBContext, ue 
 		return nil, err
 	}
 
-	// The MME may follow the Attach Complete with an optional EMM Information
-	// message. Consuming it keeps the downlink NAS COUNT in step.
+	// Consuming the optional EMM Information keeps the downlink NAS COUNT in step.
 	wctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
@@ -688,8 +661,6 @@ func (h *Handler) sendUplink(enb *store.ENBContext, ue *store.UEEPSContext, t *t
 	return t.Send(ul, false)
 }
 
-// One-way: the MME stores the radio capability for replay in a later Initial
-// Context Setup Request (TS 23.401 §5.11.2) and sends no reply.
 func (h *Handler) ueCapabilityInfo(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	cap := []byte{0x01, 0x02, 0x03, 0x04, 0x05}
 	if req.UERadioCapability != "" {
@@ -712,9 +683,6 @@ func (h *Handler) ueCapabilityInfo(ctx context.Context, enb *store.ENBContext, u
 		return nil, err
 	}
 
-	// No response is expected on success; a forged or inconsistent UE S1AP ID must
-	// draw an Error Indication (TS 36.413 §10.6). The indication echoes the forged
-	// IDs, so match by message type only.
 	wctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 
@@ -723,8 +691,6 @@ func (h *Handler) ueCapabilityInfo(ctx context.Context, enb *store.ENBContext, u
 	return &SendENBNASResponse{S1AP: resp}, nil
 }
 
-// Each ID is replaced by its request override, for AP-ID fuzzing (TS 36.413
-// §10.6).
 func forgeIDs(ue *store.UEEPSContext, req *SendENBNASRequest) (uint32, uint32) {
 	mmeID, enbID := ue.MMEUES1APID, ue.ENBUES1APID
 	if req == nil {
@@ -742,10 +708,6 @@ func forgeIDs(ue *store.UEEPSContext, req *SendENBNASRequest) (uint32, uint32) {
 	return mmeID, enbID
 }
 
-// Emulates a target eNB after an X2 handover, switching the UE's default-bearer
-// downlink to a fresh endpoint. The MME answers with a Path Switch Request
-// Acknowledge carrying a fresh {NH, NCC}, or a Path Switch Request Failure
-// (TS 36.413 §9.1.5.8; key chain per TS 33.401 §7.2.8).
 func (h *Handler) pathSwitch(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	if !ue.SecurityActive {
 		return nil, fmt.Errorf("no UE context; complete an attach first")
@@ -761,9 +723,7 @@ func (h *Handler) pathSwitch(ctx context.Context, enb *store.ENBContext, ue *sto
 		erabID = *req.PathSwitchERABID
 	}
 
-	// Report the same UE security capabilities the UE advertised at attach (the
-	// MME's stored values), so a matching Path Switch draws no replay. The S1AP
-	// encoding drops the EEA0/EIA0 bit, so shift the network capability octets left.
+	// The S1AP encoding drops the EEA0/EIA0 bit, so shift the octets left.
 	netcap := ue.UENetworkCapability
 	if len(netcap) < 2 {
 		netcap = naseps.DefaultUENetworkCapability
@@ -785,7 +745,7 @@ func (h *Handler) pathSwitch(ctx context.Context, enb *store.ENBContext, ue *sto
 		SourceMMEUES1APID:             sourceMME,
 		ERABID:                        erabID,
 		TargetS1UAddr:                 enb.N3Addr,
-		TargetTEID:                    ue.ENBUES1APID + 0x1000, // a fresh target downlink TEID
+		TargetTEID:                    ue.ENBUES1APID + 0x1000,
 		MCC:                           enb.MCC,
 		MNC:                           enb.MNC,
 		TAC:                           enb.TAC,
@@ -810,9 +770,6 @@ func (h *Handler) pathSwitch(ctx context.Context, enb *store.ENBContext, ue *sto
 	return &SendENBNASResponse{S1AP: dl}, nil
 }
 
-// Emulates an eNB-initiated S1 RESET (TS 36.413 §8.7.1). The MME must release
-// the affected UE-associated connections and reply with a Reset Acknowledge,
-// which for a partial reset echoes the connection list.
 func (h *Handler) reset(ctx context.Context, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	var connections []s1ap.ResetConnection
 	if !req.ResetAll {
@@ -828,8 +785,6 @@ func (h *Handler) reset(ctx context.Context, ue *store.UEEPSContext, t *transpor
 		return nil, err
 	}
 
-	// The Reset Acknowledge is non-UE-associated — a full reset carries no UE ID —
-	// so match by message type only.
 	resp, err := t.WaitForMessage(ctx, "ResetAcknowledge")
 	if err != nil {
 		return &SendENBNASResponse{}, nil
@@ -838,7 +793,6 @@ func (h *Handler) reset(ctx context.Context, ue *store.UEEPSContext, t *transpor
 	return &SendENBNASResponse{S1AP: resp}, nil
 }
 
-// Drives a UE-requested additional PDN connection (TS 24.301 §6.5.1).
 func (h *Handler) pdnConnectivity(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	if !ue.SecurityActive {
 		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
@@ -873,9 +827,6 @@ func (h *Handler) pdnConnectivity(ctx context.Context, enb *store.ENBContext, ue
 		return nil, err
 	}
 
-	// The MME accepts via E-RAB Setup Request (carrying the Activate Default), or
-	// rejects with a PDN Connectivity Reject in a Downlink NAS Transport. A
-	// discarded request yields no reply.
 	dl := h.waitDownlinkTolerant(ctx, t, ue, "ERABSetupRequest", "DownlinkNASTransport")
 	if dl == nil {
 		return &SendENBNASResponse{}, nil
@@ -907,8 +858,6 @@ func (h *Handler) pdnConnectivity(ctx context.Context, enb *store.ENBContext, ue
 	return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
 }
 
-// The radio leg is acknowledged with an E-RAB Setup Response and the session
-// with an Activate Default EPS Bearer Context Accept (TS 24.301 §6.5.1.3).
 func (h *Handler) acceptAdditionalBearer(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, dl *s1ap.S1APResponse, nas *naseps.NASResponse, req *SendENBNASRequest) error {
 	if nas.EPSBearerIdentity == nil {
 		return fmt.Errorf("activate default without an EPS bearer identity")
@@ -925,7 +874,7 @@ func (h *Handler) acceptAdditionalBearer(enb *store.ENBContext, ue *store.UEEPSC
 		PTI:    pti,
 		APN:    nas.APN,
 		UEIP:   ueIPFromPDNAddress(nas.PDNAddress),
-		DLTeid: (ue.ENBUES1APID << 8) | uint32(ebi), // distinct per (UE, bearer)
+		DLTeid: (ue.ENBUES1APID << 8) | uint32(ebi),
 	}
 
 	if len(dl.ERABSetupItems) > 0 {
@@ -961,7 +910,6 @@ func (h *Handler) acceptAdditionalBearer(enb *store.ENBContext, ue *store.UEEPSC
 	return h.sendUplink(enb, ue, t, protectedAccept, req)
 }
 
-// Drives a UE-requested PDN disconnect (TS 24.301 §6.5.2).
 func (h *Handler) pdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	if !ue.SecurityActive {
 		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
@@ -991,9 +939,6 @@ func (h *Handler) pdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *
 		return nil, err
 	}
 
-	// Disconnecting an additional PDN keeps the UE connected, so the MME carries
-	// the Deactivate in an E-RAB Release Command that also releases the radio
-	// bearer (TS 23.401 §5.10.3); a reject arrives as a Downlink NAS Transport.
 	dl := h.waitDownlinkTolerant(ctx, t, ue, "ERABReleaseCommand", "DownlinkNASTransport")
 	if dl == nil {
 		return &SendENBNASResponse{}, nil
@@ -1053,11 +998,9 @@ func (h *Handler) pdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *
 	return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
 }
 
-// ESM cause #111, protocol error unspecified (TS 24.301 §9.9.4.4).
+// TS 24.301 §9.9.4.4.
 const esmCauseProtocolErrorUnspec uint8 = 111
 
-// Sends an ESM STATUS reporting an ESM protocol error for a bearer (TS 24.301
-// §6.7). ESM cause #43 makes the MME deactivate the bearer.
 func (h *Handler) statusESM(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	if !ue.SecurityActive {
 		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
@@ -1076,7 +1019,6 @@ func (h *Handler) statusESM(enb *store.ENBContext, ue *store.UEEPSContext, t *tr
 	return h.sendESM(enb, ue, t, esm, req)
 }
 
-// TS 24.301 §6.4.3.3.
 func (h *Handler) modifyBearerAccept(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	if !ue.SecurityActive {
 		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
@@ -1090,7 +1032,6 @@ func (h *Handler) modifyBearerAccept(enb *store.ENBContext, ue *store.UEEPSConte
 	return h.sendESM(enb, ue, t, esm, req)
 }
 
-// TS 24.301 §6.4.4.3.
 func (h *Handler) deactivateBearerAccept(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	if !ue.SecurityActive {
 		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
@@ -1133,10 +1074,8 @@ func esmPTI(req *SendENBNASRequest) uint8 {
 	return 0
 }
 
-// TS 36.413 §8.7.2 leaves the MME's reaction to an Error Indication
-// implementation-specific, so any of the awaited downlinks is valid.
 func (h *Handler) errorIndication(ctx context.Context, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
-	encoded, err := s1ap.BuildErrorIndication(sourceMMEID(ue, req), sourceENBID(ue, req), 0) // radio-network unspecified
+	encoded, err := s1ap.BuildErrorIndication(sourceMMEID(ue, req), sourceENBID(ue, req), causeRadioNetworkUnspecified)
 	if err != nil {
 		return nil, err
 	}
@@ -1150,9 +1089,8 @@ func (h *Handler) errorIndication(ctx context.Context, ue *store.UEEPSContext, t
 	return &SendENBNASResponse{S1AP: resp}, nil
 }
 
-// Send-only: the MME releases the UE context (TS 36.413 §8.3.1.4).
 func (h *Handler) initialContextSetupFailure(ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
-	encoded, err := s1ap.BuildInitialContextSetupFailure(sourceMMEID(ue, req), sourceENBID(ue, req), 0) // radio-network unspecified
+	encoded, err := s1ap.BuildInitialContextSetupFailure(sourceMMEID(ue, req), sourceENBID(ue, req), causeRadioNetworkUnspecified)
 	if err != nil {
 		return nil, err
 	}
@@ -1164,8 +1102,6 @@ func (h *Handler) initialContextSetupFailure(ue *store.UEEPSContext, t *transpor
 	return &SendENBNASResponse{}, nil
 }
 
-// Send-only: the MME completes the procedure on the NAS Modify Accept
-// (TS 36.413 §8.2.2).
 func (h *Handler) modifyResponse(ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	encoded, err := s1ap.BuildERABModifyResponse(ue.MMEUES1APID, ue.ENBUES1APID, []uint8{esmBearerID(ue, req)})
 	if err != nil {
@@ -1179,8 +1115,6 @@ func (h *Handler) modifyResponse(ue *store.UEEPSContext, t *transport.S1APTransp
 	return &SendENBNASResponse{}, nil
 }
 
-// The MME answers a TAU Request with a TAU Accept or a TAU Reject (TS 24.301
-// §5.5.3).
 func (h *Handler) trackingAreaUpdate(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	if !ue.SecurityActive {
 		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
@@ -1214,7 +1148,6 @@ func (h *Handler) trackingAreaUpdate(ctx context.Context, enb *store.ENBContext,
 		return nil, err
 	}
 
-	// A discarded (bad-MAC) TAU yields no reply; that is a valid outcome.
 	dl := h.waitDownlinkTolerant(ctx, t, ue, "DownlinkNASTransport")
 	if dl == nil {
 		return &SendENBNASResponse{}, nil
@@ -1225,7 +1158,6 @@ func (h *Handler) trackingAreaUpdate(ctx context.Context, enb *store.ENBContext,
 		return nil, err
 	}
 
-	// A TAU Reject is sent plain (§4.4.4.2); a TAU Accept is protected.
 	sht, err := naseps.SecurityHeader(nasBytes)
 	if err != nil {
 		return nil, err
@@ -1246,7 +1178,6 @@ func (h *Handler) trackingAreaUpdate(ctx context.Context, enb *store.ENBContext,
 		return nil, err
 	}
 
-	// A reallocated GUTI must be acknowledged with TAU Complete (§5.5.3.2.4).
 	if nas.GUTI != nil {
 		ue.GUTIMCC = nas.GUTI.MCC
 		ue.GUTIMNC = nas.GUTI.MNC
@@ -1275,8 +1206,6 @@ func (h *Handler) trackingAreaUpdate(ctx context.Context, enb *store.ENBContext,
 	return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
 }
 
-// The eNB-initiated S1 release moves the UE to ECM-IDLE. Its NAS security
-// context is retained for a following Service Request.
 func (h *Handler) releaseRequest(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	mmeID, enbID := forgeIDs(ue, req)
 
@@ -1294,17 +1223,11 @@ func (h *Handler) releaseRequest(ctx context.Context, enb *store.ENBContext, ue 
 		return nil, err
 	}
 
-	// A forged or inconsistent UE S1AP ID must draw an Error Indication, not a
-	// Release Command (TS 36.413 §10.6). The indication echoes the forged IDs, so
-	// match by message type only.
 	if req.MMEUES1APIDOverride != nil || req.ENBUES1APIDOverride != nil {
 		resp, _ := t.WaitForMessage(ctx, "ErrorIndication", "UEContextReleaseCommand")
 		return &SendENBNASResponse{S1AP: resp}, nil
 	}
 
-	// The MME answers with a Release Command, or — when the S1 context is already
-	// gone, as on a repeated release — an Error Indication (TS 36.413 §10.6). No
-	// reply is a valid outcome.
 	dl, err := h.waitDownlink(ctx, t, ue, "UEContextReleaseCommand", "ErrorIndication")
 	if err != nil {
 		return &SendENBNASResponse{}, nil
@@ -1326,10 +1249,6 @@ func (h *Handler) releaseRequest(ctx context.Context, enb *store.ENBContext, ue 
 	return &SendENBNASResponse{S1AP: dl}, nil
 }
 
-// The Service Request is short-MAC protected and carried in an Initial UE
-// Message identified by the UE's S-TMSI. The MME re-establishes the bearer with
-// an Initial Context Setup Request, or refuses with a Service Reject (TS 24.301
-// §5.6.1).
 func (h *Handler) serviceRequest(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	if !ue.SecurityActive {
 		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
@@ -1346,7 +1265,7 @@ func (h *Handler) serviceRequest(ctx context.Context, enb *store.ENBContext, ue 
 	}
 
 	if req.CorruptMAC {
-		sr[3] ^= 0xff // corrupt the short MAC
+		sr[3] ^= 0xff
 	}
 
 	mtmsi := ue.GUTIMTMSI
@@ -1366,8 +1285,6 @@ func (h *Handler) serviceRequest(ctx context.Context, enb *store.ENBContext, ue 
 		return nil, err
 	}
 
-	// A Service Request with a bad short-MAC may be discarded without reply, so no
-	// reply is a valid outcome.
 	dl := h.waitDownlinkTolerant(ctx, t, ue, "InitialContextSetupRequest", "DownlinkNASTransport")
 	if dl == nil {
 		return &SendENBNASResponse{}, nil
@@ -1390,7 +1307,6 @@ func (h *Handler) serviceRequest(ctx context.Context, enb *store.ENBContext, ue 
 			return nil, err
 		}
 	case "DownlinkNASTransport":
-		// A Service Reject is sent plain (TS 24.301 §5.6.1.5).
 		if dl.NASPDU != nil {
 			if plain, berr := nasPDUBytes(dl); berr == nil {
 				resp.NAS, _ = naseps.Decode(plain)
@@ -1401,8 +1317,6 @@ func (h *Handler) serviceRequest(ctx context.Context, enb *store.ENBContext, ue 
 	return resp, nil
 }
 
-// A normal detach draws a Detach Accept and a UE Context Release; a switch-off
-// detach draws only the release (TS 24.301 §5.5.2).
 func (h *Handler) detach(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	if !ue.SecurityActive {
 		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
@@ -1500,7 +1414,6 @@ func (h *Handler) injectNAS(ctx context.Context, enb *store.ENBContext, ue *stor
 		return nil, err
 	}
 
-	// No ID matcher: a forged ID may not echo this UE's.
 	resp, err := t.WaitForMessage(ctx, "DownlinkNASTransport", "ErrorIndication", "UEContextReleaseCommand")
 	if err != nil {
 		return &SendENBNASResponse{}, nil
@@ -1509,8 +1422,6 @@ func (h *Handler) injectNAS(ctx context.Context, enb *store.ENBContext, ue *stor
 	return &SendENBNASResponse{S1AP: resp}, nil
 }
 
-// waitDownlink for adversarial paths where no reply is a valid outcome: a
-// timeout yields nil, not an error.
 func (h *Handler) waitDownlinkTolerant(ctx context.Context, t *transport.S1APTransport, ue *store.UEEPSContext, types ...string) *s1ap.S1APResponse {
 	resp, err := h.waitDownlink(ctx, t, ue, types...)
 	if err != nil {

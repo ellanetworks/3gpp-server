@@ -23,9 +23,7 @@ type RegistrationRequestOpts struct {
 	Overrides *NASRequest
 }
 
-// BuildRegistrationRequest builds a plain REGISTRATION REQUEST (TS 24.501
-// §8.2.6). The mobile identity is the GUTI when the UE holds one, else its SUCI
-// (§5.5.1.2.2).
+// BuildRegistrationRequest builds a plain REGISTRATION REQUEST (TS 24.501 §8.2.6).
 func BuildRegistrationRequest(opts *RegistrationRequestOpts) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
@@ -268,9 +266,10 @@ func applyRegistrationRequestOverrides(rr *nasMessage.RegistrationRequest, req *
 	}
 }
 
-// BuildAuthenticationResponse builds an AUTHENTICATION RESPONSE (TS 24.501
-// §8.2.2) carrying RES* in the Authentication response parameter IE, which is
-// at most 16 octets (§9.11.3.17).
+// maxAuthenticationResponseParameterLen is the IE's maximum, TS 24.501 §9.11.3.17.
+const maxAuthenticationResponseParameterLen = 16
+
+// BuildAuthenticationResponse builds an AUTHENTICATION RESPONSE (TS 24.501 §8.2.2).
 func BuildAuthenticationResponse(resStar []byte) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
@@ -284,10 +283,7 @@ func BuildAuthenticationResponse(resStar []byte) ([]byte, error) {
 
 	if len(resStar) > 0 {
 		authResp.AuthenticationResponseParameter = nasType.NewAuthenticationResponseParameter(nasMessage.AuthenticationResponseAuthenticationResponseParameterType)
-		n := len(resStar)
-		if n > 16 {
-			n = 16
-		}
+		n := min(len(resStar), maxAuthenticationResponseParameterLen)
 		authResp.AuthenticationResponseParameter.SetLen(uint8(n))
 		copy(authResp.AuthenticationResponseParameter.Octet[:], resStar[:n])
 	}
@@ -303,9 +299,6 @@ func BuildAuthenticationResponse(resStar []byte) ([]byte, error) {
 }
 
 // BuildSecurityModeComplete builds a SECURITY MODE COMPLETE (TS 24.501 §8.2.26).
-// The NAS message container replays the initial Registration Request the UE sent
-// unprotected (§4.4.6); the IMEISV answers a Security Mode Command that requested
-// it (§5.4.2.3).
 func BuildSecurityModeComplete(regRequestPdu []byte, imeisv string) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
@@ -340,10 +333,7 @@ func BuildSecurityModeComplete(regRequestPdu []byte, imeisv string) ([]byte, err
 	return data.Bytes(), nil
 }
 
-// BuildAuthenticationFailure builds an AUTHENTICATION FAILURE with the given
-// 5GMM cause (TS 24.501 §8.2.4). For cause #21 "synch failure" the caller
-// supplies the AUTS re-synchronisation token in the Authentication failure
-// parameter IE.
+// BuildAuthenticationFailure builds an AUTHENTICATION FAILURE (TS 24.501 §8.2.4).
 func BuildAuthenticationFailure(cause uint8, auts []byte) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
@@ -373,8 +363,7 @@ func BuildAuthenticationFailure(cause uint8, auts []byte) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
-// BuildSecurityModeReject builds a SECURITY MODE REJECT with the given 5GMM
-// cause (TS 24.501 §8.2.27).
+// BuildSecurityModeReject builds a SECURITY MODE REJECT (TS 24.501 §8.2.27).
 func BuildSecurityModeReject(cause uint8) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
@@ -397,9 +386,7 @@ func BuildSecurityModeReject(cause uint8) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
-// BuildIdentityResponse builds an IDENTITY RESPONSE carrying the given mobile
-// identity contents (TS 24.501 §8.2.22), which must match the identity type the
-// AMF requested (e.g. the UE's SUCI).
+// BuildIdentityResponse builds an IDENTITY RESPONSE (TS 24.501 §8.2.22).
 func BuildIdentityResponse(mobileIdentity []byte) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
@@ -424,8 +411,7 @@ func BuildIdentityResponse(mobileIdentity []byte) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
-// BuildRegistrationComplete builds a REGISTRATION COMPLETE (TS 24.501 §8.2.8)
-// acknowledging a Registration Accept.
+// BuildRegistrationComplete builds a REGISTRATION COMPLETE (TS 24.501 §8.2.8).
 func BuildRegistrationComplete() ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()

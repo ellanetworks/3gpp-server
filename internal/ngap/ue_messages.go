@@ -368,8 +368,6 @@ func BuildUplinkNASTransport(amfUeNgapID, ranUeNgapID int64, nasPDU []byte, mcc,
 	return ngap.Encoder(pdu)
 }
 
-// buildPDUSessionResourceSetupResponseTransfer encodes the gNB's downlink GTP
-// tunnel for an admitted PDU session (TS 38.413 §9.3.4.10).
 func buildPDUSessionResourceSetupResponseTransfer(teid uint32, ip string) ([]byte, error) {
 	addr, err := netip.ParseAddr(ip)
 	if err != nil {
@@ -453,8 +451,6 @@ func BuildPDUSessionResourceSetupResponse(amfUeNgapID, ranUeNgapID, pduSessionID
 	return ngap.Encoder(pdu)
 }
 
-// BuildUERadioCapabilityInfoIndication builds a UE RADIO CAPABILITY INFO
-// INDICATION (TS 38.413 §8.14.1).
 func BuildUERadioCapabilityInfoIndication(amfUeNgapID, ranUeNgapID int64, radioCapability []byte) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
@@ -488,9 +484,6 @@ func BuildUERadioCapabilityInfoIndication(amfUeNgapID, ranUeNgapID int64, radioC
 	return ngap.Encoder(pdu)
 }
 
-// BuildErrorIndication builds an ERROR INDICATION for the UE-associated
-// connection (TS 38.413 §8.7.5). causeRadioNetwork is a radio-network Cause
-// value.
 func BuildErrorIndication(amfUeNgapID, ranUeNgapID, causeRadioNetwork int64) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
@@ -620,8 +613,6 @@ func BuildUEContextReleaseComplete(amfUeNgapID, ranUeNgapID int64) ([]byte, erro
 	return ngap.Encoder(pdu)
 }
 
-// BuildUEContextReleaseRequest builds a gNB-initiated UE CONTEXT RELEASE REQUEST
-// (TS 38.413 §8.3.2). causeRadioNetwork is a radio-network Cause value.
 func BuildUEContextReleaseRequest(amfUeNgapID, ranUeNgapID int64, causeRadioNetwork int64) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage

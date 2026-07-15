@@ -3,11 +3,6 @@
 
 //go:build integration
 
-// Tests for the Service Request procedure (TS 24.501 §5.6.1). A registered UE
-// that has gone CM-IDLE (after a UE Context Release) sends a Service Request to
-// return to CM-CONNECTED. The AMF re-activates the UE context via Initial
-// Context Setup and the UE receives a Service Accept.
-
 package integration_test
 
 import (
@@ -15,8 +10,6 @@ import (
 	"testing"
 )
 
-// idleRegisteredUE leaves the UE RM-REGISTERED / CM-IDLE with a PDU session, the
-// precondition for a Service Request.
 func idleRegisteredUE(t *testing.T) (string, string) {
 	t.Helper()
 
@@ -62,7 +55,6 @@ func Test5GServiceRequest_Data(t *testing.T) {
 	}
 }
 
-// A signalling-type Service Request asks for no user-plane reactivation.
 func Test5GServiceRequest_Signalling(t *testing.T) {
 	gnbID, ueID := idleRegisteredUE(t)
 
@@ -82,7 +74,6 @@ func Test5GServiceRequest_Signalling(t *testing.T) {
 	}
 }
 
-// A normal deregistration afterwards is what proves the UE reached CM-CONNECTED.
 func Test5GServiceRequest_ThenDeregister(t *testing.T) {
 	gnbID, ueID := idleRegisteredUE(t)
 
@@ -105,11 +96,8 @@ func Test5GServiceRequest_ThenDeregister(t *testing.T) {
 	}
 }
 
-// With no security context the request goes out plain with a zeroed 5G-S-TMSI, so
-// it reaches the AMF. A SERVICE REQUEST must be integrity protected (TS 24.501
-// §4.4.4.2), so an unprotected one from an unknown UE may draw either a 5GMM
-// STATUS or a SERVICE REJECT; only the security property is asserted: service
-// must not be granted.
+// An unprotected SERVICE REQUEST (TS 24.501 §4.4.4.2) may draw a 5GMM STATUS or a
+// SERVICE REJECT, so only the denial of service is asserted.
 func Test5GServiceRequest_WithoutRegistration(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -128,8 +116,6 @@ func Test5GServiceRequest_WithoutRegistration(t *testing.T) {
 	}
 }
 
-// idleRegisteredUENoSession leaves the UE CM-IDLE having never established a PDU
-// session.
 func idleRegisteredUENoSession(t *testing.T) (string, string) {
 	t.Helper()
 
@@ -150,12 +136,9 @@ func idleRegisteredUENoSession(t *testing.T) (string, string) {
 	return gnbID, ueID
 }
 
-// Claiming no active PDU sessions must draw a signalling-style reactivation, with
-// no session set up.
 func Test5GServiceRequest_IdleNoSession(t *testing.T) {
 	gnbID, ueID := idleRegisteredUENoSession(t)
 
-	// pdu_session_status "0000" => claim no active sessions.
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
 		`{"message_type":"service_request","pdu_session_status":"0000"}`)
 	if status != 200 {
@@ -166,12 +149,10 @@ func Test5GServiceRequest_IdleNoSession(t *testing.T) {
 	}
 }
 
-// A UE claiming a PDU session the AMF does not hold must be reconciled against
-// the AMF's view and still accepted.
 func Test5GServiceRequest_PDUStatusMismatch(t *testing.T) {
 	gnbID, ueID := idleRegisteredUENoSession(t)
 
-	// bit 1 set => claim session 1 active; AMF has none.
+	// pdu_session_status bit 1 (0x0200) claims session 1 active; the AMF holds none.
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
 		`{"message_type":"service_request","pdu_session_status":"0200"}`)
 	if status != 200 {
@@ -182,8 +163,7 @@ func Test5GServiceRequest_PDUStatusMismatch(t *testing.T) {
 	}
 }
 
-// A Service Request from a still-CM-CONNECTED UE is out-of-state, so either an
-// accept on the new connection or a reject is conformant; only a hang is not.
+// Out-of-state: accept and reject are both conformant, so only a hang fails.
 func Test5GServiceRequest_WhileConnected(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -200,8 +180,6 @@ func Test5GServiceRequest_WhileConnected(t *testing.T) {
 	}
 }
 
-// With no context left for a deregistered UE, the AMF must answer with a SERVICE
-// REJECT (TS 24.501 §5.6.1.5).
 func Test5GServiceRequest_AfterDeregistration(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -227,8 +205,7 @@ func Test5GServiceRequest_AfterDeregistration(t *testing.T) {
 	}
 }
 
-// The first request brings the UE to CM-CONNECTED, making the second an
-// out-of-state already-connected request; neither must hang.
+// The second request is out-of-state: accept and reject are both conformant.
 func Test5GServiceRequest_BackToBack(t *testing.T) {
 	gnbID, ueID := idleRegisteredUE(t)
 
@@ -251,8 +228,7 @@ func Test5GServiceRequest_BackToBack(t *testing.T) {
 	}
 }
 
-// Behaviour varies by service type and by whether the UE is emergency-registered,
-// so only liveness is asserted.
+// Response varies by service type and emergency registration, so only liveness is asserted.
 func Test5GServiceRequest_ServiceTypes(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -280,8 +256,6 @@ func Test5GServiceRequest_ServiceTypes(t *testing.T) {
 	}
 }
 
-// Malformed NAS payloads ride an otherwise-valid Initial UE Message + 5G-S-TMSI,
-// so they reach the AMF, which must answer and not leave the request hanging.
 func Test5GServiceRequest_Fuzz(t *testing.T) {
 	tests := []struct {
 		name string
@@ -310,8 +284,7 @@ func Test5GServiceRequest_Fuzz(t *testing.T) {
 			gnbID, ueID := idleRegisteredUE(t)
 
 			status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap", tt.body)
-			// A local build rejection (400/500) and an AMF answer are both
-			// acceptable; only a 504 hang is not.
+			// A local build rejection (400/500) is as conformant as an AMF answer.
 			if status == 504 {
 				t.Fatalf("service request hung (HTTP 504)\n  body: %s", body)
 			}
@@ -319,9 +292,7 @@ func Test5GServiceRequest_Fuzz(t *testing.T) {
 	}
 }
 
-// A Service Request opens a fresh connection via Initial UE Message, which
-// carries no AMF UE NGAP ID, so the forged override is inert and the AMF must
-// serve the request normally.
+// Initial UE Message carries no AMF UE NGAP ID, so the override never reaches the AMF.
 func Test5GServiceRequest_StaleAMFIDOverride(t *testing.T) {
 	gnbID, ueID := idleRegisteredUE(t)
 

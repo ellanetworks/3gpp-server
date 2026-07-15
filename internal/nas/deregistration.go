@@ -19,9 +19,7 @@ type DeregistrationRequestOpts struct {
 	SwitchOff uint8
 }
 
-// BuildDeregistrationRequest builds a UE-originating DEREGISTRATION REQUEST
-// (TS 24.501 §8.2.12) over 3GPP access. With SwitchOff set the AMF sends no
-// Deregistration Accept (§5.5.2.2.2).
+// BuildDeregistrationRequest builds a UE-originating DEREGISTRATION REQUEST (TS 24.501 §8.2.12).
 func BuildDeregistrationRequest(opts *DeregistrationRequestOpts) ([]byte, error) {
 	m := gonas.NewMessage()
 	m.GmmMessage = gonas.NewGmmMessage()

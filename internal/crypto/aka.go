@@ -13,22 +13,13 @@ import (
 	"github.com/free5gc/util/ueauth"
 )
 
-// supiRegexp matches the "imsi-<digits>" form of the SUPI (TS 29.571 §5.3.2);
-// the captured digits are the IMSI that P0 of the K_AMF derivation is set to
-// (TS 33.501 §A.7.0).
 var supiRegexp = regexp.MustCompile(`(?:imsi|supi)-([0-9]{5,15})`)
 
-// AKAResult holds the outputs of a successful 5G-AKA challenge.
 type AKAResult struct {
-	RESstar []byte // 128-bit RES*, sent in the Authentication Response (TS 33.501 §A.4)
-	Kamf    []byte // 256-bit K_AMF (TS 33.501 §A.7)
+	RESstar []byte
+	Kamf    []byte
 }
 
-// ComputeResStar verifies the AUTN, recovers SQN, and derives RES* and K_AMF for
-// a 5G-AKA challenge (TS 33.501 §6.1.3.2, Annex A.2/A.4/A.6/A.7). snn is the
-// serving network name bound into K_AUSF and K_SEAF; supi supplies the IMSI that
-// K_AMF binds to. It returns ErrMACFailure on a bad AUTN MAC and ErrSQNOutOfRange
-// when the challenge SQN is older than the stored value.
 func ComputeResStar(k, opc, sqn, supi, snn string, rand, autn []byte) (*AKAResult, error) {
 	opcBytes, err := hex.DecodeString(opc)
 	if err != nil {
@@ -65,8 +56,6 @@ func ComputeResStar(k, opc, sqn, supi, snn string, rand, autn []byte) (*AKAResul
 
 	imsi := []byte(groups[1])
 
-	// AUTN = (SQN⊕AK) ‖ AMF ‖ MAC, so its first 6 octets are the SQN⊕AK input
-	// K_AUSF binds to (TS 33.501 §A.2).
 	sqnXorAK := autn[:6]
 
 	key := make([]byte, 0, len(CK)+len(IK))
@@ -116,12 +105,11 @@ func derivateKamf(key []byte, snName string, imsi, sqnXorAK []byte) ([]byte, err
 		return nil, fmt.Errorf("derive Kseaf: %w", err)
 	}
 
-	// ABBA parameter, 0x0000 for a non-interworking 5GS (TS 33.501 §A.7.1).
-	P1 := []byte{0x00, 0x00}
+	abba := []byte{0x00, 0x00} // non-interworking 5GS (TS 33.501 §A.7.1)
 
 	Kamf, err := ueauth.GetKDFValue(Kseaf, ueauth.FC_FOR_KAMF_DERIVATION,
 		imsi, ueauth.KDFLen(imsi),
-		P1, ueauth.KDFLen(P1))
+		abba, ueauth.KDFLen(abba))
 	if err != nil {
 		return nil, fmt.Errorf("derive Kamf: %w", err)
 	}

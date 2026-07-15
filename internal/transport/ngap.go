@@ -9,7 +9,6 @@ import (
 	ngapCodec "github.com/ellanetworks/3gpp-server/internal/ngap"
 )
 
-// NGAPTransport is an NGAP association to an AMF (PPID 60, TS 38.412).
 type NGAPTransport struct {
 	*framed[ngapCodec.NGAPResponse]
 }

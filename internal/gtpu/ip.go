@@ -20,8 +20,9 @@ const (
 	icmpEchoRequest = 8
 )
 
-// onesComplementSum folds the end-around carry and pads a trailing odd byte as
-// the high-order byte of a zero-padded word (RFC 1071 §2).
+const ipTTL = 64
+
+// RFC 1071 §2
 func onesComplementSum(b []byte) uint16 {
 	var sum uint32
 
@@ -66,8 +67,6 @@ func BuildUDP(src, dst netip.Addr, srcPort, dstPort uint16, payload []byte) ([]b
 		binary.BigEndian.PutUint16(udp[2:4], dstPort)
 		binary.BigEndian.PutUint16(udp[4:6], uint16(len(udp)))
 		copy(udp[8:], payload)
-		// The UDP checksum is optional over IPv4 and an all-zero field marks it as
-		// not computed (RFC 768).
 
 		return buildIPv4(protoUDP, src, dst, udp), nil
 	case src.Is6() && dst.Is6():
@@ -80,9 +79,9 @@ func BuildUDP(src, dst netip.Addr, srcPort, dstPort uint16, payload []byte) ([]b
 func buildIPv4(proto uint8, src, dst netip.Addr, l4 []byte) []byte {
 	total := 20 + len(l4)
 	ip := make([]byte, total)
-	ip[0] = 0x45 // version 4, IHL 5
+	ip[0] = 0x45
 	binary.BigEndian.PutUint16(ip[2:4], uint16(total))
-	ip[8] = 64 // TTL
+	ip[8] = ipTTL
 	ip[9] = proto
 
 	s := src.As4()
@@ -96,14 +95,12 @@ func buildIPv4(proto uint8, src, dst netip.Addr, l4 []byte) []byte {
 	return ip
 }
 
-// InnerPacket is a decoded inner IP packet, surfaced for assertions on a
-// received downlink T-PDU.
 type InnerPacket struct {
 	Src      string `json:"src"`
 	Dst      string `json:"dst"`
 	Protocol uint8  `json:"protocol"`
 
-	// ICMPType has no omitempty so an Echo Reply (type 0) stays distinguishable.
+	// omitempty on ICMPType would hide an Echo Reply, which is type 0.
 	ICMPType uint8  `json:"icmp_type"`
 	ICMPID   uint16 `json:"icmp_id,omitempty"`
 	ICMPSeq  uint16 `json:"icmp_seq,omitempty"`
@@ -111,7 +108,7 @@ type InnerPacket struct {
 	UDPSrcPort uint16 `json:"udp_src_port,omitempty"`
 	UDPDstPort uint16 `json:"udp_dst_port,omitempty"`
 
-	Payload string `json:"payload,omitempty"` // hex of the L4 payload
+	Payload string `json:"payload,omitempty"`
 }
 
 func ParseIPv4(b []byte) (*InnerPacket, error) {

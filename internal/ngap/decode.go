@@ -14,9 +14,6 @@ import (
 	"github.com/free5gc/ngap/ngapType"
 )
 
-// decodeULTunnel APER-decodes a PDU Session Resource Setup Request Transfer
-// (TS 38.413 §9.3.4.1) and returns the UPF's uplink GTP-U tunnel (TEID + N3 IP)
-// from the UL NG-U UP TNL Information IE.
 func decodeULTunnel(transfer []byte) (teid uint32, ipv4, ipv6 string, ok bool) {
 	var t ngapType.PDUSessionResourceSetupRequestTransfer
 	if err := aper.UnmarshalWithParams(transfer, &t, "valueExt"); err != nil {
@@ -35,9 +32,7 @@ func decodeULTunnel(transfer []byte) (teid uint32, ipv4, ipv6 string, ok bool) {
 
 		teid = binary.BigEndian.Uint32(gt.GTPTEID.Value)
 
-		// A TransportLayerAddress is 4 octets (IPv4), 16 (IPv6), or 20 octets
-		// for a dual-stack endpoint: the IPv4 address in the first 32 bits and
-		// the IPv6 address in the following 128 bits (TS 38.413).
+		// TransportLayerAddress: 32-bit IPv4, 128-bit IPv6, or 160-bit carrying the IPv4 in the first 32 bits (TS 38.413).
 		b := gt.TransportLayerAddress.Value.Bytes
 		switch len(b) {
 		case 4:
@@ -111,10 +106,6 @@ func decodeSuccessfulOutcome(so *ngapType.SuccessfulOutcome, resp *NGAPResponse)
 	}
 }
 
-// decodePathSwitchRequestAcknowledge surfaces the AMF/RAN UE NGAP IDs the AMF
-// echoes when it accepts a path switch, plus the UE Security Capabilities IE it
-// returns on a security-capability mismatch (TS 38.413 §9.2.3.9, TS 33.501
-// §6.7.3.1).
 func decodePathSwitchRequestAcknowledge(msg *ngapType.PathSwitchRequestAcknowledge, resp *NGAPResponse) {
 	if msg == nil {
 		return
@@ -161,8 +152,6 @@ func decodePathSwitchRequestAcknowledge(msg *ngapType.PathSwitchRequestAcknowled
 	}
 }
 
-// decodeUESecurityCapabilities hex-encodes the four algorithm bitmaps of a UE
-// Security Capabilities IE (TS 38.413 §9.3.1.86).
 func decodeUESecurityCapabilities(caps *ngapType.UESecurityCapabilities) *UESecurityCapabilitiesJSON {
 	return &UESecurityCapabilitiesJSON{
 		NREncryption:    hex.EncodeToString(caps.NRencryptionAlgorithms.Value.Bytes),
@@ -172,9 +161,6 @@ func decodeUESecurityCapabilities(caps *ngapType.UESecurityCapabilities) *UESecu
 	}
 }
 
-// decodeHandoverCancelAcknowledge surfaces the AMF/RAN UE NGAP IDs the AMF
-// echoes when acknowledging a source-initiated Handover Cancel (TS 38.413
-// §9.2.3.12).
 func decodeHandoverCancelAcknowledge(msg *ngapType.HandoverCancelAcknowledge, resp *NGAPResponse) {
 	if msg == nil {
 		return
@@ -200,8 +186,6 @@ func decodeHandoverCancelAcknowledge(msg *ngapType.HandoverCancelAcknowledge, re
 	}
 }
 
-// decodeHandoverCommand surfaces the source-side AMF/RAN UE NGAP IDs and the
-// list of PDU sessions the AMF confirms for handover (TS 38.413 §9.2.3.2).
 func decodeHandoverCommand(msg *ngapType.HandoverCommand, resp *NGAPResponse) {
 	if msg == nil {
 		return
@@ -239,9 +223,6 @@ func decodeHandoverCommand(msg *ngapType.HandoverCommand, resp *NGAPResponse) {
 	}
 }
 
-// decodeNGResetAcknowledge surfaces the UE-associated Logical NG-connection
-// List (TS 38.413 §9.2.6.7): one IE per reset connection, carrying the AMF/RAN
-// UE NGAP IDs the AMF echoed back.
 func decodeNGResetAcknowledge(msg *ngapType.NGResetAcknowledge, resp *NGAPResponse) {
 	if msg == nil {
 		return
@@ -285,9 +266,6 @@ func decodeUnsuccessfulOutcome(uo *ngapType.UnsuccessfulOutcome, resp *NGAPRespo
 	}
 }
 
-// decodePathSwitchRequestFailure surfaces the AMF/RAN UE NGAP IDs and the
-// PDU Session Resource Released List the AMF returns when it rejects a path
-// switch (TS 38.413 §9.2.3.10).
 func decodePathSwitchRequestFailure(msg *ngapType.PathSwitchRequestFailure, resp *NGAPResponse) {
 	if msg == nil {
 		return
@@ -319,9 +297,6 @@ func decodePathSwitchRequestFailure(msg *ngapType.PathSwitchRequestFailure, resp
 	}
 }
 
-// decodeHandoverPreparationFailure surfaces the source-side AMF/RAN UE NGAP IDs
-// and the Cause the AMF reports when handover preparation fails (TS 38.413
-// §9.2.3.3).
 func decodeHandoverPreparationFailure(msg *ngapType.HandoverPreparationFailure, resp *NGAPResponse) {
 	if msg == nil {
 		return
@@ -351,10 +326,6 @@ func decodeHandoverPreparationFailure(msg *ngapType.HandoverPreparationFailure, 
 	}
 }
 
-// decodePDUSessionResourceModifyRequest surfaces the AMF/RAN UE NGAP IDs and the
-// per-session NAS PDU of a PDU SESSION RESOURCE MODIFY REQUEST (TS 38.413
-// §9.2.1.5). The PDU Session Modification Command is carried in the NAS PDU of
-// each item in the PDU Session Resource Modify List.
 func decodePDUSessionResourceModifyRequest(msg *ngapType.PDUSessionResourceModifyRequest, resp *NGAPResponse) {
 	if msg == nil {
 		return
@@ -417,9 +388,6 @@ func decodeInitiatingMessage(im *ngapType.InitiatingMessage, resp *NGAPResponse)
 	}
 }
 
-// decodeDownlinkRANStatusTransfer surfaces the IEs of a DOWNLINK RAN STATUS
-// TRANSFER (TS 38.413 §9.2.3.14): the target's UE NGAP IDs and the RAN Status
-// Transfer Transparent Container the AMF relayed from the source.
 func decodeDownlinkRANStatusTransfer(msg *ngapType.DownlinkRANStatusTransfer, resp *NGAPResponse) {
 	if msg == nil {
 		return
@@ -470,7 +438,6 @@ func decodeRANStatusTransferContainer(c *ngapType.RANStatusTransferTransparentCo
 	return out
 }
 
-// decodePaging surfaces the IEs of a PAGING (TS 38.413 §9.2.4.1).
 func decodePaging(msg *ngapType.Paging, resp *NGAPResponse) {
 	if msg == nil {
 		return
@@ -499,9 +466,6 @@ func decodeFiveGSTMSI(t *ngapType.FiveGSTMSI) *FiveGSTMSIJSON {
 	}
 }
 
-// decodeErrorIndication surfaces the IEs of an ERROR INDICATION (TS 38.413
-// §9.2.1.3): the echoed AMF/RAN UE NGAP IDs and the Cause or Criticality
-// Diagnostics §8.7.5.2 requires.
 func decodeErrorIndication(msg *ngapType.ErrorIndication, resp *NGAPResponse) {
 	if msg == nil {
 		return
@@ -535,8 +499,6 @@ func decodeErrorIndication(msg *ngapType.ErrorIndication, resp *NGAPResponse) {
 	}
 }
 
-// decodeHandoverRequest surfaces the AMF UE NGAP ID assigned for the target side
-// of an N2 handover and the PDU sessions to be set up (TS 38.413 §9.2.3.1).
 func decodeHandoverRequest(msg *ngapType.HandoverRequest, resp *NGAPResponse) {
 	if msg == nil {
 		return
@@ -774,8 +736,6 @@ func decodePDUSessionResourceSetupRequest(msg *ngapType.PDUSessionResourceSetupR
 		case ngapType.ProtocolIEIDPDUSessionResourceSetupListSUReq:
 			if ie.Value.PDUSessionResourceSetupListSUReq != nil {
 				for _, item := range ie.Value.PDUSessionResourceSetupListSUReq.List {
-					// First-wins: a later item must not displace the NAS-PDU
-					// already decoded.
 					if item.PDUSessionNASPDU != nil && decoded.NasPDU == nil {
 						s := hex.EncodeToString(item.PDUSessionNASPDU.Value)
 						decoded.NasPDU = &s
@@ -984,9 +944,6 @@ func criticalityName(c aper.Enumerated) string {
 	}
 }
 
-// initiatingMessageName labels an initiating message, falling back to the
-// on-wire procedure code (TS 38.413 §9.4.7) for messages this decoder does not
-// model, so the label stays stable and awaitable.
 func initiatingMessageName(msgType int, procedureCode int64) string {
 	switch msgType {
 	case ngapType.InitiatingMessagePresentDownlinkNASTransport:
@@ -1060,9 +1017,6 @@ func unsuccessfulOutcomeName(msgType int, procedureCode int64) string {
 	}
 }
 
-// timeToWaitName maps the TimeToWait enum (TS 38.413 §9.3.1.53) to its
-// self-describing spec name, so a client reads the back-off duration and not an
-// enum index.
 func timeToWaitName(t aper.Enumerated) string {
 	switch t {
 	case ngapType.TimeToWaitPresentV1s:
@@ -1095,9 +1049,6 @@ func decodeUEContextReleaseCommand(msg *ngapType.UEContextReleaseCommand, resp *
 
 		switch ie.Id.Value {
 		case ngapType.ProtocolIEIDUENGAPIDs:
-			// UE-NGAP-IDs is a CHOICE (TS 38.413 §9.3.3.19): the ID pair, or a
-			// bare AMF-UE-NGAP-ID. The AMF ID is surfaced for either, so a
-			// waiter keyed on the UE matches.
 			if ids := ie.Value.UENGAPIDs; ids != nil {
 				switch ids.Present {
 				case ngapType.UENGAPIDsPresentUENGAPIDPair:

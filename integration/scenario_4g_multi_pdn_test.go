@@ -18,9 +18,6 @@ func getENBUE(t *testing.T, enbID, ueID string) []byte {
 	return body
 }
 
-// Test4GMultiPDNConnect requests connectivity to a second APN after attach. Per
-// TS 24.301 §6.5.1.3 the MME activates a new default EPS bearer with an EPS
-// bearer identity and IP address distinct from the first PDN connection's.
 func Test4GMultiPDNConnect(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -47,9 +44,6 @@ func Test4GMultiPDNConnect(t *testing.T) {
 	}
 }
 
-// Test4GMultiPDNIPv6 requests an IPv6 PDN after an IPv4 default attach: per
-// TS 24.301 §9.9.4.9 the Activate Default PDN address carries the PDN type IPv6
-// and the 8-octet interface identifier.
 func Test4GMultiPDNIPv6(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -62,15 +56,12 @@ func Test4GMultiPDNIPv6(t *testing.T) {
 		t.Fatalf("IPv6 PDN: nas.message_type = %q, want activate_default_eps_bearer_context_request; body: %s", got, resp)
 	}
 
-	// The PDN address IE begins with the PDN type octet (TS 24.301 §9.9.4.9):
-	// 02 = IPv6.
+	// The PDN address IE begins with the PDN type octet; 02 = IPv6 (TS 24.301 §9.9.4.9).
 	if addr := jsonGet(resp, "nas.pdn_address"); len(addr) < 2 || addr[:2] != "02" {
 		t.Fatalf("IPv6 PDN address = %q, want a PDN type IPv6 (02…) address; body: %s", addr, resp)
 	}
 }
 
-// connectSecondPDN attaches the UE, opens a second PDN connection to internet46
-// and returns the additional bearer's EPS bearer identity.
 func connectSecondPDN(t *testing.T, enbID, ueID string) string {
 	t.Helper()
 
@@ -84,9 +75,6 @@ func connectSecondPDN(t *testing.T, enbID, ueID string) string {
 	return jsonGet(resp, "nas.eps_bearer_identity")
 }
 
-// Test4GPDNDisconnect disconnects an additional PDN connection. Per TS 24.301
-// §6.5.2.3 the MME deactivates that PDN's bearer and leaves the default PDN
-// connection up.
 func Test4GPDNDisconnect(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -99,8 +87,6 @@ func Test4GPDNDisconnect(t *testing.T) {
 		t.Fatalf("pdn disconnect: nas.message_type = %q, want deactivate_eps_bearer_context_request (TS 24.301 §6.5.2.3); body: %s", got, resp)
 	}
 
-	// The UE stays connected, so only the radio bearer is released
-	// (TS 23.401 §5.10.3).
 	if got := jsonGet(resp, "s1ap.message_type"); got != "ERABReleaseCommand" {
 		t.Fatalf("pdn disconnect: s1ap.message_type = %q, want ERABReleaseCommand (TS 36.413 §8.2.3); body: %s", got, resp)
 	}
@@ -109,8 +95,7 @@ func Test4GPDNDisconnect(t *testing.T) {
 		t.Fatalf("deactivated EBI = %q, want %q (the disconnected PDN); body: %s", got, ebi, resp)
 	}
 
-	// bearers holds the additional PDN connections only, so an empty list leaves
-	// the default PDN connection standing.
+	// bearers holds the additional PDN connections only; the default PDN connection is not listed.
 	if b := jsonGet(getENBUE(t, enbID, ueID), "bearers.0.ebi"); b != "" {
 		t.Fatalf("additional bearer still present after disconnect: %q", b)
 	}

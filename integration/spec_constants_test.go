@@ -3,9 +3,6 @@
 
 //go:build integration
 
-// Human-readable names for the 3GPP coded values used across the integration
-// tests. Values are taken from the referenced TS 24.501 / TS 38.413 tables.
-
 package integration_test
 
 import (
@@ -47,10 +44,7 @@ const (
 	causeRadioNetworkReleaseDueToNgranGeneratedReason = 3
 	causeRadioNetworkUserInactivity                   = 20
 	causeRadioNetworkUnspecified                      = 0
-
-	// causeRadioNetworkOutOfRange is deliberately outside the enumerated
-	// radio-network Cause range, for robustness fuzzing.
-	causeRadioNetworkOutOfRange = 250
+	causeRadioNetworkOutOfRange                       = 250
 )
 
 // NAS service types — TS 24.501 §9.11.3.50, Table 9.11.3.50.1.
@@ -61,9 +55,7 @@ const (
 	serviceTypeEmergencyServices         = 3
 	serviceTypeEmergencyServicesFallback = 4
 	serviceTypeHighPriorityAccess        = 5
-
-	// serviceTypeOutOfRange is an unassigned service-type value, for fuzzing.
-	serviceTypeOutOfRange = 7
+	serviceTypeOutOfRange                = 7
 )
 
 // NGAP message-type names as decoded by internal/ngap/decode.go.
@@ -131,8 +123,7 @@ const (
 	ngapProcedureCodeUplinkNASTransport = 46
 )
 
-// 5GS identity types — TS 24.501 §9.11.3.3, Table 9.11.3.3.1. A string: the
-// server emits nas.identity_type in decimal.
+// 5GS identity types — TS 24.501 §9.11.3.3, Table 9.11.3.3.1.
 const identityTypeSUCI = "1"
 
 // NAS registration types — TS 24.501 §9.11.3.7, Table 9.11.3.7.1.
@@ -147,12 +138,9 @@ const (
 const (
 	rrcEstablishmentCauseHighPriorityAccess = 1
 	rrcEstablishmentCauseMoVoiceCall        = 5
-
-	// rrcEstablishmentCauseOutOfRange is outside the enumerated range, for fuzzing.
-	rrcEstablishmentCauseOutOfRange = 99
+	rrcEstablishmentCauseOutOfRange         = 99
 )
 
-// assertNASCause treats a want of 0 as "do not check".
 func assertNASCause(t *testing.T, body []byte, path string, want int) {
 	t.Helper()
 
@@ -165,9 +153,6 @@ func assertNASCause(t *testing.T, body []byte, path string, want int) {
 	}
 }
 
-// ngapCause returns the Cause group ("misc", "radioNetwork", …) and the value
-// within that group, or ("", 0) if the response at responseKey (e.g.
-// "ng_setup_response") carries no Cause IE.
 func ngapCause(body []byte, responseKey string) (string, int) {
 	var top map[string]any
 	if err := json.Unmarshal(body, &top); err != nil {
@@ -206,7 +191,6 @@ func ngapCause(body []byte, responseKey string) (string, int) {
 	return "", 0
 }
 
-// assertNGAPCauseMisc treats a want of 0 as "do not check".
 func assertNGAPCauseMisc(t *testing.T, body []byte, responseKey string, want int) {
 	t.Helper()
 
@@ -221,10 +205,7 @@ func assertNGAPCauseMisc(t *testing.T, body []byte, responseKey string, want int
 	}
 }
 
-// assertUnpredictableTMSIs judges allocation by span: sequential allocation
-// packs n values into a span of n-1, so a far wider span is evidence of the
-// unpredictable generation the security specs call for (TS 33.401 §7.1 for
-// M-TMSI, TS 33.501 §6.12.3 for 5G-TMSI).
+// Sequential allocation packs n values into a span of n-1, so a far wider span is evidence of unpredictable generation.
 func assertUnpredictableTMSIs(t *testing.T, values []uint64, name, cite string) {
 	t.Helper()
 

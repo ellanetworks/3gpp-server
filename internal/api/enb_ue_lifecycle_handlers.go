@@ -10,7 +10,6 @@ import (
 	"strconv"
 )
 
-// There is no slice (SST/SD) counterpart: slicing is 5GS-only (TS 23.501 §5.15).
 type PatchENBUERequest struct {
 	K           *string `json:"k,omitempty"`
 	OPc         *string `json:"opc,omitempty"`
@@ -77,8 +76,6 @@ func (h *Handler) DeleteENBUE(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// UPFIP and ULTeid are the S-GW endpoint the eNB sends uplink to; DLTeid is the
-// eNB's own.
 type ENBTunnelResponse struct {
 	EBI    uint8  `json:"ebi"`
 	APN    string `json:"apn,omitempty"`
@@ -88,7 +85,6 @@ type ENBTunnelResponse struct {
 	DLTeid uint32 `json:"dl_teid,omitempty"`
 }
 
-// An absent ebi query parameter selects the default bearer.
 func (h *Handler) GetENBTunnel(w http.ResponseWriter, r *http.Request) {
 	enb, err := h.Store.GetENB(r.PathValue("enb_id"))
 	if err != nil {

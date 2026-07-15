@@ -10,8 +10,6 @@ import (
 	"testing"
 )
 
-// attachToSMC drives a UE to the Security Mode Command, optionally advertising a
-// specific EEA/EIA capability bitmap.
 func attachToSMC(t *testing.T, enbID, ueNetworkCapability string) (string, []byte) {
 	t.Helper()
 
@@ -42,10 +40,6 @@ func attachToSMC(t *testing.T, enbID, ueNetworkCapability string) (string, []byt
 	return ueID, smc
 }
 
-// Test4GSecurityModeAlgorithmSelection checks the MME replays the UE's security
-// capabilities verbatim (bidding-down protection, TS 24.301 §5.4.3.2), selects an
-// algorithm the UE actually supports, and never selects EIA0 for a normal attach
-// (§5.4.3.3 / TS 33.401 §5.1.4.1).
 func Test4GSecurityModeAlgorithmSelection(t *testing.T) {
 	enbID := mustCreateENB(t)
 
@@ -82,9 +76,6 @@ func Test4GSecurityModeAlgorithmSelection(t *testing.T) {
 	}
 }
 
-// Test4GSecurityModeReject checks that when the UE rejects the Security Mode
-// Command, the MME aborts the procedure and releases the S1 connection with a UE
-// Context Release Command (TS 24.301 §5.4.3.5).
 func Test4GSecurityModeReject(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID, _ := attachToSMC(t, enbID, "")

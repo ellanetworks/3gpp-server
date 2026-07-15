@@ -9,19 +9,10 @@ import (
 	"testing"
 )
 
-// An Uplink NAS Transport (procedure code 46 = 0x2e, criticality "ignore" =
-// 0x40 — TS 38.413 §9.4.3) carrying a legal 4-octet open-type length
-// determinant over a body of garbage: the outer PDU is well formed while its
-// contents cannot be decoded, the "receiver is not able to decode the received
-// physical message" case of TS 38.413 §10.2. Test4GCriticalityDiagnostics
-// builds the same class of error on S1AP, feeding both RATs one stimulus.
+// 00 initiating message, 2e procedure code 46 (UplinkNASTransport), 40 criticality
+// "ignore", 04 open-type length over a garbage body (TS 38.413 §9.4.3).
 const ngapTransferSyntaxErrorPDU = "002e4004deadbeef"
 
-// TS 38.413 §10.2: on a body that fails to decode the receiver "should initiate
-// Error Indication procedure with appropriate cause value for the Transfer
-// Syntax protocol error". The Error Indication must carry the §10.2 cause and
-// satisfy §8.7.5.2 ("The ERROR INDICATION message shall contain at least either
-// the Cause IE or the Criticality Diagnostics IE"), and the AMF must survive.
 func Test5GCriticalityDiagnostics(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 
@@ -33,12 +24,9 @@ func Test5GCriticalityDiagnostics(t *testing.T) {
 
 	assertTransferSyntaxErrorIndication(t, resp)
 
-	// A fresh gNB completing NG Setup proves the AMF survived the stimulus.
 	mustCreateGnB(t)
 }
 
-// assertTransferSyntaxErrorIndication checks the IEs TS 38.413 §8.7.5.2
-// requires and the cause §10.2 names.
 func assertTransferSyntaxErrorIndication(t *testing.T, body []byte) {
 	t.Helper()
 
@@ -60,9 +48,8 @@ func assertTransferSyntaxErrorIndication(t *testing.T, body []byte) {
 		}
 	}
 
-	// Criticality Diagnostics is optional for a transfer syntax error (TS 38.413
-	// §9.3.1.3 mandates it only for not-comprehended, missing or logically
-	// erroneous IEs), so its contents are asserted only when the AMF includes it.
+	// TS 38.413 §9.3.1.3 mandates Criticality Diagnostics only for not-comprehended,
+	// missing or logically erroneous IEs, so a transfer-syntax error may omit it.
 	if cd == nil {
 		return
 	}

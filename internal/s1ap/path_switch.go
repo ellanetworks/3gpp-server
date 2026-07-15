@@ -7,31 +7,22 @@ import (
 	"github.com/ellanetworks/core/s1ap"
 )
 
-// PathSwitchRequestParams are the inputs to build a PATH SWITCH REQUEST the
-// target eNB sends after an X2 handover to switch the S1-U downlink to itself
-// (TS 36.413 §9.1.5.8).
 type PathSwitchRequestParams struct {
-	ENBUES1APID       uint32 // the target eNB's new eNB UE S1AP ID
-	SourceMMEUES1APID uint32 // the MME UE S1AP ID the source eNB held
+	ENBUES1APID       uint32
+	SourceMMEUES1APID uint32
 	ERABID            uint8
-	TargetS1UAddr     string // the target eNB's S1-U transport address
-	TargetTEID        uint32 // the target eNB's downlink TEID
+	TargetS1UAddr     string
+	TargetTEID        uint32
 	MCC, MNC          string
 	TAC               uint16
 	CellID            uint32
 
-	// EncryptionAlgorithms and IntegrityProtectionAlgorithms are the UE security
-	// capabilities the target eNB reports (TS 36.413 §9.2.1.40).
 	EncryptionAlgorithms          uint16
 	IntegrityProtectionAlgorithms uint16
 
-	// Duplicate emits the E-RAB to-be-switched item twice, an abnormal condition
-	// the MME must reject with cause multiple-E-RAB-ID-instances (TS 36.413).
 	Duplicate bool
 }
 
-// BuildPathSwitchRequest builds a PATH SWITCH REQUEST switching a single E-RAB's
-// downlink to the target eNB.
 func BuildPathSwitchRequest(p PathSwitchRequestParams) ([]byte, error) {
 	plmn, err := encodePLMN(p.MCC, p.MNC)
 	if err != nil {

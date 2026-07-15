@@ -13,22 +13,16 @@ import (
 	"github.com/free5gc/nas/nasType"
 )
 
-// ServiceRequestOpts configures a 5GMM Service Request (TS 24.501 §8.2.16).
 type ServiceRequestOpts struct {
-	ServiceType uint8 // nasMessage.ServiceType* (default Data)
+	ServiceType uint8
 	NgKsi       uint8
-	Guti        *nasType.GUTI5G // source of the 5G-S-TMSI mobile identity
+	Guti        *nasType.GUTI5G
 
-	// PDUSessionStatus, when non-nil, sets the PDU Session Status IE (bit i =
-	// session i is active in the UE). For ServiceTypeData the same bitmap is
-	// also reflected in the Uplink Data Status IE to request user-plane
-	// re-activation.
+	// PDUSessionStatus sets the PDU Session Status IE, bit i = session i active.
 	PDUSessionStatus *[16]bool
 }
 
-// BuildServiceRequest builds a plain (unprotected) Service Request NAS PDU. A nil
-// Guti zeroes the 5G-S-TMSI, which is intentionally permitted so an
-// unregistered/unknown UE can still emit a Service Request for the AMF to reject.
+// BuildServiceRequest builds a plain SERVICE REQUEST (TS 24.501 §8.2.16); a nil Guti zeroes the 5G-S-TMSI so an unknown UE can still emit one.
 func BuildServiceRequest(opts *ServiceRequestOpts) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
@@ -41,7 +35,6 @@ func BuildServiceRequest(opts *ServiceRequestOpts) ([]byte, error) {
 	sr.SetServiceTypeValue(opts.ServiceType)
 	sr.SetNasKeySetIdentifiler(opts.NgKsi)
 
-	// 5G-S-TMSI mobile identity (type of identity = 4) derived from the GUTI.
 	sr.SetTypeOfIdentity(nasMessage.MobileIdentity5GSType5gSTmsi)
 	if opts.Guti != nil {
 		sr.SetAMFSetID(opts.Guti.GetAMFSetID())

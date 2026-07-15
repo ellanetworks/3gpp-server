@@ -10,13 +10,12 @@ import (
 	"testing"
 )
 
-// completeRegistration returns the security-mode-complete response, which carries
-// the Registration Accept inside the Initial Context Setup Request.
+// The returned security-mode-complete response carries the Registration Accept
+// inside the Initial Context Setup Request's NAS PDU.
 func completeRegistration(t *testing.T, gnbID, ueID string, regType int) []byte {
 	t.Helper()
 
-	// A real UE includes its 5GMM capability in the initial registration; a later
-	// mobility/periodic update may then omit it (TS 24.501 §5.5.1.3.2).
+	// The 5GMM capability is re-sent only on change, so updates may omit it (TS 24.501 §5.5.1.3.2).
 	regBody := `{"message_type":"registration_request","capability_5gmm":"07"}`
 	if regType > 0 {
 		regBody = fmt.Sprintf(`{"message_type":"registration_request","registration_type":%d,"capability_5gmm":"07"}`, regType)
@@ -24,7 +23,7 @@ func completeRegistration(t *testing.T, gnbID, ueID string, regType int) []byte 
 
 	steps := []struct {
 		body        string
-		wantNASType string // "" = don't check
+		wantNASType string
 	}{
 		{regBody, nasAuthenticationRequest},
 		{`{"message_type":"authentication_response"}`, nasSecurityModeCommand},
@@ -54,8 +53,6 @@ func completeRegistration(t *testing.T, gnbID, ueID string, regType int) []byte 
 	return last
 }
 
-// registerThenIdle leaves the UE in CM-IDLE, the precondition for a
-// mobility/periodic registration update.
 func registerThenIdle(t *testing.T, gnbID, ueID string) {
 	t.Helper()
 
@@ -68,9 +65,6 @@ func registerThenIdle(t *testing.T, gnbID, ueID string) {
 	}
 }
 
-// Mobility Registration Updating (TS 24.501 §5.5.1.3): the integrity-protected
-// request carries the existing security context and omits the optional 5GMM
-// capability IE (re-sent only on change, §5.5.1.3.2), so the AMF accepts directly.
 func Test5GRegistration_MobilityUpdate(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -87,12 +81,8 @@ func Test5GRegistration_MobilityUpdate(t *testing.T) {
 	}
 }
 
-// TS 24.501 §4.4.4.3 lets the AMF process a REGISTRATION REQUEST that fails the
-// integrity check, but not accept it on the spot: it "shall initiate a primary
-// authentication and key agreement procedure to create a new native 5G NAS
-// security context. Additionally, the AMF shall initiate a security mode control
-// procedure". Rejecting or re-identifying the UE also keeps security closed, so
-// only a Registration Accept is disqualifying.
+// Re-authenticating, rejecting and re-identifying all keep security closed
+// (TS 24.501 §4.4.4.3), so only a Registration Accept is disqualifying.
 func Test5GRegistration_MobilityUpdateBadMAC(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -110,7 +100,6 @@ func Test5GRegistration_MobilityUpdateBadMAC(t *testing.T) {
 	}
 }
 
-// Periodic Registration Updating (TS 24.501 §5.5.1.3).
 func Test5GRegistration_PeriodicUpdate(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -127,8 +116,6 @@ func Test5GRegistration_PeriodicUpdate(t *testing.T) {
 	}
 }
 
-// On a non-switch-off de-registration the AMF must reply with a Deregistration
-// Accept before releasing the context (TS 24.501 §5.5.2.2).
 func Test5GDeregistration_NonSwitchOff_Accept(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -146,8 +133,6 @@ func Test5GDeregistration_NonSwitchOff_Accept(t *testing.T) {
 	}
 }
 
-// On NG Setup with a PLMN it does not serve, the AMF must answer with NG Setup
-// Failure (TS 38.413 §8.7.1.3).
 func Test5GNGSetup_UnknownPLMN(t *testing.T) {
 	body := `{
 		"amf_address":"10.3.0.2:38412", "gnb_n2_address":"10.3.0.3",
@@ -169,13 +154,9 @@ func Test5GNGSetup_UnknownPLMN(t *testing.T) {
 		t.Errorf("ng_setup_response.message_type = %q, want NGSetupFailure (TS 38.413 §8.7.1.3)\n  body: %s", got, resp)
 	}
 
-	// TS 38.413 §9.3.1.2.
 	assertNGAPCauseMisc(t, resp, "ng_setup_response", causeMiscUnknownPLMNOrSNPN)
 }
 
-// On a fresh Registration Request arriving mid-Security-Mode, the AMF must abort
-// the security mode control procedure and process the new registration, re-running
-// authentication (TS 24.501 §5.4.2.7 c).
 func Test5GRegistration_DuringSecurityMode(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -192,7 +173,6 @@ func Test5GRegistration_DuringSecurityMode(t *testing.T) {
 		t.Fatalf("authentication_response: HTTP %d nas=%q\n  body: %s", status, jsonGet(body, "nas.message_type"), body)
 	}
 
-	// The collision under test: a new Registration Request mid-Security-Mode.
 	status, body = doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
 		`{"message_type":"registration_request"}`)
 	if status == 504 {

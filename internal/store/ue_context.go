@@ -13,7 +13,6 @@ import (
 	"github.com/free5gc/nas/nasType"
 )
 
-// UEContext is an emulated UE's 5GS registration state on a gNB.
 type UEContext struct {
 	ID string
 
@@ -38,8 +37,6 @@ type UEContext struct {
 	RanUeNgapID int64
 	AmfUeNgapID int64
 
-	// 5G NAS security context (TS 33.501 §6.2). Counts are per-direction and
-	// increment per protected message.
 	UeSecurityCapability     *nasType.UESecurityCapability
 	IntegrityAlg             uint8
 	CipheringAlg             uint8
@@ -51,16 +48,11 @@ type UEContext struct {
 	DLCount                  uint32
 	SecurityContextAvailable bool
 
-	// LastUplinkNAS is the most recent secured uplink NAS PDU sent, kept so it
-	// can be replayed to test the AMF's NAS replay protection (TS 24.501 §4.4.3.2).
 	LastUplinkNAS []byte
 
-	// Last authentication challenge, stored from the Authentication Request so the
-	// response can be computed without the client re-supplying it.
 	LastRAND []byte
 	LastAUTN []byte
 
-	// Serving network name
 	Snn string
 
 	DNN            string
@@ -69,7 +61,6 @@ type UEContext struct {
 	SST            int32
 	SD             string
 
-	// GUTI assigned in the Registration Accept.
 	Guti *nasType.GUTI5G
 
 	IMEISV string
@@ -247,7 +238,7 @@ func encodeSuci(msin, mcc, mnc, routingIndicator string, hnPubKey crypto.HomeNet
 	}
 
 	buffer := make([]byte, 8+len(schemeOutput))
-	buffer[0] = 1 // SUCI type
+	buffer[0] = 1
 
 	plmnID, err := getMccAndMncInOctets(mcc, mnc)
 	if err != nil {

@@ -31,7 +31,6 @@ func TestEncodePLMN(t *testing.T) {
 		}
 	}
 
-	// Malformed input must return an error, never panic.
 	invalid := []struct {
 		name, mcc, mnc string
 	}{

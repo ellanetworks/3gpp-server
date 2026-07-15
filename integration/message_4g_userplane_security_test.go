@@ -10,8 +10,6 @@ import (
 	"testing"
 )
 
-// gtpuENBAttach creates a GTP-U eNB and attaches a UE, confirming a baseline
-// uplink round-trip works so a later "no downlink" is meaningful.
 func gtpuENBAttach(t *testing.T) (string, string) {
 	t.Helper()
 
@@ -29,9 +27,6 @@ func gtpuENBAttach(t *testing.T) (string, string) {
 	return enbID, ueID
 }
 
-// uplinkRoundTrips reports whether one uplink ICMP echo draws a decapsulated
-// downlink reply. It returns as soon as the reply arrives, so only a genuine
-// forwarding failure exhausts the timeout.
 func uplinkRoundTrips(t *testing.T, enbID, ueID string, teid *uint32, id, seq int) bool {
 	t.Helper()
 
@@ -50,8 +45,7 @@ func uplinkRoundTrips(t *testing.T, enbID, ueID string, teid *uint32, id, seq in
 	return s == 200
 }
 
-// drainDownlinks consumes buffered downlink replies so a following negative
-// assertion does not pick up a stale one.
+// Buffered replies are drained so a following negative assertion cannot pick up a stale one.
 func drainDownlinks(t *testing.T, enbID, ueID string) {
 	t.Helper()
 
@@ -62,8 +56,6 @@ func drainDownlinks(t *testing.T, enbID, ueID string) {
 	}
 }
 
-// Test4GUserPlaneWrongTEID checks the UPF does not forward user data sent on an
-// uplink TEID it never allocated (an invalid bearer).
 func Test4GUserPlaneWrongTEID(t *testing.T) {
 	enbID, ueID := gtpuENBAttach(t)
 
@@ -75,9 +67,6 @@ func Test4GUserPlaneWrongTEID(t *testing.T) {
 	}
 }
 
-// Test4GUserPlanePostRelease checks the UPF stops forwarding downlink to a
-// released eNB bearer: after an S1 release, an uplink that elicits a reply must
-// not come back to the (now idle) eNB — it is buffered for paging instead.
 func Test4GUserPlanePostRelease(t *testing.T) {
 	enbID, ueID := gtpuENBAttach(t)
 
@@ -89,10 +78,6 @@ func Test4GUserPlanePostRelease(t *testing.T) {
 	}
 }
 
-// Test4GUserPlaneDetachStopsForwarding checks that a normal Detach deactivates
-// the UE's EPS bearer and the S-GW/P-GW release its context (TS 23.401
-// §5.3.8.2.1), so the UPF stops forwarding the UE's user plane entirely — unlike
-// an idle S1 release, which buffers it for paging.
 func Test4GUserPlaneDetachStopsForwarding(t *testing.T) {
 	enbID, ueID := gtpuENBAttach(t)
 

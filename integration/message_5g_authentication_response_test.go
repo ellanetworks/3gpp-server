@@ -26,8 +26,6 @@ func Test5GAuthenticationResponse(t *testing.T) {
 			wantNASMsgType:  nasSecurityModeCommand,
 		},
 		{
-			// RES* mismatch for a SUCI-identified UE: the AMF aborts
-			// authentication with Authentication Reject (TS 33.501 §6.1.3.2.2).
 			name:            "wrong RES*: 16 bytes of zeros",
 			body:            `{"message_type":"authentication_response","res_star_override":"00000000000000000000000000000000"}`,
 			wantHTTP:        200,
@@ -42,7 +40,8 @@ func Test5GAuthenticationResponse(t *testing.T) {
 			wantNASMsgType:  nasAuthenticationReject,
 		},
 		{
-			// 32 bytes still decode as a 16-octet RES* that mismatches → reject.
+			// The first 16 octets decode as a mismatching RES*, so this is a reject,
+			// not the §7.5.1 syntax error a truncated RES* raises.
 			name:            "oversized RES*: 32 bytes",
 			body:            `{"message_type":"authentication_response","res_star_override":"0000000000000000000000000000000000000000000000000000000000000000"}`,
 			wantHTTP:        200,
@@ -50,9 +49,6 @@ func Test5GAuthenticationResponse(t *testing.T) {
 			wantNASMsgType:  nasAuthenticationReject,
 		},
 		{
-			// With the Authentication response parameter IE omitted there is no
-			// RES* to verify, so the AMF rejects authentication (TS 24.501
-			// §5.4.1.3.5).
 			name:            "empty RES*",
 			body:            `{"message_type":"authentication_response","res_star_override":""}`,
 			wantHTTP:        200,
@@ -68,8 +64,7 @@ func Test5GAuthenticationResponse(t *testing.T) {
 		},
 		{
 			name: "raw NAS PDU: single byte",
-			// Too short to carry a complete message type IE, so it shall be ignored
-			// (TS 24.501 §7.2.1): the AMF keeps T3560 running and sends no reply.
+			// TS 24.501 §7.2.1: too short for a message type IE, so it is ignored — no reply.
 			body:     `{"message_type":"authentication_response","raw_nas_pdu":"7e"}`,
 			wantHTTP: 504,
 		},
@@ -118,9 +113,6 @@ func Test5GAuthenticationResponse(t *testing.T) {
 	}
 }
 
-// An Authentication Response sent before any challenge has no stored RAND/AUTN
-// to answer. The server must still put it on the wire with a zeroed RES* so the
-// AMF is the one that reacts to it.
 func Test5GAuthenticationResponse_WithoutChallenge(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -135,14 +127,8 @@ func Test5GAuthenticationResponse_WithoutChallenge(t *testing.T) {
 	}
 }
 
-// An 8-octet RES* is a syntactically incorrect mandatory IE (TS 24.501
-// §9.11.3.17 fixes RES* at 16 octets). TS 24.501 §7.5.1 lets the network
-// "either: 1) try to treat the
-// message (the exact further actions are implementation dependent); or 2) ignore
-// the message except that it should return a status message ... with cause #96
-// 'invalid mandatory information'." Option 1 leaves the treatment open, so the
-// message type is not pinned; #96 is the only cause the clause names for a
-// status answering this message.
+// TS 24.501 §7.5.1: a status answering a syntactically incorrect mandatory IE
+// carries #96; the alternative treatment is open, so no message type is pinned.
 func Test5GAuthenticationResponse_TruncatedRESStar(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)

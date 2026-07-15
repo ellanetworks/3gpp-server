@@ -10,11 +10,8 @@ import (
 	"testing"
 )
 
-// Test4GUserPlaneSourceSpoofing checks the UPF drops uplink user data whose inner
-// source IP is not the UE's allocated address (UE source anti-spoofing, GSMA
-// security baseline). A rogue UE-A sends traffic with victim UE-B's source IP: if
-// the UPF forwards it, the data-network reply un-NATs to B's address and is
-// delivered to B's tunnel, proving A impersonated B's IP.
+// A forwarded spoof shows up as the data-network reply un-NATing to UE-B's
+// address and reaching UE-B's tunnel.
 func Test4GUserPlaneSourceSpoofing(t *testing.T) {
 	enbID := createGTPUENB(t, claimENBID(), "gtpu-enb", n3IPv4)
 
@@ -31,8 +28,6 @@ func Test4GUserPlaneSourceSpoofing(t *testing.T) {
 		t.Fatal("could not determine victim UE-B's IP")
 	}
 
-	// UE-A's legitimate user plane works, so a later "no delivery to B" reflects
-	// the UPF dropping the spoof, not a broken data path.
 	baseline := scrapeUPFCounters(t)
 	if !uplinkRoundTrips(t, enbID, ueA, nil, 0x10, 1) {
 		t.Fatalf("UE-A baseline round-trip failed\n%s", upfDelta(t, baseline))

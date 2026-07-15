@@ -15,8 +15,6 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/transport"
 )
 
-// These messages are non-UE-associated because the target eNB addresses a UE it
-// does not own, by the S1AP ID pair the MME assigned.
 func (h *Handler) SendENBS1AP(w http.ResponseWriter, r *http.Request) {
 	enb, err := h.Store.GetENB(r.PathValue("enb_id"))
 	if err != nil {
@@ -269,8 +267,6 @@ func (h *Handler) enbStatusTransfer(ue *store.UEEPSContext, t *transport.S1APTra
 	return &SendENBNASResponse{}, nil
 }
 
-// The radio-network Cause a handover_required reports (TS 36.413 §9.2.1.3),
-// defaulting to handover-desirable-for-radio-reasons.
 func handoverRequiredCause(req *SendENBNASRequest) int {
 	if req != nil && req.HandoverRequiredCause != nil {
 		return *req.HandoverRequiredCause
@@ -295,9 +291,6 @@ func sourceENBID(ue *store.UEEPSContext, req *SendENBNASRequest) uint32 {
 	return ue.ENBUES1APID
 }
 
-// MigrateENBUE moves a UE context to the target eNB's association, modelling the
-// UE arriving at the target after an S1 handover. The UE keeps its security
-// context; its S1AP ID pair becomes the target's.
 func (h *Handler) MigrateENBUE(w http.ResponseWriter, r *http.Request) {
 	src, err := h.Store.GetENB(r.PathValue("enb_id"))
 	if err != nil {

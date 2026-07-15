@@ -39,7 +39,6 @@ func Test4GAssociationFlood(t *testing.T) {
 		createENBID(t, claimENBID())
 	}
 
-	// One more association after the flood: the MME is still serving.
 	createENBID(t, claimENBID())
 }
 
@@ -77,8 +76,6 @@ func Test4GAttachFlood(t *testing.T) {
 	fullAttach(t, enbID, fresh)
 }
 
-// Test4GOversizedPDU checks S1AP and NAS PDUs sized near the SCTP read buffer do
-// not crash the MME.
 func Test4GOversizedPDU(t *testing.T) {
 	if status, resp := createENBRaw(t, strings.Repeat("ab", 60000)); status != 201 {
 		t.Fatalf("oversized S1AP: server failed to handle it (HTTP %d): %s", status, resp)

@@ -10,9 +10,7 @@ import (
 	"testing"
 )
 
-// createGTPUENB creates an eNB terminating the S1-U data path. Only one eNB can
-// bind a given S1-U address:port, so callers must let cleanup run before reusing
-// the same transport.
+// Only one eNB can bind a given S1-U address:port, so callers must let cleanup run before reusing the same transport.
 func createGTPUENB(t *testing.T, enbID int, name string, n3 n3Transport) string {
 	t.Helper()
 
@@ -35,10 +33,6 @@ func createGTPUENB(t *testing.T, enbID int, name string, n3 n3Transport) string 
 	return id
 }
 
-// Test4GGTPUEcho sends the path-management form of the GTP-U Echo Request (no
-// extension header) over both S1-U transport families. A GTP-U peer "shall be
-// prepared to receive an Echo Request at any time and it shall reply with an Echo
-// Response" (TS 29.281 §7.2.1).
 func Test4GGTPUEcho(t *testing.T) {
 	for _, n3 := range []n3Transport{n3IPv4, n3IPv6} {
 		t.Run(n3.name, func(t *testing.T) {
@@ -57,9 +51,6 @@ func Test4GGTPUEcho(t *testing.T) {
 	}
 }
 
-// Test4GGTPUWrongTEIDErrorIndication sends a G-PDU on a non-zero TEID for which
-// the UPF has no PDR. The UPF "shall also return a GTP error indication to the
-// originating node" (TS 29.281 §7.3.1).
 func Test4GGTPUWrongTEIDErrorIndication(t *testing.T) {
 	enbID := createGTPUENB(t, claimENBID(), "gtpu-errind-enb", n3IPv4)
 	ueID := mustCreateENBUE(t, enbID)
@@ -77,8 +68,6 @@ func Test4GGTPUWrongTEIDErrorIndication(t *testing.T) {
 	}
 }
 
-// Test4GGTPU_UDPRoundTrip proves the S1-U data path carries UDP, not only ICMP:
-// the UPF must forward and NAT UDP user-plane traffic.
 func Test4GGTPU_UDPRoundTrip(t *testing.T) {
 	enbID := createGTPUENB(t, claimENBID(), "gtpu-udp-enb", n3IPv4)
 	ueID := mustCreateENBUE(t, enbID)
@@ -97,7 +86,7 @@ func Test4GGTPU_UDPRoundTrip(t *testing.T) {
 	}
 
 	checks := map[string]string{
-		"inner.protocol":     "17", // UDP
+		"inner.protocol":     "17",
 		"inner.src":          dnResponderIP,
 		"inner.udp_src_port": fmt.Sprintf("%d", udpEchoPort),
 		"inner.payload":      payloadHex,

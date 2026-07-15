@@ -5,10 +5,7 @@ package nas
 
 import "testing"
 
-// plainSecurityModeCommand is a SECURITY MODE COMMAND sent with security header
-// type "plain" (TS 24.501 §8.2.25): EPD, security header type, message type,
-// Selected NAS security algorithms (§9.11.3.34: ciphering in bits 8-5, integrity
-// in bits 4-1), ngKSI, then the Replayed UE security capabilities (LV).
+// TS 24.501 §8.2.25; selected NAS security algorithms are ciphering in bits 8-5, integrity in bits 4-1 (§9.11.3.34).
 func plainSecurityModeCommand() []byte {
 	return []byte{
 		0x7e,             // extended protocol discriminator: 5GMM
@@ -20,10 +17,6 @@ func plainSecurityModeCommand() []byte {
 	}
 }
 
-// TS 24.501 §4.4.4.2 requires the AMF to send a SECURITY MODE COMMAND integrity
-// protected (with a new 5G NAS security context, §5.4.2.2), so an unprotected one
-// is a deviation. Catching it needs the message's own IEs — the selected
-// algorithms — so the plain path must decode them.
 func TestDecodeSurfacesIEsOfAnUnprotectedSecurityModeCommand(t *testing.T) {
 	resp, err := Decode(plainSecurityModeCommand())
 	if err != nil {
@@ -39,11 +32,11 @@ func TestDecodeSurfacesIEsOfAnUnprotectedSecurityModeCommand(t *testing.T) {
 	}
 
 	if resp.SelectedCipheringAlg == nil || *resp.SelectedCipheringAlg != 2 {
-		t.Errorf("selected ciphering algorithm = %v, want 2 (NEA2) — an unprotected Security Mode Command must still surface its selected algorithms (TS 24.501 §9.11.3.34)", resp.SelectedCipheringAlg)
+		t.Errorf("selected ciphering algorithm = %v, want 2 (NEA2)", resp.SelectedCipheringAlg)
 	}
 
 	if resp.SelectedIntegrityAlg == nil || *resp.SelectedIntegrityAlg != 2 {
-		t.Errorf("selected integrity algorithm = %v, want 2 (NIA2) — an unprotected Security Mode Command must still surface its selected algorithms (TS 24.501 §9.11.3.34)", resp.SelectedIntegrityAlg)
+		t.Errorf("selected integrity algorithm = %v, want 2 (NIA2)", resp.SelectedIntegrityAlg)
 	}
 
 	if resp.NgKSI == nil || *resp.NgKSI != 0 {

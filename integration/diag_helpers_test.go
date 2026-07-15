@@ -3,12 +3,6 @@
 
 //go:build integration
 
-// User-plane diagnostics. A failed user-plane assertion ("no downlink arrived")
-// says nothing about where the packet went. Ella Core counts every XDP verdict,
-// FIB-lookup result and byte volume; sampling those counters around the step
-// under test names the packet's fate: which guard dropped it, on which
-// interface, and whether it reached the data network.
-
 package integration_test
 
 import (
@@ -21,22 +15,17 @@ import (
 	"testing"
 )
 
-// upfCounterPrefixes are the Ella Core metric families that describe a packet's
-// fate in the UPF data path.
 var upfCounterPrefixes = []string{
-	"app_xdp_action_total",            // XDP verdict per interface (XDP_DROP is the fate we chase)
-	"app_xdp_fib_lookup_total",        // routing result: success / no_neigh / blackhole / unreachable
-	"app_xdp_source_spoof_drop_total", // UE source anti-spoofing guard
+	"app_xdp_action_total",
+	"app_xdp_fib_lookup_total",
+	"app_xdp_source_spoof_drop_total",
 	"app_xdp_ifindex_mismatch_total",
 	"app_uplink_bytes",
 	"app_downlink_bytes",
 }
 
-// upfCounters keys a metric by its full `name{labels}` identity.
 type upfCounters map[string]float64
 
-// scrapeUPFCounters never fails the test: diagnostics must not turn a real
-// failure into a confusing one.
 func scrapeUPFCounters(t *testing.T) upfCounters {
 	t.Helper()
 

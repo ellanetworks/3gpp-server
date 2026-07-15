@@ -7,25 +7,20 @@ import (
 	"github.com/ellanetworks/core/s1ap"
 )
 
-// STMSIParams identifies an idle UE re-establishing (e.g. a Service Request).
 type STMSIParams struct {
 	MMEC  uint8
 	MTMSI uint32
 }
 
-// InitialUEMessageParams are the inputs to build an Initial UE Message carrying a
-// UE's first NAS message (TS 36.413 §9.1.7.1).
 type InitialUEMessageParams struct {
 	ENBUES1APID uint32
 	NASPDU      []byte
 	MCC, MNC    string
 	TAC         uint16
 	CellID      uint32
-	STMSI       *STMSIParams // present when the UE re-establishes with an S-TMSI
+	STMSI       *STMSIParams
 }
 
-// BuildInitialUEMessage builds an Initial UE Message with RRC establishment
-// cause mo-Signalling (an attach).
 func BuildInitialUEMessage(p InitialUEMessageParams) ([]byte, error) {
 	plmn, err := encodePLMN(p.MCC, p.MNC)
 	if err != nil {
@@ -47,8 +42,6 @@ func BuildInitialUEMessage(p InitialUEMessageParams) ([]byte, error) {
 	return m.Marshal()
 }
 
-// BuildUEContextReleaseRequest builds an eNB-initiated UE CONTEXT RELEASE
-// REQUEST (TS 36.413 §9.1.4.5). cause is a radio-network Cause value.
 func BuildUEContextReleaseRequest(mmeUEID, enbUEID uint32, cause int) ([]byte, error) {
 	m := &s1ap.UEContextReleaseRequest{
 		MMEUES1APID: s1ap.MMEUES1APID(mmeUEID),
@@ -59,8 +52,6 @@ func BuildUEContextReleaseRequest(mmeUEID, enbUEID uint32, cause int) ([]byte, e
 	return m.Marshal()
 }
 
-// BuildInitialContextSetupFailure builds an INITIAL CONTEXT SETUP FAILURE
-// (TS 36.413 §8.3.1.4).
 func BuildInitialContextSetupFailure(mmeUEID, enbUEID uint32, cause int) ([]byte, error) {
 	return (&s1ap.InitialContextSetupFailure{
 		MMEUES1APID: s1ap.MMEUES1APID(mmeUEID),
@@ -69,7 +60,6 @@ func BuildInitialContextSetupFailure(mmeUEID, enbUEID uint32, cause int) ([]byte
 	}).Marshal()
 }
 
-// BuildERABModifyResponse builds an E-RAB MODIFY RESPONSE (TS 36.413 §8.2.2).
 func BuildERABModifyResponse(mmeUEID, enbUEID uint32, modified []uint8) ([]byte, error) {
 	items := make([]s1ap.ERABModifyItemBearerModRes, 0, len(modified))
 	for _, ebi := range modified {
@@ -83,8 +73,6 @@ func BuildERABModifyResponse(mmeUEID, enbUEID uint32, modified []uint8) ([]byte,
 	}).Marshal()
 }
 
-// BuildErrorIndication builds an ERROR INDICATION for the UE-associated
-// connection (TS 36.413 §8.7.2). cause is a radio-network Cause value.
 func BuildErrorIndication(mmeUEID, enbUEID uint32, cause int) ([]byte, error) {
 	mme := s1ap.MMEUES1APID(mmeUEID)
 	enb := s1ap.ENBUES1APID(enbUEID)
@@ -97,8 +85,6 @@ func BuildErrorIndication(mmeUEID, enbUEID uint32, cause int) ([]byte, error) {
 	}).Marshal()
 }
 
-// BuildUEContextReleaseComplete builds a UE CONTEXT RELEASE COMPLETE
-// (TS 36.413 §9.1.4.7).
 func BuildUEContextReleaseComplete(mmeUEID, enbUEID uint32) ([]byte, error) {
 	return (&s1ap.UEContextReleaseComplete{
 		MMEUES1APID: s1ap.MMEUES1APID(mmeUEID),
@@ -106,8 +92,6 @@ func BuildUEContextReleaseComplete(mmeUEID, enbUEID uint32) ([]byte, error) {
 	}).Marshal()
 }
 
-// BuildUECapabilityInfoIndication builds a UE CAPABILITY INFO INDICATION
-// (TS 36.413 §8.9).
 func BuildUECapabilityInfoIndication(mmeUEID, enbUEID uint32, radioCapability []byte) ([]byte, error) {
 	return (&s1ap.UECapabilityInfoIndication{
 		MMEUES1APID:       s1ap.MMEUES1APID(mmeUEID),
@@ -116,8 +100,6 @@ func BuildUECapabilityInfoIndication(mmeUEID, enbUEID uint32, radioCapability []
 	}).Marshal()
 }
 
-// UplinkNASTransportParams are the inputs to relay a UE NAS message on an
-// established UE context (TS 36.413 §9.1.7.3).
 type UplinkNASTransportParams struct {
 	MMEUES1APID uint32
 	ENBUES1APID uint32
@@ -144,18 +126,14 @@ func BuildUplinkNASTransport(p UplinkNASTransportParams) ([]byte, error) {
 	return m.Marshal()
 }
 
-// InitialContextSetupResponseParams are the inputs to build an Initial Context
-// Setup Response (TS 36.413 §9.1.4.2).
 type InitialContextSetupResponseParams struct {
 	MMEUES1APID uint32
 	ENBUES1APID uint32
 	ERABID      uint8
-	ENBN3Addr   string // eNB S1-U transport address
-	GTPTEID     uint32 // eNB-side downlink TEID
+	ENBN3Addr   string
+	GTPTEID     uint32
 }
 
-// BuildInitialContextSetupResponse builds an Initial Context Setup Response
-// acknowledging the single default E-RAB.
 func BuildInitialContextSetupResponse(p InitialContextSetupResponseParams) ([]byte, error) {
 	addr, err := parseTransportAddr(p.ENBN3Addr)
 	if err != nil {
@@ -175,8 +153,6 @@ func BuildInitialContextSetupResponse(p InitialContextSetupResponseParams) ([]by
 	return m.Marshal()
 }
 
-// BuildERABReleaseResponse builds an E-RAB RELEASE RESPONSE (TS 36.413
-// §9.1.3.5).
 func BuildERABReleaseResponse(mmeUEID, enbUEID uint32, erabID uint8) ([]byte, error) {
 	m := &s1ap.ERABReleaseResponse{
 		MMEUES1APID:  s1ap.MMEUES1APID(mmeUEID),
@@ -187,8 +163,6 @@ func BuildERABReleaseResponse(mmeUEID, enbUEID uint32, erabID uint8) ([]byte, er
 	return m.Marshal()
 }
 
-// BuildERABSetupResponse builds an E-RAB SETUP RESPONSE (TS 36.413 §9.1.3.2)
-// acknowledging one additional E-RAB.
 func BuildERABSetupResponse(p InitialContextSetupResponseParams) ([]byte, error) {
 	addr, err := parseTransportAddr(p.ENBN3Addr)
 	if err != nil {

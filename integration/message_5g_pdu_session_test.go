@@ -9,7 +9,6 @@ import (
 	"testing"
 )
 
-// A wrong UE NGAP ID must draw an Error Indication (TS 38.413 §10.6, §8.7.5.2).
 func Test5GPDUSessionEstablishment_NGAPIDFuzz(t *testing.T) {
 	cases := []struct {
 		name string
@@ -35,9 +34,7 @@ func Test5GPDUSessionEstablishment_NGAPIDFuzz(t *testing.T) {
 	}
 }
 
-// PDU session identity 16 is reserved (outside the 1-15 range), so per
-// TS 24.501 §7.3.2 c) the AMF returns the message in a Downlink NAS Transport
-// with 5GMM cause #90 "payload was not forwarded".
+// PDU session identity 16 falls outside the valid 1-15 range (TS 24.501 §7.3.2 c).
 func Test5GPDUSessionEstablishment_ReservedPDUSessionID(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -61,12 +58,9 @@ func Test5GPDUSessionEstablishment_ReservedPDUSessionID(t *testing.T) {
 	assertNASCause(t, body, "nas.cause_5gmm", cause5GMMPayloadWasNotForwarded)
 }
 
-// On a second establishment request for an already-active PDU session, per
-// TS 24.501 §5.4.5.2.5 item 12 the AMF locally releases it and re-establishes,
-// so the gNB receives a fresh PDU Session Resource Setup Request.
 func Test5GPDUSessionEstablishment_DuplicateReestablishes(t *testing.T) {
 	gnbID := mustCreateGnB(t)
-	ueID := establishRegisteredUE(t, gnbID) // registered UE with an active PDU session
+	ueID := establishRegisteredUE(t, gnbID)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
 		`{"message_type":"pdu_session_establishment_request"}`)
@@ -79,11 +73,8 @@ func Test5GPDUSessionEstablishment_DuplicateReestablishes(t *testing.T) {
 	}
 }
 
-// raw_nas_pdu bytes go on the wire as the NAS PDU IE of an UplinkNASTransport,
-// unwrapped by any UL NAS TRANSPORT payload container, so these cases exercise
-// the AMF's outer NAS decoder and not the SMF's GSM decoder. An undecodable NAS
-// payload draws 5GMM STATUS with cause #111 (TS 24.501 §4.4.4.3); an empty NGAP
-// NAS-PDU IE fails ASN.1 decoding and draws an Error Indication.
+// raw_nas_pdu goes on the wire unwrapped by any payload container, so these cases
+// reach the AMF's outer NAS decoder, never the SMF's 5GSM one.
 func Test5GPDUSessionEstablishment_Fuzz(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -164,9 +155,8 @@ func Test5GPDUSessionEstablishment_Fuzz(t *testing.T) {
 	}
 }
 
-// inner_sm_payload keeps the outer UL NAS Transport correctly built and
-// security-wrapped, so a malformed payload reaches the SMF's 5GSM decoder and
-// the AMF forwards the SMF's reject per TS 24.501 §5.4.5.3.
+// inner_sm_payload keeps the outer UL NAS Transport well-formed and security-wrapped,
+// so the payload reaches the SMF's 5GSM decoder (TS 24.501 §5.4.5.3).
 func Test5GPDUSessionEstablishment_InnerSMFuzz(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -192,10 +182,8 @@ func Test5GPDUSessionEstablishment_InnerSMFuzz(t *testing.T) {
 		},
 		{
 			name: "inner SM: PDU SESSION ESTABLISHMENT ACCEPT (wrong direction, truncated)",
-			// 2E EPD, 01 PDU session ID, 01 PTI, C2 msg type = est accept.
-			// ACCEPT has mandatory IEs (Session AMBR, Authorized QoS rules, etc.)
-			// so the 4-byte input fails 5GSM decoding before the message-type
-			// check fires, yielding #111 (protocol error, unspecified).
+			// 2E EPD, 01 PDU session ID, 01 PTI, C2 msg type = est accept, whose
+			// mandatory IEs are absent: decoding fails before the message-type check.
 			innerSMPayload:   "2e0101c2",
 			wantNGAPMsgType:  ngapDownlinkNASTransport,
 			wantInnerNASType: nasPDUSessionEstablishmentReject,
@@ -255,8 +243,6 @@ func Test5GPDUSessionEstablishment_InnerSMFuzz(t *testing.T) {
 	}
 }
 
-// Edge-case IE values of an otherwise well-formed PDU SESSION ESTABLISHMENT
-// REQUEST, per TS 24.501 §8.3.1 / §9.6.
 func Test5GPDUSessionEstablishment_InnerSMRequestIEFuzz(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -286,10 +272,8 @@ func Test5GPDUSessionEstablishment_InnerSMRequestIEFuzz(t *testing.T) {
 			wantInnerNASType: nasPDUSessionEstablishmentAccept,
 		},
 		{
-			// TS 24.501 §6.4.1.4.1: when the requested PDU session type is
-			// "Unstructured" or "Ethernet" and the network does not support
-			// it for the DNN, the SMF shall reject with 5GSM cause #28
-			// "unknown PDU session type".
+			// TS 24.501 §6.4.1.4.1: an Unstructured session type unsupported for the
+			// DNN draws 5GSM cause #28.
 			name: "REQUEST with PDU session type = Unstructured (4)",
 			// 9- IEI (0x90) with value 4 (Unstructured) = 0x94
 			innerSMPayload:   "2e0401c1ffff94",

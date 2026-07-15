@@ -168,10 +168,6 @@ func createSubscriber(token, imsi string) error {
 	return nil
 }
 
-// provisionExtraDataNetworks adds an IPv6-only and a dual-stack data network
-// alongside the IPv4-only "internet" seeded by init, so the same subscribers can
-// drive PDU-session-type negotiation (TS 24.501 §6.4.1.3), plus a /30-pool
-// network for IP-pool exhaustion.
 func provisionExtraDataNetworks(token string) error {
 	dataNetworks := []struct{ name, body string }{
 		{"internet6", `{"name":"internet6","ipv6_pool":"2001:db8:6::/48","dns":"2001:4860:4860::8888","mtu":1400}`},
@@ -198,9 +194,7 @@ func provisionExtraDataNetworks(token string) error {
 	return nil
 }
 
-// ECIES Profile A (X25519) and Profile B (P-256) home network keys — TS 33.501
-// §6.12.2, Annex C. The key identifiers are dedicated so they do not collide
-// with the absent-key id the SUCI rejection tests name.
+// ECIES Profile A (X25519) and Profile B (P-256) — TS 33.501 Annex C.
 const (
 	profileAKeyID   = 10
 	profileBKeyID   = 11
@@ -208,17 +202,13 @@ const (
 	profileBPrivKey = "a1b2c3d4e5f60718293a4b5c6d7e8f90112233445566778899aabbccddeeff00"
 )
 
-// A subscriber outside the shared pool, for the subscription-change tests that
-// mutate its profile. Tests restore it on cleanup so the persistent env stays
-// consistent.
-const (
-	subscriptionChangeIMSI = "001010000000100"
-	subscriptionChangeSUPI = "imsi-" + subscriptionChangeIMSI
+const subscriptionChangeIndex = 100
+
+var (
+	subscriptionChangeSUPI = testSUPI(subscriptionChangeIndex)
+	subscriptionChangeIMSI = subscriptionChangeSUPI[len("imsi-"):]
 )
 
-// provisionAlternateSlice installs a second slice with its own profile and
-// policy, so a subscriber can be moved onto a slice that does not match an
-// existing PDU session — TS 23.501 §5.15.5.2.2.
 func provisionAlternateSlice(token string) error {
 	if err := ensureProvisioned(token, "/api/v1/slices", "alternate",
 		`{"name":"alternate","sst":2,"sd":"abcdef"}`); err != nil {
@@ -259,9 +249,7 @@ func provisionHomeNetworkKeys(token string) error {
 		b, _ := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
 
-		// A persistent env already holds the key, which the core reports without a
-		// stable status code, so a failed create only logs — the SUCI tests fail
-		// loudly if the key is in fact missing.
+		// A persistent env already holds the key, which the core reports without a stable status code.
 		if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 			log.Printf("home network key %d not created (HTTP %d: %s) — assuming already provisioned", k.id, resp.StatusCode, b)
 		}
@@ -270,8 +258,6 @@ func provisionHomeNetworkKeys(token string) error {
 	return nil
 }
 
-// ensureProvisioned creates the named resource only when absent, keeping
-// TestMain idempotent across the persistent test environment.
 func ensureProvisioned(token, collectionPath, name, body string) error {
 	getReq, _ := http.NewRequest("GET", ellaAPIURL+collectionPath+"/"+name, nil)
 	getReq.Header.Set("Authorization", "Bearer "+token)
@@ -333,8 +319,6 @@ func doRequest(t *testing.T, method, path, body string) (int, []byte) {
 	return resp.StatusCode, b
 }
 
-// jsonGet reads the value at a dot-separated path (e.g. "nas.message_type"),
-// where a numeric key indexes an array.
 func jsonGet(data []byte, path string) string {
 	keys := strings.Split(path, ".")
 	var current any

@@ -5,10 +5,6 @@ package s1ap
 
 import "testing"
 
-// TestTransportLayerIPs covers the three forms TS 36.414 §5.3 defines for a
-// Transport Layer Address: "a) 32 bits in case of IPv4 address; b) 128 bits in
-// case of IPv6 address; or c) 160 bits if both IPv4 and IPv6 addresses are
-// signalled, in which case the IPv4 address is contained in the first 32 bits."
 func TestTransportLayerIPs(t *testing.T) {
 	v4 := []byte{10, 3, 0, 2}
 	v6 := []byte{0xfd, 0x00, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2}

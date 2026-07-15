@@ -24,9 +24,7 @@ type PDUSessionEstablishmentRequestOpts struct {
 	SD             string
 }
 
-// BuildPDUSessionEstablishmentRequest builds a PDU SESSION ESTABLISHMENT
-// REQUEST (TS 24.501 §8.3.1). The caller wraps it in the payload container of a
-// UL NAS TRANSPORT (§8.2.10); the PTI is UE-allocated (§7.3.1).
+// BuildPDUSessionEstablishmentRequest builds a PDU SESSION ESTABLISHMENT REQUEST (TS 24.501 §8.3.1).
 func BuildPDUSessionEstablishmentRequest(opts *PDUSessionEstablishmentRequestOpts) ([]byte, error) {
 	m := gonas.NewMessage()
 	m.GsmMessage = gonas.NewGsmMessage()
@@ -72,10 +70,7 @@ func BuildPDUSessionEstablishmentRequest(opts *PDUSessionEstablishmentRequestOpt
 	return data.Bytes(), nil
 }
 
-// BuildULNASTransport wraps a 5GSM message establishing a new PDU session in a
-// UL NAS TRANSPORT (TS 24.501 §8.2.10), carrying the PDU session information —
-// PDU session ID, S-NSSAI, DNN, request type — alongside the N1 SM payload
-// container (§5.4.5.2.2).
+// BuildULNASTransport wraps a 5GSM message establishing a new PDU session in a UL NAS TRANSPORT (TS 24.501 §8.2.10).
 func BuildULNASTransport(pduSessionID uint8, payloadContainer []byte, dnn string, sst int32, sd string) ([]byte, error) {
 	m := gonas.NewMessage()
 	m.GmmMessage = gonas.NewGmmMessage()
@@ -130,9 +125,7 @@ func BuildULNASTransport(pduSessionID uint8, payloadContainer []byte, dnn string
 	return data.Bytes(), nil
 }
 
-// BuildPDUSessionReleaseRequest builds a UE-requested PDU SESSION RELEASE
-// REQUEST (TS 24.501 §8.3.8). The PTI is UE-allocated and echoed by the network
-// in the resulting Release Command.
+// BuildPDUSessionReleaseRequest builds a UE-requested PDU SESSION RELEASE REQUEST (TS 24.501 §8.3.8).
 func BuildPDUSessionReleaseRequest(pduSessionID, pti uint8) ([]byte, error) {
 	m := gonas.NewMessage()
 	m.GsmMessage = gonas.NewGsmMessage()
@@ -154,10 +147,7 @@ func BuildPDUSessionReleaseRequest(pduSessionID, pti uint8) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
-// BuildPDUSessionModificationRequest builds a UE-requested PDU SESSION
-// MODIFICATION REQUEST (TS 24.501 §8.3.7) carrying only its mandatory IEs. The
-// PTI is UE-allocated; the network echoes it in the resulting Modification
-// Command or Reject (TS 24.501 §6.4.2.3/§6.4.2.4).
+// BuildPDUSessionModificationRequest builds a UE-requested PDU SESSION MODIFICATION REQUEST (TS 24.501 §8.3.7).
 func BuildPDUSessionModificationRequest(pduSessionID, pti uint8) ([]byte, error) {
 	m := gonas.NewMessage()
 	m.GsmMessage = gonas.NewGsmMessage()
@@ -179,9 +169,7 @@ func BuildPDUSessionModificationRequest(pduSessionID, pti uint8) ([]byte, error)
 	return data.Bytes(), nil
 }
 
-// BuildPDUSessionReleaseComplete builds a PDU SESSION RELEASE COMPLETE
-// (TS 24.501 §8.3.10), acknowledging a Release Command. The PTI matches the one
-// the network used in the command.
+// BuildPDUSessionReleaseComplete builds a PDU SESSION RELEASE COMPLETE (TS 24.501 §8.3.10).
 func BuildPDUSessionReleaseComplete(pduSessionID, pti uint8) ([]byte, error) {
 	m := gonas.NewMessage()
 	m.GsmMessage = gonas.NewGsmMessage()
@@ -203,9 +191,7 @@ func BuildPDUSessionReleaseComplete(pduSessionID, pti uint8) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
-// BuildPDUSessionModificationComplete builds a PDU SESSION MODIFICATION
-// COMPLETE (TS 24.501 §8.3.5), acknowledging a network-requested Modification
-// Command. The PTI matches the one the network used in the command.
+// BuildPDUSessionModificationComplete builds a PDU SESSION MODIFICATION COMPLETE (TS 24.501 §8.3.5).
 func BuildPDUSessionModificationComplete(pduSessionID, pti uint8) ([]byte, error) {
 	m := gonas.NewMessage()
 	m.GsmMessage = gonas.NewGsmMessage()
@@ -227,9 +213,7 @@ func BuildPDUSessionModificationComplete(pduSessionID, pti uint8) ([]byte, error
 	return data.Bytes(), nil
 }
 
-// BuildPDUSessionModificationCommandReject builds a PDU SESSION MODIFICATION
-// COMMAND REJECT (TS 24.501 §8.3.6), rejecting a network-requested Modification
-// Command. The PTI matches the command being rejected.
+// BuildPDUSessionModificationCommandReject builds a PDU SESSION MODIFICATION COMMAND REJECT (TS 24.501 §8.3.6).
 func BuildPDUSessionModificationCommandReject(pduSessionID, pti, cause uint8) ([]byte, error) {
 	m := gonas.NewMessage()
 	m.GsmMessage = gonas.NewGsmMessage()
@@ -252,8 +236,7 @@ func BuildPDUSessionModificationCommandReject(pduSessionID, pti, cause uint8) ([
 	return data.Bytes(), nil
 }
 
-// BuildPDUSessionStatus5GSM builds a 5GSM STATUS (TS 24.501 §8.3.13) reporting
-// an erroneous condition for a PDU session, carrying the given PTI and cause.
+// BuildPDUSessionStatus5GSM builds a 5GSM STATUS (TS 24.501 §8.3.13).
 func BuildPDUSessionStatus5GSM(pduSessionID, pti, cause uint8) ([]byte, error) {
 	m := gonas.NewMessage()
 	m.GsmMessage = gonas.NewGsmMessage()
@@ -276,10 +259,7 @@ func BuildPDUSessionStatus5GSM(pduSessionID, pti, cause uint8) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
-// BuildULNASTransportExisting wraps a 5GSM message for an existing PDU session
-// (release, modification) in a UL NAS TRANSPORT (TS 24.501 §8.2.10). It omits the
-// establishment-only Request Type, DNN and S-NSSAI IEs; their absence makes the
-// AMF forward the message to the SMF for the existing session.
+// BuildULNASTransportExisting wraps a 5GSM message in a UL NAS TRANSPORT (TS 24.501 §8.2.10); omitting DNN and S-NSSAI routes it to the existing session's SMF.
 func BuildULNASTransportExisting(pduSessionID uint8, requestType *uint8, payloadContainer []byte) ([]byte, error) {
 	m := gonas.NewMessage()
 	m.GmmMessage = gonas.NewGmmMessage()
@@ -355,9 +335,6 @@ func DecodePDUSessionEstablishmentAccept(nasResp *NASResponse, gsmMsg *gonas.Gsm
 		nasResp.AlwaysOnIndication = &apsi
 	}
 
-	// The Accept carries a 5GSM cause when the network downgrades the requested
-	// PDU session type (TS 24.501 §6.4.1.3): #50 "IPv4 only allowed" or #51
-	// "IPv6 only allowed".
 	if msg.Cause5GSM != nil {
 		cause := int(msg.GetCauseValue())
 		nasResp.Cause5GSM = &cause

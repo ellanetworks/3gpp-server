@@ -3,10 +3,6 @@
 
 //go:build integration
 
-// N3 / GTP-U user-plane (TS 29.281): the emulated gNB terminates the data
-// tunnel, so a round-tripping uplink proves the UPF programmed its forwarding
-// state from the control-plane PDU session establishment.
-
 package integration_test
 
 import (
@@ -14,8 +10,7 @@ import (
 	"testing"
 )
 
-// Only one gNB can bind a given N3 address:port, so callers must let cleanup run
-// before reusing the same transport.
+// Only one gNB can bind a given N3 address:port at a time.
 func createGTPUGnB(t *testing.T, gnbID, name string, n3 n3Transport) string {
 	t.Helper()
 
@@ -80,9 +75,6 @@ func Test5GGTPU_ICMPRoundTrip(t *testing.T) {
 	}
 }
 
-// A GTP-U peer "shall be prepared to receive an Echo Request at any time and it
-// shall reply with an Echo Response" (TS 29.281 §7.2.1). The request sent is the
-// conformant path-management form: sequence-number flag set, no extension header.
 func Test5GGTPU_Echo(t *testing.T) {
 	cases := []struct {
 		n3    n3Transport
@@ -109,8 +101,6 @@ func Test5GGTPU_Echo(t *testing.T) {
 	}
 }
 
-// gtpuAwaitDownlink returns as soon as the decapsulated downlink reply arrives,
-// so only a genuine forwarding failure exhausts the timeout.
 func gtpuAwaitDownlink(t *testing.T, gnbID, ueID, dst string, id, seq int) ([]byte, bool) {
 	t.Helper()
 
@@ -125,9 +115,6 @@ func gtpuAwaitDownlink(t *testing.T, gnbID, ueID, dst string, id, seq int) ([]by
 	return body, status == 200
 }
 
-// Releasing the PDU session (TS 24.501 §6.3.3) tears down the UPF's forwarding
-// state, so the same uplink that round-tripped before the release must yield no
-// downlink after it.
 func Test5GGTPU_ReleaseStopsForwarding(t *testing.T) {
 	gnbID := createGTPUGnB(t, "00ec05", "gtpu-rel", n3IPv4)
 	ueID := establishRegisteredUEWithSUPI(t, gnbID, "imsi-001010000000002")
@@ -154,8 +141,6 @@ func Test5GGTPU_ReleaseStopsForwarding(t *testing.T) {
 	}
 }
 
-// Covers the UPF forwarding and NATing UDP user-plane traffic, which the ICMP
-// round-trip does not exercise.
 func Test5GGTPU_UDPRoundTrip(t *testing.T) {
 	gnbID := createGTPUGnB(t, "00ec06", "gtpu-udp", n3IPv4)
 	ueID := establishRegisteredUEWithSUPI(t, gnbID, "imsi-001010000000003")
@@ -186,8 +171,6 @@ func Test5GGTPU_UDPRoundTrip(t *testing.T) {
 	}
 }
 
-// A G-PDU carrying a TEID for which the UPF has no PDR must be discarded
-// (TS 29.281 §7.3.1), so no downlink results.
 func Test5GGTPU_WrongTEID_Dropped(t *testing.T) {
 	gnbID := createGTPUGnB(t, "00ec07", "gtpu-badteid", n3IPv4)
 	ueID := establishRegisteredUEWithSUPI(t, gnbID, "imsi-001010000000004")
@@ -204,8 +187,6 @@ func Test5GGTPU_WrongTEID_Dropped(t *testing.T) {
 	}
 }
 
-// For a G-PDU with a non-zero TEID it has no PDR for, the UPF "shall also return
-// a GTP error indication to the originating node" (TS 29.281 §7.3.1).
 func Test5GGTPU_WrongTEID_ErrorIndication(t *testing.T) {
 	gnbID := createGTPUGnB(t, "00ec08", "gtpu-errind", n3IPv4)
 	ueID := establishRegisteredUEWithSUPI(t, gnbID, "imsi-001010000000005")

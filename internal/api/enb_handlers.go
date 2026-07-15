@@ -17,8 +17,6 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/transport"
 )
 
-// ErrorIndication is included because a strict MME may return one for a bad
-// request.
 var defaultS1SetupWait = []string{"S1SetupResponse", "S1SetupFailure", "ErrorIndication"}
 
 func (h *Handler) CreateENB(w http.ResponseWriter, r *http.Request) {
@@ -87,7 +85,6 @@ func (h *Handler) CreateENB(w http.ResponseWriter, r *http.Request) {
 		h.GTPU[enb.ID] = gt
 	}
 
-	// Models an eNB that has not completed S1 Setup (TS 36.413 §8.7.1).
 	if req.SkipS1Setup {
 		writeJSON(w, http.StatusCreated, CreateENBResponse{ENBID: enb.ID})
 		return
@@ -114,8 +111,6 @@ func (h *Handler) CreateENB(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := t.WaitForMessage(ctx, waitFor...)
 	if err != nil {
-		// An MME may validly drop a malformed PDU without replying; the association
-		// is kept so the caller can probe it further.
 		if raw {
 			writeJSON(w, http.StatusCreated, CreateENBResponse{ENBID: enb.ID})
 			return

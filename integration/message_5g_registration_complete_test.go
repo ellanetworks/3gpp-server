@@ -3,10 +3,6 @@
 
 //go:build integration
 
-// Tests for RegistrationComplete (TS 24.501 §8.2.8). Until it arrives, the AMF
-// retransmits Registration Accept on a T3550 timer and the 5GMM context stays
-// in REGISTERED-INITIATED, so a discarded RegistrationComplete draws no reply.
-
 package integration_test
 
 import (

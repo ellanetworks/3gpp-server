@@ -10,9 +10,6 @@ import (
 	"testing"
 )
 
-// assertEPSErrorIndication asserts a response is a spec-compliant S1AP Error
-// Indication for a UE-associated AP-ID error: it carries a Cause and echoes both
-// the MME-UE-S1AP-ID and the eNB-UE-S1AP-ID (TS 36.413 §8.7.2.2).
 func assertEPSErrorIndication(t *testing.T, body []byte) {
 	t.Helper()
 
@@ -30,11 +27,6 @@ func assertEPSErrorIndication(t *testing.T, body []byte) {
 	}
 }
 
-// Test4GUplinkNASTransportS1APIDFuzz mutates the UE S1AP IDs of an Uplink NAS
-// Transport sent on an established association. Per TS 36.413 §10.6, a message
-// carrying AP ID(s) that identify a logical connection unknown to the MME — an
-// unallocated MME-UE-S1AP-ID, or one paired with an inconsistent eNB-UE-S1AP-ID —
-// obliges the MME to initiate the Error Indication procedure.
 func Test4GUplinkNASTransportS1APIDFuzz(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -46,8 +38,6 @@ func Test4GUplinkNASTransportS1APIDFuzz(t *testing.T) {
 		body string
 	}{
 		{
-			// The MME allocates MME-UE-S1AP-IDs from a non-zero base, so 0 was
-			// never assigned to any UE.
 			name: "unknown MME-UE-S1AP-ID (0, never allocated)",
 			body: `{"message_type":"inject_nas","mme_ue_s1ap_id":0,"raw_nas_pdu":"00","timeout_ms":3000}`,
 		},
@@ -72,10 +62,6 @@ func Test4GUplinkNASTransportS1APIDFuzz(t *testing.T) {
 	fullAttach(t, enbID, fresh)
 }
 
-// s1apIDFuzzCases are forged-AP-ID variants for UE-associated eNB-originated
-// messages: an unallocated MME-UE-S1AP-ID, and a valid one paired with an
-// inconsistent eNB-UE-S1AP-ID (24-bit max). Each obliges the MME to answer with
-// an Error Indication (TS 36.413 §10.6).
 var s1apIDFuzzCases = []struct {
 	name      string
 	overrides string
@@ -85,10 +71,6 @@ var s1apIDFuzzCases = []struct {
 	{"inconsistent eNB-UE-S1AP-ID", `"enb_ue_s1ap_id":16777215`},
 }
 
-// Test4GUECapabilityInfoS1APIDFuzz fuzzes the UE S1AP IDs of a UE Capability
-// Info Indication on an established association. Per TS 36.413 §10.6 an unknown
-// or inconsistent AP ID must draw an Error Indication, never store the radio
-// capability against a UE context.
 func Test4GUECapabilityInfoS1APIDFuzz(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -104,10 +86,6 @@ func Test4GUECapabilityInfoS1APIDFuzz(t *testing.T) {
 	}
 }
 
-// Test4GUEContextReleaseRequestS1APIDFuzz fuzzes the UE S1AP IDs of a UE Context
-// Release Request. Per TS 36.413 §10.6 an unknown or inconsistent AP ID must draw
-// an Error Indication, never a UE Context Release Command tearing down another
-// UE's connection.
 func Test4GUEContextReleaseRequestS1APIDFuzz(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)

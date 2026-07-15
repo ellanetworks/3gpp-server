@@ -11,13 +11,11 @@ import (
 	"github.com/ellanetworks/core/s1ap/aper"
 )
 
-// maxProtocolIEs bounds a ProtocolIE-Container's field count (TS 36.413,
-// S1AP-Constants).
-const maxProtocolIEs = 65535
-
-// criticalityRootCount is the size of the Criticality ENUMERATED root
-// (TS 36.413 §10.3.2): reject, ignore, notify.
-const criticalityRootCount = 3
+// APER constraint bounds; both are part of the wire encoding (TS 36.413, S1AP-Constants and §10.3.2).
+const (
+	maxProtocolIEs       = 65535
+	criticalityRootCount = 3
+)
 
 type protocolIEField struct {
 	id    int64
@@ -25,9 +23,6 @@ type protocolIEField struct {
 	value []byte
 }
 
-// appendIE re-encodes a message body's ProtocolIE-Container with one extra
-// ProtocolIE-Field appended, the wire form of an MME sending an IE the message
-// type does not model.
 func appendIE(t *testing.T, body []byte, id int64, crit s1ap.Criticality, value []byte) []byte {
 	t.Helper()
 
@@ -124,10 +119,6 @@ func handoverCancelAcknowledgeWithIE(t *testing.T, id int64, crit s1ap.Criticali
 	return tampered
 }
 
-// TestDecodeSurfacesUnmodeledIEWithCriticality checks an IE the message type does
-// not model reaches the JSON with the criticality received on the wire. TS 36.413
-// §10.3.2 makes that criticality the sole input to a receiver's handling of a
-// not-comprehended IE (§10.3.4.2), so an IE reported without it cannot be judged.
 func TestDecodeSurfacesUnmodeledIEWithCriticality(t *testing.T) {
 	const unmodeledIEID = 300 // no HANDOVER CANCEL ACKNOWLEDGE IE bears this id
 
@@ -150,10 +141,6 @@ func TestDecodeSurfacesUnmodeledIEWithCriticality(t *testing.T) {
 	}
 }
 
-// TestDecodeReportsUnmodeledIECriticalityReject checks a not-comprehended IE
-// marked "reject" is distinguishable from one marked "notify": TS 36.413
-// §10.3.4.2 requires the receiver to reject the procedure in the first case and
-// to continue it in the second.
 func TestDecodeReportsUnmodeledIECriticalityReject(t *testing.T) {
 	const unmodeledIEID = 301
 

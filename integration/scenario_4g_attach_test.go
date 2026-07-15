@@ -78,8 +78,7 @@ func Test4GScenarioAttach(t *testing.T) {
 			t.Fatalf("MME selected NAS integrity algorithm %q for a normal attach; want non-EIA0; body: %s", got, resp)
 		}
 
-		// The MME must replay the UE's security capabilities verbatim against
-		// bidding-down (TS 24.301 §5.4.3.2); the UE advertised EEA0/1/2 + EIA0/1/2.
+		// The UE advertised EEA0/1/2 + EIA0/1/2, which the MME must replay verbatim (TS 24.301 §5.4.3.2).
 		if got := jsonGet(resp, "nas.replayed_ue_security_capabilities"); got != "e0e0" {
 			t.Fatalf("replayed UE security capabilities = %q, want e0e0; body: %s", got, resp)
 		}
