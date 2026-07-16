@@ -84,30 +84,61 @@ func Test4GConcurrentAttach(t *testing.T) {
 	}
 }
 
+// TS 24.301 §5.5.1.2.7 b) binds only a PDU whose EMM header identifies an ATTACH REQUEST.
+var malformedNAS = []struct {
+	pdu                 string
+	attachProtocolError bool
+}{
+	{pdu: "00"},
+	{pdu: "ff"},
+	{pdu: "deadbeef"},
+	{pdu: "0741", attachProtocolError: true},
+	{pdu: "0741ffffff", attachProtocolError: true},
+}
+
+func attachRejectCauseAllowed(c string) bool {
+	switch c {
+	case "96", "99", "100", "111":
+		return true
+	}
+
+	return false
+}
+
 func Test4GMalformedNAS(t *testing.T) {
 	enbID := mustCreateENB(t)
 
-	garbage := []string{
-		"00",
-		"ff",
-		"deadbeef",
-		"0741",       // EMM Attach Request header, then nothing
-		"0741ffffff", // EMM Attach Request header, then garbage
-	}
-
-	for _, g := range garbage {
-		t.Run("garbage "+g, func(t *testing.T) {
+	for _, g := range malformedNAS {
+		t.Run("garbage "+g.pdu, func(t *testing.T) {
 			ueID := mustCreateENBUE(t, enbID)
 
-			body := fmt.Sprintf(`{"message_type":"attach_request","raw_nas_pdu":%q,"timeout_ms":800}`, g)
+			timeout := 800
+			if g.attachProtocolError {
+				timeout = 3000
+			}
+
+			body := fmt.Sprintf(`{"message_type":"attach_request","raw_nas_pdu":%q,"timeout_ms":%d}`, g.pdu, timeout)
 
 			status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas", body)
 			if status != 200 {
 				t.Fatalf("server failed to handle raw NAS (HTTP %d): %s", status, resp)
 			}
 
-			if got := jsonGet(resp, "nas.message_type"); got == "attach_accept" {
+			got := jsonGet(resp, "nas.message_type")
+			if got == "attach_accept" {
 				t.Fatalf("MME accepted malformed NAS as an attach; body: %s", resp)
+			}
+
+			if !g.attachProtocolError {
+				return
+			}
+
+			if got != "attach_reject" {
+				t.Fatalf("nas.message_type = %q, want attach_reject (TS 24.301 §5.5.1.2.7 b)); body: %s", got, resp)
+			}
+
+			if c := jsonGet(resp, "nas.emm_cause"); !attachRejectCauseAllowed(c) {
+				t.Errorf("attach_reject emm_cause = %q, want 96, 99, 100 or 111 (TS 24.301 §5.5.1.2.7 b)); body: %s", c, resp)
 			}
 		})
 	}

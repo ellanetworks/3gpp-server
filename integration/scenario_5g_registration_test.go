@@ -86,6 +86,8 @@ func Test5GScenarioRegistration(t *testing.T) {
 		if jsonGet(body, "nas.guti") == "" {
 			t.Error("missing GUTI in RegistrationAccept")
 		}
+
+		assertRegistrationAcceptTAIList(t, body)
 	})
 
 	t.Run("registration complete finishes the procedure", func(t *testing.T) {

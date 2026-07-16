@@ -19,8 +19,9 @@ const (
 	enbS1Address = "10.3.0.3"
 )
 
-// A malformed PDU usually draws no reply, so timeout_ms is capped low to keep
-// the adversarial sweep within the suite timeout.
+// timeout_ms is capped low to keep the adversarial sweep within the suite
+// timeout; the MME shares a host with the tester, so a reply arrives in
+// milliseconds or not at all.
 func createENBRaw(t *testing.T, rawHex string) (int, []byte) {
 	t.Helper()
 
@@ -189,8 +190,14 @@ func Test4GS1SetupMalformed(t *testing.T) {
 				t.Fatalf("server failed to handle raw send (HTTP %d): %s", status, resp)
 			}
 
-			if got := jsonGet(resp, "response.message_type"); got == "S1SetupResponse" {
+			got := jsonGet(resp, "response.message_type")
+			if got == "S1SetupResponse" {
 				t.Fatalf("MME accepted malformed PDU as S1 Setup; body: %s", resp)
+			}
+
+			// The cause value is unchecked: TS 36.413 §10.2 asks only for "an appropriate cause value".
+			if got != "ErrorIndication" {
+				t.Errorf("response.message_type = %q, want ErrorIndication — a PDU the ASN.1 decoder cannot decode is a Transfer Syntax Error (TS 36.413 §10.2); body: %s", got, resp)
 			}
 		})
 	}

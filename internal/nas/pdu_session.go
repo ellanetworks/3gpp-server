@@ -304,18 +304,26 @@ func DecodePDUSessionEstablishmentAccept(nasResp *NASResponse, gsmMsg *gonas.Gsm
 	pduSessionID := int(msg.GetPDUSessionID())
 	nasResp.PDUSessionID = &pduSessionID
 
-	pduSessionType := msg.SelectedSSCModeAndSelectedPDUSessionType.Octet & 0x07
+	pti := int(msg.GetPTI())
+	nasResp.PTI = &pti
+
+	pduSessionType := msg.GetPDUSessionType()
 	pduSessionTypeValue := int(pduSessionType)
 	nasResp.PDUSessionType = &pduSessionTypeValue
 
-	pduAddr := msg.GetPDUAddressInformation()
-	switch pduSessionType {
-	case nasMessage.PDUSessionTypeIPv4:
-		nasResp.PDUAddress = fmt.Sprintf("%d.%d.%d.%d", pduAddr[0], pduAddr[1], pduAddr[2], pduAddr[3])
-	case nasMessage.PDUSessionTypeIPv6:
-		nasResp.PDUAddress = hex.EncodeToString(pduAddr[:])
-	case nasMessage.PDUSessionTypeIPv4IPv6:
-		nasResp.PDUAddress = fmt.Sprintf("%d.%d.%d.%d", pduAddr[8], pduAddr[9], pduAddr[10], pduAddr[11])
+	sscMode := int(msg.GetSSCMode())
+	nasResp.SSCMode = &sscMode
+
+	if msg.PDUAddress != nil {
+		pduAddr := msg.GetPDUAddressInformation()
+		switch pduSessionType {
+		case nasMessage.PDUSessionTypeIPv4:
+			nasResp.PDUAddress = fmt.Sprintf("%d.%d.%d.%d", pduAddr[0], pduAddr[1], pduAddr[2], pduAddr[3])
+		case nasMessage.PDUSessionTypeIPv6:
+			nasResp.PDUAddress = hex.EncodeToString(pduAddr[:])
+		case nasMessage.PDUSessionTypeIPv4IPv6:
+			nasResp.PDUAddress = fmt.Sprintf("%d.%d.%d.%d", pduAddr[8], pduAddr[9], pduAddr[10], pduAddr[11])
+		}
 	}
 
 	ulAMBR := msg.GetSessionAMBRForUplink()
@@ -339,6 +347,78 @@ func DecodePDUSessionEstablishmentAccept(nasResp *NASResponse, gsmMsg *gonas.Gsm
 		cause := int(msg.GetCauseValue())
 		nasResp.Cause5GSM = &cause
 	}
+}
+
+func DecodePDUSessionReleaseCommand(nasResp *NASResponse, gsmMsg *gonas.GsmMessage, raw []byte) {
+	if gsmMsg == nil || gsmMsg.PDUSessionReleaseCommand == nil {
+		return
+	}
+
+	msg := gsmMsg.PDUSessionReleaseCommand
+
+	pti := int(msg.GetPTI())
+	nasResp.PTI = &pti
+
+	cause := int(msg.GetCauseValue())
+	nasResp.Cause5GSM = &cause
+
+	accessType := releaseCommandHasAccessType(raw)
+	nasResp.AccessTypePresent = &accessType
+}
+
+// TS 24.501 Table 8.3.14.1.1; free5gc has no constant for it.
+const serviceLevelAAContainerIEI = 0x72
+
+// TS 24.501 Table 8.3.14.1.1: the Access type IE is a type 1 IE, which free5gc's
+// PDU SESSION RELEASE COMMAND decoder skips without recording.
+func releaseCommandHasAccessType(raw []byte) bool {
+	const (
+		mandatoryOctets = 5
+		accessTypeIEI   = 0xd
+	)
+
+	if len(raw) < mandatoryOctets {
+		return false
+	}
+
+	for opt := raw[mandatoryOctets:]; len(opt) > 0; {
+		iei := opt[0]
+
+		if iei >= 0x80 {
+			if iei>>4 == accessTypeIEI {
+				return true
+			}
+			opt = opt[1:]
+
+			continue
+		}
+
+		lenOctets := 1
+		switch iei {
+		case nasMessage.PDUSessionReleaseCommandEAPMessageType,
+			nasMessage.PDUSessionReleaseCommandExtendedProtocolConfigurationOptionsType,
+			serviceLevelAAContainerIEI:
+			lenOctets = 2
+		}
+
+		if len(opt) < 1+lenOctets {
+			return false
+		}
+
+		contents := int(opt[1])
+		if lenOctets == 2 {
+			contents = int(opt[1])<<8 | int(opt[2])
+		}
+
+		skip := 1 + lenOctets + contents
+		if len(opt) < skip {
+			return false
+		}
+
+		opt = opt[skip:]
+	}
+
+	return false
 }
 
 func DecodePDUSessionEstablishmentReject(nasResp *NASResponse, gsmMsg *gonas.GsmMessage) {

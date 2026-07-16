@@ -71,6 +71,8 @@ func decodeGmm(m *gonas.Message, resp *NASResponse) error {
 		decodeRegistrationAccept(m, resp)
 	case gonas.MsgTypeRegistrationReject:
 		decodeRegistrationReject(m, resp)
+	case gonas.MsgTypeServiceAccept:
+		decodeServiceAccept(m, resp)
 	case gonas.MsgTypeServiceReject:
 		decodeServiceReject(m, resp)
 	case gonas.MsgTypeStatus5GMM:
@@ -166,6 +168,24 @@ func decodeRegistrationAccept(m *gonas.Message, resp *NASResponse) {
 			resp.GUTI = hex.EncodeToString(m.RegistrationAccept.GUTI5G.Octet[:gutiLen])
 		}
 	}
+
+	if m.RegistrationAccept.TAIList != nil {
+		taiLen := int(m.RegistrationAccept.TAIList.GetLen())
+		if taiLen > 0 && taiLen <= len(m.RegistrationAccept.TAIList.Buffer) {
+			resp.TAIList = hex.EncodeToString(m.RegistrationAccept.TAIList.Buffer[:taiLen])
+		}
+	}
+}
+
+func decodeServiceAccept(m *gonas.Message, resp *NASResponse) {
+	if m.ServiceAccept == nil || m.ServiceAccept.PDUSessionStatus == nil {
+		return
+	}
+
+	statusLen := int(m.ServiceAccept.PDUSessionStatus.GetLen())
+	if statusLen > 0 && statusLen <= len(m.ServiceAccept.PDUSessionStatus.Buffer) {
+		resp.PDUSessionStatus = hex.EncodeToString(m.ServiceAccept.PDUSessionStatus.Buffer[:statusLen])
+	}
 }
 
 func securityHeaderTypeToString(t uint8) string {
@@ -222,10 +242,7 @@ func decodeDLNASTransport(m *gonas.Message, resp *NASResponse) error {
 	case gonas.MsgTypePDUSessionEstablishmentReject:
 		DecodePDUSessionEstablishmentReject(resp, inner.GsmMessage)
 	case gonas.MsgTypePDUSessionReleaseCommand:
-		if inner.PDUSessionReleaseCommand != nil {
-			cause := int(inner.PDUSessionReleaseCommand.GetCauseValue())
-			resp.Cause5GSM = &cause
-		}
+		DecodePDUSessionReleaseCommand(resp, inner.GsmMessage, payload)
 	case gonas.MsgTypePDUSessionModificationReject:
 		if inner.PDUSessionModificationReject != nil {
 			cause := int(inner.PDUSessionModificationReject.GetCauseValue())

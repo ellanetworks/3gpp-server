@@ -379,6 +379,18 @@ func decodeHandoverRequest(value []byte, resp *S1APResponse) error {
 		NextHop:              hex.EncodeToString(m.SecurityContext.NextHopParameter[:]),
 	}
 
+	resp.UEAggregateMaxBitRate = &UEAggregateMaxBitRateJSON{
+		DL: int64(m.UEAMBR.DL),
+		UL: int64(m.UEAMBR.UL),
+	}
+
+	resp.UESecurityCapabilities = &UESecurityCapabilitiesJSON{
+		EncryptionAlgorithms:          int(m.UESecurityCapabilities.EncryptionAlgorithms),
+		IntegrityProtectionAlgorithms: int(m.UESecurityCapabilities.IntegrityProtectionAlgorithms),
+	}
+
+	resp.SourceToTargetContainer = hex.EncodeToString(m.SourceToTarget)
+
 	return nil
 }
 

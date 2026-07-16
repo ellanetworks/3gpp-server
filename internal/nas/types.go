@@ -112,7 +112,10 @@ type NASResponse struct {
 	SelectedCipheringAlg *int `json:"selected_ciphering_alg,omitempty"`
 	SelectedIntegrityAlg *int `json:"selected_integrity_alg,omitempty"`
 
-	GUTI string `json:"guti,omitempty"`
+	GUTI    string `json:"guti,omitempty"`
+	TAIList string `json:"tai_list,omitempty"`
+
+	PDUSessionStatus string `json:"pdu_session_status,omitempty"`
 
 	CauseGMM *int `json:"cause_5gmm,omitempty"`
 
@@ -121,7 +124,11 @@ type NASResponse struct {
 	// The numeric IEs below are pointers so a decoded value of 0 stays distinct from an absent IE under omitempty.
 	PDUSessionID   *int   `json:"pdu_session_id,omitempty"`
 	PDUSessionType *int   `json:"pdu_session_type,omitempty"`
+	SSCMode        *int   `json:"ssc_mode,omitempty"`
 	PDUAddress     string `json:"pdu_address,omitempty"`
+	PTI            *int   `json:"pti,omitempty"`
+
+	AccessTypePresent *bool `json:"access_type_present,omitempty"`
 
 	SessionAMBRUplink   *int   `json:"session_ambr_uplink,omitempty"`
 	SessionAMBRDownlink *int   `json:"session_ambr_downlink,omitempty"`

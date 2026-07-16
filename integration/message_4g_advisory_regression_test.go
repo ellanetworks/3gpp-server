@@ -48,6 +48,7 @@ func Test4GShortProtectedNASNoCrash(t *testing.T) {
 	fullAttach(t, enbID, fresh)
 }
 
+// All bits zero encodes "no algorithm other than EEA0/EIA0" (TS 36.413 §9.2.1.40), a legal report that mismatches the UE's stored caps.
 func Test4GPathSwitchEmptySecCapNoCrash(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -56,8 +57,16 @@ func Test4GPathSwitchEmptySecCapNoCrash(t *testing.T) {
 
 	resp := nasBody(t, enbID, ueID, `{"message_type":"path_switch","path_switch_eea":0,"path_switch_eia":0}`)
 
-	if got := jsonGet(resp, "s1ap.message_type"); got != "PathSwitchRequestAcknowledge" && got != "PathSwitchRequestFailure" {
-		t.Fatalf("path switch with zero sec caps: s1ap.message_type = %q, want a defined response; body: %s", got, resp)
+	if got := jsonGet(resp, "s1ap.message_type"); got != "PathSwitchRequestAcknowledge" {
+		t.Fatalf("path switch with zero sec caps: s1ap.message_type = %q, want PathSwitchRequestAcknowledge; body: %s", got, resp)
+	}
+
+	if eea := jsonGet(resp, "s1ap.replayed_ue_security_capabilities.encryption_algorithms"); eea != storedUESecurityCapabilities {
+		t.Errorf("replayed encryption algorithms = %q, want %s (the stored value, TS 33.401 §7.2.4.2.2); body: %s", eea, storedUESecurityCapabilities, resp)
+	}
+
+	if eia := jsonGet(resp, "s1ap.replayed_ue_security_capabilities.integrity_protection_algorithms"); eia != storedUESecurityCapabilities {
+		t.Errorf("replayed integrity algorithms = %q, want %s (the stored value, TS 33.401 §7.2.4.2.2); body: %s", eia, storedUESecurityCapabilities, resp)
 	}
 
 	fresh := mustCreateENBUE(t, enbID)

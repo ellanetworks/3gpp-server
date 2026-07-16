@@ -194,7 +194,12 @@ func (h *Handler) SendENBGTPUEcho(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"echo_response": true, "seq": msg.Seq})
+	resp := map[string]any{"echo_response": true, "seq": msg.Seq}
+	if msg.Recovery != nil {
+		resp["recovery_restart_counter"] = *msg.Recovery
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) AwaitENBErrorIndication(w http.ResponseWriter, r *http.Request) {
@@ -218,12 +223,13 @@ func (h *Handler) AwaitENBErrorIndication(w http.ResponseWriter, r *http.Request
 	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
-	if _, err := gt.WaitForControl(ctx, gtpu.MsgErrorIndication); err != nil {
+	msg, err := gt.WaitForControl(ctx, gtpu.MsgErrorIndication)
+	if err != nil {
 		writeError(w, http.StatusGatewayTimeout, err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"error_indication": true})
+	writeJSON(w, http.StatusOK, errorIndicationJSON(msg))
 }
 
 func (h *Handler) AwaitENBDownlink(w http.ResponseWriter, r *http.Request) {
@@ -247,14 +253,14 @@ func (h *Handler) AwaitENBDownlink(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
-	tpdu, err := gt.WaitForDownlink(ctx, dlTeid)
+	msg, err := gt.WaitForDownlink(ctx, dlTeid)
 	if err != nil {
 		writeError(w, http.StatusGatewayTimeout, err.Error())
 		return
 	}
 
-	resp := map[string]any{"raw_hex": hex.EncodeToString(tpdu)}
-	if inner, err := gtpu.ParseInner(tpdu); err == nil {
+	resp := map[string]any{"raw_hex": hex.EncodeToString(msg.Payload)}
+	if inner, err := gtpu.ParseInner(msg.Payload); err == nil {
 		resp["inner"] = inner
 	}
 

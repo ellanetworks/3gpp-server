@@ -107,6 +107,12 @@ const (
 	pduSessionTypeEthernet     = 5
 )
 
+// Always-on PDU session indication — TS 24.501 §9.11.4.3, Table 9.11.4.3.1.
+const (
+	alwaysOnPDUSessionNotAllowed = 0
+	alwaysOnPDUSessionRequired   = 1
+)
+
 // NGAP Cause, Misc group — TS 38.413 §9.3.1.2.
 const (
 	causePresentMisc           = "misc"
@@ -150,6 +156,16 @@ func assertNASCause(t *testing.T, body []byte, path string, want int) {
 
 	if got := jsonGet(body, path); got != strconv.Itoa(want) {
 		t.Errorf("%s = %q, want %d\n  body: %s", path, got, want, body)
+	}
+}
+
+// TS 24.501 §5.5.1.2.4: the AMF shall assign and include a TAI list as the
+// registration area in the REGISTRATION ACCEPT.
+func assertRegistrationAcceptTAIList(t *testing.T, body []byte) {
+	t.Helper()
+
+	if got := jsonGet(body, "nas.tai_list"); got == "" {
+		t.Errorf("nas.tai_list is absent, want a TAI list registration area (TS 24.501 §5.5.1.2.4)\n  body: %s", body)
 	}
 }
 

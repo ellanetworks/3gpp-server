@@ -47,6 +47,8 @@ func Test4GGTPUEcho(t *testing.T) {
 			if got := jsonGet(body, "echo_response"); got != "true" {
 				t.Errorf("echo_response = %q over %s, want true\n  body: %s", got, n3.name, body)
 			}
+
+			assertEchoResponseRecovery(t, body)
 		})
 	}
 }
@@ -66,6 +68,8 @@ func Test4GGTPUWrongTEIDErrorIndication(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("no GTP-U Error Indication for a G-PDU to an unknown TEID on S1-U (HTTP %d) — the UPF shall return one (TS 29.281 §7.3.1)\n  body: %s", status, body)
 	}
+
+	assertGTPUErrorIndication(t, body, n3IPv4.upfN3)
 }
 
 func Test4GGTPU_UDPRoundTrip(t *testing.T) {

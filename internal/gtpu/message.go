@@ -7,6 +7,7 @@ package gtpu
 import (
 	"encoding/binary"
 	"fmt"
+	"net/netip"
 )
 
 const (
@@ -22,12 +23,30 @@ const (
 	flagsWithExt = 0x34
 
 	extPDUSessionContainer = 0x85
-	pscPDUTypeUL           = 0x10
+
+	pduTypeDL = 0
+	pduTypeUL = 1
 
 	port = 2152
 )
 
+// TS 29.281 Table 8.1-1
+const (
+	ieRecovery    = 14
+	ieTEIDDataI   = 16
+	iePeerAddress = 133
+)
+
+var tvValueLengths = map[uint8]int{ieRecovery: 1, ieTEIDDataI: 4}
+
 const Port = port
+
+// TS 38.415 §5.5.2
+type PDUSessionContainer struct {
+	PDUType uint8 `json:"pdu_type"`
+	QFI     uint8 `json:"qfi"`
+	RQI     *bool `json:"rqi,omitempty"`
+}
 
 type Message struct {
 	Type    uint8
@@ -35,6 +54,12 @@ type Message struct {
 	Seq     uint16
 	HasSeq  bool
 	Payload []byte
+
+	PDUSession *PDUSessionContainer
+
+	Recovery    *uint8
+	TEIDDataI   *uint32
+	PeerAddress string
 }
 
 func EncodeGPDU(teid uint32, tpdu []byte) []byte {
@@ -57,7 +82,7 @@ func EncodeGPDUWithQFI(teid uint32, qfi uint8, tpdu []byte) []byte {
 	binary.BigEndian.PutUint32(out[4:8], teid)
 	out[11] = extPDUSessionContainer
 	out[12] = 0x01
-	out[13] = pscPDUTypeUL
+	out[13] = pduTypeUL << 4
 	out[14] = qfi & 0x3f
 	out[15] = 0x00
 	copy(out[16:], tpdu)
@@ -119,6 +144,10 @@ func Decode(b []byte) (*Message, error) {
 				break
 			}
 
+			if nextExt == extPDUSessionContainer {
+				m.PDUSession = decodePDUSessionContainer(b[payloadStart+1 : payloadStart+extLen-1])
+			}
+
 			nextExt = b[payloadStart+extLen-1]
 			payloadStart += extLen
 		}
@@ -135,5 +164,78 @@ func Decode(b []byte) (*Message, error) {
 
 	m.Payload = b[payloadStart:end]
 
+	if m.Type != MsgGPDU {
+		m.decodeIEs(m.Payload)
+	}
+
 	return m, nil
+}
+
+// TS 38.415 §5.5.2.1, §5.5.2.2
+func decodePDUSessionContainer(b []byte) *PDUSessionContainer {
+	if len(b) < 2 {
+		return nil
+	}
+
+	c := &PDUSessionContainer{
+		PDUType: b[0] >> 4,
+		QFI:     b[1] & 0x3f,
+	}
+
+	// TS 38.415 §5.5.3.4: the RQI is used only in the downlink direction.
+	if c.PDUType == pduTypeDL {
+		rqi := b[1]&0x40 != 0
+		c.RQI = &rqi
+	}
+
+	return c
+}
+
+// TS 29.281 §8.1: type bit 8 clear selects TV, set selects TLV with a 2-octet length.
+func (m *Message) decodeIEs(b []byte) {
+	for i := 0; i < len(b); {
+		ieType := b[i]
+
+		if ieType&0x80 == 0 {
+			n, known := tvValueLengths[ieType]
+			if !known || i+1+n > len(b) {
+				return
+			}
+
+			m.setIE(ieType, b[i+1:i+1+n])
+			i += 1 + n
+
+			continue
+		}
+
+		if i+3 > len(b) {
+			return
+		}
+
+		n := int(binary.BigEndian.Uint16(b[i+1 : i+3]))
+		if i+3+n > len(b) {
+			return
+		}
+
+		m.setIE(ieType, b[i+3:i+3+n])
+		i += 3 + n
+	}
+}
+
+func (m *Message) setIE(ieType uint8, value []byte) {
+	switch ieType {
+	case ieRecovery:
+		restartCounter := value[0]
+		m.Recovery = &restartCounter
+
+	case ieTEIDDataI:
+		teid := binary.BigEndian.Uint32(value)
+		m.TEIDDataI = &teid
+
+	case iePeerAddress:
+		// TS 29.281 §8.4: the length field admits only 4 (IPv4) or 16 (IPv6).
+		if addr, ok := netip.AddrFromSlice(value); ok {
+			m.PeerAddress = addr.Unmap().String()
+		}
+	}
 }

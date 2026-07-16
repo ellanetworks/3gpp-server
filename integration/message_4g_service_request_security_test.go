@@ -23,6 +23,10 @@ func Test4GServiceRequestUnknownUE(t *testing.T) {
 	if got := jsonGet(resp, "nas.message_type"); got != "service_reject" {
 		t.Fatalf("unknown-S-TMSI service request: nas.message_type = %q, want service_reject; body: %s", got, resp)
 	}
+
+	if got := jsonGet(resp, "nas.emm_cause"); got != "9" {
+		t.Errorf("unknown-S-TMSI service_reject: nas.emm_cause = %q, want 9 (TS 24.301 §4.4.4.3); body: %s", got, resp)
+	}
 }
 
 func Test4GServiceRequestReplay(t *testing.T) {

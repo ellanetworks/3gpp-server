@@ -7,6 +7,7 @@ package integration_test
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 )
 
@@ -486,10 +487,16 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
+			// TS 24.501 §7.4: reception of a 5GMM message is foreseen in this state, so
+			// the AMF should answer an undefined message type with 5GMM STATUS and #97.
 			name:            "raw NAS: valid 5GMM header but unknown message type 0xff",
 			body:            `{"message_type":"registration_request","raw_nas_pdu":"7e00ff"}`,
 			wantHTTP:        200,
 			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasStatus5GMM,
+			wantNASFields: map[string]fieldCheck{
+				"cause_5gmm": {wantExact: strconv.Itoa(cause5GMMMessageTypeNonExistent)},
+			},
 		},
 		{
 			name:            "raw NAS: RegistrationRequest truncated after mandatory header",

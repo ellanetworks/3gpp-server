@@ -38,6 +38,8 @@ func Test5GSecurityModeComplete_Fuzz(t *testing.T) {
 		body            string
 		wantHTTP        int
 		wantNGAPMsgType string
+		wantNASMsgType  string
+		wantCause5GMM   int
 	}{
 		{
 			name: "raw NAS: plain SecurityModeComplete (no integrity protection)",
@@ -78,10 +80,14 @@ func Test5GSecurityModeComplete_Fuzz(t *testing.T) {
 			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
+			// TS 24.501 §7.4: reception of a 5GMM message is foreseen in this state, so
+			// the AMF should answer an undefined message type with 5GMM STATUS and #97.
 			name:            "raw NAS: valid NAS header but unknown message type 0xff",
 			body:            `{"message_type":"security_mode_complete","raw_nas_pdu":"7e00ff"}`,
 			wantHTTP:        200,
 			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasStatus5GMM,
+			wantCause5GMM:   cause5GMMMessageTypeNonExistent,
 		},
 	}
 
@@ -116,6 +122,14 @@ func Test5GSecurityModeComplete_Fuzz(t *testing.T) {
 					t.Errorf("ngap.message_type = %q, want %q\n  body: %s", got, tt.wantNGAPMsgType, body)
 				}
 			}
+
+			if tt.wantNASMsgType != "" {
+				if got := jsonGet(body, "nas.message_type"); got != tt.wantNASMsgType {
+					t.Errorf("nas.message_type = %q, want %q\n  body: %s", got, tt.wantNASMsgType, body)
+				}
+			}
+
+			assertNASCause(t, body, "nas.cause_5gmm", tt.wantCause5GMM)
 
 			ngapMsgType := jsonGet(body, "ngap.message_type")
 			if ngapMsgType != ngapErrorIndication {

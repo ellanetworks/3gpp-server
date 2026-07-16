@@ -50,11 +50,12 @@ func Test5GAssociationFlood(t *testing.T) {
 func Test5GOversizedPDU(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 
-	status, resp := doRequest(t, "POST", "/gnb/"+gnbID+"/ngap",
-		fmt.Sprintf(`{"raw_ngap_pdu":%q}`, strings.Repeat("ab", 60000)))
-	if status != 200 {
-		t.Fatalf("oversized NGAP: server failed to handle it (HTTP %d): %s", status, resp)
-	}
+	// ab: the NGAP-PDU CHOICE extension bit is set, so the Type of Message IE
+	// does not decode (TS 38.413 §9.3.1.1).
+	const oversizedClause = "§10.2, §10.3.4.1A"
+
+	resp := sendRawNGAPAwaitingErrorIndication(t, gnbID, strings.Repeat("ab", 60000), oversizedClause)
+	assertErrorIndicationReported(t, resp, oversizedClause)
 
 	ueID := mustCreateUE(t, gnbID)
 

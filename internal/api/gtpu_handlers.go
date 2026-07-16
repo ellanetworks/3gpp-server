@@ -181,15 +181,19 @@ func (h *Handler) AwaitDownlink(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
-	tpdu, err := gt.WaitForDownlink(ctx, info.DLTeid)
+	msg, err := gt.WaitForDownlink(ctx, info.DLTeid)
 	if err != nil {
 		writeError(w, http.StatusGatewayTimeout, err.Error())
 		return
 	}
 
-	resp := map[string]any{"raw_hex": hex.EncodeToString(tpdu)}
-	if inner, err := gtpu.ParseInner(tpdu); err == nil {
+	resp := map[string]any{"raw_hex": hex.EncodeToString(msg.Payload)}
+	if inner, err := gtpu.ParseInner(msg.Payload); err == nil {
 		resp["inner"] = inner
+	}
+
+	if msg.PDUSession != nil {
+		resp["pdu_session_container"] = msg.PDUSession
 	}
 
 	writeJSON(w, http.StatusOK, resp)
@@ -245,7 +249,12 @@ func (h *Handler) SendGTPUEcho(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"echo_response": true, "seq": msg.Seq})
+	resp := map[string]any{"echo_response": true, "seq": msg.Seq}
+	if msg.Recovery != nil {
+		resp["recovery_restart_counter"] = *msg.Recovery
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) AwaitErrorIndication(w http.ResponseWriter, r *http.Request) {
@@ -265,10 +274,24 @@ func (h *Handler) AwaitErrorIndication(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
-	if _, err := gt.WaitForControl(ctx, gtpu.MsgErrorIndication); err != nil {
+	msg, err := gt.WaitForControl(ctx, gtpu.MsgErrorIndication)
+	if err != nil {
 		writeError(w, http.StatusGatewayTimeout, err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"error_indication": true})
+	writeJSON(w, http.StatusOK, errorIndicationJSON(msg))
+}
+
+func errorIndicationJSON(msg *gtpu.Message) map[string]any {
+	resp := map[string]any{"error_indication": true, "header_teid": msg.TEID}
+	if msg.TEIDDataI != nil {
+		resp["teid_data_i"] = *msg.TEIDDataI
+	}
+
+	if msg.PeerAddress != "" {
+		resp["gtpu_peer_address"] = msg.PeerAddress
+	}
+
+	return resp
 }

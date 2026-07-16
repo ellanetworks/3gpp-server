@@ -57,8 +57,15 @@ func Test4GMultiPDNIPv6(t *testing.T) {
 	}
 
 	// The PDN address IE begins with the PDN type octet; 02 = IPv6 (TS 24.301 §9.9.4.9).
-	if addr := jsonGet(resp, "nas.pdn_address"); len(addr) < 2 || addr[:2] != "02" {
+	addr := jsonGet(resp, "nas.pdn_address")
+	if len(addr) < 2 || addr[:2] != "02" {
 		t.Fatalf("IPv6 PDN address = %q, want a PDN type IPv6 (02…) address; body: %s", addr, resp)
+	}
+
+	// Type octet plus the 8-octet IPv6 interface identifier of octets 4 to 11 (TS 24.301 §9.9.4.9).
+	if want := 2 + 2*8; len(addr) != want {
+		t.Errorf("IPv6 PDN address = %q (%d hex chars), want %d: a PDN type octet and an 8-octet interface identifier (TS 24.301 §9.9.4.9); body: %s",
+			addr, len(addr), want, resp)
 	}
 }
 
@@ -81,7 +88,9 @@ func Test4GPDNDisconnect(t *testing.T) {
 
 	ebi := connectSecondPDN(t, enbID, ueID)
 
-	resp := nasBody(t, enbID, ueID, `{"message_type":"pdn_disconnect","linked_ebi":`+ebi+`}`)
+	const disconnectPTI = "9"
+
+	resp := nasBody(t, enbID, ueID, `{"message_type":"pdn_disconnect","linked_ebi":`+ebi+`,"pti":`+disconnectPTI+`}`)
 
 	if got := jsonGet(resp, "nas.message_type"); got != "deactivate_eps_bearer_context_request" {
 		t.Fatalf("pdn disconnect: nas.message_type = %q, want deactivate_eps_bearer_context_request (TS 24.301 §6.5.2.3); body: %s", got, resp)
@@ -93,6 +102,11 @@ func Test4GPDNDisconnect(t *testing.T) {
 
 	if got := jsonGet(resp, "nas.eps_bearer_identity"); got != ebi {
 		t.Fatalf("deactivated EBI = %q, want %q (the disconnected PDN); body: %s", got, ebi, resp)
+	}
+
+	if got := jsonGet(resp, "nas.bearer_pti"); got != disconnectPTI {
+		t.Errorf("deactivated PTI = %q, want %q (the PTI of the PDN Disconnect Request) (TS 24.301 §6.5.2.3, §6.4.4.2); body: %s",
+			got, disconnectPTI, resp)
 	}
 
 	// bearers holds the additional PDN connections only; the default PDN connection is not listed.

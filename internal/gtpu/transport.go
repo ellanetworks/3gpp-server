@@ -21,7 +21,7 @@ type Endpoint struct {
 
 	mu      sync.Mutex
 	cond    *sync.Cond
-	gpdus   map[uint32][][]byte
+	gpdus   map[uint32][]*Message
 	control map[uint8][]*Message
 }
 
@@ -35,7 +35,7 @@ func Listen(localIP string) (*Endpoint, error) {
 
 	e := &Endpoint{
 		conn:    conn,
-		gpdus:   make(map[uint32][][]byte),
+		gpdus:   make(map[uint32][]*Message),
 		control: make(map[uint8][]*Message),
 	}
 	e.cond = sync.NewCond(&e.mu)
@@ -73,7 +73,7 @@ func (e *Endpoint) runReceiver() {
 		e.mu.Lock()
 
 		if msg.Type == MsgGPDU {
-			e.gpdus[msg.TEID] = append(e.gpdus[msg.TEID], msg.Payload)
+			e.gpdus[msg.TEID] = append(e.gpdus[msg.TEID], msg)
 		} else {
 			e.control[msg.Type] = append(e.control[msg.Type], msg)
 		}
@@ -109,7 +109,7 @@ func (e *Endpoint) SendEchoRequest(remoteIP string, seq uint16) error {
 	return e.sendTo(remoteIP, EncodeEchoRequest(seq))
 }
 
-func (e *Endpoint) WaitForDownlink(ctx context.Context, dlTeid uint32) ([]byte, error) {
+func (e *Endpoint) WaitForDownlink(ctx context.Context, dlTeid uint32) (*Message, error) {
 	stop := make(chan struct{})
 	defer close(stop)
 

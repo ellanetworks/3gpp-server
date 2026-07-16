@@ -7,6 +7,7 @@ package integration_test
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -31,6 +32,54 @@ func awaitENBUES1AP(t *testing.T, enbID, ueID string, messageTypes string) (int,
 
 // The target assigns this to the incoming UE and must reuse it across the Handover Request Acknowledge and Notify (TS 36.413 §8.4.2, §8.4.3).
 const targetENBUES1APID = 100
+
+// BuildHandoverRequired emits this one-octet stub, which the EPC passes to the target unread (TS 36.413 §9.2.1.56).
+const sourceToTargetContainer = "00"
+
+// The MME stores 0xC000 for the UE's advertised EEA0/1/2 + EIA0/1/2, the S1AP bitmap carrying no EEA0/EIA0 bit.
+const storedUESecurityCapabilities = "49152"
+
+// NCC seeds at 1 at Initial Context Setup and the source MME advances it by one on HANDOVER REQUIRED, so the first S1 handover after attach carries 2 (TS 33.401 §7.2.8.1.1, §7.2.8.4.3).
+func assertHandoverRequestSecurity(t *testing.T, hoReq []byte) {
+	t.Helper()
+
+	if got := jsonGet(hoReq, "s1ap.security_context.next_hop_chaining_count"); got != "2" {
+		t.Errorf("HandoverRequest NCC = %q, want 2 (TS 33.401 §7.2.8.4.3)\n  body: %s", got, hoReq)
+	}
+
+	nh := jsonGet(hoReq, "s1ap.security_context.next_hop")
+	if len(nh) != 64 {
+		t.Errorf("HandoverRequest NH = %q, want a 256-bit (64-hex) Next Hop (TS 36.413 §9.2.1.26)\n  body: %s", nh, hoReq)
+	}
+
+	if nh == strings.Repeat("0", 64) {
+		t.Errorf("HandoverRequest NH is all-zero, not a fresh derived key (TS 33.401 §7.2.8.4.3)\n  body: %s", hoReq)
+	}
+}
+
+// The UE Security Capabilities and the Source to Target Transparent Container reach the target unmodified (TS 36.413 §9.2.1.40, §9.2.1.56; TS 33.401 §7.2.4.2.3).
+func assertHandoverRequestMandatoryIEs(t *testing.T, hoReq []byte) {
+	t.Helper()
+
+	if got := jsonGet(hoReq, "s1ap.ue_security_capabilities.encryption_algorithms"); got != storedUESecurityCapabilities {
+		t.Errorf("HandoverRequest encryption algorithms = %q, want %s (TS 36.413 §9.2.1.40)\n  body: %s", got, storedUESecurityCapabilities, hoReq)
+	}
+
+	if got := jsonGet(hoReq, "s1ap.ue_security_capabilities.integrity_protection_algorithms"); got != storedUESecurityCapabilities {
+		t.Errorf("HandoverRequest integrity algorithms = %q, want %s (TS 36.413 §9.2.1.40)\n  body: %s", got, storedUESecurityCapabilities, hoReq)
+	}
+
+	if got := jsonGet(hoReq, "s1ap.source_to_target_transparent_container"); got != sourceToTargetContainer {
+		t.Errorf("HandoverRequest Source to Target Transparent Container = %q, want %q (TS 36.413 §9.2.1.56)\n  body: %s", got, sourceToTargetContainer, hoReq)
+	}
+
+	dl := jsonGet(hoReq, "s1ap.ue_aggregate_max_bit_rate.dl")
+	ul := jsonGet(hoReq, "s1ap.ue_aggregate_max_bit_rate.ul")
+
+	if dl == "0" && ul == "0" {
+		t.Errorf("HandoverRequest UE AMBR DL and UL are both zero, a logical error (TS 36.413 §9.2.1.20)\n  body: %s", hoReq)
+	}
+}
 
 func runS1HandoverFlow(t *testing.T, sourceENB, targetENB, ueID string) {
 	t.Helper()
@@ -61,9 +110,8 @@ func runS1HandoverFlow(t *testing.T, sourceENB, targetENB, ueID string) {
 		t.Fatalf("HandoverRequest E-RAB ID = %q, want %q (the bearer established at attach, TS 36.413 §9.1.5.4)\n  body: %s", got, defaultEBI, hoReq)
 	}
 
-	if nh := jsonGet(hoReq, "s1ap.security_context.next_hop"); nh == "" {
-		t.Errorf("HandoverRequest missing Security Context (mandatory, TS 36.413 §9.1.5.4)\n  body: %s", hoReq)
-	}
+	assertHandoverRequestSecurity(t, hoReq)
+	assertHandoverRequestMandatoryIEs(t, hoReq)
 
 	status, body := doRequest(t, "POST", "/enb/"+targetENB+"/s1ap",
 		fmt.Sprintf(`{"message_type":"handover_request_acknowledge","mme_ue_s1ap_id":%s,"enb_ue_s1ap_id":%d,"admitted_erabs":[{"id":%s,"dl_teid":9000,"dl_ip":"10.3.0.3"}]}`,

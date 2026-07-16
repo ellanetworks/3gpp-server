@@ -51,6 +51,8 @@ func registerToAccept(t *testing.T, gnbID string) string {
 		t.Fatalf("Registration Accept carries no 5G-GUTI; reallocation is part of every initial registration (TS 24.501 §5.5.1.2.4)\n  body: %s", accept)
 	}
 
+	assertRegistrationAcceptTAIList(t, accept)
+
 	if status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
 		`{"message_type":"registration_complete"}`); status != 200 {
 		t.Fatalf("registration_complete: HTTP %d\n  body: %s", status, body)

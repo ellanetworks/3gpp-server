@@ -73,6 +73,8 @@ func Test5GGTPU_ICMPRoundTrip(t *testing.T) {
 			t.Errorf("downlink %s = %q, want %q\n  body: %s", field, got, want, body)
 		}
 	}
+
+	assertDLPDUSessionInformation(t, body)
 }
 
 func Test5GGTPU_Echo(t *testing.T) {
@@ -97,6 +99,8 @@ func Test5GGTPU_Echo(t *testing.T) {
 			if got := jsonGet(body, "echo_response"); got != "true" {
 				t.Errorf("echo_response = %q over %s, want true\n  body: %s", got, tc.n3.name, body)
 			}
+
+			assertEchoResponseRecovery(t, body)
 		})
 	}
 }
@@ -169,6 +173,8 @@ func Test5GGTPU_UDPRoundTrip(t *testing.T) {
 			t.Errorf("UDP downlink %s = %q, want %q\n  body: %s", field, got, want, body)
 		}
 	}
+
+	assertDLPDUSessionInformation(t, body)
 }
 
 func Test5GGTPU_WrongTEID_Dropped(t *testing.T) {
@@ -201,4 +207,6 @@ func Test5GGTPU_WrongTEID_ErrorIndication(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("no GTP-U Error Indication for a G-PDU to an unknown TEID (HTTP %d) — the UPF shall return one (TS 29.281 §7.3.1)\n  body: %s", status, body)
 	}
+
+	assertGTPUErrorIndication(t, body, n3IPv4.upfN3)
 }

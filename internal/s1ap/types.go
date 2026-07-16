@@ -53,6 +53,8 @@ type S1APResponse struct {
 	SecurityContext                *SecurityContextJSON        `json:"security_context,omitempty"`
 	ResetConnections               []ResetConnectionJSON       `json:"reset_connections,omitempty"`
 	ReplayedUESecurityCapabilities *UESecurityCapabilitiesJSON `json:"replayed_ue_security_capabilities,omitempty"`
+	UESecurityCapabilities         *UESecurityCapabilitiesJSON `json:"ue_security_capabilities,omitempty"`
+	SourceToTargetContainer        string                      `json:"source_to_target_transparent_container,omitempty"`
 	Paging                         *PagingJSON                 `json:"paging,omitempty"`
 	ERABModifyItems                []ERABModifyItemJSON        `json:"erab_modify_items,omitempty"`
 	ReleasedERABs                  []int                       `json:"released_erabs,omitempty"`

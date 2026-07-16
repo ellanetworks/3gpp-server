@@ -145,7 +145,19 @@ func Test5GServiceRequest_IdleNoSession(t *testing.T) {
 		t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
 	}
 	if got := jsonGet(body, "nas.message_type"); got != nasServiceAccept {
-		t.Errorf("nas.message_type = %q, want service_accept\n  body: %s", got, body)
+		t.Fatalf("nas.message_type = %q, want service_accept\n  body: %s", got, body)
+	}
+
+	assertServiceAcceptPDUSessionStatus(t, body)
+}
+
+// TS 24.501 §5.6.1.4.1: a PDU session status IE in the SERVICE REQUEST obliges the
+// AMF to include one in the SERVICE ACCEPT.
+func assertServiceAcceptPDUSessionStatus(t *testing.T, body []byte) {
+	t.Helper()
+
+	if got := jsonGet(body, "nas.pdu_session_status"); got == "" {
+		t.Errorf("nas.pdu_session_status is absent, want a PDU session status IE (TS 24.501 §5.6.1.4.1)\n  body: %s", body)
 	}
 }
 
@@ -159,8 +171,10 @@ func Test5GServiceRequest_PDUStatusMismatch(t *testing.T) {
 		t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
 	}
 	if got := jsonGet(body, "nas.message_type"); got != nasServiceAccept {
-		t.Errorf("nas.message_type = %q, want service_accept\n  body: %s", got, body)
+		t.Fatalf("nas.message_type = %q, want service_accept\n  body: %s", got, body)
 	}
+
+	assertServiceAcceptPDUSessionStatus(t, body)
 }
 
 // Out-of-state: accept and reject are both conformant, so only a hang fails.
