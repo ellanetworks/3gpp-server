@@ -21,7 +21,35 @@ type RegistrationRequestOpts struct {
 	SecurityCap      *nasType.UESecurityCapability
 	NgKsi            uint8
 
-	Overrides *NASRequest
+	Overrides *RegistrationRequestOverrides
+}
+
+// RegistrationRequestOverrides carries the optional REGISTRATION REQUEST IEs a caller may set (TS 24.501 §8.2.6).
+type RegistrationRequestOverrides struct {
+	NgKSI                        *uint8
+	MobileIdentityOverride       *string
+	UESecurityCapabilityOverride *string
+	FollowOnRequest              *uint8
+	NonCurrentNativeNASKSI       *uint8
+	Capability5GMM               *string
+	RequestedNSSAI               []SNSSAIJSON
+	LastVisitedRegisteredTAI     *string
+	S1UENetworkCapability        *string
+	UplinkDataStatus             *string
+	PDUSessionStatus             *string
+	MICOIndication               *uint8
+	UEStatus                     *uint8
+	AdditionalGUTI               *string
+	AllowedPDUSessionStatus      *string
+	UEsUsageSetting              *uint8
+	RequestedDRXParameters       *uint8
+	EPSNASMessageContainer       *string
+	LADNIndication               *string
+	PayloadContainer             *string
+	NetworkSlicingIndication     *uint8
+	UpdateType5GS                *string
+	NASMessageContainer          *string
+	EPSBearerContextStatus       *string
 }
 
 // BuildRegistrationRequest builds a plain REGISTRATION REQUEST (TS 24.501 §8.2.6).
@@ -99,7 +127,7 @@ func BuildRegistrationRequest(opts *RegistrationRequestOpts) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
-func applyRegistrationRequestOverrides(rr *nasMessage.RegistrationRequest, req *NASRequest) {
+func applyRegistrationRequestOverrides(rr *nasMessage.RegistrationRequest, req *RegistrationRequestOverrides) {
 	if req.NonCurrentNativeNASKSI != nil {
 		rr.NoncurrentNativeNASKeySetIdentifier = new(nasType.NoncurrentNativeNASKeySetIdentifier)
 		rr.NoncurrentNativeNASKeySetIdentifier.SetIei(nasMessage.RegistrationRequestNoncurrentNativeNASKeySetIdentifierType)

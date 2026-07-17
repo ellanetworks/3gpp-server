@@ -83,7 +83,7 @@ func Test5GScenarioRegistration(t *testing.T) {
 		if got := jsonGet(body, "nas.message_type"); got != nasRegistrationAccept {
 			t.Fatalf("nas.message_type = %q, want registration_accept", got)
 		}
-		if jsonGet(body, "nas.guti") == "" {
+		if jsonGet(body, "nas.guti.5g_tmsi") == "" {
 			t.Error("missing GUTI in RegistrationAccept")
 		}
 

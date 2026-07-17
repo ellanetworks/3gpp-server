@@ -6,7 +6,6 @@ package api
 import (
 	"context"
 	"encoding/hex"
-	"fmt"
 	"net/http"
 
 	"github.com/ellanetworks/3gpp-server/internal/ngap"
@@ -14,10 +13,9 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/transport"
 )
 
-func handleHandoverRequired(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) {
+func handleGnBHandoverRequired(gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) (*SendNGAPResponse, error) {
 	if req.TargetGnbID == nil {
-		writeError(w, http.StatusBadRequest, "target_gnb_id is required for handover_required")
-		return
+		return nil, httpErrorf(http.StatusBadRequest, "target_gnb_id is required for handover_required")
 	}
 
 	pduSessionID := pduSessionIDForRelease(ue)
@@ -42,22 +40,28 @@ func handleHandoverRequired(w http.ResponseWriter, r *http.Request, gnb *store.G
 		cause = *req.HandoverRequiredCause
 	}
 
-	encoded, err := ngap.BuildHandoverRequired(amfUeNgapID, ranUeNgapID, *req.TargetGnbID,
-		gnb.MCC, gnb.MNC, gnb.TAC, pduSessionIDs, cause)
+	encoded, err := ngap.BuildHandoverRequired(ngap.HandoverRequiredParams{
+		AmfUeNgapID:       amfUeNgapID,
+		RanUeNgapID:       ranUeNgapID,
+		TargetGnbID:       *req.TargetGnbID,
+		MCC:               gnb.MCC,
+		MNC:               gnb.MNC,
+		TAC:               gnb.TAC,
+		PDUSessionIDs:     pduSessionIDs,
+		CauseRadioNetwork: cause,
+	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build HandoverRequired: %v", err))
-		return
+		return nil, httpErrorf(http.StatusInternalServerError, "build HandoverRequired: %v", err)
 	}
 
 	if err := t.Send(encoded, false); err != nil {
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
-		return
+		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
 	}
 
-	writeJSON(w, http.StatusOK, SendNGAPResponse{})
+	return &SendNGAPResponse{}, nil
 }
 
-func handleRANStatusTransfer(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) {
+func handleGnBRANStatusTransfer(ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) (*SendNGAPResponse, error) {
 	drbs := make([]ngap.DRBStatusTransferItem, 0, len(req.StatusTransferDRBs))
 	for _, d := range req.StatusTransferDRBs {
 		drbs = append(drbs, ngap.DRBStatusTransferItem{
@@ -75,19 +79,17 @@ func handleRANStatusTransfer(w http.ResponseWriter, r *http.Request, gnb *store.
 
 	encoded, err := ngap.BuildUplinkRANStatusTransfer(effectiveAmfID(req, ue), effectiveRanID(req, ue), drbs)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build UplinkRANStatusTransfer: %v", err))
-		return
+		return nil, httpErrorf(http.StatusInternalServerError, "build UplinkRANStatusTransfer: %v", err)
 	}
 
 	if err := t.Send(encoded, false); err != nil {
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
-		return
+		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
 	}
 
-	writeJSON(w, http.StatusOK, SendNGAPResponse{})
+	return &SendNGAPResponse{}, nil
 }
 
-func handleHandoverCancel(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) {
+func handleGnBHandoverCancel(ctx context.Context, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) (*SendNGAPResponse, error) {
 	amfUeNgapID := ue.AmfUeNgapID
 	if req.AmfUeNgapIDOverride != nil {
 		amfUeNgapID = *req.AmfUeNgapIDOverride
@@ -105,36 +107,28 @@ func handleHandoverCancel(w http.ResponseWriter, r *http.Request, gnb *store.GNB
 
 	encoded, err := ngap.BuildHandoverCancel(amfUeNgapID, ranUeNgapID, cause)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build HandoverCancel: %v", err))
-		return
+		return nil, httpErrorf(http.StatusInternalServerError, "build HandoverCancel: %v", err)
 	}
 
 	if err := t.Send(encoded, false); err != nil {
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
-		return
+		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
 	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
-	defer cancel()
 
 	ngapResp, err := t.WaitForMessage(ctx, "HandoverCancelAcknowledge", "ErrorIndication")
 	if err != nil {
-		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for HandoverCancelAcknowledge: %v", err))
-		return
+		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for HandoverCancelAcknowledge: %v", err)
 	}
 
-	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
+	return &SendNGAPResponse{NGAP: ngapResp}, nil
 }
 
-func handleHandoverRequestAcknowledge(w http.ResponseWriter, t *transport.NGAPTransport, req *SendGnBNGAPRequest) {
+func handleGnBHandoverRequestAcknowledge(t *transport.NGAPTransport, req *SendGnBNGAPRequest) (*SendNGAPResponse, error) {
 	if req.AmfUeNgapID == nil || req.RanUeNgapID == nil {
-		writeError(w, http.StatusBadRequest, "amf_ue_ngap_id and ran_ue_ngap_id are required")
-		return
+		return nil, httpErrorf(http.StatusBadRequest, "amf_ue_ngap_id and ran_ue_ngap_id are required")
 	}
 
 	if len(req.PDUSessions) == 0 {
-		writeError(w, http.StatusBadRequest, "pdu_sessions is required for handover_request_acknowledge")
-		return
+		return nil, httpErrorf(http.StatusBadRequest, "pdu_sessions is required for handover_request_acknowledge")
 	}
 
 	var sessions []ngap.HandoverAdmittedSession
@@ -155,8 +149,7 @@ func handleHandoverRequestAcknowledge(w http.ResponseWriter, t *transport.NGAPTr
 		if ps.RawTransfer != nil {
 			decoded, err := hex.DecodeString(*ps.RawTransfer)
 			if err != nil {
-				writeError(w, http.StatusBadRequest, fmt.Sprintf("decode raw_transfer: %v", err))
-				return
+				return nil, httpErrorf(http.StatusBadRequest, "decode raw_transfer: %v", err)
 			}
 
 			rawTransfer = decoded
@@ -165,44 +158,50 @@ func handleHandoverRequestAcknowledge(w http.ResponseWriter, t *transport.NGAPTr
 		sessions = append(sessions, ngap.HandoverAdmittedSession{PDUSessionID: ps.ID, DLTeid: teid, DLIP: dlIP, RawTransfer: rawTransfer})
 	}
 
-	encoded, err := ngap.BuildHandoverRequestAcknowledge(*req.AmfUeNgapID, *req.RanUeNgapID, sessions, req.FailedPDUSessions)
+	encoded, err := ngap.BuildHandoverRequestAcknowledge(ngap.HandoverRequestAcknowledgeParams{
+		AmfUeNgapID: *req.AmfUeNgapID,
+		RanUeNgapID: *req.RanUeNgapID,
+		Sessions:    sessions,
+		Failed:      req.FailedPDUSessions,
+	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build HandoverRequestAcknowledge: %v", err))
-		return
+		return nil, httpErrorf(http.StatusInternalServerError, "build HandoverRequestAcknowledge: %v", err)
 	}
 
 	if err := t.Send(encoded, false); err != nil {
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
-		return
+		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
 	}
 
-	writeJSON(w, http.StatusOK, SendNGAPResponse{})
+	return &SendNGAPResponse{}, nil
 }
 
-func handleHandoverNotify(w http.ResponseWriter, gnb *store.GNBContext, t *transport.NGAPTransport, req *SendGnBNGAPRequest) {
+func handleGnBHandoverNotify(gnb *store.GNBContext, t *transport.NGAPTransport, req *SendGnBNGAPRequest) (*SendNGAPResponse, error) {
 	if req.AmfUeNgapID == nil || req.RanUeNgapID == nil {
-		writeError(w, http.StatusBadRequest, "amf_ue_ngap_id and ran_ue_ngap_id are required")
-		return
+		return nil, httpErrorf(http.StatusBadRequest, "amf_ue_ngap_id and ran_ue_ngap_id are required")
 	}
 
-	encoded, err := ngap.BuildHandoverNotify(*req.AmfUeNgapID, *req.RanUeNgapID, gnb.MCC, gnb.MNC, gnb.TAC, gnb.GNBID)
+	encoded, err := ngap.BuildHandoverNotify(ngap.HandoverNotifyParams{
+		AmfUeNgapID: *req.AmfUeNgapID,
+		RanUeNgapID: *req.RanUeNgapID,
+		MCC:         gnb.MCC,
+		MNC:         gnb.MNC,
+		TAC:         gnb.TAC,
+		GnbID:       gnb.GNBID,
+	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build HandoverNotify: %v", err))
-		return
+		return nil, httpErrorf(http.StatusInternalServerError, "build HandoverNotify: %v", err)
 	}
 
 	if err := t.Send(encoded, false); err != nil {
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
-		return
+		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
 	}
 
-	writeJSON(w, http.StatusOK, SendNGAPResponse{})
+	return &SendNGAPResponse{}, nil
 }
 
-func handleHandoverFailure(w http.ResponseWriter, t *transport.NGAPTransport, req *SendGnBNGAPRequest) {
+func handleGnBHandoverFailure(t *transport.NGAPTransport, req *SendGnBNGAPRequest) (*SendNGAPResponse, error) {
 	if req.AmfUeNgapID == nil {
-		writeError(w, http.StatusBadRequest, "amf_ue_ngap_id is required for handover_failure")
-		return
+		return nil, httpErrorf(http.StatusBadRequest, "amf_ue_ngap_id is required for handover_failure")
 	}
 
 	cause := ngap.CauseRadioNetworkHoFailureInTarget
@@ -212,14 +211,12 @@ func handleHandoverFailure(w http.ResponseWriter, t *transport.NGAPTransport, re
 
 	encoded, err := ngap.BuildHandoverFailure(*req.AmfUeNgapID, cause)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build HandoverFailure: %v", err))
-		return
+		return nil, httpErrorf(http.StatusInternalServerError, "build HandoverFailure: %v", err)
 	}
 
 	if err := t.Send(encoded, false); err != nil {
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
-		return
+		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
 	}
 
-	writeJSON(w, http.StatusOK, SendNGAPResponse{})
+	return &SendNGAPResponse{}, nil
 }

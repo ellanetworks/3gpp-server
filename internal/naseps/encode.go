@@ -35,9 +35,16 @@ func encodeGUTIIdentity(guti GUTIParams) ([]byte, error) {
 	return out, nil
 }
 
+type TrackingAreaUpdateRequestParams struct {
+	UpdateType uint8
+	ActiveFlag bool
+	KSI        uint8
+	GUTI       GUTIParams
+}
+
 // BuildTrackingAreaUpdateRequest builds a plain TAU REQUEST (TS 24.301 §8.2.29).
-func BuildTrackingAreaUpdateRequest(updateType uint8, activeFlag bool, ksi uint8, guti GUTIParams) ([]byte, error) {
-	gutiID, err := encodeGUTIIdentity(guti)
+func BuildTrackingAreaUpdateRequest(p TrackingAreaUpdateRequestParams) ([]byte, error) {
+	gutiID, err := encodeGUTIIdentity(p.GUTI)
 	if err != nil {
 		return nil, err
 	}
@@ -48,11 +55,11 @@ func BuildTrackingAreaUpdateRequest(updateType uint8, activeFlag bool, ksi uint8
 	w.U8(uint8(eps.MsgTrackingAreaUpdateRequest))
 
 	active := uint8(0)
-	if activeFlag {
+	if p.ActiveFlag {
 		active = 0x08
 	}
 
-	w.U8(ksi<<4 | active | updateType&0x07) // NAS KSI | active flag | EPS update type
+	w.U8(p.KSI<<4 | active | p.UpdateType&0x07) // NAS KSI | active flag | EPS update type
 
 	if err := w.LV(gutiID); err != nil {
 		return nil, err
@@ -164,17 +171,24 @@ func BuildAttachComplete(esmContainer []byte) ([]byte, error) {
 	return (&eps.AttachComplete{ESMMessageContainer: esmContainer}).Marshal()
 }
 
+type ServiceRequestParams struct {
+	KSI     uint8
+	Count   uint32
+	KnasInt [16]byte
+	EIA     uint8
+}
+
 // BuildServiceRequest builds the 4-octet SERVICE REQUEST: SHT/PD, KSI | 5-bit truncated COUNT, then a short MAC over those two octets (TS 24.301 §8.2.25).
-func BuildServiceRequest(ksi uint8, count uint32, knasInt [16]byte, eia uint8) ([]byte, error) {
-	integ, err := integrityFor(eia)
+func BuildServiceRequest(p ServiceRequestParams) ([]byte, error) {
+	integ, err := integrityFor(p.EIA)
 	if err != nil {
 		return nil, err
 	}
 
 	octet0 := uint8(eps.SHTServiceRequest)<<4 | eps.PDEMM
-	octet1 := ksi<<5 | uint8(count)&0x1F
+	octet1 := p.KSI<<5 | uint8(p.Count)&0x1F
 
-	mac, err := eps.ServiceRequestShortMAC([]byte{octet0, octet1}, knasInt, count, common.DirectionUplink, integ)
+	mac, err := eps.ServiceRequestShortMAC([]byte{octet0, octet1}, p.KnasInt, p.Count, common.DirectionUplink, integ)
 	if err != nil {
 		return nil, err
 	}

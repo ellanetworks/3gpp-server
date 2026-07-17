@@ -6,8 +6,8 @@ package s1ap
 import "github.com/ellanetworks/core/s1ap"
 
 type ResetConnection struct {
-	MMEUES1APID uint32
-	ENBUES1APID uint32
+	MMEUES1APID *uint32
+	ENBUES1APID *uint32
 }
 
 func BuildReset(all bool, connections []ResetConnection) ([]byte, error) {
@@ -15,12 +15,19 @@ func BuildReset(all bool, connections []ResetConnection) ([]byte, error) {
 
 	if !all {
 		for _, c := range connections {
-			mme := s1ap.MMEUES1APID(c.MMEUES1APID)
-			enb := s1ap.ENBUES1APID(c.ENBUES1APID)
-			rt.Part = append(rt.Part, s1ap.UEAssociatedLogicalS1ConnectionItem{
-				MMEUES1APID: &mme,
-				ENBUES1APID: &enb,
-			})
+			item := s1ap.UEAssociatedLogicalS1ConnectionItem{}
+
+			if c.MMEUES1APID != nil {
+				mme := s1ap.MMEUES1APID(*c.MMEUES1APID)
+				item.MMEUES1APID = &mme
+			}
+
+			if c.ENBUES1APID != nil {
+				enb := s1ap.ENBUES1APID(*c.ENBUES1APID)
+				item.ENBUES1APID = &enb
+			}
+
+			rt.Part = append(rt.Part, item)
 		}
 	}
 

@@ -35,9 +35,9 @@ type ENBUplinkRequest struct {
 	TEID *uint32 `json:"teid,omitempty"`
 }
 
-func enbBearer(ue *store.UEEPSContext, ebi uint8) (ulTeid, dlTeid uint32, upfIP, ueIP string, ok bool) {
+func enbBearer(ue *store.UEEPSContext, ebi uint8) (ulTeid, dlTeid uint32, sgwIP, ueIP string, ok bool) {
 	if ebi == 0 || ebi == ue.EPSBearerID {
-		return ue.ULTeid, ue.DLTeid, ue.UPFIP, ue.UEIP, ue.ULTeid != 0
+		return ue.ULTeid, ue.DLTeid, ue.SGWIP, ue.UEIP, ue.ULTeid != 0
 	}
 
 	b, exists := ue.Bearers[ebi]
@@ -45,7 +45,7 @@ func enbBearer(ue *store.UEEPSContext, ebi uint8) (ulTeid, dlTeid uint32, upfIP,
 		return 0, 0, "", "", false
 	}
 
-	return b.ULTeid, b.DLTeid, b.UPFIP, b.UEIP, true
+	return b.ULTeid, b.DLTeid, b.SGWIP, b.UEIP, true
 }
 
 func (h *Handler) enbGTPU(w http.ResponseWriter, r *http.Request) (*store.UEEPSContext, *gtpu.Endpoint, bool) {
@@ -82,7 +82,7 @@ func (h *Handler) SendENBUplink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ulTeid, _, upfIP, ueIP, found := enbBearer(ue, req.Ebi)
+	ulTeid, _, sgwIP, ueIP, found := enbBearer(ue, req.Ebi)
 	if !found {
 		writeError(w, http.StatusBadRequest, "no user-plane tunnel for the selected bearer; complete an attach / pdn_connectivity on a GTP-U-enabled eNB")
 		return
@@ -148,7 +148,7 @@ func (h *Handler) SendENBUplink(w http.ResponseWriter, r *http.Request) {
 		ulTeid = *req.TEID
 	}
 
-	if err := gt.SendUplinkPlain(upfIP, ulTeid, inner); err != nil {
+	if err := gt.SendUplinkPlain(sgwIP, ulTeid, inner); err != nil {
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("gtp-u send: %v", err))
 		return
 	}
@@ -170,17 +170,17 @@ func (h *Handler) SendENBGTPUEcho(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		UPFIP     string `json:"upf_ip"`
+		SGWIP     string `json:"sgw_ip"`
 		TimeoutMs int    `json:"timeout_ms,omitempty"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&req)
 
-	if req.UPFIP == "" {
-		writeError(w, http.StatusBadRequest, "upf_ip is required")
+	if req.SGWIP == "" {
+		writeError(w, http.StatusBadRequest, "sgw_ip is required")
 		return
 	}
 
-	if err := gt.SendEchoRequest(req.UPFIP, 1); err != nil {
+	if err := gt.SendEchoRequest(req.SGWIP, 1); err != nil {
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("gtp-u echo send: %v", err))
 		return
 	}

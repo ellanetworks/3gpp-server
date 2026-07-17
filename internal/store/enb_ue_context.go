@@ -9,7 +9,7 @@ type EPSBearer struct {
 	APN    string
 	UEIP   string
 	ULTeid uint32
-	UPFIP  string
+	SGWIP  string
 	DLTeid uint32
 }
 
@@ -48,7 +48,7 @@ type UEEPSContext struct {
 	KSI uint8
 
 	ULTeid uint32
-	UPFIP  string
+	SGWIP  string
 	DLTeid uint32
 	UEIP   string
 

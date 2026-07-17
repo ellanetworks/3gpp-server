@@ -192,11 +192,24 @@ func parseCriticality(s string) aper.Enumerated {
 	}
 }
 
-func BuildNGSetupRequestFromStore(mcc, mnc, tac, gnbID, name string, sst int32, sd string, slices []struct {
+type NGSetupSlice struct {
 	SST int32
 	SD  string
-}) (*NGAPMessage, error) {
-	plmnID, err := encodePLMN(mcc, mnc)
+}
+
+type NGSetupRequestFromStoreParams struct {
+	MCC    string
+	MNC    string
+	TAC    string
+	GnbID  string
+	Name   string
+	SST    int32
+	SD     string
+	Slices []NGSetupSlice
+}
+
+func BuildNGSetupRequestFromStore(p NGSetupRequestFromStoreParams) (*NGAPMessage, error) {
+	plmnID, err := encodePLMN(p.MCC, p.MNC)
 	if err != nil {
 		return nil, fmt.Errorf("PLMN: %w", err)
 	}
@@ -204,8 +217,8 @@ func BuildNGSetupRequestFromStore(mcc, mnc, tac, gnbID, name string, sst int32, 
 	plmnHex := hex.EncodeToString(plmnID)
 
 	sliceSupport := make([]SliceSupportJSON, 0)
-	if len(slices) > 0 {
-		for _, s := range slices {
+	if len(p.Slices) > 0 {
+		for _, s := range p.Slices {
 			ss := SliceSupportJSON{SST: fmt.Sprintf("%02x", byte(s.SST))}
 			if s.SD != "" {
 				ss.SD = s.SD
@@ -213,15 +226,15 @@ func BuildNGSetupRequestFromStore(mcc, mnc, tac, gnbID, name string, sst int32, 
 			sliceSupport = append(sliceSupport, ss)
 		}
 	} else {
-		ss := SliceSupportJSON{SST: fmt.Sprintf("%02x", byte(sst))}
-		if sd != "" {
-			ss.SD = sd
+		ss := SliceSupportJSON{SST: fmt.Sprintf("%02x", byte(p.SST))}
+		if p.SD != "" {
+			ss.SD = p.SD
 		}
 		sliceSupport = append(sliceSupport, ss)
 	}
 
 	pagingDRX := int64(ngapType.PagingDRXPresentV128)
-	nodeName := name
+	nodeName := p.Name
 
 	return &NGAPMessage{
 		ProcedureCode: ngapType.ProcedureCodeNGSetup,
@@ -235,7 +248,7 @@ func BuildNGSetupRequestFromStore(mcc, mnc, tac, gnbID, name string, sst int32, 
 					Present: "global_gnb_id",
 					GlobalGNBID: &GlobalGNBIDJSON{
 						PLMNIdentity: plmnHex,
-						GnbID:        gnbID,
+						GnbID:        p.GnbID,
 						GnbIDBitLen:  24,
 					},
 				},
@@ -251,7 +264,7 @@ func BuildNGSetupRequestFromStore(mcc, mnc, tac, gnbID, name string, sst int32, 
 				SupportedTAList: &SupportedTAListJSON{
 					Items: []SupportedTAItemJSON{
 						{
-							TAC: tac,
+							TAC: p.TAC,
 							BroadcastPLMNs: []BroadcastPLMNItemJSON{
 								{
 									PLMNIdentity: plmnHex,

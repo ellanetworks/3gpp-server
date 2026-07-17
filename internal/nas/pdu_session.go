@@ -70,8 +70,16 @@ func BuildPDUSessionEstablishmentRequest(opts *PDUSessionEstablishmentRequestOpt
 	return data.Bytes(), nil
 }
 
+type ULNASTransportOpts struct {
+	PduSessionID     uint8
+	PayloadContainer []byte
+	DNN              string
+	SST              int32
+	SD               string
+}
+
 // BuildULNASTransport wraps a 5GSM message establishing a new PDU session in a UL NAS TRANSPORT (TS 24.501 §8.2.10).
-func BuildULNASTransport(pduSessionID uint8, payloadContainer []byte, dnn string, sst int32, sd string) ([]byte, error) {
+func BuildULNASTransport(opts *ULNASTransportOpts) ([]byte, error) {
 	m := gonas.NewMessage()
 	m.GmmMessage = gonas.NewGmmMessage()
 	m.GmmHeader.SetMessageType(gonas.MsgTypeULNASTransport)
@@ -83,37 +91,37 @@ func BuildULNASTransport(pduSessionID uint8, payloadContainer []byte, dnn string
 
 	ul.PduSessionID2Value = new(nasType.PduSessionID2Value)
 	ul.PduSessionID2Value.SetIei(nasMessage.ULNASTransportPduSessionID2ValueType)
-	ul.SetPduSessionID2Value(pduSessionID)
+	ul.SetPduSessionID2Value(opts.PduSessionID)
 
 	ul.RequestType = new(nasType.RequestType)
 	ul.RequestType.SetIei(nasMessage.ULNASTransportRequestTypeType)
 	ul.SetRequestTypeValue(nasMessage.ULNASTransportRequestTypeInitialRequest)
 
-	if dnn != "" {
+	if opts.DNN != "" {
 		ul.DNN = new(nasType.DNN)
 		ul.DNN.SetIei(nasMessage.ULNASTransportDNNType)
-		ul.DNN.SetLen(uint8(len(dnn)))
-		ul.SetDNN(dnn)
+		ul.DNN.SetLen(uint8(len(opts.DNN)))
+		ul.SetDNN(opts.DNN)
 	}
 
 	ul.SNSSAI = nasType.NewSNSSAI(nasMessage.ULNASTransportSNSSAIType)
-	if sd == "" {
+	if opts.SD == "" {
 		ul.SNSSAI.SetLen(1)
 	} else {
 		ul.SNSSAI.SetLen(4)
 		var sdTemp [3]uint8
-		sdBytes, err := hex.DecodeString(sd)
+		sdBytes, err := hex.DecodeString(opts.SD)
 		if err != nil {
 			return nil, fmt.Errorf("nas: decode SD: %w", err)
 		}
 		copy(sdTemp[:], sdBytes)
 		ul.SetSD(sdTemp)
 	}
-	ul.SetSST(uint8(sst))
+	ul.SetSST(uint8(opts.SST))
 
 	ul.SetPayloadContainerType(nasMessage.PayloadContainerTypeN1SMInfo)
-	ul.PayloadContainer.SetLen(uint16(len(payloadContainer)))
-	ul.SetPayloadContainerContents(payloadContainer)
+	ul.PayloadContainer.SetLen(uint16(len(opts.PayloadContainer)))
+	ul.SetPayloadContainerContents(opts.PayloadContainer)
 
 	m.ULNASTransport = ul
 

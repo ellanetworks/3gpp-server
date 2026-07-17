@@ -14,15 +14,13 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/transport"
 )
 
-func handlePathSwitchRequest(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, t *transport.NGAPTransport, req *SendGnBNGAPRequest) {
+func handleGnBPathSwitchRequest(ctx context.Context, gnb *store.GNBContext, t *transport.NGAPTransport, req *SendGnBNGAPRequest) (*SendNGAPResponse, error) {
 	if req.AmfUeNgapID == nil || req.RanUeNgapID == nil {
-		writeError(w, http.StatusBadRequest, "amf_ue_ngap_id and ran_ue_ngap_id are required")
-		return
+		return nil, httpErrorf(http.StatusBadRequest, "amf_ue_ngap_id and ran_ue_ngap_id are required")
 	}
 
 	if len(req.PDUSessions) == 0 {
-		writeError(w, http.StatusBadRequest, "pdu_sessions is required for path_switch_request")
-		return
+		return nil, httpErrorf(http.StatusBadRequest, "pdu_sessions is required for path_switch_request")
 	}
 
 	var sessions []ngap.PathSwitchSession
@@ -43,8 +41,7 @@ func handlePathSwitchRequest(w http.ResponseWriter, r *http.Request, gnb *store.
 		if ps.RawTransfer != nil {
 			decoded, err := hex.DecodeString(*ps.RawTransfer)
 			if err != nil {
-				writeError(w, http.StatusBadRequest, fmt.Sprintf("decode raw_transfer: %v", err))
-				return
+				return nil, httpErrorf(http.StatusBadRequest, "decode raw_transfer: %v", err)
 			}
 
 			rawTransfer = decoded
@@ -55,36 +52,39 @@ func handlePathSwitchRequest(w http.ResponseWriter, r *http.Request, gnb *store.
 
 	secCaps, err := pathSwitchSecurityCapabilities(req.UESecurityCapabilities)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
+		return nil, httpErrorf(http.StatusBadRequest, "%v", err)
 	}
 
-	encoded, err := ngap.BuildPathSwitchRequest(*req.RanUeNgapID, *req.AmfUeNgapID, gnb.MCC, gnb.MNC, gnb.TAC, gnb.GNBID, secCaps, sessions, req.FailedPDUSessions, req.OmitIEs)
+	encoded, err := ngap.BuildPathSwitchRequest(ngap.PathSwitchRequestParams{
+		RanUeNgapID:       *req.RanUeNgapID,
+		SourceAmfUeNgapID: *req.AmfUeNgapID,
+		MCC:               gnb.MCC,
+		MNC:               gnb.MNC,
+		TAC:               gnb.TAC,
+		GnbID:             gnb.GNBID,
+		SecCaps:           secCaps,
+		Sessions:          sessions,
+		Failed:            req.FailedPDUSessions,
+		OmitIEs:           req.OmitIEs,
+	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build PathSwitchRequest: %v", err))
-		return
+		return nil, httpErrorf(http.StatusInternalServerError, "build PathSwitchRequest: %v", err)
 	}
 
 	if err := t.Send(encoded, false); err != nil {
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
-		return
+		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
 	}
 
 	if len(req.WaitFor) == 0 {
-		writeJSON(w, http.StatusOK, SendNGAPResponse{})
-		return
+		return &SendNGAPResponse{}, nil
 	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
-	defer cancel()
 
 	ngapResp, err := t.WaitForMessage(ctx, req.WaitFor...)
 	if err != nil {
-		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for %v: %v", req.WaitFor, err))
-		return
+		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for %v: %v", req.WaitFor, err)
 	}
 
-	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
+	return &SendNGAPResponse{NGAP: ngapResp}, nil
 }
 
 func pathSwitchSecurityCapabilities(in *UESecurityCapabilitiesInput) (ngap.UESecurityCapabilities, error) {
@@ -133,43 +133,35 @@ func pathSwitchSecurityCapabilities(in *UESecurityCapabilitiesInput) (ngap.UESec
 	return caps, nil
 }
 
-func handleRawNGAP(w http.ResponseWriter, r *http.Request, t *transport.NGAPTransport, req *SendGnBNGAPRequest) {
+func handleGnBRawNGAP(ctx context.Context, t *transport.NGAPTransport, req *SendGnBNGAPRequest) (*SendNGAPResponse, error) {
 	pdu, err := hex.DecodeString(*req.RawNGAPPDU)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("decode raw_ngap_pdu: %v", err))
-		return
+		return nil, httpErrorf(http.StatusBadRequest, "decode raw_ngap_pdu: %v", err)
 	}
 
 	if err := t.Send(pdu, false); err != nil {
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
-		return
+		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
 	}
 
 	if len(req.WaitFor) == 0 {
-		writeJSON(w, http.StatusOK, SendNGAPResponse{})
-		return
+		return &SendNGAPResponse{}, nil
 	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
-	defer cancel()
 
 	ngapResp, err := t.WaitForMessage(ctx, req.WaitFor...)
 	if err != nil {
-		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for %v: %v", req.WaitFor, err))
-		return
+		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for %v: %v", req.WaitFor, err)
 	}
 
-	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
+	return &SendNGAPResponse{NGAP: ngapResp}, nil
 }
 
-func handleNGReset(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, t *transport.NGAPTransport, req *SendGnBNGAPRequest) {
+func handleGnBNGReset(ctx context.Context, gnb *store.GNBContext, t *transport.NGAPTransport, req *SendGnBNGAPRequest) (*SendNGAPResponse, error) {
 	var connections []ngap.NGResetConnection
 
 	for _, ueID := range req.ResetUEIDs {
 		ue, ok := gnb.GetUE(ueID)
 		if !ok {
-			writeError(w, http.StatusNotFound, fmt.Sprintf("ue %s not found", ueID))
-			return
+			return nil, httpErrorf(http.StatusNotFound, "ue %s not found", ueID)
 		}
 
 		amf := ue.AmfUeNgapID
@@ -177,25 +169,19 @@ func handleNGReset(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext
 		connections = append(connections, ngap.NGResetConnection{AmfUeNgapID: &amf, RanUeNgapID: &ran})
 	}
 
-	encoded, err := ngap.BuildNGReset(connections)
+	encoded, err := ngap.BuildNGReset(len(connections) == 0, connections)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build NGReset: %v", err))
-		return
+		return nil, httpErrorf(http.StatusInternalServerError, "build NGReset: %v", err)
 	}
 
 	if err := t.Send(encoded, true); err != nil {
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
-		return
+		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
 	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
-	defer cancel()
 
 	ngapResp, err := t.WaitForMessage(ctx, "NGResetAcknowledge", "ErrorIndication")
 	if err != nil {
-		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for NGResetAcknowledge: %v", err))
-		return
+		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for NGResetAcknowledge: %v", err)
 	}
 
-	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
+	return &SendNGAPResponse{NGAP: ngapResp}, nil
 }

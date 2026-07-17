@@ -44,56 +44,74 @@ func (h *Handler) SendNGAP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
+	defer cancel()
+
+	var (
+		resp *SendNGAPResponse
+		herr error
+	)
+
 	switch req.MessageType {
 	case "registration_request":
-		handleRegistrationRequest(w, r, gnb, ue, t, &req)
+		resp, herr = handleGnBRegistrationRequest(ctx, gnb, ue, t, &req)
 	case "authentication_response":
-		handleAuthenticationResponse(w, r, gnb, ue, t, &req)
+		resp, herr = handleGnBAuthenticationResponse(ctx, gnb, ue, t, &req)
 	case "security_mode_complete":
-		handleSecurityModeComplete(w, r, gnb, ue, t, &req)
+		resp, herr = handleGnBSecurityModeComplete(ctx, gnb, ue, t, &req)
 	case "registration_complete":
-		handleRegistrationComplete(w, r, gnb, ue, t, &req)
+		resp, herr = handleGnBRegistrationComplete(ctx, gnb, ue, t, &req)
 	case "pdu_session_establishment_request":
-		handlePDUSessionEstablishmentRequest(w, r, gnb, ue, t, h.GTPU[gnbID], &req)
+		resp, herr = handleGnBPDUSessionEstablishmentRequest(ctx, gnb, ue, t, h.GTPU[gnbID], &req)
 	case "deregistration_request":
-		handleDeregistrationRequest(w, r, gnb, ue, t, &req)
+		resp, herr = handleGnBDeregistrationRequest(ctx, gnb, ue, t, &req)
 	case "ue_context_release_request":
-		handleUEContextReleaseRequest(w, r, gnb, ue, t, &req)
+		resp, herr = handleGnBUEContextReleaseRequest(ctx, ue, t, &req)
 	case "service_request":
-		handleServiceRequest(w, r, gnb, ue, t, &req)
+		resp, herr = handleGnBServiceRequest(ctx, gnb, ue, t, &req)
 	case "inject_nas":
-		handleInjectNAS(w, r, gnb, ue, t, &req)
+		resp, herr = handleGnBInjectNAS(ctx, gnb, ue, t, &req)
 	case "error_indication":
-		handleErrorIndication(w, r, gnb, ue, t, &req)
+		resp, herr = handleGnBErrorIndication(ctx, ue, t, &req)
 	case "ue_capability_info":
-		handleUECapabilityInfo(w, r, gnb, ue, t, &req)
+		resp, herr = handleGnBUECapabilityInfo(ctx, ue, t, &req)
 	case "identity_response":
-		handleIdentityResponse(w, r, gnb, ue, t, &req)
+		resp, herr = handleGnBIdentityResponse(ctx, gnb, ue, t, &req)
 	case "pdu_session_release_request":
-		handlePDUSessionReleaseRequest(w, r, gnb, ue, t, &req)
+		resp, herr = handleGnBPDUSessionReleaseRequest(ctx, gnb, ue, t, &req)
 	case "pdu_session_modification_request":
-		handlePDUSessionModificationRequest(w, r, gnb, ue, t, &req)
+		resp, herr = handleGnBPDUSessionModificationRequest(ctx, gnb, ue, t, &req)
 	case "pdu_session_release_complete":
-		handlePDUSessionReleaseComplete(w, r, gnb, ue, t, &req)
+		resp, herr = handleGnBPDUSessionReleaseComplete(gnb, ue, t, &req)
 	case "pdu_session_modification_complete":
-		handlePDUSessionModificationComplete(w, r, gnb, ue, t, &req)
+		resp, herr = handleGnBPDUSessionModificationComplete(gnb, ue, t, &req)
 	case "pdu_session_modification_command_reject":
-		handlePDUSessionModificationCommandReject(w, r, gnb, ue, t, &req)
+		resp, herr = handleGnBPDUSessionModificationCommandReject(gnb, ue, t, &req)
 	case "status_5gsm":
-		handleStatus5GSM(w, r, gnb, ue, t, &req)
+		resp, herr = handleGnBStatus5GSM(gnb, ue, t, &req)
 	case "authentication_failure":
-		handleAuthenticationFailure(w, r, gnb, ue, t, &req)
+		resp, herr = handleGnBAuthenticationFailure(ctx, gnb, ue, t, &req)
 	case "security_mode_reject":
-		handleSecurityModeReject(w, r, gnb, ue, t, &req)
+		resp, herr = handleGnBSecurityModeReject(ctx, gnb, ue, t, &req)
 	case "handover_required":
-		handleHandoverRequired(w, r, gnb, ue, t, &req)
+		resp, herr = handleGnBHandoverRequired(gnb, ue, t, &req)
 	case "ran_status_transfer":
-		handleRANStatusTransfer(w, r, gnb, ue, t, &req)
+		resp, herr = handleGnBRANStatusTransfer(ue, t, &req)
 	case "handover_cancel":
-		handleHandoverCancel(w, r, gnb, ue, t, &req)
+		resp, herr = handleGnBHandoverCancel(ctx, ue, t, &req)
+	case "initial_context_setup_failure":
+		resp, herr = handleGnBInitialContextSetupFailure(ue, t, &req)
 	default:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unsupported message_type: %s", req.MessageType))
+		return
 	}
+
+	if herr != nil {
+		writeError(w, statusForError(herr), herr.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) SendGnBNGAP(w http.ResponseWriter, r *http.Request) {
@@ -117,25 +135,38 @@ func (h *Handler) SendGnBNGAP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.RawNGAPPDU != nil {
-		handleRawNGAP(w, r, t, &req)
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
+	defer cancel()
+
+	var (
+		resp *SendNGAPResponse
+		herr error
+	)
+
+	switch {
+	case req.RawNGAPPDU != nil:
+		resp, herr = handleGnBRawNGAP(ctx, t, &req)
+	case req.MessageType == "ng_reset":
+		resp, herr = handleGnBNGReset(ctx, gnb, t, &req)
+	case req.MessageType == "handover_request_acknowledge":
+		resp, herr = handleGnBHandoverRequestAcknowledge(t, &req)
+	case req.MessageType == "handover_failure":
+		resp, herr = handleGnBHandoverFailure(t, &req)
+	case req.MessageType == "handover_notify":
+		resp, herr = handleGnBHandoverNotify(gnb, t, &req)
+	case req.MessageType == "path_switch_request":
+		resp, herr = handleGnBPathSwitchRequest(ctx, gnb, t, &req)
+	default:
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("unsupported message_type: %s", req.MessageType))
 		return
 	}
 
-	switch req.MessageType {
-	case "ng_reset":
-		handleNGReset(w, r, gnb, t, &req)
-	case "handover_request_acknowledge":
-		handleHandoverRequestAcknowledge(w, t, &req)
-	case "handover_failure":
-		handleHandoverFailure(w, t, &req)
-	case "handover_notify":
-		handleHandoverNotify(w, gnb, t, &req)
-	case "path_switch_request":
-		handlePathSwitchRequest(w, r, gnb, t, &req)
-	default:
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("unsupported message_type: %s", req.MessageType))
+	if herr != nil {
+		writeError(w, statusForError(herr), herr.Error())
+		return
 	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func effectiveRanID(req *SendNGAPRequest, ue *store.UEContext) int64 {
@@ -164,45 +195,46 @@ func firstNonEmpty(vals ...string) string {
 	return ""
 }
 
-func sendAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest, ngapMsg *ngap.NGAPMessage, waitFor ...string) {
+func sendAndWait(ctx context.Context, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest, ngapMsg *ngap.NGAPMessage, waitFor ...string) (*SendNGAPResponse, error) {
 	encoded, err := ngap.Encode(ngapMsg)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NGAP encode: %v", err))
-		return
+		return nil, httpErrorf(http.StatusInternalServerError, "NGAP encode: %v", err)
 	}
 
-	sendRawAndWait(w, r, gnb, ue, t, req, encoded, waitFor...)
+	return sendRawAndWait(ctx, ue, t, req, encoded, waitFor...)
 }
 
-func sendUplinkAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest, nasPDU []byte, waitFor ...string) {
-	encoded, err := ngap.BuildUplinkNASTransport(
-		ue.AmfUeNgapID, ue.RanUeNgapID, nasPDU,
-		gnb.MCC, gnb.MNC, gnb.TAC, gnb.GNBID, uplinkOverrides(req),
-	)
+func sendUplinkAndWait(ctx context.Context, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest, nasPDU []byte, waitFor ...string) (*SendNGAPResponse, error) {
+	encoded, err := ngap.BuildUplinkNASTransport(ngap.UplinkNASTransportParams{
+		AmfUeNgapID: ue.AmfUeNgapID,
+		RanUeNgapID: ue.RanUeNgapID,
+		NASPDU:      nasPDU,
+		MCC:         gnb.MCC,
+		MNC:         gnb.MNC,
+		TAC:         gnb.TAC,
+		GnbID:       gnb.GNBID,
+		Overrides:   uplinkOverrides(req),
+	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("NGAP encode: %v", err))
-		return
+		return nil, httpErrorf(http.StatusInternalServerError, "NGAP encode: %v", err)
 	}
 
-	sendRawAndWait(w, r, gnb, ue, t, req, encoded, waitFor...)
+	return sendRawAndWait(ctx, ue, t, req, encoded, waitFor...)
 }
 
-func sendRawAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest, encoded []byte, waitFor ...string) {
+func sendRawAndWait(ctx context.Context, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest, encoded []byte, waitFor ...string) (*SendNGAPResponse, error) {
 	if err := t.Send(encoded, false); err != nil {
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
-		return
+		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
 	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
-	defer cancel()
 
 	ngapResp, err := t.WaitForMessageMatching(ctx, ueNGAPMatcher(effectiveRanID(req, ue), effectiveAmfID(req, ue)), waitFor...)
 	if err != nil {
-		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for response: %v", err))
-		return
+		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for response: %v", err)
 	}
 
 	var nasResp *nasCodec.NASResponse
+
+	var macVerified *bool
 
 	for _, ie := range ngapResp.IEs {
 		// An Error Indication echoes the AP IDs it was sent; it assigns none.
@@ -217,7 +249,7 @@ func sendRawAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GNBContex
 			}
 
 			if len(ue.Kamf) > 0 {
-				nasResp, _ = nasCodec.DecodeSecuredNAS(ue, nasPDUBytes)
+				nasResp, macVerified = decodeGNBDownlinkNAS(ue, nasPDUBytes)
 			} else {
 				nasResp, _ = nasCodec.Decode(nasPDUBytes)
 			}
@@ -233,11 +265,8 @@ func sendRawAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GNBContex
 				ue.NgKsi = uint8(*nasResp.NgKSI)
 			}
 
-			if nasResp != nil && nasResp.GUTI != "" {
-				gutiBytes, err := hex.DecodeString(nasResp.GUTI)
-				if err == nil {
-					ue.Guti = nasCodec.ParseGUTI(gutiBytes)
-				}
+			if nasResp != nil && nasResp.GUTI != nil {
+				ue.Guti = nasCodec.GUTI5GFromStructured(nasResp.GUTI)
 			}
 		}
 	}
@@ -260,8 +289,9 @@ func sendRawAndWait(w http.ResponseWriter, r *http.Request, gnb *store.GNBContex
 		}
 	}
 
-	writeJSON(w, http.StatusOK, SendNGAPResponse{
-		NGAP: ngapResp,
-		NAS:  nasResp,
-	})
+	return &SendNGAPResponse{
+		NGAP:        ngapResp,
+		NAS:         nasResp,
+		MACVerified: macVerified,
+	}, nil
 }

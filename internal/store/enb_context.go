@@ -12,7 +12,7 @@ type ENBContext struct {
 	ID    string
 	MCC   string
 	MNC   string
-	TAC   uint16
+	TAC   string
 	ENBID uint32
 	Name  string
 
@@ -23,7 +23,7 @@ type ENBContext struct {
 	nextENBUEID atomic.Uint32
 }
 
-func NewENBContext(id, mcc, mnc string, tac uint16, enbID uint32, name string) *ENBContext {
+func NewENBContext(id, mcc, mnc, tac string, enbID uint32, name string) *ENBContext {
 	return &ENBContext{
 		ID:    id,
 		MCC:   mcc,

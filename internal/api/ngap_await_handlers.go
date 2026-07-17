@@ -97,7 +97,7 @@ func decodeNASFromNGAP(ue *store.UEContext, ngapResp *ngap.NGAPResponse) *nasCod
 			continue
 		}
 
-		nasResp, _ = nasCodec.DecodeSecuredNAS(ue, nasPDUBytes)
+		nasResp, _ = decodeGNBDownlinkNAS(ue, nasPDUBytes)
 	}
 
 	return nasResp

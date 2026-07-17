@@ -100,7 +100,7 @@ func registerSUPI(gnbID, supi string) (regResult, error) {
 		}
 
 		if s.wantNAS == nasRegistrationAccept {
-			guti = jsonGet(body, "nas.guti")
+			guti = jsonGet(body, "nas.guti.5g_tmsi")
 		}
 	}
 

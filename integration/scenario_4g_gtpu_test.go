@@ -39,7 +39,7 @@ func Test4GGTPUEcho(t *testing.T) {
 			enbID := createGTPUENB(t, claimENBID(), "gtpu-echo-enb-"+n3.name, n3)
 
 			status, body := doRequest(t, "POST", "/enb/"+enbID+"/gtpu/echo",
-				fmt.Sprintf(`{"upf_ip":%q,"timeout_ms":5000}`, n3.upfN3))
+				fmt.Sprintf(`{"sgw_ip":%q,"timeout_ms":5000}`, n3.upfN3))
 			if status != 200 {
 				t.Fatalf("no GTP-U Echo Response (HTTP %d) on S1-U over %s — the UPF did not answer a conformant Echo Request (TS 29.281 §7.2.1)\n  body: %s", status, n3.name, body)
 			}

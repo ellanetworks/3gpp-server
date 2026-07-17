@@ -32,8 +32,9 @@ type SendENBNASRequest struct {
 	RawNASPDU  *string `json:"raw_nas_pdu,omitempty"`
 	CorruptMAC bool    `json:"corrupt_mac,omitempty"`
 
-	MMEUES1APIDOverride *uint32 `json:"mme_ue_s1ap_id_override,omitempty"`
-	ENBUES1APIDOverride *uint32 `json:"enb_ue_s1ap_id_override,omitempty"`
+	MMEUES1APIDOverride           *uint32 `json:"mme_ue_s1ap_id_override,omitempty"`
+	ENBUES1APIDOverride           *uint32 `json:"enb_ue_s1ap_id_override,omitempty"`
+	RRCEstablishmentCauseOverride *int64  `json:"rrc_establishment_cause,omitempty"`
 
 	ReplayLast        bool    `json:"replay_last,omitempty"`
 	SwitchOff         bool    `json:"switch_off,omitempty"`

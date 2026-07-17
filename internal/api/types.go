@@ -4,7 +4,6 @@
 package api
 
 import (
-	nasTypes "github.com/ellanetworks/3gpp-server/internal/nas"
 	"github.com/ellanetworks/3gpp-server/internal/ngap"
 )
 
@@ -23,6 +22,10 @@ type CreateGnBRequest struct {
 
 	NGSetupIEs  []ngap.IE `json:"ng_setup_ies,omitempty"`
 	SkipNGSetup bool      `json:"skip_ng_setup,omitempty"`
+
+	RawNGAPPDU *string  `json:"raw_ngap_pdu,omitempty"`
+	WaitFor    []string `json:"wait_for,omitempty"`
+	TimeoutMs  int      `json:"timeout_ms,omitempty"`
 
 	EnableGTPU   bool   `json:"enable_gtpu,omitempty"`
 	GnBN3Address string `json:"gnb_n3_address,omitempty"`
@@ -157,11 +160,4 @@ type PatchUERequest struct {
 	SST         *int32  `json:"sst,omitempty"`
 	SD          *string `json:"sd,omitempty"`
 	IMEISV      *string `json:"imeisv,omitempty"`
-}
-
-type SendNGAPRequest = nasTypes.NASRequest
-
-type SendNGAPResponse struct {
-	NGAP *ngap.NGAPResponse    `json:"ngap"`
-	NAS  *nasTypes.NASResponse `json:"nas,omitempty"`
 }

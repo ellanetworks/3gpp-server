@@ -5,6 +5,7 @@ package api
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -31,6 +32,8 @@ func NewHandler(s *store.Store) *Handler {
 		S1APTransports: make(map[string]*transport.S1APTransport),
 	}
 }
+
+var defaultNGSetupWait = []string{"NGSetupResponse", "NGSetupFailure", "ErrorIndication"}
 
 func (h *Handler) CreateGNB(w http.ResponseWriter, r *http.Request) {
 	var req CreateGnBRequest
@@ -86,39 +89,56 @@ func (h *Handler) CreateGNB(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var msg *ngap.NGAPMessage
-	if len(req.NGSetupIEs) > 0 {
-		msg = &ngap.NGAPMessage{
-			ProcedureCode: ngapType.ProcedureCodeNGSetup,
-			PDUType:       "initiating_message",
-			Criticality:   "reject",
-			IEs:           req.NGSetupIEs,
-		}
-	} else {
-		sliceArgs := make([]struct {
-			SST int32
-			SD  string
-		}, 0, len(req.Slices))
-		for _, s := range req.Slices {
-			sliceArgs = append(sliceArgs, struct {
-				SST int32
-				SD  string
-			}{SST: s.SST, SD: s.SD})
-		}
-		var berr error
-		msg, berr = ngap.BuildNGSetupRequestFromStore(req.MCC, req.MNC, req.TAC, req.GnbID, req.Name, req.SST, req.SD, sliceArgs)
-		if berr != nil {
+	var encoded []byte
+
+	if req.RawNGAPPDU != nil {
+		decoded, derr := hex.DecodeString(*req.RawNGAPPDU)
+		if derr != nil {
 			h.teardownGNB(gnb.ID, t)
-			writeError(w, http.StatusBadRequest, fmt.Sprintf("build ng setup: %v", berr))
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("raw_ngap_pdu must be hex: %v", derr))
 			return
 		}
-	}
 
-	encoded, err := ngap.Encode(msg)
-	if err != nil {
-		h.teardownGNB(gnb.ID, t)
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("ngap encode: %v", err))
-		return
+		encoded = decoded
+	} else {
+		var msg *ngap.NGAPMessage
+		if len(req.NGSetupIEs) > 0 {
+			msg = &ngap.NGAPMessage{
+				ProcedureCode: ngapType.ProcedureCodeNGSetup,
+				PDUType:       "initiating_message",
+				Criticality:   "reject",
+				IEs:           req.NGSetupIEs,
+			}
+		} else {
+			sliceArgs := make([]ngap.NGSetupSlice, 0, len(req.Slices))
+			for _, s := range req.Slices {
+				sliceArgs = append(sliceArgs, ngap.NGSetupSlice{SST: s.SST, SD: s.SD})
+			}
+			var berr error
+			msg, berr = ngap.BuildNGSetupRequestFromStore(ngap.NGSetupRequestFromStoreParams{
+				MCC:    req.MCC,
+				MNC:    req.MNC,
+				TAC:    req.TAC,
+				GnbID:  req.GnbID,
+				Name:   req.Name,
+				SST:    req.SST,
+				SD:     req.SD,
+				Slices: sliceArgs,
+			})
+			if berr != nil {
+				h.teardownGNB(gnb.ID, t)
+				writeError(w, http.StatusBadRequest, fmt.Sprintf("build ng setup: %v", berr))
+				return
+			}
+		}
+
+		var eerr error
+		encoded, eerr = ngap.Encode(msg)
+		if eerr != nil {
+			h.teardownGNB(gnb.ID, t)
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("ngap encode: %v", eerr))
+			return
+		}
 	}
 
 	if err := t.Send(encoded, true); err != nil {
@@ -127,10 +147,15 @@ func (h *Handler) CreateGNB(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(0))
+	waitFor := req.WaitFor
+	if len(waitFor) == 0 {
+		waitFor = defaultNGSetupWait
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
-	ngapResp, err := t.WaitForMessage(ctx, "NGSetupResponse", "NGSetupFailure", "ErrorIndication")
+	ngapResp, err := t.WaitForMessage(ctx, waitFor...)
 	if err != nil {
 		h.teardownGNB(gnb.ID, t)
 		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for NGSetupResponse: %v", err))

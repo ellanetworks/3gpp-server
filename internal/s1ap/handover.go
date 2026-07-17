@@ -17,12 +17,17 @@ type HandoverRequiredParams struct {
 
 	TargetMCC   string
 	TargetMNC   string
-	TargetTAC   uint16
+	TargetTAC   string
 	TargetENBID uint32
 }
 
 func BuildHandoverRequired(p HandoverRequiredParams) ([]byte, error) {
 	plmn, err := encodePLMN(p.TargetMCC, p.TargetMNC)
+	if err != nil {
+		return nil, err
+	}
+
+	tac, err := parseTAC(p.TargetTAC)
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +43,7 @@ func BuildHandoverRequired(p HandoverRequiredParams) ([]byte, error) {
 					PLMNIdentity: plmn,
 					ENBID:        s1ap.ENBID{Kind: s1ap.ENBIDMacro, Value: p.TargetENBID},
 				},
-				SelectedTAI: s1ap.TAI{PLMNIdentity: plmn, TAC: s1ap.TAC(p.TargetTAC)},
+				SelectedTAI: s1ap.TAI{PLMNIdentity: plmn, TAC: s1ap.TAC(tac)},
 			},
 		},
 		SourceToTarget: handoverContainerStub,
@@ -100,7 +105,7 @@ type HandoverNotifyParams struct {
 	ENBUES1APID uint32
 	MCC         string
 	MNC         string
-	TAC         uint16
+	TAC         string
 	CellID      uint32
 }
 
@@ -110,11 +115,16 @@ func BuildHandoverNotify(p HandoverNotifyParams) ([]byte, error) {
 		return nil, err
 	}
 
+	tac, err := parseTAC(p.TAC)
+	if err != nil {
+		return nil, err
+	}
+
 	m := &s1ap.HandoverNotify{
 		MMEUES1APID: s1ap.MMEUES1APID(p.MMEUES1APID),
 		ENBUES1APID: s1ap.ENBUES1APID(p.ENBUES1APID),
 		EUTRANCGI:   s1ap.EUTRANCGI{PLMNIdentity: plmn, CellID: p.CellID},
-		TAI:         s1ap.TAI{PLMNIdentity: plmn, TAC: s1ap.TAC(p.TAC)},
+		TAI:         s1ap.TAI{PLMNIdentity: plmn, TAC: s1ap.TAC(tac)},
 	}
 
 	return m.Marshal()

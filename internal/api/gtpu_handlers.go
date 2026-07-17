@@ -71,7 +71,7 @@ func (h *Handler) gtpuSession(w http.ResponseWriter, r *http.Request, pduSession
 		}
 	}
 
-	info, ok := gnb.GetPDUSession(ue.RanUeNgapID, pduSessionID)
+	info, ok := ue.PDUSessions[uint8(pduSessionID)]
 	if !ok || info.ULTeid == 0 || info.UEIP == "" {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("no established N3 tunnel for PDU session %d", pduSessionID))
 		return nil, nil, false
@@ -199,6 +199,16 @@ func (h *Handler) AwaitDownlink(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
+type GnBTunnelResponse struct {
+	PDUSessionID uint8  `json:"pdu_session_id"`
+	N3GnbIP      string `json:"n3_gnb_ip"`
+	DLTeid       uint32 `json:"dl_teid"`
+	QFI          uint8  `json:"qfi"`
+	ULTeid       uint32 `json:"ul_teid,omitempty"`
+	UPFIP        string `json:"upf_ip,omitempty"`
+	UEIP         string `json:"ue_ip,omitempty"`
+}
+
 func (h *Handler) GetTunnel(w http.ResponseWriter, r *http.Request) {
 	pduSessionID := int64(0)
 	if v := r.URL.Query().Get("pdu_session_id"); v != "" {
@@ -212,7 +222,15 @@ func (h *Handler) GetTunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, info)
+	writeJSON(w, http.StatusOK, GnBTunnelResponse{
+		PDUSessionID: info.PDUSessionID,
+		N3GnbIP:      info.N3GnbIP,
+		DLTeid:       info.DLTeid,
+		QFI:          info.QFI,
+		ULTeid:       info.ULTeid,
+		UPFIP:        info.UPFIP,
+		UEIP:         info.UEIP,
+	})
 }
 
 func (h *Handler) SendGTPUEcho(w http.ResponseWriter, r *http.Request) {

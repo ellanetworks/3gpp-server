@@ -27,7 +27,7 @@ func Decode(data []byte) (*NASResponse, error) {
 	payload := make([]byte, len(data))
 	copy(payload, data)
 
-	resp.SecurityHeaderType = securityHeaderTypeToString(m.SecurityHeaderType)
+	resp.SecurityHeaderType = SecurityHeaderTypeString(m.SecurityHeaderType)
 
 	if m.SecurityHeaderType != gonas.SecurityHeaderTypePlainNas {
 		resp.MessageType = "secured_nas"
@@ -165,7 +165,7 @@ func decodeRegistrationAccept(m *gonas.Message, resp *NASResponse) {
 	if m.RegistrationAccept.GUTI5G != nil {
 		gutiLen := m.RegistrationAccept.GUTI5G.GetLen()
 		if gutiLen > 0 && gutiLen <= 11 {
-			resp.GUTI = hex.EncodeToString(m.RegistrationAccept.GUTI5G.Octet[:gutiLen])
+			resp.GUTI = guti5GStructured(m.RegistrationAccept.GUTI5G)
 		}
 	}
 
@@ -188,7 +188,8 @@ func decodeServiceAccept(m *gonas.Message, resp *NASResponse) {
 	}
 }
 
-func securityHeaderTypeToString(t uint8) string {
+// SecurityHeaderTypeString renders a 5GS security header type for JSON (TS 24.501 §9.3).
+func SecurityHeaderTypeString(t uint8) string {
 	switch t {
 	case gonas.SecurityHeaderTypePlainNas:
 		return "plain"
@@ -287,16 +288,69 @@ func gsmMessageTypeName(t uint8) string {
 	}
 }
 
-func ParseGUTI(contents []byte) *nasType.GUTI5G {
-	if len(contents) < 11 {
+// guti5GStructured decodes a 5G-GUTI into its fields (TS 24.501 §9.11.3.4).
+func guti5GStructured(g *nasType.GUTI5G) *GUTI5GJSON {
+	mcc := fmt.Sprintf("%d%d%d", g.GetMCCDigit1(), g.GetMCCDigit2(), g.GetMCCDigit3())
+
+	mnc := fmt.Sprintf("%d%d", g.GetMNCDigit1(), g.GetMNCDigit2())
+	if d3 := g.GetMNCDigit3(); d3 != 0x0f {
+		mnc += fmt.Sprintf("%d", d3)
+	}
+
+	tmsi := g.GetTMSI5G()
+
+	return &GUTI5GJSON{
+		MCC:         mcc,
+		MNC:         mnc,
+		AMFRegionID: int(g.GetAMFRegionID()),
+		AMFSetID:    int(g.GetAMFSetID()),
+		AMFPointer:  int(g.GetAMFPointer()),
+		FiveGTMSI:   hex.EncodeToString(tmsi[:]),
+	}
+}
+
+// GUTI5GFromStructured re-encodes a decoded 5G-GUTI for reuse in a later uplink
+// message (TS 24.501 §9.11.3.4); it is the inverse of guti5GStructured.
+func GUTI5GFromStructured(s *GUTI5GJSON) *nasType.GUTI5G {
+	if s == nil {
 		return nil
 	}
 
-	guti := &nasType.GUTI5G{}
-	guti.Len = uint16(len(contents))
-	copy(guti.Octet[:], contents)
+	g := nasType.NewGUTI5G(0)
+	g.SetLen(11)
+	g.SetSpare(0)
+	g.SetSpare2(0)
+	g.SetTypeOfIdentity(nasMessage.MobileIdentity5GSType5gGuti)
 
-	return guti
+	if len(s.MCC) == 3 {
+		g.SetMCCDigit1(s.MCC[0] - '0')
+		g.SetMCCDigit2(s.MCC[1] - '0')
+		g.SetMCCDigit3(s.MCC[2] - '0')
+	}
+
+	switch len(s.MNC) {
+	case 2:
+		g.SetMNCDigit1(s.MNC[0] - '0')
+		g.SetMNCDigit2(s.MNC[1] - '0')
+		g.SetMNCDigit3(0x0f)
+	case 3:
+		g.SetMNCDigit1(s.MNC[0] - '0')
+		g.SetMNCDigit2(s.MNC[1] - '0')
+		g.SetMNCDigit3(s.MNC[2] - '0')
+	}
+
+	g.SetAMFRegionID(uint8(s.AMFRegionID))
+	g.SetAMFSetID(uint16(s.AMFSetID))
+	g.SetAMFPointer(uint8(s.AMFPointer))
+
+	var tmsi [4]byte
+	if b, err := hex.DecodeString(s.FiveGTMSI); err == nil {
+		copy(tmsi[:], b)
+	}
+
+	g.SetTMSI5G(tmsi)
+
+	return g
 }
 
 func decodeStatus5GMM(m *gonas.Message, resp *NASResponse) {

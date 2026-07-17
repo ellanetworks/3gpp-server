@@ -81,7 +81,7 @@ type ENBTunnelResponse struct {
 	APN    string `json:"apn,omitempty"`
 	UEIP   string `json:"ue_ip,omitempty"`
 	ULTeid uint32 `json:"ul_teid,omitempty"`
-	UPFIP  string `json:"upf_ip,omitempty"`
+	SGWIP  string `json:"sgw_ip,omitempty"`
 	DLTeid uint32 `json:"dl_teid,omitempty"`
 }
 
@@ -110,13 +110,13 @@ func (h *Handler) GetENBTunnel(w http.ResponseWriter, r *http.Request) {
 		ebi = uint8(n)
 	}
 
-	ulTeid, dlTeid, upfIP, ueIP, found := enbBearer(ue, ebi)
+	ulTeid, dlTeid, sgwIP, ueIP, found := enbBearer(ue, ebi)
 	if !found {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("no user-plane tunnel for bearer %d; complete an attach / pdn_connectivity on a GTP-U-enabled eNB", ebi))
 		return
 	}
 
-	resp := ENBTunnelResponse{EBI: ebi, UEIP: ueIP, ULTeid: ulTeid, UPFIP: upfIP, DLTeid: dlTeid}
+	resp := ENBTunnelResponse{EBI: ebi, UEIP: ueIP, ULTeid: ulTeid, SGWIP: sgwIP, DLTeid: dlTeid}
 	if ebi == 0 || ebi == ue.EPSBearerID {
 		resp.EBI = ue.EPSBearerID
 	} else if b, exists := ue.Bearers[ebi]; exists {

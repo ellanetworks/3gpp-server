@@ -14,7 +14,7 @@ type PathSwitchRequestParams struct {
 	TargetS1UAddr     string
 	TargetTEID        uint32
 	MCC, MNC          string
-	TAC               uint16
+	TAC               string
 	CellID            uint32
 
 	EncryptionAlgorithms          uint16
@@ -30,6 +30,11 @@ func BuildPathSwitchRequest(p PathSwitchRequestParams) ([]byte, error) {
 	}
 
 	addr, err := parseTransportAddr(p.TargetS1UAddr)
+	if err != nil {
+		return nil, err
+	}
+
+	tac, err := parseTAC(p.TAC)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +55,7 @@ func BuildPathSwitchRequest(p PathSwitchRequestParams) ([]byte, error) {
 		ERABToBeSwitchedDL: items,
 		SourceMMEUES1APID:  s1ap.MMEUES1APID(p.SourceMMEUES1APID),
 		EUTRANCGI:          s1ap.EUTRANCGI{PLMNIdentity: plmn, CellID: p.CellID},
-		TAI:                s1ap.TAI{PLMNIdentity: plmn, TAC: s1ap.TAC(p.TAC)},
+		TAI:                s1ap.TAI{PLMNIdentity: plmn, TAC: s1ap.TAC(tac)},
 		UESecurityCapabilities: s1ap.UESecurityCapabilities{
 			EncryptionAlgorithms:          p.EncryptionAlgorithms,
 			IntegrityProtectionAlgorithms: p.IntegrityProtectionAlgorithms,

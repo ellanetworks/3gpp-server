@@ -4,188 +4,106 @@
 package nas
 
 import (
-	"encoding/hex"
+	"bytes"
+	"errors"
 	"fmt"
 
 	gonas "github.com/free5gc/nas"
 	"github.com/free5gc/nas/nasMessage"
 	"github.com/free5gc/nas/security"
-
-	"github.com/ellanetworks/3gpp-server/internal/crypto"
-	"github.com/ellanetworks/3gpp-server/internal/store"
 )
 
-type EncodeOption func(*encodeOptions)
+var ErrMACMismatch = errors.New("nas: NAS-MAC mismatch")
 
-type encodeOptions struct {
-	corruptMAC    bool
-	countOverride *uint32
+// SecurityHeader returns the 5GS security header type of a NAS PDU (TS 24.501 §9.3).
+func SecurityHeader(message []byte) (uint8, error) {
+	if len(message) < 2 {
+		return 0, fmt.Errorf("nas: NAS PDU too short: %d bytes", len(message))
+	}
+
+	return gonas.GetSecurityHeaderType(message) & 0x0f, nil
 }
 
-func WithCorruptMAC() EncodeOption {
-	return func(o *encodeOptions) { o.corruptMAC = true }
+// PeekProtectedPayload returns the inner NAS message of a secured PDU without verifying the
+// NAS-MAC, so a Security Mode Command's algorithms can be read before their keys exist.
+func PeekProtectedPayload(message []byte) ([]byte, error) {
+	if len(message) < 7 {
+		return nil, fmt.Errorf("nas: secured NAS too short: %d bytes", len(message))
+	}
+
+	inner := make([]byte, len(message)-7)
+	copy(inner, message[7:])
+
+	return inner, nil
 }
 
-// WithNASCountOverride sets the COUNT written into the message; the UE's own counter still advances.
-func WithNASCountOverride(count uint32) EncodeOption {
-	return func(o *encodeOptions) { o.countOverride = &count }
-}
-
-func EncodeNasPduWithSecurity(ue *store.UEContext, pdu []byte, securityHeaderType uint8, opts ...EncodeOption) ([]byte, error) {
+// Protect wraps a plain 5GS NAS message in the security wrapper at the given COUNT (TS 24.501 §9.1.1).
+func Protect(plain []byte, sht uint8, count uint32, cipheringAlg, integrityAlg uint8, knasEnc, knasInt [16]byte) ([]byte, error) {
 	m := gonas.NewMessage()
-	if err := m.PlainNasDecode(&pdu); err != nil {
+	if err := m.PlainNasDecode(&plain); err != nil {
 		return nil, fmt.Errorf("nas: plain NAS decode: %w", err)
 	}
 
 	m.SecurityHeader = gonas.SecurityHeader{
 		ProtocolDiscriminator: nasMessage.Epd5GSMobilityManagementMessage,
-		SecurityHeaderType:    securityHeaderType,
+		SecurityHeaderType:    sht,
 	}
 
-	return nasEncode(ue, m, securityHeaderType, opts...)
-}
-
-func nasEncode(ue *store.UEContext, msg *gonas.Message, securityHeaderType uint8, opts ...EncodeOption) ([]byte, error) {
-	var o encodeOptions
-	for _, opt := range opts {
-		opt(&o)
-	}
-
-	if !ue.SecurityContextAvailable && len(ue.Kamf) == 0 {
-		return nil, fmt.Errorf("nas: no security context available")
-	}
-
-	if securityHeaderType == gonas.SecurityHeaderTypeIntegrityProtectedWithNew5gNasSecurityContext ||
-		securityHeaderType == gonas.SecurityHeaderTypeIntegrityProtectedAndCipheredWithNew5gNasSecurityContext {
-		ue.ULCount = 0
-		ue.DLCount = 0
-	}
-
-	count := ue.NextUL()
-	if o.countOverride != nil {
-		count = *o.countOverride
-	}
-
-	sequenceNumber := uint8(count & 0xff)
-
-	payload, err := msg.PlainNasEncode()
+	payload, err := m.PlainNasEncode()
 	if err != nil {
 		return nil, fmt.Errorf("nas: plain NAS encode: %w", err)
 	}
 
-	if securityHeaderType != gonas.SecurityHeaderTypeIntegrityProtected &&
-		securityHeaderType != gonas.SecurityHeaderTypeIntegrityProtectedWithNew5gNasSecurityContext {
-		if err = security.NASEncrypt(ue.CipheringAlg, ue.KnasEnc, count, security.Bearer3GPP,
-			security.DirectionUplink, payload); err != nil {
+	if ciphered(sht) {
+		if err = security.NASEncrypt(cipheringAlg, knasEnc, count, security.Bearer3GPP, security.DirectionUplink, payload); err != nil {
 			return nil, fmt.Errorf("nas: NAS encrypt: %w", err)
 		}
 	}
 
-	payload = append([]byte{sequenceNumber}, payload...)
+	payload = append([]byte{uint8(count & 0xff)}, payload...)
 
-	mac32, err := security.NASMacCalculate(ue.IntegrityAlg, ue.KnasInt, count, security.Bearer3GPP, security.DirectionUplink, payload)
+	mac, err := security.NASMacCalculate(integrityAlg, knasInt, count, security.Bearer3GPP, security.DirectionUplink, payload)
 	if err != nil {
 		return nil, fmt.Errorf("nas: NAS MAC: %w", err)
 	}
 
-	payload = append(mac32, payload...)
-	msgSecurityHeader := []byte{msg.ProtocolDiscriminator, msg.SecurityHeaderType}
-	payload = append(msgSecurityHeader, payload...)
+	payload = append(mac, payload...)
 
-	// The 5GS security header is 2 octets, so the NAS-MAC's first octet is at index 2.
-	if o.corruptMAC && len(payload) >= 7 {
-		payload[2] ^= 0xff
-	}
-
-	ue.LastUplinkNAS = payload
-
-	return payload, nil
+	return append([]byte{nasMessage.Epd5GSMobilityManagementMessage, sht}, payload...), nil
 }
 
-func DecodeSecuredNAS(ue *store.UEContext, message []byte) (*NASResponse, error) {
-	if len(message) == 0 {
-		return nil, fmt.Errorf("nas: empty NAS PDU")
-	}
-
-	resp := &NASResponse{
-		RawHex: hex.EncodeToString(message),
-	}
-
-	secHeaderType := gonas.GetSecurityHeaderType(message) & 0x0f
-	resp.SecurityHeaderType = securityHeaderTypeToString(secHeaderType)
-
-	if secHeaderType == gonas.SecurityHeaderTypePlainNas {
-		return Decode(message)
-	}
-
+// Unprotect verifies the downlink NAS-MAC, decrypts, and returns the recovered plain 5GS NAS
+// message; it returns the message with ErrMACMismatch when the MAC does not verify (TS 24.501 §9.1.1).
+func Unprotect(message []byte, count uint32, cipheringAlg, integrityAlg uint8, knasEnc, knasInt [16]byte) ([]byte, error) {
 	if len(message) < 7 {
 		return nil, fmt.Errorf("nas: secured NAS too short: %d bytes", len(message))
 	}
 
-	sequenceNumber := message[6]
-	payload := make([]byte, len(message)-7)
-	copy(payload, message[7:])
+	receivedMAC := message[2:6]
 
-	cph := false
-	newSecurityContext := false
+	macInput := make([]byte, len(message)-6)
+	copy(macInput, message[6:])
 
-	switch secHeaderType {
-	case gonas.SecurityHeaderTypeIntegrityProtected:
-	case gonas.SecurityHeaderTypeIntegrityProtectedAndCiphered:
-		cph = true
-	case gonas.SecurityHeaderTypeIntegrityProtectedWithNew5gNasSecurityContext:
-		newSecurityContext = true
-	case gonas.SecurityHeaderTypeIntegrityProtectedAndCipheredWithNew5gNasSecurityContext:
-		cph = true
-		newSecurityContext = true
+	mac, err := security.NASMacCalculate(integrityAlg, knasInt, count, security.Bearer3GPP, security.DirectionDownlink, macInput)
+	if err != nil {
+		return nil, fmt.Errorf("nas: NAS MAC: %w", err)
 	}
 
-	ue.NextDL(sequenceNumber)
-
-	if cph && ue.SecurityContextAvailable {
-		if err := security.NASEncrypt(ue.CipheringAlg, ue.KnasEnc, ue.DLCount, security.Bearer3GPP,
-			security.DirectionDownlink, payload); err != nil {
+	inner := macInput[1:]
+	if ciphered(gonas.GetSecurityHeaderType(message) & 0x0f) {
+		if err := security.NASEncrypt(cipheringAlg, knasEnc, count, security.Bearer3GPP, security.DirectionDownlink, inner); err != nil {
 			return nil, fmt.Errorf("nas: NAS decrypt: %w", err)
 		}
 	}
 
-	m := new(gonas.Message)
-	payloadCopy := make([]byte, len(payload))
-	copy(payloadCopy, payload)
-
-	if err := m.PlainNasDecode(&payloadCopy); err != nil {
-		return nil, fmt.Errorf("nas: NAS decode after decrypt: %w", err)
+	if !bytes.Equal(mac, receivedMAC) {
+		return inner, ErrMACMismatch
 	}
 
-	if newSecurityContext && m.GmmMessage != nil {
-		if m.GmmHeader.GetMessageType() == gonas.MsgTypeSecurityModeCommand {
-			ue.CipheringAlg = m.SelectedNASSecurityAlgorithms.GetTypeOfCipheringAlgorithm()
-			ue.IntegrityAlg = m.SelectedNASSecurityAlgorithms.GetTypeOfIntegrityProtectionAlgorithm()
+	return inner, nil
+}
 
-			var err error
-			if ue.KnasEnc, ue.KnasInt, err = crypto.Derive5GNASKeys(ue.Kamf, ue.CipheringAlg, ue.IntegrityAlg); err != nil {
-				return nil, fmt.Errorf("nas: derive algorithm keys: %w", err)
-			}
-
-			ue.DLCount = 0
-			ue.SecurityContextAvailable = true
-		}
-	}
-
-	if m.GmmMessage == nil {
-		messageType, err := unknownMessageType(m)
-		if err != nil {
-			return nil, err
-		}
-
-		resp.MessageType = messageType
-
-		return resp, nil
-	}
-
-	if err := decodeGmm(m, resp); err != nil {
-		return nil, err
-	}
-
-	return resp, nil
+func ciphered(sht uint8) bool {
+	return sht == gonas.SecurityHeaderTypeIntegrityProtectedAndCiphered ||
+		sht == gonas.SecurityHeaderTypeIntegrityProtectedAndCipheredWithNew5gNasSecurityContext
 }

@@ -354,7 +354,7 @@ paths:
       summary: Get the S1-U GTP-U tunnel state for a UE's EPS bearer
       description: |
         Returns the captured tunnel for the selected bearer (the default bearer
-        when `ebi` is absent): the S-GW uplink endpoint (upf_ip, ul_teid), the
+        when `ebi` is absent): the S-GW uplink endpoint (sgw_ip, ul_teid), the
         eNB downlink TEID (dl_teid), and the UE IP (ue_ip). Populated when the
         bearer was established on a GTP-U-enabled eNB.
       parameters:
@@ -615,10 +615,10 @@ paths:
       - $ref: "#/components/parameters/enb_id"
     post:
       operationId: sendENBGTPUEcho
-      summary: Send a GTP-U Echo Request to the S-GW/UPF (S1-U path management)
+      summary: Send a GTP-U Echo Request to the S-GW (S1-U path management)
       description: |
         Sends a GTP-U Echo Request (TS 29.281 §7.2.1) from the eNB's S1-U endpoint
-        to upf_ip and returns the Echo Response. Requires the eNB to have been
+        to sgw_ip and returns the Echo Response. Requires the eNB to have been
         created with enable_gtpu.
       requestBody:
         required: true
@@ -626,9 +626,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [upf_ip]
+              required: [sgw_ip]
               properties:
-                upf_ip: { type: string, description: "S-GW/UPF S1-U IP to echo." }
+                sgw_ip: { type: string, description: "S-GW S1-U IP to echo." }
                 timeout_ms: { type: integer, description: "How long to wait. Default 5000." }
       responses:
         "200": { description: "Echo Response received." }
@@ -1230,6 +1230,16 @@ components:
             Open the SCTP association without sending an NG Setup Request,
             modelling an NG-RAN node that has not completed NG Setup (TS 38.413
             §8.7.1.1). The response carries no ng_setup_response.
+        raw_ngap_pdu:
+          type: string
+          description: Hex NGAP PDU sent verbatim instead of an NG Setup Request.
+        wait_for:
+          type: array
+          description: NGAP message types to wait for. Default NGSetupResponse/NGSetupFailure/ErrorIndication.
+          items: { type: string }
+        timeout_ms:
+          type: integer
+          description: How long to wait for the response. Default 5000.
         enable_gtpu:
           type: boolean
           description: >
@@ -1505,6 +1515,9 @@ components:
             Override the eNB-UE-S1AP-ID in the S1AP wrapper of every uplink message
             this UE sends — on its own it pairs a valid MME-UE-S1AP-ID with an
             inconsistent eNB-UE-S1AP-ID (TS 36.413 §10.6).
+        rrc_establishment_cause:
+          type: integer
+          description: Override RRC establishment cause in InitialUEMessage (attach_request only).
         replay_last:
           type: boolean
           description: On inject_nas, resend this UE's last uplink NAS PDU (replay test).
@@ -1784,7 +1797,7 @@ components:
         message_type:
           type: string
           description: NAS message to send.
-          enum: [registration_request, authentication_response, security_mode_complete, registration_complete, pdu_session_establishment_request, deregistration_request, ue_context_release_request, service_request, identity_response, pdu_session_release_request, pdu_session_release_complete, pdu_session_modification_request, pdu_session_modification_complete, pdu_session_modification_command_reject, status_5gsm, authentication_failure, security_mode_reject, handover_required, handover_cancel, ran_status_transfer, inject_nas, ue_capability_info, error_indication]
+          enum: [registration_request, authentication_response, security_mode_complete, registration_complete, pdu_session_establishment_request, deregistration_request, ue_context_release_request, service_request, identity_response, pdu_session_release_request, pdu_session_release_complete, pdu_session_modification_request, pdu_session_modification_complete, pdu_session_modification_command_reject, status_5gsm, authentication_failure, security_mode_reject, handover_required, handover_cancel, ran_status_transfer, inject_nas, ue_capability_info, error_indication, initial_context_setup_failure]
         raw_nas_pdu:
           type: string
           description: |

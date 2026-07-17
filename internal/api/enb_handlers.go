@@ -33,21 +33,17 @@ func (h *Handler) CreateENB(w http.ResponseWriter, r *http.Request) {
 
 	raw := req.RawS1APPDU != nil
 
-	var tac uint64
 	if req.TAC != "" {
-		parsed, err := strconv.ParseUint(req.TAC, 16, 16)
-		if err != nil {
+		if _, err := strconv.ParseUint(req.TAC, 16, 16); err != nil {
 			writeError(w, http.StatusBadRequest, fmt.Sprintf("tac must be a 2-octet hex string: %v", err))
 			return
 		}
-
-		tac = parsed
 	} else if !raw {
 		writeError(w, http.StatusBadRequest, "tac is required")
 		return
 	}
 
-	encoded, err := encodeS1SetupAttempt(&req, uint16(tac))
+	encoded, err := encodeS1SetupAttempt(&req)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -64,7 +60,7 @@ func (h *Handler) CreateENB(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	enb := h.Store.CreateENB(req.MCC, req.MNC, uint16(tac), req.ENBID, req.Name)
+	enb := h.Store.CreateENB(req.MCC, req.MNC, req.TAC, req.ENBID, req.Name)
 	enb.N3Addr = localAddr
 	h.S1APTransports[enb.ID] = t
 
@@ -127,7 +123,7 @@ func (h *Handler) CreateENB(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func encodeS1SetupAttempt(req *CreateENBRequest, tac uint16) ([]byte, error) {
+func encodeS1SetupAttempt(req *CreateENBRequest) ([]byte, error) {
 	if req.RawS1APPDU != nil {
 		b, err := hex.DecodeString(*req.RawS1APPDU)
 		if err != nil {
@@ -142,7 +138,7 @@ func encodeS1SetupAttempt(req *CreateENBRequest, tac uint16) ([]byte, error) {
 		MNC:     req.MNC,
 		ENBID:   req.ENBID,
 		ENBName: req.Name,
-		TAC:     tac,
+		TAC:     req.TAC,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("s1ap encode: %v", err)
@@ -162,7 +158,7 @@ func (h *Handler) GetENB(w http.ResponseWriter, r *http.Request) {
 		ID:    enb.ID,
 		MCC:   enb.MCC,
 		MNC:   enb.MNC,
-		TAC:   fmt.Sprintf("%04x", enb.TAC),
+		TAC:   enb.TAC,
 		ENBID: enb.ENBID,
 		Name:  enb.Name,
 	})

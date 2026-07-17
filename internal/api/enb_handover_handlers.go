@@ -35,28 +35,25 @@ func (h *Handler) SendENBS1AP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.RawS1APPDU != nil {
-		h.handleRawS1AP(w, r, t, &req)
-		return
-	}
-
-	if req.MessageType == "path_switch_request" {
-		h.handleENBPathSwitchRequest(w, r, enb, t, &req)
-		return
-	}
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
+	defer cancel()
 
 	var (
 		resp *SendENBNASResponse
 		herr error
 	)
 
-	switch req.MessageType {
-	case "handover_request_acknowledge":
-		resp, herr = h.handoverRequestAcknowledge(enb, t, &req)
-	case "handover_notify":
-		resp, herr = h.handoverNotify(enb, t, &req)
-	case "handover_failure":
-		resp, herr = h.handoverFailure(t, &req)
+	switch {
+	case req.RawS1APPDU != nil:
+		resp, herr = handleENBRawS1AP(ctx, t, &req)
+	case req.MessageType == "path_switch_request":
+		resp, herr = handleENBPathSwitchRequest(ctx, enb, t, &req)
+	case req.MessageType == "handover_request_acknowledge":
+		resp, herr = handleENBHandoverRequestAcknowledge(enb, t, &req)
+	case req.MessageType == "handover_notify":
+		resp, herr = handleENBHandoverNotify(enb, t, &req)
+	case req.MessageType == "handover_failure":
+		resp, herr = handleENBHandoverFailure(t, &req)
 	default:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unsupported message_type %q", req.MessageType))
 		return
@@ -70,44 +67,35 @@ func (h *Handler) SendENBS1AP(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-func (h *Handler) handleRawS1AP(w http.ResponseWriter, r *http.Request, t *transport.S1APTransport, req *SendENBS1APRequest) {
+func handleENBRawS1AP(ctx context.Context, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBNASResponse, error) {
 	pdu, err := hex.DecodeString(*req.RawS1APPDU)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("decode raw_s1ap_pdu: %v", err))
-		return
+		return nil, httpErrorf(http.StatusBadRequest, "decode raw_s1ap_pdu: %v", err)
 	}
 
 	if err := t.Send(pdu, false); err != nil {
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
-		return
+		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
 	}
 
 	if len(req.WaitFor) == 0 {
-		writeJSON(w, http.StatusOK, SendENBNASResponse{})
-		return
+		return &SendENBNASResponse{}, nil
 	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
-	defer cancel()
 
 	resp, err := t.WaitForMessage(ctx, req.WaitFor...)
 	if err != nil {
-		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for %v: %v", req.WaitFor, err))
-		return
+		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for %v: %v", req.WaitFor, err)
 	}
 
-	writeJSON(w, http.StatusOK, SendENBNASResponse{S1AP: resp})
+	return &SendENBNASResponse{S1AP: resp}, nil
 }
 
-func (h *Handler) handleENBPathSwitchRequest(w http.ResponseWriter, r *http.Request, enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) {
+func handleENBPathSwitchRequest(ctx context.Context, enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBNASResponse, error) {
 	if req.MMEUES1APID == nil || req.ENBUES1APID == nil {
-		writeError(w, http.StatusBadRequest, "mme_ue_s1ap_id and enb_ue_s1ap_id are required")
-		return
+		return nil, httpErrorf(http.StatusBadRequest, "mme_ue_s1ap_id and enb_ue_s1ap_id are required")
 	}
 
 	if len(req.ERABs) == 0 {
-		writeError(w, http.StatusBadRequest, "erabs is required for path_switch_request")
-		return
+		return nil, httpErrorf(http.StatusBadRequest, "erabs is required for path_switch_request")
 	}
 
 	erab := req.ERABs[0]
@@ -134,33 +122,26 @@ func (h *Handler) handleENBPathSwitchRequest(w http.ResponseWriter, r *http.Requ
 		IntegrityProtectionAlgorithms: uint16(netcap[1]<<1) << 8,
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build PathSwitchRequest: %v", err))
-		return
+		return nil, httpErrorf(http.StatusInternalServerError, "build PathSwitchRequest: %v", err)
 	}
 
 	if err := t.Send(encoded, false); err != nil {
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
-		return
+		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
 	}
 
 	if len(req.WaitFor) == 0 {
-		writeJSON(w, http.StatusOK, SendENBNASResponse{})
-		return
+		return &SendENBNASResponse{}, nil
 	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
-	defer cancel()
 
 	resp, err := t.WaitForMessage(ctx, req.WaitFor...)
 	if err != nil {
-		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for %v: %v", req.WaitFor, err))
-		return
+		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for %v: %v", req.WaitFor, err)
 	}
 
-	writeJSON(w, http.StatusOK, SendENBNASResponse{S1AP: resp})
+	return &SendENBNASResponse{S1AP: resp}, nil
 }
 
-func (h *Handler) handoverRequestAcknowledge(enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBNASResponse, error) {
+func handleENBHandoverRequestAcknowledge(enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBNASResponse, error) {
 	if req.MMEUES1APID == nil || req.ENBUES1APID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "mme_ue_s1ap_id and enb_ue_s1ap_id are required")
 	}
@@ -206,7 +187,7 @@ func (h *Handler) handoverRequestAcknowledge(enb *store.ENBContext, t *transport
 	return &SendENBNASResponse{}, nil
 }
 
-func (h *Handler) handoverNotify(enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBNASResponse, error) {
+func handleENBHandoverNotify(enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBNASResponse, error) {
 	if req.MMEUES1APID == nil || req.ENBUES1APID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "mme_ue_s1ap_id and enb_ue_s1ap_id are required")
 	}
@@ -235,7 +216,7 @@ func (h *Handler) handoverNotify(enb *store.ENBContext, t *transport.S1APTranspo
 	return &SendENBNASResponse{}, nil
 }
 
-func (h *Handler) handoverFailure(t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBNASResponse, error) {
+func handleENBHandoverFailure(t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBNASResponse, error) {
 	if req.MMEUES1APID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "mme_ue_s1ap_id is required for handover_failure")
 	}
@@ -257,12 +238,12 @@ func (h *Handler) handoverFailure(t *transport.S1APTransport, req *SendENBS1APRe
 	return &SendENBNASResponse{}, nil
 }
 
-func (h *Handler) handoverRequired(ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBHandoverRequired(st *store.Store, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	if req.TargetENBID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "target_enb_id is required for handover_required")
 	}
 
-	target, err := h.Store.GetENB(*req.TargetENBID)
+	target, err := st.GetENB(*req.TargetENBID)
 	if err != nil {
 		return nil, httpErrorf(http.StatusNotFound, "target enb not found: %v", err)
 	}
@@ -287,7 +268,7 @@ func (h *Handler) handoverRequired(ue *store.UEEPSContext, t *transport.S1APTran
 	return &SendENBNASResponse{}, nil
 }
 
-func (h *Handler) handoverCancel(ctx context.Context, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBHandoverCancel(ctx context.Context, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	cause := s1ap.CauseRadioNetworkHandoverCancelled
 	if req.HandoverCancelCause != nil {
 		cause = *req.HandoverCancelCause
@@ -310,7 +291,7 @@ func (h *Handler) handoverCancel(ctx context.Context, ue *store.UEEPSContext, t 
 	return &SendENBNASResponse{S1AP: resp}, nil
 }
 
-func (h *Handler) enbStatusTransfer(ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBEnbStatusTransfer(ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	var container []byte
 
 	if req.StatusTransferContainer != nil {

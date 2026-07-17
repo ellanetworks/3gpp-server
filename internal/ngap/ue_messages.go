@@ -205,23 +205,34 @@ type InitialUEMessageOverrides struct {
 	RanUeNgapID           *int64
 }
 
-func BuildInitialUEMessageFromState(ranUeNgapID int64, nasPDU []byte, mcc, mnc, tac, gnbID string, guti *FiveGSTMSIFromGUTI, overrides *InitialUEMessageOverrides) (*NGAPMessage, error) {
-	plmnID, err := encodePLMN(mcc, mnc)
+type InitialUEMessageFromStateParams struct {
+	RanUeNgapID int64
+	NASPDU      []byte
+	MCC         string
+	MNC         string
+	TAC         string
+	GnbID       string
+	GUTI        *FiveGSTMSIFromGUTI
+	Overrides   *InitialUEMessageOverrides
+}
+
+func BuildInitialUEMessageFromState(p InitialUEMessageFromStateParams) (*NGAPMessage, error) {
+	plmnID, err := encodePLMN(p.MCC, p.MNC)
 	if err != nil {
 		return nil, fmt.Errorf("PLMN: %w", err)
 	}
 
 	plmnHex := hex.EncodeToString(plmnID)
-	nasPDUHex := hex.EncodeToString(nasPDU)
+	nasPDUHex := hex.EncodeToString(p.NASPDU)
 
-	effectiveRanID := ranUeNgapID
-	if overrides != nil && overrides.RanUeNgapID != nil {
-		effectiveRanID = *overrides.RanUeNgapID
+	effectiveRanID := p.RanUeNgapID
+	if p.Overrides != nil && p.Overrides.RanUeNgapID != nil {
+		effectiveRanID = *p.Overrides.RanUeNgapID
 	}
 
 	rrcCause := int64(ngapType.RRCEstablishmentCausePresentMoSignalling)
-	if overrides != nil && overrides.RRCEstablishmentCause != nil {
-		rrcCause = *overrides.RRCEstablishmentCause
+	if p.Overrides != nil && p.Overrides.RRCEstablishmentCause != nil {
+		rrcCause = *p.Overrides.RRCEstablishmentCause
 	}
 
 	ies := []IE{
@@ -243,11 +254,11 @@ func BuildInitialUEMessageFromState(ranUeNgapID int64, nasPDU []byte, mcc, mnc, 
 				NR: &UserLocationInformationNRJSON{
 					NRCGI: NRCGIJSON{
 						PLMNIdentity:   plmnHex,
-						NRCellIdentity: gnbID,
+						NRCellIdentity: p.GnbID,
 					},
 					TAI: TAIJSON{
 						PLMNIdentity: plmnHex,
-						TAC:          tac,
+						TAC:          p.TAC,
 					},
 				},
 			},
@@ -259,22 +270,22 @@ func BuildInitialUEMessageFromState(ranUeNgapID int64, nasPDU []byte, mcc, mnc, 
 		},
 	}
 
-	if guti != nil {
+	if p.GUTI != nil {
 		ies = append(ies, IE{
 			ID:          ngapType.ProtocolIEIDFiveGSTMSI,
 			Criticality: "reject",
 			FiveGSTMSI: &FiveGSTMSIJSON{
-				AMFSetID:   guti.AMFSetID,
-				AMFPointer: guti.AMFPointer,
-				FiveGTMSI:  guti.FiveGTMSI,
+				AMFSetID:   p.GUTI.AMFSetID,
+				AMFPointer: p.GUTI.AMFPointer,
+				FiveGTMSI:  p.GUTI.FiveGTMSI,
 			},
 		})
 	}
 
-	if overrides == nil || overrides.UEContextRequest == nil || *overrides.UEContextRequest >= 0 {
+	if p.Overrides == nil || p.Overrides.UEContextRequest == nil || *p.Overrides.UEContextRequest >= 0 {
 		ueContextReq := int64(ngapType.UEContextRequestPresentRequested)
-		if overrides != nil && overrides.UEContextRequest != nil {
-			ueContextReq = *overrides.UEContextRequest
+		if p.Overrides != nil && p.Overrides.UEContextRequest != nil {
+			ueContextReq = *p.Overrides.UEContextRequest
 		}
 
 		ies = append(ies, IE{
@@ -303,27 +314,40 @@ type UplinkNASTransportOverrides struct {
 	RanUeNgapID *int64
 }
 
-func BuildUplinkNASTransport(amfUeNgapID, ranUeNgapID int64, nasPDU []byte, mcc, mnc, tac, gnbID string, overrides *UplinkNASTransportOverrides) ([]byte, error) {
-	if overrides != nil && overrides.AmfUeNgapID != nil {
-		amfUeNgapID = *overrides.AmfUeNgapID
+type UplinkNASTransportParams struct {
+	AmfUeNgapID int64
+	RanUeNgapID int64
+	NASPDU      []byte
+	MCC         string
+	MNC         string
+	TAC         string
+	GnbID       string
+	Overrides   *UplinkNASTransportOverrides
+}
+
+func BuildUplinkNASTransport(p UplinkNASTransportParams) ([]byte, error) {
+	amfUeNgapID := p.AmfUeNgapID
+	if p.Overrides != nil && p.Overrides.AmfUeNgapID != nil {
+		amfUeNgapID = *p.Overrides.AmfUeNgapID
 	}
 
-	if overrides != nil && overrides.RanUeNgapID != nil {
-		ranUeNgapID = *overrides.RanUeNgapID
+	ranUeNgapID := p.RanUeNgapID
+	if p.Overrides != nil && p.Overrides.RanUeNgapID != nil {
+		ranUeNgapID = *p.Overrides.RanUeNgapID
 	}
-	plmnBytes, err := encodePLMN(mcc, mnc)
+	plmnBytes, err := encodePLMN(p.MCC, p.MNC)
 	if err != nil {
 		return nil, fmt.Errorf("PLMN: %w", err)
 	}
 
 	plmnID := ngapType.PLMNIdentity{Value: plmnBytes}
 
-	nrCellID, err := nrCellIdentity(gnbID)
+	nrCellID, err := nrCellIdentity(p.GnbID)
 	if err != nil {
 		return nil, fmt.Errorf("NRCellIdentity: %w", err)
 	}
 
-	tacBytes, err := tacInBytes(tac)
+	tacBytes, err := tacInBytes(p.TAC)
 	if err != nil {
 		return nil, fmt.Errorf("TAC: %w", err)
 	}
@@ -355,7 +379,7 @@ func BuildUplinkNASTransport(amfUeNgapID, ranUeNgapID int64, nasPDU []byte, mcc,
 	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentReject,
 		ngapType.UplinkNASTransportIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
 	add(ngapType.ProtocolIEIDNASPDU, ngapType.CriticalityPresentReject,
-		ngapType.UplinkNASTransportIEsPresentNASPDU).NASPDU = &ngapType.NASPDU{Value: nasPDU}
+		ngapType.UplinkNASTransportIEsPresentNASPDU).NASPDU = &ngapType.NASPDU{Value: p.NASPDU}
 	add(ngapType.ProtocolIEIDUserLocationInformation, ngapType.CriticalityPresentIgnore,
 		ngapType.UplinkNASTransportIEsPresentUserLocationInformation).UserLocationInformation = &ngapType.UserLocationInformation{
 		Present: ngapType.UserLocationInformationPresentUserLocationInformationNR,
@@ -406,7 +430,15 @@ func buildPDUSessionResourceSetupResponseTransfer(teid uint32, ip string) ([]byt
 	return buf, nil
 }
 
-func BuildPDUSessionResourceSetupResponse(amfUeNgapID, ranUeNgapID, pduSessionID int64, dlTeid uint32, dlIP string) ([]byte, error) {
+type PDUSessionResourceSetupResponseParams struct {
+	AmfUeNgapID  int64
+	RanUeNgapID  int64
+	PDUSessionID int64
+	DLTeid       uint32
+	DLIP         string
+}
+
+func BuildPDUSessionResourceSetupResponse(p PDUSessionResourceSetupResponseParams) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome
 	pdu.SuccessfulOutcome = new(ngapType.SuccessfulOutcome)
@@ -430,18 +462,18 @@ func BuildPDUSessionResourceSetupResponse(amfUeNgapID, ranUeNgapID, pduSessionID
 	}
 
 	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentIgnore,
-		ngapType.PDUSessionResourceSetupResponseIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: amfUeNgapID}
+		ngapType.PDUSessionResourceSetupResponseIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: p.AmfUeNgapID}
 	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentIgnore,
-		ngapType.PDUSessionResourceSetupResponseIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
+		ngapType.PDUSessionResourceSetupResponseIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: p.RanUeNgapID}
 
-	transfer, err := buildPDUSessionResourceSetupResponseTransfer(dlTeid, dlIP)
+	transfer, err := buildPDUSessionResourceSetupResponseTransfer(p.DLTeid, p.DLIP)
 	if err != nil {
 		return nil, err
 	}
 
 	setupList := &ngapType.PDUSessionResourceSetupListSURes{}
 	setupList.List = append(setupList.List, ngapType.PDUSessionResourceSetupItemSURes{
-		PDUSessionID:                            ngapType.PDUSessionID{Value: pduSessionID},
+		PDUSessionID:                            ngapType.PDUSessionID{Value: p.PDUSessionID},
 		PDUSessionResourceSetupResponseTransfer: transfer,
 	})
 

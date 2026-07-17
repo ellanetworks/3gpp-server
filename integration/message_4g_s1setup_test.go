@@ -44,7 +44,7 @@ func validS1SetupPDU(t *testing.T) []byte {
 	t.Helper()
 
 	b, err := s1ap.BuildS1SetupRequest(&s1ap.S1SetupRequestParams{
-		MCC: "001", MNC: "01", ENBID: 7, ENBName: "fuzz-seed", TAC: 1,
+		MCC: "001", MNC: "01", ENBID: 7, ENBName: "fuzz-seed", TAC: "0001",
 	})
 	if err != nil {
 		t.Fatalf("build seed S1 Setup: %v", err)
@@ -240,7 +240,7 @@ func Test4GS1SetupPLMNFlex(t *testing.T) {
 		resp := sendS1SetupPDU(t, &s1ap.S1SetupRequestParams{
 			MCC: "001", MNC: "01", ENBID: 0x100, ENBName: "enb-flex-match",
 			SupportedTAs: []s1ap.SupportedTAParams{{
-				TAC:            1,
+				TAC:            "0001",
 				BroadcastPLMNs: []s1ap.PLMNParams{foreignA, served, foreignB},
 			}},
 		})
@@ -251,7 +251,7 @@ func Test4GS1SetupPLMNFlex(t *testing.T) {
 		resp := sendS1SetupPDU(t, &s1ap.S1SetupRequestParams{
 			MCC: "310", MNC: "410", ENBID: 0x101, ENBName: "enb-flex-none",
 			SupportedTAs: []s1ap.SupportedTAParams{{
-				TAC:            1,
+				TAC:            "0001",
 				BroadcastPLMNs: []s1ap.PLMNParams{foreignA, foreignB},
 			}},
 		})
@@ -275,7 +275,7 @@ func Test4GS1SetupENBIDVariants(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			resp := sendS1SetupPDU(t, &s1ap.S1SetupRequestParams{
 				MCC: "001", MNC: "01", ENBID: tt.id, ENBIDKind: tt.kind,
-				ENBName: "enb-" + strings.ReplaceAll(tt.name, " ", "-"), TAC: 1,
+				ENBName: "enb-" + strings.ReplaceAll(tt.name, " ", "-"), TAC: "0001",
 			})
 			assertS1SetupAccepted(t, resp)
 		})
@@ -287,7 +287,7 @@ func Test4GS1SetupSupportedTAs(t *testing.T) {
 		resp := sendS1SetupPDU(t, &s1ap.S1SetupRequestParams{
 			MCC: "001", MNC: "01", ENBID: 0x200, ENBName: "enb-multi-ta",
 			SupportedTAs: []s1ap.SupportedTAParams{
-				{TAC: 1}, {TAC: 2}, {TAC: 0xABCD},
+				{TAC: "0001"}, {TAC: "0002"}, {TAC: "abcd"},
 			},
 		})
 		assertS1SetupAccepted(t, resp)
@@ -295,7 +295,7 @@ func Test4GS1SetupSupportedTAs(t *testing.T) {
 
 	t.Run("max-length eNB name", func(t *testing.T) {
 		resp := sendS1SetupPDU(t, &s1ap.S1SetupRequestParams{
-			MCC: "001", MNC: "01", ENBID: 0x201, TAC: 1,
+			MCC: "001", MNC: "01", ENBID: 0x201, TAC: "0001",
 			ENBName: strings.Repeat("e", 150),
 		})
 		assertS1SetupAccepted(t, resp)

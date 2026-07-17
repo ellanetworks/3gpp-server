@@ -5,40 +5,15 @@ package store
 
 import "testing"
 
-func TestGNBContextDeleteUEPurgesSessions(t *testing.T) {
-	g := NewGNBContext("g1", "001", "01", "000001", "000001", "gnb", 1, "", nil)
-
-	ue := &UEContext{ID: "ue1", RanUeNgapID: 42}
-	g.CreateUE(ue)
-	g.StorePDUSession(42, &PDUSessionInfo{PDUSessionID: 1})
-
-	if !g.DeleteUE("ue1") {
-		t.Fatal("DeleteUE returned false for an existing UE")
-	}
-
-	if _, ok := g.GetPDUSession(42, 1); ok {
-		t.Error("the session map still holds the deleted UE")
-	}
-
-	if len(g.pduSessions) != 0 {
-		t.Errorf("session map = %d entries, want 0", len(g.pduSessions))
-	}
-}
-
-func TestGNBContextMigrateUEPurgesSourceUnderOldID(t *testing.T) {
+func TestGNBContextMigrateUE(t *testing.T) {
 	src := NewGNBContext("g1", "001", "01", "000001", "000001", "src", 1, "", nil)
 	target := NewGNBContext("g2", "001", "01", "000001", "000002", "target", 1, "", nil)
 
-	ue := &UEContext{ID: "ue1", RanUeNgapID: 42}
+	ue := &UEContext{ID: "ue1", RanUeNgapID: 42, PDUSessions: map[uint8]*PDUSessionInfo{1: {PDUSessionID: 1}}}
 	src.CreateUE(ue)
-	src.StorePDUSession(42, &PDUSessionInfo{PDUSessionID: 1})
 
 	newRan, newAmf := int64(7), int64(99)
 	src.MigrateUE(target, ue, &newRan, &newAmf)
-
-	if len(src.pduSessions) != 0 {
-		t.Errorf("source session map = %d entries, want 0", len(src.pduSessions))
-	}
 
 	if _, ok := src.GetUE("ue1"); ok {
 		t.Error("source still holds the migrated UE")
@@ -55,5 +30,19 @@ func TestGNBContextMigrateUEPurgesSourceUnderOldID(t *testing.T) {
 
 	if got.AmfUeNgapID != newAmf {
 		t.Errorf("AmfUeNgapID = %d, want %d", got.AmfUeNgapID, newAmf)
+	}
+
+	if _, ok := got.PDUSessions[1]; !ok {
+		t.Error("migrated UE lost its PDU session")
+	}
+}
+
+func TestGNBContextAllocateRanUeNgapID(t *testing.T) {
+	g := NewGNBContext("g1", "001", "01", "000001", "000001", "gnb", 1, "", nil)
+
+	for want := int64(1); want <= 3; want++ {
+		if got := g.AllocateRanUeNgapID(); got != want {
+			t.Errorf("AllocateRanUeNgapID() = %d, want %d", got, want)
+		}
 	}
 }

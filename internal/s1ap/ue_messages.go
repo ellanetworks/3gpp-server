@@ -13,12 +13,13 @@ type STMSIParams struct {
 }
 
 type InitialUEMessageParams struct {
-	ENBUES1APID uint32
-	NASPDU      []byte
-	MCC, MNC    string
-	TAC         uint16
-	CellID      uint32
-	STMSI       *STMSIParams
+	ENBUES1APID           uint32
+	NASPDU                []byte
+	MCC, MNC              string
+	TAC                   string
+	CellID                uint32
+	STMSI                 *STMSIParams
+	RRCEstablishmentCause *int64
 }
 
 func BuildInitialUEMessage(p InitialUEMessageParams) ([]byte, error) {
@@ -27,12 +28,22 @@ func BuildInitialUEMessage(p InitialUEMessageParams) ([]byte, error) {
 		return nil, err
 	}
 
+	rrcCause := s1ap.RRCCauseMOSignalling
+	if p.RRCEstablishmentCause != nil {
+		rrcCause = s1ap.RRCEstablishmentCause(*p.RRCEstablishmentCause)
+	}
+
+	tac, err := parseTAC(p.TAC)
+	if err != nil {
+		return nil, err
+	}
+
 	m := &s1ap.InitialUEMessage{
 		ENBUES1APID:           s1ap.ENBUES1APID(p.ENBUES1APID),
 		NASPDU:                p.NASPDU,
-		TAI:                   s1ap.TAI{PLMNIdentity: plmn, TAC: s1ap.TAC(p.TAC)},
+		TAI:                   s1ap.TAI{PLMNIdentity: plmn, TAC: s1ap.TAC(tac)},
 		EUTRANCGI:             s1ap.EUTRANCGI{PLMNIdentity: plmn, CellID: p.CellID},
-		RRCEstablishmentCause: s1ap.RRCCauseMOSignalling,
+		RRCEstablishmentCause: rrcCause,
 	}
 
 	if p.STMSI != nil {
@@ -105,7 +116,7 @@ type UplinkNASTransportParams struct {
 	ENBUES1APID uint32
 	NASPDU      []byte
 	MCC, MNC    string
-	TAC         uint16
+	TAC         string
 	CellID      uint32
 }
 
@@ -115,12 +126,17 @@ func BuildUplinkNASTransport(p UplinkNASTransportParams) ([]byte, error) {
 		return nil, err
 	}
 
+	tac, err := parseTAC(p.TAC)
+	if err != nil {
+		return nil, err
+	}
+
 	m := &s1ap.UplinkNASTransport{
 		MMEUES1APID: s1ap.MMEUES1APID(p.MMEUES1APID),
 		ENBUES1APID: s1ap.ENBUES1APID(p.ENBUES1APID),
 		NASPDU:      p.NASPDU,
 		EUTRANCGI:   s1ap.EUTRANCGI{PLMNIdentity: plmn, CellID: p.CellID},
-		TAI:         s1ap.TAI{PLMNIdentity: plmn, TAC: s1ap.TAC(p.TAC)},
+		TAI:         s1ap.TAI{PLMNIdentity: plmn, TAC: s1ap.TAC(tac)},
 	}
 
 	return m.Marshal()

@@ -59,7 +59,7 @@ func (s *Store) DeleteGNB(id string) error {
 	return nil
 }
 
-func (s *Store) CreateENB(mcc, mnc string, tac uint16, enbID uint32, name string) *ENBContext {
+func (s *Store) CreateENB(mcc, mnc, tac string, enbID uint32, name string) *ENBContext {
 	id := strconv.FormatInt(s.nextID.Add(1), 10)
 	enb := NewENBContext(id, mcc, mnc, tac, enbID, name)
 

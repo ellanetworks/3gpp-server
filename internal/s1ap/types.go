@@ -20,12 +20,12 @@ type S1SetupRequestParams struct {
 	ENBID        uint32
 	ENBIDKind    ENBIDKind
 	ENBName      string
-	TAC          uint16
+	TAC          string
 	SupportedTAs []SupportedTAParams
 }
 
 type SupportedTAParams struct {
-	TAC            uint16
+	TAC            string
 	BroadcastPLMNs []PLMNParams
 }
 

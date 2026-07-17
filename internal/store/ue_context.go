@@ -12,6 +12,17 @@ import (
 	"github.com/free5gc/nas/nasType"
 )
 
+type PDUSessionInfo struct {
+	PDUSessionID uint8
+	N3GnbIP      string
+	DLTeid       uint32
+	QFI          uint8
+
+	ULTeid uint32
+	UPFIP  string
+	UEIP   string
+}
+
 type UEContext struct {
 	ID string
 
@@ -59,6 +70,8 @@ type UEContext struct {
 	PDUSessionType uint8
 	SST            int32
 	SD             string
+
+	PDUSessions map[uint8]*PDUSessionInfo
 
 	Guti *nasType.GUTI5G
 
@@ -186,6 +199,7 @@ func NewUEContext(id string, ranUeNgapID int64, mncLength int, opts *CreateUEOpt
 		SST:                  opts.SST,
 		SD:                   opts.SD,
 		IMEISV:               opts.IMEISV,
+		PDUSessions:          make(map[uint8]*PDUSessionInfo),
 	}
 
 	return ue, nil

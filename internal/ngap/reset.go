@@ -14,7 +14,7 @@ type NGResetConnection struct {
 	RanUeNgapID *int64
 }
 
-func BuildNGReset(connections []NGResetConnection) ([]byte, error) {
+func BuildNGReset(all bool, connections []NGResetConnection) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
 	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
@@ -45,7 +45,7 @@ func BuildNGReset(connections []NGResetConnection) ([]byte, error) {
 
 	resetType := new(ngapType.ResetType)
 
-	if len(connections) == 0 {
+	if all {
 		resetType.Present = ngapType.ResetTypePresentNGInterface
 		resetType.NGInterface = &ngapType.ResetAll{Value: ngapType.ResetAllPresentResetAll}
 	} else {

@@ -30,8 +30,19 @@ type HandoverAdmittedSession struct {
 	RawTransfer  []byte
 }
 
+type HandoverRequiredParams struct {
+	AmfUeNgapID       int64
+	RanUeNgapID       int64
+	TargetGnbID       string
+	MCC               string
+	MNC               string
+	TAC               string
+	PDUSessionIDs     []int64
+	CauseRadioNetwork int64
+}
+
 // The source-to-target container and per-session transfer are opaque to the AMF (TS 38.413 §8.4.1), so placeholders suffice.
-func BuildHandoverRequired(amfUeNgapID, ranUeNgapID int64, targetGnbID, mcc, mnc, tac string, pduSessionIDs []int64, causeRadioNetwork int64) ([]byte, error) {
+func BuildHandoverRequired(p HandoverRequiredParams) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
 	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
@@ -54,10 +65,10 @@ func BuildHandoverRequired(amfUeNgapID, ranUeNgapID int64, targetGnbID, mcc, mnc
 	}
 
 	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentReject,
-		ngapType.HandoverRequiredIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: amfUeNgapID}
+		ngapType.HandoverRequiredIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: p.AmfUeNgapID}
 
 	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentReject,
-		ngapType.HandoverRequiredIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
+		ngapType.HandoverRequiredIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: p.RanUeNgapID}
 
 	add(ngapType.ProtocolIEIDHandoverType, ngapType.CriticalityPresentReject,
 		ngapType.HandoverRequiredIEsPresentHandoverType).HandoverType = &ngapType.HandoverType{Value: ngapType.HandoverTypePresentIntra5gs}
@@ -65,20 +76,20 @@ func BuildHandoverRequired(amfUeNgapID, ranUeNgapID int64, targetGnbID, mcc, mnc
 	add(ngapType.ProtocolIEIDCause, ngapType.CriticalityPresentIgnore,
 		ngapType.HandoverRequiredIEsPresentCause).Cause = &ngapType.Cause{
 		Present:      ngapType.CausePresentRadioNetwork,
-		RadioNetwork: &ngapType.CauseRadioNetwork{Value: aper.Enumerated(causeRadioNetwork)},
+		RadioNetwork: &ngapType.CauseRadioNetwork{Value: aper.Enumerated(p.CauseRadioNetwork)},
 	}
 
-	plmnID, err := encodePLMN(mcc, mnc)
+	plmnID, err := encodePLMN(p.MCC, p.MNC)
 	if err != nil {
 		return nil, fmt.Errorf("target PLMN: %w", err)
 	}
 
-	tacBytes, err := tacInBytes(tac)
+	tacBytes, err := tacInBytes(p.TAC)
 	if err != nil {
 		return nil, fmt.Errorf("target TAC: %w", err)
 	}
 
-	gnbIDBits := ngapConvert.HexToBitString(targetGnbID, 24)
+	gnbIDBits := ngapConvert.HexToBitString(p.TargetGnbID, 24)
 	add(ngapType.ProtocolIEIDTargetID, ngapType.CriticalityPresentReject,
 		ngapType.HandoverRequiredIEsPresentTargetID).TargetID = &ngapType.TargetID{
 		Present: ngapType.TargetIDPresentTargetRANNodeID,
@@ -103,7 +114,7 @@ func BuildHandoverRequired(amfUeNgapID, ranUeNgapID int64, targetGnbID, mcc, mnc
 	}
 
 	list := &ngapType.PDUSessionResourceListHORqd{}
-	for _, id := range pduSessionIDs {
+	for _, id := range p.PDUSessionIDs {
 		list.List = append(list.List, ngapType.PDUSessionResourceItemHORqd{
 			PDUSessionID:             ngapType.PDUSessionID{Value: id},
 			HandoverRequiredTransfer: transfer,
@@ -120,7 +131,14 @@ func BuildHandoverRequired(amfUeNgapID, ranUeNgapID int64, targetGnbID, mcc, mnc
 	return ngap.Encoder(pdu)
 }
 
-func BuildHandoverRequestAcknowledge(amfUeNgapID, ranUeNgapID int64, sessions []HandoverAdmittedSession, failed []int64) ([]byte, error) {
+type HandoverRequestAcknowledgeParams struct {
+	AmfUeNgapID int64
+	RanUeNgapID int64
+	Sessions    []HandoverAdmittedSession
+	Failed      []int64
+}
+
+func BuildHandoverRequestAcknowledge(p HandoverRequestAcknowledgeParams) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome
 	pdu.SuccessfulOutcome = new(ngapType.SuccessfulOutcome)
@@ -143,13 +161,13 @@ func BuildHandoverRequestAcknowledge(amfUeNgapID, ranUeNgapID int64, sessions []
 	}
 
 	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentIgnore,
-		ngapType.HandoverRequestAcknowledgeIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: amfUeNgapID}
+		ngapType.HandoverRequestAcknowledgeIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: p.AmfUeNgapID}
 
 	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentIgnore,
-		ngapType.HandoverRequestAcknowledgeIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
+		ngapType.HandoverRequestAcknowledgeIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: p.RanUeNgapID}
 
 	admitted := &ngapType.PDUSessionResourceAdmittedList{}
-	for _, s := range sessions {
+	for _, s := range p.Sessions {
 		transfer := s.RawTransfer
 		if transfer == nil {
 			var err error
@@ -169,14 +187,14 @@ func BuildHandoverRequestAcknowledge(amfUeNgapID, ranUeNgapID int64, sessions []
 	add(ngapType.ProtocolIEIDPDUSessionResourceAdmittedList, ngapType.CriticalityPresentIgnore,
 		ngapType.HandoverRequestAcknowledgeIEsPresentPDUSessionResourceAdmittedList).PDUSessionResourceAdmittedList = admitted
 
-	if len(failed) > 0 {
+	if len(p.Failed) > 0 {
 		unsuccessful, err := buildHandoverResourceAllocationUnsuccessfulTransfer()
 		if err != nil {
 			return nil, err
 		}
 
 		failedList := &ngapType.PDUSessionResourceFailedToSetupListHOAck{}
-		for _, id := range failed {
+		for _, id := range p.Failed {
 			failedList.List = append(failedList.List, ngapType.PDUSessionResourceFailedToSetupItemHOAck{
 				PDUSessionID: ngapType.PDUSessionID{Value: id},
 				HandoverResourceAllocationUnsuccessfulTransfer: unsuccessful,
@@ -281,6 +299,42 @@ func BuildHandoverFailure(amfUeNgapID, causeRadioNetwork int64) ([]byte, error) 
 	return ngap.Encoder(pdu)
 }
 
+func BuildInitialContextSetupFailure(amfUeNgapID, ranUeNgapID, causeRadioNetwork int64) ([]byte, error) {
+	pdu := ngapType.NGAPPDU{}
+	pdu.Present = ngapType.NGAPPDUPresentUnsuccessfulOutcome
+	pdu.UnsuccessfulOutcome = new(ngapType.UnsuccessfulOutcome)
+
+	uo := pdu.UnsuccessfulOutcome
+	uo.ProcedureCode.Value = ngapType.ProcedureCodeInitialContextSetup
+	uo.Criticality.Value = ngapType.CriticalityPresentReject
+	uo.Value.Present = ngapType.UnsuccessfulOutcomePresentInitialContextSetupFailure
+	uo.Value.InitialContextSetupFailure = new(ngapType.InitialContextSetupFailure)
+
+	ies := &uo.Value.InitialContextSetupFailure.ProtocolIEs
+
+	add := func(id int64, crit aper.Enumerated, present int) *ngapType.InitialContextSetupFailureIEsValue {
+		ie := ngapType.InitialContextSetupFailureIEs{}
+		ie.Id.Value = id
+		ie.Criticality.Value = crit
+		ie.Value.Present = present
+		ies.List = append(ies.List, ie)
+
+		return &ies.List[len(ies.List)-1].Value
+	}
+
+	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentReject,
+		ngapType.InitialContextSetupFailureIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: amfUeNgapID}
+	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentReject,
+		ngapType.InitialContextSetupFailureIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
+	add(ngapType.ProtocolIEIDCause, ngapType.CriticalityPresentIgnore,
+		ngapType.InitialContextSetupFailureIEsPresentCause).Cause = &ngapType.Cause{
+		Present:      ngapType.CausePresentRadioNetwork,
+		RadioNetwork: &ngapType.CauseRadioNetwork{Value: aper.Enumerated(causeRadioNetwork)},
+	}
+
+	return ngap.Encoder(pdu)
+}
+
 func BuildHandoverCancel(amfUeNgapID, ranUeNgapID, causeRadioNetwork int64) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
@@ -378,7 +432,16 @@ func BuildUplinkRANStatusTransfer(amfUeNgapID, ranUeNgapID int64, drbs []DRBStat
 	return ngap.Encoder(pdu)
 }
 
-func BuildHandoverNotify(amfUeNgapID, ranUeNgapID int64, mcc, mnc, tac, gnbID string) ([]byte, error) {
+type HandoverNotifyParams struct {
+	AmfUeNgapID int64
+	RanUeNgapID int64
+	MCC         string
+	MNC         string
+	TAC         string
+	GnbID       string
+}
+
+func BuildHandoverNotify(p HandoverNotifyParams) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
 	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
@@ -401,22 +464,22 @@ func BuildHandoverNotify(amfUeNgapID, ranUeNgapID int64, mcc, mnc, tac, gnbID st
 	}
 
 	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentReject,
-		ngapType.HandoverNotifyIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: amfUeNgapID}
+		ngapType.HandoverNotifyIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: p.AmfUeNgapID}
 
 	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentReject,
-		ngapType.HandoverNotifyIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
+		ngapType.HandoverNotifyIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: p.RanUeNgapID}
 
-	plmnID, err := encodePLMN(mcc, mnc)
+	plmnID, err := encodePLMN(p.MCC, p.MNC)
 	if err != nil {
 		return nil, fmt.Errorf("PLMN: %w", err)
 	}
 
-	tacBytes, err := tacInBytes(tac)
+	tacBytes, err := tacInBytes(p.TAC)
 	if err != nil {
 		return nil, fmt.Errorf("TAC: %w", err)
 	}
 
-	nrCellID, err := nrCellIdentity(gnbID)
+	nrCellID, err := nrCellIdentity(p.GnbID)
 	if err != nil {
 		return nil, fmt.Errorf("NRCellIdentity: %w", err)
 	}

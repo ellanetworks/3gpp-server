@@ -6,9 +6,19 @@ package s1ap
 import (
 	"fmt"
 	"net"
+	"strconv"
 
 	"github.com/ellanetworks/core/s1ap"
 )
+
+func parseTAC(s string) (uint16, error) {
+	v, err := strconv.ParseUint(s, 16, 16)
+	if err != nil {
+		return 0, fmt.Errorf("tac must be a 2-octet hex string: %v", err)
+	}
+
+	return uint16(v), nil
+}
 
 // IPv4 must return in 4-byte form to keep the IE at its 32-bit width (TS 36.414 §5.3).
 func parseTransportAddr(s string) (net.IP, error) {

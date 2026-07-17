@@ -28,7 +28,20 @@ type UESecurityCapabilities struct {
 	EUTRAIntegrity  []byte
 }
 
-func BuildPathSwitchRequest(ranUeNgapID, sourceAmfUeNgapID int64, mcc, mnc, tac, gnbID string, secCaps UESecurityCapabilities, sessions []PathSwitchSession, failed []int64, omitIEs []int64) ([]byte, error) {
+type PathSwitchRequestParams struct {
+	RanUeNgapID       int64
+	SourceAmfUeNgapID int64
+	MCC               string
+	MNC               string
+	TAC               string
+	GnbID             string
+	SecCaps           UESecurityCapabilities
+	Sessions          []PathSwitchSession
+	Failed            []int64
+	OmitIEs           []int64
+}
+
+func BuildPathSwitchRequest(p PathSwitchRequestParams) ([]byte, error) {
 	pdu := ngapType.NGAPPDU{}
 	pdu.Present = ngapType.NGAPPDUPresentInitiatingMessage
 	pdu.InitiatingMessage = new(ngapType.InitiatingMessage)
@@ -51,22 +64,22 @@ func BuildPathSwitchRequest(ranUeNgapID, sourceAmfUeNgapID int64, mcc, mnc, tac,
 	}
 
 	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentReject,
-		ngapType.PathSwitchRequestIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: ranUeNgapID}
+		ngapType.PathSwitchRequestIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: p.RanUeNgapID}
 
 	add(ngapType.ProtocolIEIDSourceAMFUENGAPID, ngapType.CriticalityPresentReject,
-		ngapType.PathSwitchRequestIEsPresentSourceAMFUENGAPID).SourceAMFUENGAPID = &ngapType.AMFUENGAPID{Value: sourceAmfUeNgapID}
+		ngapType.PathSwitchRequestIEsPresentSourceAMFUENGAPID).SourceAMFUENGAPID = &ngapType.AMFUENGAPID{Value: p.SourceAmfUeNgapID}
 
-	plmnID, err := encodePLMN(mcc, mnc)
+	plmnID, err := encodePLMN(p.MCC, p.MNC)
 	if err != nil {
 		return nil, fmt.Errorf("PLMN: %w", err)
 	}
 
-	tacBytes, err := tacInBytes(tac)
+	tacBytes, err := tacInBytes(p.TAC)
 	if err != nil {
 		return nil, fmt.Errorf("TAC: %w", err)
 	}
 
-	nrCellID, err := nrCellIdentity(gnbID)
+	nrCellID, err := nrCellIdentity(p.GnbID)
 	if err != nil {
 		return nil, fmt.Errorf("NRCellIdentity: %w", err)
 	}
@@ -86,14 +99,14 @@ func BuildPathSwitchRequest(ranUeNgapID, sourceAmfUeNgapID int64, mcc, mnc, tac,
 
 	add(ngapType.ProtocolIEIDUESecurityCapabilities, ngapType.CriticalityPresentIgnore,
 		ngapType.PathSwitchRequestIEsPresentUESecurityCapabilities).UESecurityCapabilities = &ngapType.UESecurityCapabilities{
-		NRencryptionAlgorithms:             ngapType.NRencryptionAlgorithms{Value: secBitString(secCaps.NREncryption)},
-		NRintegrityProtectionAlgorithms:    ngapType.NRintegrityProtectionAlgorithms{Value: secBitString(secCaps.NRIntegrity)},
-		EUTRAencryptionAlgorithms:          ngapType.EUTRAencryptionAlgorithms{Value: secBitString(secCaps.EUTRAEncryption)},
-		EUTRAintegrityProtectionAlgorithms: ngapType.EUTRAintegrityProtectionAlgorithms{Value: secBitString(secCaps.EUTRAIntegrity)},
+		NRencryptionAlgorithms:             ngapType.NRencryptionAlgorithms{Value: secBitString(p.SecCaps.NREncryption)},
+		NRintegrityProtectionAlgorithms:    ngapType.NRintegrityProtectionAlgorithms{Value: secBitString(p.SecCaps.NRIntegrity)},
+		EUTRAencryptionAlgorithms:          ngapType.EUTRAencryptionAlgorithms{Value: secBitString(p.SecCaps.EUTRAEncryption)},
+		EUTRAintegrityProtectionAlgorithms: ngapType.EUTRAintegrityProtectionAlgorithms{Value: secBitString(p.SecCaps.EUTRAIntegrity)},
 	}
 
 	switchedList := &ngapType.PDUSessionResourceToBeSwitchedDLList{}
-	for _, s := range sessions {
+	for _, s := range p.Sessions {
 		transfer := s.RawTransfer
 		if transfer == nil {
 			transfer, err = buildPathSwitchRequestTransfer(s.DLTeid, s.DLIP)
@@ -111,14 +124,14 @@ func BuildPathSwitchRequest(ranUeNgapID, sourceAmfUeNgapID int64, mcc, mnc, tac,
 	add(ngapType.ProtocolIEIDPDUSessionResourceToBeSwitchedDLList, ngapType.CriticalityPresentReject,
 		ngapType.PathSwitchRequestIEsPresentPDUSessionResourceToBeSwitchedDLList).PDUSessionResourceToBeSwitchedDLList = switchedList
 
-	if len(failed) > 0 {
+	if len(p.Failed) > 0 {
 		setupFailed, err := buildPathSwitchRequestSetupFailedTransfer()
 		if err != nil {
 			return nil, err
 		}
 
 		failedList := &ngapType.PDUSessionResourceFailedToSetupListPSReq{}
-		for _, id := range failed {
+		for _, id := range p.Failed {
 			failedList.List = append(failedList.List, ngapType.PDUSessionResourceFailedToSetupItemPSReq{
 				PDUSessionID:                         ngapType.PDUSessionID{Value: id},
 				PathSwitchRequestSetupFailedTransfer: setupFailed,
@@ -129,9 +142,9 @@ func BuildPathSwitchRequest(ranUeNgapID, sourceAmfUeNgapID int64, mcc, mnc, tac,
 			ngapType.PathSwitchRequestIEsPresentPDUSessionResourceFailedToSetupListPSReq).PDUSessionResourceFailedToSetupListPSReq = failedList
 	}
 
-	if len(omitIEs) > 0 {
-		omit := make(map[int64]bool, len(omitIEs))
-		for _, id := range omitIEs {
+	if len(p.OmitIEs) > 0 {
+		omit := make(map[int64]bool, len(p.OmitIEs))
+		for _, id := range p.OmitIEs {
 			omit[id] = true
 		}
 
