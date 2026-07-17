@@ -171,7 +171,9 @@ func profileAEncrypt(msin string, hnPubkey *ecdh.PublicKey) (string, error) {
 		return "", err
 	}
 
-	out := append(ephemeralPub, cipherText...)
+	out := make([]byte, 0, len(ephemeralPub)+len(cipherText)+len(mac))
+	out = append(out, ephemeralPub...)
+	out = append(out, cipherText...)
 	out = append(out, mac...)
 
 	return hex.EncodeToString(out), nil
@@ -217,7 +219,9 @@ func profileBEncrypt(msin string, hnPubkey *ecdh.PublicKey) (string, error) {
 		return "", err
 	}
 
-	out := append(ephemeralPubCompressed, cipherText...)
+	out := make([]byte, 0, len(ephemeralPubCompressed)+len(cipherText)+len(mac))
+	out = append(out, ephemeralPubCompressed...)
+	out = append(out, cipherText...)
 	out = append(out, mac...)
 
 	return hex.EncodeToString(out), nil
@@ -269,7 +273,11 @@ func ansiX963KDF(sharedKey, publicKey []byte, encKeyLen, macKeyLen, hashLen int)
 	for i := 0; i < kdfRounds; i++ {
 		counterBytes := make([]byte, 4)
 		binary.BigEndian.PutUint32(counterBytes, counter)
-		tmpK := sha256.Sum256(append(append(sharedKey, counterBytes...), publicKey...))
+		input := make([]byte, 0, len(sharedKey)+len(counterBytes)+len(publicKey))
+		input = append(input, sharedKey...)
+		input = append(input, counterBytes...)
+		input = append(input, publicKey...)
+		tmpK := sha256.Sum256(input)
 		kdfKey = append(kdfKey, tmpK[:]...)
 		counter++
 	}

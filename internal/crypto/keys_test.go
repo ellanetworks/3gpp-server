@@ -9,18 +9,18 @@ import (
 )
 
 // TS 33.501 §A.8
-func TestAlgorithmKeyDerivationVector(t *testing.T) {
-	res, err := ComputeResStar(tsK, tsOPc, "000000000000", tsSUPI, tsSNN,
+func TestDerive5GNASKeysVector(t *testing.T) {
+	res, err := Compute5GAKA(tsK, tsOPc, "000000000000", tsSUPI, tsSNN,
 		mustHex(t, tsRAND), mustHex(t, tsAUTN))
 	if err != nil {
-		t.Fatalf("ComputeResStar: %v", err)
+		t.Fatalf("Compute5GAKA: %v", err)
 	}
 
 	const cipherAlg, intAlg = 2, 2
 
-	var knasEnc, knasInt [16]byte
-	if err := AlgorithmKeyDerivation(cipherAlg, res.Kamf, &knasEnc, intAlg, &knasInt); err != nil {
-		t.Fatalf("AlgorithmKeyDerivation: %v", err)
+	knasEnc, knasInt, err := Derive5GNASKeys(res.Kamf, cipherAlg, intAlg)
+	if err != nil {
+		t.Fatalf("Derive5GNASKeys: %v", err)
 	}
 
 	wantEnc := kdf(t, res.Kamf, 0x69, []byte{0x01}, []byte{cipherAlg})[16:32]

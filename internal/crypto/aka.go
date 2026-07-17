@@ -15,12 +15,12 @@ import (
 
 var supiRegexp = regexp.MustCompile(`(?:imsi|supi)-([0-9]{5,15})`)
 
-type AKAResult struct {
-	RESstar []byte
+type AKA5GResult struct {
+	RESStar []byte
 	Kamf    []byte
 }
 
-func ComputeResStar(k, opc, sqn, supi, snn string, rand, autn []byte) (*AKAResult, error) {
+func Compute5GAKA(k, opc, sqn, supi, snn string, rand, autn []byte) (*AKA5GResult, error) {
 	opcBytes, err := hex.DecodeString(opc)
 	if err != nil {
 		return nil, fmt.Errorf("decode OPc: %w", err)
@@ -62,7 +62,7 @@ func ComputeResStar(k, opc, sqn, supi, snn string, rand, autn []byte) (*AKAResul
 	key = append(key, CK...)
 	key = append(key, IK...)
 
-	kamf, err := derivateKamf(key, snn, imsi, sqnXorAK)
+	kamf, err := deriveKamf(key, snn, imsi, sqnXorAK)
 	if err != nil {
 		return nil, fmt.Errorf("derive Kamf: %w", err)
 	}
@@ -72,8 +72,8 @@ func ComputeResStar(k, opc, sqn, supi, snn string, rand, autn []byte) (*AKAResul
 		return nil, fmt.Errorf("derive RES*: %w", err)
 	}
 
-	return &AKAResult{
-		RESstar: resStar,
+	return &AKA5GResult{
+		RESStar: resStar,
 		Kamf:    kamf,
 	}, nil
 }
@@ -91,7 +91,7 @@ func computeResStar(key []byte, snName string, rand, res []byte) ([]byte, error)
 	return kdfVal[len(kdfVal)/2:], nil
 }
 
-func derivateKamf(key []byte, snName string, imsi, sqnXorAK []byte) ([]byte, error) {
+func deriveKamf(key []byte, snName string, imsi, sqnXorAK []byte) ([]byte, error) {
 	Kausf, err := ueauth.GetKDFValue(key, ueauth.FC_FOR_KAUSF_DERIVATION,
 		[]byte(snName), ueauth.KDFLen([]byte(snName)),
 		sqnXorAK, ueauth.KDFLen(sqnXorAK))

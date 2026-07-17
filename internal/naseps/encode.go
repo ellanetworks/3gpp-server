@@ -6,7 +6,6 @@ package naseps
 import (
 	"encoding/binary"
 	"fmt"
-	"strings"
 
 	"github.com/ellanetworks/core/nas/common"
 	"github.com/ellanetworks/core/nas/eps"
@@ -69,93 +68,6 @@ func BuildTrackingAreaUpdateComplete() ([]byte, error) {
 
 // EEA0/1/2 and EIA0/1/2; bit 7 = algorithm 0, bit 6 = 1, bit 5 = 2 (TS 24.301 §9.9.3.34).
 var DefaultUENetworkCapability = []byte{0xE0, 0xE0}
-
-// PDN types (TS 24.301 §9.9.4.10).
-const (
-	PDNTypeIPv4   uint8 = 1
-	PDNTypeIPv6   uint8 = 2
-	PDNTypeIPv4v6 uint8 = 3
-)
-
-// BuildPDNConnectivityRequest builds an ESM PDN CONNECTIVITY REQUEST (TS 24.301 §8.3.20).
-func BuildPDNConnectivityRequest(pti, pdnType uint8) ([]byte, error) {
-	return BuildPDNConnectivityRequestWith(PDNConnectivityParams{PTI: pti, PDNType: pdnType})
-}
-
-// PDNConnectivityParams drives a PDN CONNECTIVITY REQUEST; EPSBearerIdentity is 0 in a valid request, non-zero exercising the invalid-EBI path (TS 24.301 §7.3.2).
-type PDNConnectivityParams struct {
-	PTI               uint8
-	EPSBearerIdentity uint8
-	PDNType           uint8
-	APN               string
-}
-
-// BuildPDNConnectivityRequestWith builds a PDN CONNECTIVITY REQUEST (TS 24.301 §8.3.20).
-func BuildPDNConnectivityRequestWith(p PDNConnectivityParams) ([]byte, error) {
-	pdnType := p.PDNType
-	if pdnType == 0 {
-		pdnType = PDNTypeIPv4
-	}
-
-	m := &eps.PDNConnectivityRequest{
-		EPSBearerIdentity:            p.EPSBearerIdentity,
-		ProcedureTransactionIdentity: p.PTI,
-		RequestType:                  1, // initial request
-		PDNType:                      pdnType,
-		AccessPointName:              encodeAPN(p.APN),
-	}
-
-	return m.Marshal()
-}
-
-// encodeAPN emits each label prefixed by its length octet (TS 23.003 §9.1).
-func encodeAPN(apn string) []byte {
-	if apn == "" {
-		return nil
-	}
-
-	var out []byte
-	for _, label := range strings.Split(apn, ".") {
-		out = append(out, byte(len(label)))
-		out = append(out, label...)
-	}
-
-	return out
-}
-
-// BuildPDNDisconnectRequest builds a PDN DISCONNECT REQUEST (TS 24.301 §8.3.19).
-func BuildPDNDisconnectRequest(pti, linkedEBI uint8) ([]byte, error) {
-	return (&eps.PDNDisconnectRequest{
-		EPSBearerIdentity:            0,
-		ProcedureTransactionIdentity: pti,
-		LinkedEPSBearerIdentity:      linkedEBI,
-	}).Marshal()
-}
-
-// BuildDeactivateEPSBearerContextAccept builds a DEACTIVATE EPS BEARER CONTEXT ACCEPT (TS 24.301 §8.3.8).
-func BuildDeactivateEPSBearerContextAccept(ebi, pti uint8) ([]byte, error) {
-	return (&eps.DeactivateEPSBearerContextAccept{
-		EPSBearerIdentity:            ebi,
-		ProcedureTransactionIdentity: pti,
-	}).Marshal()
-}
-
-// BuildModifyEPSBearerContextAccept builds a MODIFY EPS BEARER CONTEXT ACCEPT (TS 24.301 §8.3.10).
-func BuildModifyEPSBearerContextAccept(ebi, pti uint8) ([]byte, error) {
-	return (&eps.ModifyEPSBearerContextAccept{
-		EPSBearerIdentity:            ebi,
-		ProcedureTransactionIdentity: pti,
-	}).Marshal()
-}
-
-// BuildESMStatus builds an ESM STATUS (TS 24.301 §8.3.15).
-func BuildESMStatus(ebi, pti, cause uint8) ([]byte, error) {
-	return (&eps.ESMStatus{
-		EPSBearerIdentity:            ebi,
-		ProcedureTransactionIdentity: pti,
-		ESMCause:                     cause,
-	}).Marshal()
-}
 
 // GUTIParams identifies a GUTI mobile identity (TS 24.301 §9.9.3.12).
 type GUTIParams struct {
@@ -245,14 +157,6 @@ func BuildSecurityModeComplete(imeisv []byte) ([]byte, error) {
 // BuildSecurityModeReject builds a plain SECURITY MODE REJECT (TS 24.301 §8.2.22).
 func BuildSecurityModeReject(cause uint8) ([]byte, error) {
 	return (&eps.SecurityModeReject{Cause: cause}).Marshal()
-}
-
-// BuildActivateDefaultEPSBearerContextAccept builds an ACTIVATE DEFAULT EPS BEARER CONTEXT ACCEPT (TS 24.301 §8.3.2).
-func BuildActivateDefaultEPSBearerContextAccept(ebi, pti uint8) ([]byte, error) {
-	return (&eps.ActivateDefaultEPSBearerContextAccept{
-		EPSBearerIdentity:            ebi,
-		ProcedureTransactionIdentity: pti,
-	}).Marshal()
 }
 
 // BuildAttachComplete builds a plain ATTACH COMPLETE (TS 24.301 §8.2.2).

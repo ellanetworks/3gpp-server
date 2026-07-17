@@ -61,7 +61,7 @@ func Test4GForgedS1APIDInjection(t *testing.T) {
 	ueID := mustCreateENBUE(t, enbID)
 
 	resp := nasBody(t, enbID, ueID,
-		`{"message_type":"inject_nas","mme_ue_s1ap_id":4294967000,"raw_nas_pdu":"00","timeout_ms":1500}`)
+		`{"message_type":"inject_nas","mme_ue_s1ap_id_override":4294967000,"raw_nas_pdu":"00","timeout_ms":1500}`)
 
 	// TS 36.413 §10.6 leaves silence and an Error Indication both compliant.
 	if got := jsonGet(resp, "s1ap.message_type"); got == "DownlinkNASTransport" {

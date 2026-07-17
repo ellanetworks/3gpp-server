@@ -32,8 +32,8 @@ type SendENBNASRequest struct {
 	RawNASPDU  *string `json:"raw_nas_pdu,omitempty"`
 	CorruptMAC bool    `json:"corrupt_mac,omitempty"`
 
-	MMEUES1APIDOverride *uint32 `json:"mme_ue_s1ap_id,omitempty"`
-	ENBUES1APIDOverride *uint32 `json:"enb_ue_s1ap_id,omitempty"`
+	MMEUES1APIDOverride *uint32 `json:"mme_ue_s1ap_id_override,omitempty"`
+	ENBUES1APIDOverride *uint32 `json:"enb_ue_s1ap_id_override,omitempty"`
 
 	ReplayLast        bool    `json:"replay_last,omitempty"`
 	SwitchOff         bool    `json:"switch_off,omitempty"`
@@ -55,6 +55,7 @@ type SendENBNASRequest struct {
 	LinkedEBI         *uint8 `json:"linked_ebi,omitempty"`
 	EPSBearerIdentity *uint8 `json:"eps_bearer_identity,omitempty"`
 	ESMCause          *uint8 `json:"esm_cause,omitempty"`
+	WithholdAccept    bool   `json:"withhold_accept,omitempty"`
 
 	RESOverride *string `json:"res_override,omitempty"`
 	Cause       *int    `json:"cause,omitempty"`
@@ -79,6 +80,7 @@ type SendENBS1APRequest struct {
 
 	Admitted    []HandoverERAB `json:"admitted_erabs,omitempty"`
 	FailedERABs []uint8        `json:"failed_erabs,omitempty"`
+	ERABs       []HandoverERAB `json:"erabs,omitempty"`
 
 	Cause  *int    `json:"cause,omitempty"`
 	CellID *uint32 `json:"cell_id,omitempty"`

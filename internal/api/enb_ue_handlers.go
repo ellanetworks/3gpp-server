@@ -196,6 +196,12 @@ func (h *Handler) SendENBNAS(w http.ResponseWriter, r *http.Request) {
 		resp, herr = h.deactivateBearerAccept(enb, ue, t, &req)
 	case "status_esm":
 		resp, herr = h.statusESM(enb, ue, t, &req)
+	case "bearer_resource_allocation_request":
+		resp, herr = h.bearerResourceAllocation(enb, ue, t, &req)
+	case "bearer_resource_modification_request":
+		resp, herr = h.bearerResourceModification(enb, ue, t, &req)
+	case "esm_information_response":
+		resp, herr = h.esmInformationResponse(enb, ue, t, &req)
 	case "reset":
 		resp, herr = h.reset(ctx, ue, t, &req)
 	case "security_mode_complete":
@@ -277,6 +283,8 @@ func (h *Handler) attachRequest(ctx context.Context, enb *store.ENBContext, ue *
 		return nil, err
 	}
 
+	annotateSecurityHeaderType(nas, plain)
+
 	ue.RAND, _ = hex.DecodeString(nas.RAND)
 	ue.AUTN, _ = hex.DecodeString(nas.AUTN)
 	if nas.KSI != nil {
@@ -314,6 +322,7 @@ func (h *Handler) attachRequestRaw(ctx context.Context, enb *store.ENBContext, u
 	if dl.NASPDU != nil {
 		if plain, perr := nasPDUBytes(dl); perr == nil {
 			nas, _ = naseps.Decode(plain)
+			annotateSecurityHeaderType(nas, plain)
 		}
 	}
 
@@ -365,7 +374,7 @@ func (h *Handler) authenticationResponse(ctx context.Context, enb *store.ENBCont
 			return nil, derr
 		}
 
-		return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
+		return &SendENBNASResponse{S1AP: dl, NAS: annotateSecurityHeaderType(nas, nasBytes)}, nil
 	}
 
 	// The Security Mode Command is not ciphered, so the algorithms it selects are readable before their keys exist.
@@ -397,7 +406,7 @@ func (h *Handler) authenticationResponse(ctx context.Context, enb *store.ENBCont
 	_, verr := naseps.Unprotect(nasBytes, ue.NextDL(), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
 	verified := verr == nil
 
-	return &SendENBNASResponse{S1AP: dl, NAS: smc, MACVerified: &verified}, nil
+	return &SendENBNASResponse{S1AP: dl, NAS: annotateSecurityHeaderType(smc, nasBytes), MACVerified: &verified}, nil
 }
 
 func (h *Handler) identityResponse(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
@@ -424,6 +433,8 @@ func (h *Handler) identityResponse(ctx context.Context, enb *store.ENBContext, u
 	if err != nil {
 		return nil, err
 	}
+
+	annotateSecurityHeaderType(nas, plain)
 
 	if nas.MessageType == "authentication_request" {
 		ue.RAND, _ = hex.DecodeString(nas.RAND)
@@ -471,6 +482,8 @@ func (h *Handler) authenticationFailure(ctx context.Context, enb *store.ENBConte
 	if err != nil {
 		return nil, err
 	}
+
+	annotateSecurityHeaderType(nas, plain)
 
 	if nas.MessageType == "authentication_request" {
 		ue.RAND, _ = hex.DecodeString(nas.RAND)
@@ -527,6 +540,8 @@ func (h *Handler) securityModeComplete(ctx context.Context, enb *store.ENBContex
 	if err != nil {
 		return nil, err
 	}
+
+	annotateSecurityHeaderType(nas, nasBytes)
 
 	if nas.EPSBearerIdentity != nil {
 		ue.EPSBearerID = uint8(*nas.EPSBearerIdentity)
@@ -638,6 +653,7 @@ func (h *Handler) attachComplete(ctx context.Context, enb *store.ENBContext, ue 
 			if plain, perr := naseps.Unprotect(nasBytes, ue.NextDL(), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc); perr == nil {
 				resp.S1AP = dl
 				resp.NAS, _ = naseps.Decode(plain)
+				resp.NAS = annotateSecurityHeaderType(resp.NAS, nasBytes)
 			}
 		}
 	}
@@ -847,7 +863,14 @@ func (h *Handler) pdnConnectivity(ctx context.Context, enb *store.ENBContext, ue
 		return nil, err
 	}
 
+	annotateSecurityHeaderType(nas, nasBytes)
+
 	if dl.MessageType != "ERABSetupRequest" || nas.MessageType != "activate_default_eps_bearer_context_request" {
+		return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
+	}
+
+	// Withholding the accept leaves timer T3485 running so its retransmission is observable (TS 24.301 §6.4.1.6 a).
+	if req.WithholdAccept {
 		return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
 	}
 
@@ -959,6 +982,13 @@ func (h *Handler) pdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *
 		return nil, err
 	}
 
+	annotateSecurityHeaderType(nas, nasBytes)
+
+	// Withholding the accept leaves timer T3495 running so its retransmission is observable (TS 24.301 §6.4.4.5 a).
+	if req.WithholdAccept {
+		return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
+	}
+
 	if nas.MessageType == "deactivate_eps_bearer_context_request" && nas.EPSBearerIdentity != nil {
 		deactEBI := uint8(*nas.EPSBearerIdentity)
 		deactPTI := uint8(0)
@@ -1012,6 +1042,45 @@ func (h *Handler) statusESM(enb *store.ENBContext, ue *store.UEEPSContext, t *tr
 	}
 
 	esm, err := naseps.BuildESMStatus(esmBearerID(ue, req), esmPTI(req), cause)
+	if err != nil {
+		return nil, err
+	}
+
+	return h.sendESM(enb, ue, t, esm, req)
+}
+
+func (h *Handler) bearerResourceAllocation(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+	if !ue.SecurityActive {
+		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
+	}
+
+	esm, err := naseps.BuildBearerResourceAllocationRequest(esmPTI(req))
+	if err != nil {
+		return nil, err
+	}
+
+	return h.sendESM(enb, ue, t, esm, req)
+}
+
+func (h *Handler) bearerResourceModification(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+	if !ue.SecurityActive {
+		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
+	}
+
+	esm, err := naseps.BuildBearerResourceModificationRequest(esmPTI(req))
+	if err != nil {
+		return nil, err
+	}
+
+	return h.sendESM(enb, ue, t, esm, req)
+}
+
+func (h *Handler) esmInformationResponse(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+	if !ue.SecurityActive {
+		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
+	}
+
+	esm, err := naseps.BuildESMInformationResponse(esmPTI(req))
 	if err != nil {
 		return nil, err
 	}
@@ -1165,7 +1234,7 @@ func (h *Handler) trackingAreaUpdate(ctx context.Context, enb *store.ENBContext,
 
 	if sht == naseps.SHTPlain {
 		nas, derr := naseps.Decode(nasBytes)
-		return &SendENBNASResponse{S1AP: dl, NAS: nas}, derr
+		return &SendENBNASResponse{S1AP: dl, NAS: annotateSecurityHeaderType(nas, nasBytes)}, derr
 	}
 
 	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
@@ -1177,6 +1246,8 @@ func (h *Handler) trackingAreaUpdate(ctx context.Context, enb *store.ENBContext,
 	if err != nil {
 		return nil, err
 	}
+
+	annotateSecurityHeaderType(nas, nasBytes)
 
 	if nas.GUTI != nil {
 		ue.GUTIMCC = nas.GUTI.MCC
@@ -1310,6 +1381,7 @@ func (h *Handler) serviceRequest(ctx context.Context, enb *store.ENBContext, ue 
 		if dl.NASPDU != nil {
 			if plain, berr := nasPDUBytes(dl); berr == nil {
 				resp.NAS, _ = naseps.Decode(plain)
+				resp.NAS = annotateSecurityHeaderType(resp.NAS, plain)
 			}
 		}
 	}
@@ -1366,6 +1438,8 @@ func (h *Handler) detach(ctx context.Context, enb *store.ENBContext, ue *store.U
 		if resp.NAS, err = naseps.Decode(plain); err != nil {
 			return nil, err
 		}
+
+		resp.NAS = annotateSecurityHeaderType(resp.NAS, nasBytes)
 	}
 
 	return resp, nil
@@ -1452,4 +1526,33 @@ func nasPDUBytes(resp *s1ap.S1APResponse) ([]byte, error) {
 	}
 
 	return hex.DecodeString(*resp.NASPDU)
+}
+
+func annotateSecurityHeaderType(nas *naseps.NASResponse, downlink []byte) *naseps.NASResponse {
+	if nas == nil {
+		return nil
+	}
+
+	if sht, err := naseps.SecurityHeader(downlink); err == nil {
+		nas.SecurityHeaderType = epsSecurityHeaderTypeString(sht)
+	}
+
+	return nas
+}
+
+func epsSecurityHeaderTypeString(sht naseps.SecurityHeaderType) string {
+	switch sht {
+	case naseps.SHTPlain:
+		return "plain"
+	case naseps.SHTIntegrityProtected:
+		return "integrity_protected"
+	case naseps.SHTIntegrityProtectedCiphered:
+		return "integrity_protected_and_ciphered"
+	case naseps.SHTIntegrityProtectedNewContext:
+		return "integrity_protected_with_new_eps_security_context"
+	case naseps.SHTIntegrityProtectedCipheredNew:
+		return "integrity_protected_and_ciphered_with_new_eps_security_context"
+	default:
+		return fmt.Sprintf("unknown(%d)", uint8(sht))
+	}
 }

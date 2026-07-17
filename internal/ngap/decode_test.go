@@ -4,6 +4,9 @@
 package ngap
 
 import (
+	"bytes"
+	"encoding/hex"
+	"encoding/json"
 	"testing"
 
 	"github.com/free5gc/aper"
@@ -148,5 +151,87 @@ func TestDecodeUEContextReleaseCommandBareAMFID(t *testing.T) {
 	}
 	if idsIE.RanUeNgapID != nil {
 		t.Errorf("bare-AMF-ID CHOICE: expected no RanUeNgapID, got %d", *idsIE.RanUeNgapID)
+	}
+}
+
+func TestDecodeUnmodeledIEValueSurfaces(t *testing.T) {
+	const amfID int64 = 7
+
+	pdu := ngapType.NGAPPDU{}
+	pdu.Present = ngapType.NGAPPDUPresentSuccessfulOutcome
+	pdu.SuccessfulOutcome = new(ngapType.SuccessfulOutcome)
+
+	so := pdu.SuccessfulOutcome
+	so.ProcedureCode.Value = ngapType.ProcedureCodePathSwitchRequest
+	so.Criticality.Value = ngapType.CriticalityPresentReject
+	so.Value.Present = ngapType.SuccessfulOutcomePresentPathSwitchRequestAcknowledge
+	so.Value.PathSwitchRequestAcknowledge = new(ngapType.PathSwitchRequestAcknowledge)
+
+	ies := &so.Value.PathSwitchRequestAcknowledge.ProtocolIEs
+
+	amf := ngapType.PathSwitchRequestAcknowledgeIEs{}
+	amf.Id.Value = ngapType.ProtocolIEIDAMFUENGAPID
+	amf.Criticality.Value = ngapType.CriticalityPresentReject
+	amf.Value.Present = ngapType.PathSwitchRequestAcknowledgeIEsPresentAMFUENGAPID
+	amf.Value.AMFUENGAPID = &ngapType.AMFUENGAPID{Value: amfID}
+	ies.List = append(ies.List, amf)
+
+	rvf := &ngapType.RedirectionVoiceFallback{Value: ngapType.RedirectionVoiceFallbackPresentNotPossible}
+	unmodeled := ngapType.PathSwitchRequestAcknowledgeIEs{}
+	unmodeled.Id.Value = ngapType.ProtocolIEIDRedirectionVoiceFallback
+	unmodeled.Criticality.Value = ngapType.CriticalityPresentIgnore
+	unmodeled.Value.Present = ngapType.PathSwitchRequestAcknowledgeIEsPresentRedirectionVoiceFallback
+	unmodeled.Value.RedirectionVoiceFallback = rvf
+	ies.List = append(ies.List, unmodeled)
+
+	data, err := ngap.Encoder(pdu)
+	if err != nil {
+		t.Fatalf("encode PathSwitchRequestAcknowledge: %v", err)
+	}
+
+	resp, err := Decode(data)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	var modeled, surfaced *IE
+	for i := range resp.IEs {
+		switch resp.IEs[i].ID {
+		case ngapType.ProtocolIEIDAMFUENGAPID:
+			modeled = &resp.IEs[i]
+		case ngapType.ProtocolIEIDRedirectionVoiceFallback:
+			surfaced = &resp.IEs[i]
+		}
+	}
+
+	if modeled == nil || modeled.AmfUeNgapID == nil || *modeled.AmfUeNgapID != amfID {
+		t.Fatalf("modeled AMF-UE-NGAP-ID IE = %+v, want AmfUeNgapID %d", modeled, amfID)
+	}
+	if modeled.Value != nil {
+		t.Fatalf("modeled IE value = %s, want nil", modeled.Value)
+	}
+
+	if surfaced == nil {
+		t.Fatalf("unmodeled IE %d absent from %+v", ngapType.ProtocolIEIDRedirectionVoiceFallback, resp.IEs)
+	}
+	if surfaced.Value == nil {
+		t.Fatal("unmodeled IE value = nil, want octets present")
+	}
+
+	var got string
+	if err := json.Unmarshal(surfaced.Value, &got); err != nil {
+		t.Fatalf("unmodeled IE value = %s, want a JSON hex string: %v", surfaced.Value, err)
+	}
+	gotOctets, err := hex.DecodeString(got)
+	if err != nil {
+		t.Fatalf("unmodeled IE value %q is not hex: %v", got, err)
+	}
+
+	want, err := aper.MarshalWithParams(*rvf, "referenceFieldValue:146")
+	if err != nil {
+		t.Fatalf("encode reference value: %v", err)
+	}
+	if !bytes.Equal(gotOctets, want) {
+		t.Fatalf("unmodeled IE octets = %x, want %x", gotOctets, want)
 	}
 }

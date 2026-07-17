@@ -141,13 +141,10 @@ type FiveGSTMSIJSON struct {
 	FiveGTMSI  string `json:"five_g_tmsi"`
 }
 
+// Value indexes the ASN.1 enumeration of the named Cause CHOICE group (TS 38.413 §9.3.1.2).
 type CauseJSON struct {
-	Present      string `json:"present"`
-	RadioNetwork *int64 `json:"radio_network,omitempty"`
-	Transport    *int64 `json:"transport,omitempty"`
-	NAS          *int64 `json:"nas,omitempty"`
-	Protocol     *int64 `json:"protocol,omitempty"`
-	Misc         *int64 `json:"misc,omitempty"`
+	Group string `json:"group"`
+	Value int    `json:"value"`
 }
 
 type ServedGUAMIJSON struct {

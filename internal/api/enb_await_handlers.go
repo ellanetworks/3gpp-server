@@ -98,7 +98,7 @@ func decodeENBDownlinkNAS(ue *store.UEEPSContext, resp *s1ap.S1APResponse) *nase
 
 	if sht == naseps.SHTPlain {
 		nas, _ := naseps.Decode(b)
-		return nas
+		return annotateSecurityHeaderType(nas, b)
 	}
 
 	if !ue.SecurityActive || len(b) < 6 {
@@ -112,7 +112,7 @@ func decodeENBDownlinkNAS(ue *store.UEEPSContext, resp *s1ap.S1APResponse) *nase
 
 	nas, _ := naseps.Decode(plain)
 
-	return nas
+	return annotateSecurityHeaderType(nas, b)
 }
 
 // An mmeID of 0 means the MME has not assigned one yet, so it cannot match.

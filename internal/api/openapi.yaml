@@ -215,9 +215,18 @@ paths:
         ## ESM procedures (TS 24.301 §6)
 
         - `pdn_connectivity` — PDN CONNECTIVITY REQUEST for an additional PDN
-          connection to `apn`.
+          connection to `apn`. With `withhold_accept` the tester never sends the
+          bearer accept, leaving T3485 to retransmit (TS 24.301 §6.4.1.6 a).
         - `pdn_disconnect` — PDN DISCONNECT REQUEST for the PDN connection whose
-          linked default bearer is `linked_ebi`.
+          linked default bearer is `linked_ebi`. With `withhold_accept` the tester
+          never sends the deactivate accept, leaving T3495 to retransmit
+          (TS 24.301 §6.4.4.5 a).
+        - `bearer_resource_allocation_request` — BEARER RESOURCE ALLOCATION REQUEST
+          with the given `pti` (TS 24.301 §8.3.8). Send-only.
+        - `bearer_resource_modification_request` — BEARER RESOURCE MODIFICATION
+          REQUEST with the given `pti` (TS 24.301 §8.3.10). Send-only.
+        - `esm_information_response` — ESM INFORMATION RESPONSE with the given `pti`
+          (TS 24.301 §8.3.14). Send-only.
         - `modify_eps_bearer_context_accept` — MODIFY EPS BEARER CONTEXT ACCEPT.
         - `deactivate_eps_bearer_context_accept` — DEACTIVATE EPS BEARER CONTEXT
           ACCEPT.
@@ -255,8 +264,8 @@ paths:
           NAS PDU, to test replay protection). No reply — the MME discarding it —
           is a valid outcome.
 
-        `mme_ue_s1ap_id` / `enb_ue_s1ap_id` override the S1AP ID pair on any of
-        the uplink messages above, to probe the MME's UE-association validation
+        `mme_ue_s1ap_id_override` / `enb_ue_s1ap_id_override` override the S1AP ID
+        pair on any of the uplink messages above, to probe the MME's UE-association validation
         (TS 36.413 §10.6).
       requestBody:
         required: true
@@ -415,6 +424,10 @@ paths:
           (TS 36.413 §8.4.3). Send-only.
         - `handover_failure` — Target-eNB HANDOVER FAILURE (TS 36.413 §8.4.2),
           making the MME abort the handover. Send-only.
+        - `path_switch_request` — PATH SWITCH REQUEST (TS 36.413 §8.6.1) claiming a
+          UE by its `mme_ue_s1ap_id` with a fresh `enb_ue_s1ap_id` and the `erabs`
+          to switch. With `wait_for` the call blocks for the acknowledge, failure or
+          Error Indication.
 
         ## Raw escape hatch
 
@@ -1457,7 +1470,7 @@ components:
       properties:
         message_type:
           type: string
-          enum: [attach_request, authentication_response, authentication_failure, identity_response, security_mode_complete, security_mode_reject, attach_complete, detach_request, release_request, service_request, ue_capability_info, tracking_area_update, path_switch, pdn_connectivity, pdn_disconnect, modify_response, modify_eps_bearer_context_accept, deactivate_eps_bearer_context_accept, status_esm, reset, inject_nas, handover_required, handover_cancel, enb_status_transfer, initial_context_setup_failure, error_indication]
+          enum: [attach_request, authentication_response, authentication_failure, identity_response, security_mode_complete, security_mode_reject, attach_complete, detach_request, release_request, service_request, ue_capability_info, tracking_area_update, path_switch, pdn_connectivity, pdn_disconnect, bearer_resource_allocation_request, bearer_resource_modification_request, esm_information_response, modify_response, modify_eps_bearer_context_accept, deactivate_eps_bearer_context_accept, status_esm, reset, inject_nas, handover_required, handover_cancel, enb_status_transfer, initial_context_setup_failure, error_indication]
         pdn_type:
           type: integer
           description: "Requested PDN type for attach: 1=IPv4, 2=IPv6, 3=IPv4v6 (default 1)."
@@ -1479,14 +1492,14 @@ components:
           description: >
             On security_mode_complete, flip a NAS-MAC byte so the MME's integrity
             check fails; the MME must discard the message.
-        mme_ue_s1ap_id:
+        mme_ue_s1ap_id_override:
           type: integer
           description: >
             Override the MME-UE-S1AP-ID in the S1AP wrapper of every uplink message
             this UE sends (Uplink NAS Transport, UE Capability Info Indication, UE
             Context Release Request). Use a stale, unknown or another UE's value to
             exercise TS 36.413 §10.6.
-        enb_ue_s1ap_id:
+        enb_ue_s1ap_id_override:
           type: integer
           description: >
             Override the eNB-UE-S1AP-ID in the S1AP wrapper of every uplink message
@@ -1527,7 +1540,10 @@ components:
           description: On pdn_connectivity, the access point name of the additional PDN connection (TS 24.301 §6.5.1).
         pti:
           type: integer
-          description: On pdn_connectivity/pdn_disconnect, override the procedure transaction identity (0=reserved, for §7.3.1 invalid-PTI tests).
+          description: On pdn_connectivity/pdn_disconnect/bearer_resource_allocation_request/bearer_resource_modification_request/esm_information_response, override the procedure transaction identity (0=unassigned, 255=reserved, for §7.3.1 invalid-PTI tests).
+        withhold_accept:
+          type: boolean
+          description: On pdn_connectivity/pdn_disconnect, suppress the automatic ESM accept so the MME's T3485/T3495 retransmission is observable (TS 24.301 §6.4.1.6, §6.4.4.5).
         request_ebi:
           type: integer
           description: On pdn_connectivity, override the ESM-header EPS bearer identity (normally 0; non-zero for §7.3.2 invalid-EBI tests).
@@ -1571,14 +1587,14 @@ components:
       properties:
         message_type:
           type: string
-          enum: [handover_request_acknowledge, handover_notify, handover_failure]
+          enum: [handover_request_acknowledge, handover_notify, handover_failure, path_switch_request]
         raw_s1ap_pdu:
           type: string
           description: When set, hex S1AP PDU written verbatim onto the S1-MME association with no encoding or validation; message_type is ignored. Lets a test send any S1AP PDU, well-formed or not.
         wait_for:
           type: array
           items: { type: string }
-          description: With raw_s1ap_pdu, downlink S1AP message types to block for (empty = fire-and-forget).
+          description: With raw_s1ap_pdu or path_switch_request, downlink S1AP message types to block for (empty = fire-and-forget).
         timeout_ms:
           type: integer
           description: With raw_s1ap_pdu + wait_for, how long to wait. Default 5000.
@@ -1587,7 +1603,17 @@ components:
           description: MME UE S1AP ID the MME assigned to the incoming UE (from the Handover Request).
         enb_ue_s1ap_id:
           type: integer
-          description: eNB UE S1AP ID the target eNB assigns the UE; reused across handover_request_acknowledge and handover_notify.
+          description: eNB UE S1AP ID the target eNB assigns the UE; reused across handover_request_acknowledge and handover_notify. On path_switch_request, a fresh value the relocating eNB claims, staling the source association (TS 36.413 §10.6).
+        erabs:
+          type: array
+          description: On path_switch_request, the E-RABs to switch to this eNB with their downlink S1-U endpoints.
+          items:
+            type: object
+            required: [id]
+            properties:
+              id: { type: integer, description: "E-RAB ID." }
+              dl_teid: { type: integer, description: "Target eNB downlink TEID (default synthesized)." }
+              dl_ip: { type: string, description: "Target eNB S1-U address (default the eNB's own)." }
         admitted_erabs:
           type: array
           description: On handover_request_acknowledge, the E-RABs the target admits with their downlink S1-U endpoints.

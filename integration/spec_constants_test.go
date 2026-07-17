@@ -196,12 +196,12 @@ func ngapCause(body []byte, responseKey string) (string, int) {
 			continue
 		}
 
-		present, _ := cause["present"].(string)
-		if v, ok := cause[present].(float64); ok {
-			return present, int(v)
+		group, _ := cause["group"].(string)
+		if v, ok := cause["value"].(float64); ok {
+			return group, int(v)
 		}
 
-		return present, 0
+		return group, 0
 	}
 
 	return "", 0

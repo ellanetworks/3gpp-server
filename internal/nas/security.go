@@ -61,7 +61,7 @@ func nasEncode(ue *store.UEContext, msg *gonas.Message, securityHeaderType uint8
 		ue.DLCount = 0
 	}
 
-	count := ue.ULCount
+	count := ue.NextUL()
 	if o.countOverride != nil {
 		count = *o.countOverride
 	}
@@ -97,7 +97,6 @@ func nasEncode(ue *store.UEContext, msg *gonas.Message, securityHeaderType uint8
 		payload[2] ^= 0xff
 	}
 
-	ue.ULCount++
 	ue.LastUplinkNAS = payload
 
 	return payload, nil
@@ -141,12 +140,7 @@ func DecodeSecuredNAS(ue *store.UEContext, message []byte) (*NASResponse, error)
 		newSecurityContext = true
 	}
 
-	dlSQN := uint8(ue.DLCount & 0xff)
-	if dlSQN > sequenceNumber {
-		ue.DLCount = (ue.DLCount & 0xffffff00) + 0x100 + uint32(sequenceNumber)
-	} else {
-		ue.DLCount = (ue.DLCount & 0xffffff00) + uint32(sequenceNumber)
-	}
+	ue.NextDL(sequenceNumber)
 
 	if cph && ue.SecurityContextAvailable {
 		if err := security.NASEncrypt(ue.CipheringAlg, ue.KnasEnc, ue.DLCount, security.Bearer3GPP,
@@ -168,7 +162,8 @@ func DecodeSecuredNAS(ue *store.UEContext, message []byte) (*NASResponse, error)
 			ue.CipheringAlg = m.SelectedNASSecurityAlgorithms.GetTypeOfCipheringAlgorithm()
 			ue.IntegrityAlg = m.SelectedNASSecurityAlgorithms.GetTypeOfIntegrityProtectionAlgorithm()
 
-			if err := deriveAlgKeys(ue); err != nil {
+			var err error
+			if ue.KnasEnc, ue.KnasInt, err = crypto.Derive5GNASKeys(ue.Kamf, ue.CipheringAlg, ue.IntegrityAlg); err != nil {
 				return nil, fmt.Errorf("nas: derive algorithm keys: %w", err)
 			}
 
@@ -193,16 +188,4 @@ func DecodeSecuredNAS(ue *store.UEContext, message []byte) (*NASResponse, error)
 	}
 
 	return resp, nil
-}
-
-func deriveAlgKeys(ue *store.UEContext) error {
-	return deriveAlgKeysFromKamf(ue.CipheringAlg, ue.Kamf, &ue.KnasEnc, ue.IntegrityAlg, &ue.KnasInt)
-}
-
-func deriveAlgKeysFromKamf(cipheringAlg uint8, kamf []byte, knasEnc *[16]uint8, integrityAlg uint8, knasInt *[16]uint8) error {
-	if len(kamf) == 0 {
-		return fmt.Errorf("nas: kamf is empty")
-	}
-
-	return crypto.AlgorithmKeyDerivation(cipheringAlg, kamf, knasEnc, integrityAlg, knasInt)
 }

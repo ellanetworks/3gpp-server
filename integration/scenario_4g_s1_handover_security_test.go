@@ -23,7 +23,7 @@ func Test4GS1HandoverCrossENBHijack(t *testing.T) {
 	attackerUE := mustCreateENBUE(t, attackerENB)
 
 	status, body := doRequest(t, "POST", "/enb/"+attackerENB+"/ue/"+attackerUE+"/nas",
-		fmt.Sprintf(`{"message_type":"handover_required","target_enb_id":%q,"mme_ue_s1ap_id":%s,"enb_ue_s1ap_id":%s}`,
+		fmt.Sprintf(`{"message_type":"handover_required","target_enb_id":%q,"mme_ue_s1ap_id_override":%s,"enb_ue_s1ap_id_override":%s}`,
 			victimENB, vMME, vENB))
 	if status != 200 {
 		t.Fatalf("handover_required (forged): HTTP %d\n  body: %s", status, body)

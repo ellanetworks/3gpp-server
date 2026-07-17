@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/ellanetworks/3gpp-server/internal/naseps"
 	"github.com/ellanetworks/3gpp-server/internal/s1ap"
 	"github.com/ellanetworks/3gpp-server/internal/store"
 	"github.com/ellanetworks/3gpp-server/internal/transport"
@@ -36,6 +37,11 @@ func (h *Handler) SendENBS1AP(w http.ResponseWriter, r *http.Request) {
 
 	if req.RawS1APPDU != nil {
 		h.handleRawS1AP(w, r, t, &req)
+		return
+	}
+
+	if req.MessageType == "path_switch_request" {
+		h.handleENBPathSwitchRequest(w, r, enb, t, &req)
 		return
 	}
 
@@ -72,6 +78,67 @@ func (h *Handler) handleRawS1AP(w http.ResponseWriter, r *http.Request, t *trans
 	}
 
 	if err := t.Send(pdu, false); err != nil {
+		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
+		return
+	}
+
+	if len(req.WaitFor) == 0 {
+		writeJSON(w, http.StatusOK, SendENBNASResponse{})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
+	defer cancel()
+
+	resp, err := t.WaitForMessage(ctx, req.WaitFor...)
+	if err != nil {
+		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for %v: %v", req.WaitFor, err))
+		return
+	}
+
+	writeJSON(w, http.StatusOK, SendENBNASResponse{S1AP: resp})
+}
+
+func (h *Handler) handleENBPathSwitchRequest(w http.ResponseWriter, r *http.Request, enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) {
+	if req.MMEUES1APID == nil || req.ENBUES1APID == nil {
+		writeError(w, http.StatusBadRequest, "mme_ue_s1ap_id and enb_ue_s1ap_id are required")
+		return
+	}
+
+	if len(req.ERABs) == 0 {
+		writeError(w, http.StatusBadRequest, "erabs is required for path_switch_request")
+		return
+	}
+
+	erab := req.ERABs[0]
+
+	teid := erab.DLTeid
+	if teid == 0 {
+		teid = *req.ENBUES1APID + 0x1000
+	}
+
+	// The S1AP encoding drops the EEA0/EIA0 bit, so shift the octets left.
+	netcap := naseps.DefaultUENetworkCapability
+
+	encoded, err := s1ap.BuildPathSwitchRequest(s1ap.PathSwitchRequestParams{
+		ENBUES1APID:                   *req.ENBUES1APID,
+		SourceMMEUES1APID:             *req.MMEUES1APID,
+		ERABID:                        erab.ID,
+		TargetS1UAddr:                 enb.N3Addr,
+		TargetTEID:                    teid,
+		MCC:                           enb.MCC,
+		MNC:                           enb.MNC,
+		TAC:                           enb.TAC,
+		CellID:                        1,
+		EncryptionAlgorithms:          uint16(netcap[0]<<1) << 8,
+		IntegrityProtectionAlgorithms: uint16(netcap[1]<<1) << 8,
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("build PathSwitchRequest: %v", err))
+		return
+	}
+
+	if err := t.Send(encoded, false); err != nil {
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
 		return
 	}

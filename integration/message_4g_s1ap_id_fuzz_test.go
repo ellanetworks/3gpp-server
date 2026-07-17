@@ -39,15 +39,15 @@ func Test4GUplinkNASTransportS1APIDFuzz(t *testing.T) {
 	}{
 		{
 			name: "unknown MME-UE-S1AP-ID (0, never allocated)",
-			body: `{"message_type":"inject_nas","mme_ue_s1ap_id":0,"raw_nas_pdu":"00","timeout_ms":3000}`,
+			body: `{"message_type":"inject_nas","mme_ue_s1ap_id_override":0,"raw_nas_pdu":"00","timeout_ms":3000}`,
 		},
 		{
 			name: "unknown MME-UE-S1AP-ID (2^32-1, never allocated)",
-			body: `{"message_type":"inject_nas","mme_ue_s1ap_id":4294967295,"raw_nas_pdu":"00","timeout_ms":3000}`,
+			body: `{"message_type":"inject_nas","mme_ue_s1ap_id_override":4294967295,"raw_nas_pdu":"00","timeout_ms":3000}`,
 		},
 		{
 			name: "inconsistent eNB-UE-S1AP-ID (valid MME ID, forged eNB ID)",
-			body: `{"message_type":"inject_nas","enb_ue_s1ap_id":16777215,"raw_nas_pdu":"00","timeout_ms":3000}`,
+			body: `{"message_type":"inject_nas","enb_ue_s1ap_id_override":16777215,"raw_nas_pdu":"00","timeout_ms":3000}`,
 		},
 	}
 
@@ -66,9 +66,9 @@ var s1apIDFuzzCases = []struct {
 	name      string
 	overrides string
 }{
-	{"unknown MME-UE-S1AP-ID (0)", `"mme_ue_s1ap_id":0`},
-	{"unknown MME-UE-S1AP-ID (2^32-1)", `"mme_ue_s1ap_id":4294967295`},
-	{"inconsistent eNB-UE-S1AP-ID", `"enb_ue_s1ap_id":16777215`},
+	{"unknown MME-UE-S1AP-ID (0)", `"mme_ue_s1ap_id_override":0`},
+	{"unknown MME-UE-S1AP-ID (2^32-1)", `"mme_ue_s1ap_id_override":4294967295`},
+	{"inconsistent eNB-UE-S1AP-ID", `"enb_ue_s1ap_id_override":16777215`},
 }
 
 func Test4GUECapabilityInfoS1APIDFuzz(t *testing.T) {

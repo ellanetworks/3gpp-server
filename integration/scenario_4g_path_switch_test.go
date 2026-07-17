@@ -60,7 +60,7 @@ func Test4GPathSwitchUnknownUE(t *testing.T) {
 
 	fullAttach(t, enbID, ueID)
 
-	resp := nasBody(t, enbID, ueID, `{"message_type":"path_switch","mme_ue_s1ap_id":2147483646,"timeout_ms":4000}`)
+	resp := nasBody(t, enbID, ueID, `{"message_type":"path_switch","mme_ue_s1ap_id_override":2147483646,"timeout_ms":4000}`)
 
 	if got := jsonGet(resp, "s1ap.message_type"); got != "PathSwitchRequestFailure" {
 		t.Fatalf("unknown-UE path switch: s1ap.message_type = %q, want PathSwitchRequestFailure; body: %s", got, resp)

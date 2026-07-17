@@ -82,8 +82,8 @@ type UEAggregateMaxBitRateJSON struct {
 }
 
 type UESecurityCapabilitiesJSON struct {
-	EncryptionAlgorithms          int `json:"encryption_algorithms"`
-	IntegrityProtectionAlgorithms int `json:"integrity_protection_algorithms"`
+	EncryptionAlgorithms          string `json:"encryption_algorithms"`
+	IntegrityProtectionAlgorithms string `json:"integrity_protection_algorithms"`
 }
 
 type SecurityContextJSON struct {

@@ -186,7 +186,7 @@ func ngapHasCause(body []byte) bool {
 		NGAP struct {
 			IEs []struct {
 				Cause *struct {
-					Present string `json:"present"`
+					Group string `json:"group"`
 				} `json:"cause"`
 			} `json:"ies"`
 		} `json:"ngap"`
@@ -197,7 +197,7 @@ func ngapHasCause(body []byte) bool {
 	}
 
 	for _, ie := range top.NGAP.IEs {
-		if ie.Cause != nil && ie.Cause.Present != "" {
+		if ie.Cause != nil && ie.Cause.Group != "" {
 			return true
 		}
 	}

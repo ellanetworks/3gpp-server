@@ -4,34 +4,28 @@
 package crypto
 
 import (
-	"github.com/free5gc/nas/security"
+	"fmt"
+
 	"github.com/free5gc/util/ueauth"
 )
 
-func AlgorithmKeyDerivation(cipheringAlg uint8, kamf []byte, knasEnc *[16]uint8, integrityAlg uint8, knasInt *[16]uint8) error {
-	P0 := []byte{security.NNASEncAlg}
-	L0 := ueauth.KDFLen(P0)
-	P1 := []byte{cipheringAlg}
-	L1 := ueauth.KDFLen(P1)
-
-	kenc, err := ueauth.GetKDFValue(kamf, ueauth.FC_FOR_ALGORITHM_KEY_DERIVATION, P0, L0, P1, L1)
+func Derive5GNASKeys(kamf []byte, cipheringAlg, integrityAlg uint8) (knasEnc, knasInt [16]byte, err error) {
+	enc, err := ueauth.GetKDFValue(kamf, ueauth.FC_FOR_ALGORITHM_KEY_DERIVATION,
+		[]byte{algTypeNASEnc}, ueauth.KDFLen([]byte{algTypeNASEnc}),
+		[]byte{cipheringAlg}, ueauth.KDFLen([]byte{cipheringAlg}))
 	if err != nil {
-		return err
+		return knasEnc, knasInt, fmt.Errorf("derive K_NASenc: %w", err)
 	}
 
-	copy(knasEnc[:], kenc[16:32])
-
-	P0 = []byte{security.NNASIntAlg}
-	L0 = ueauth.KDFLen(P0)
-	P1 = []byte{integrityAlg}
-	L1 = ueauth.KDFLen(P1)
-
-	kint, err := ueauth.GetKDFValue(kamf, ueauth.FC_FOR_ALGORITHM_KEY_DERIVATION, P0, L0, P1, L1)
+	intg, err := ueauth.GetKDFValue(kamf, ueauth.FC_FOR_ALGORITHM_KEY_DERIVATION,
+		[]byte{algTypeNASInt}, ueauth.KDFLen([]byte{algTypeNASInt}),
+		[]byte{integrityAlg}, ueauth.KDFLen([]byte{integrityAlg}))
 	if err != nil {
-		return err
+		return knasEnc, knasInt, fmt.Errorf("derive K_NASint: %w", err)
 	}
 
-	copy(knasInt[:], kint[16:32])
+	copy(knasEnc[:], enc[16:32])
+	copy(knasInt[:], intg[16:32])
 
-	return nil
+	return knasEnc, knasInt, nil
 }

@@ -6,8 +6,10 @@ package ngap
 import (
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/netip"
+	"reflect"
 
 	"github.com/free5gc/aper"
 	"github.com/free5gc/ngap"
@@ -146,6 +148,8 @@ func decodePathSwitchRequestAcknowledge(msg *ngapType.PathSwitchRequestAcknowled
 				v := ie.Value.SecurityContext.NextHopChainingCount.Value
 				decoded.NextHopChainingCount = &v
 			}
+		default:
+			decoded.Value = unmodeledIEValue(ie.Value)
 		}
 
 		resp.IEs = append(resp.IEs, decoded)
@@ -180,6 +184,8 @@ func decodeHandoverCancelAcknowledge(msg *ngapType.HandoverCancelAcknowledge, re
 				v := ie.Value.RANUENGAPID.Value
 				decoded.RanUeNgapID = &v
 			}
+		default:
+			decoded.Value = unmodeledIEValue(ie.Value)
 		}
 
 		resp.IEs = append(resp.IEs, decoded)
@@ -291,6 +297,8 @@ func decodePathSwitchRequestFailure(msg *ngapType.PathSwitchRequestFailure, resp
 					decoded.ReleasePDUSessionIDs = append(decoded.ReleasePDUSessionIDs, item.PDUSessionID.Value)
 				}
 			}
+		default:
+			decoded.Value = unmodeledIEValue(ie.Value)
 		}
 
 		resp.IEs = append(resp.IEs, decoded)
@@ -320,6 +328,8 @@ func decodeHandoverPreparationFailure(msg *ngapType.HandoverPreparationFailure, 
 			if ie.Value.Cause != nil {
 				decoded.Cause = decodeCause(ie.Value.Cause)
 			}
+		default:
+			decoded.Value = unmodeledIEValue(ie.Value)
 		}
 
 		resp.IEs = append(resp.IEs, decoded)
@@ -357,10 +367,42 @@ func decodePDUSessionResourceModifyRequest(msg *ngapType.PDUSessionResourceModif
 					}
 				}
 			}
+		default:
+			decoded.Value = unmodeledIEValue(ie.Value)
 		}
 
 		resp.IEs = append(resp.IEs, decoded)
 	}
+}
+
+// Re-encodes an unmodeled IE's CHOICE value so its octets survive; nil when aper discarded them (id absent from the message CHOICE).
+func unmodeledIEValue(v any) json.RawMessage {
+	rv := reflect.ValueOf(v)
+	if rv.Kind() != reflect.Struct || rv.NumField() == 0 {
+		return nil
+	}
+
+	present := int(rv.Field(0).Int())
+	if present <= 0 || present >= rv.NumField() {
+		return nil
+	}
+
+	alt := rv.Field(present)
+	if alt.Kind() == reflect.Pointer && alt.IsNil() {
+		return nil
+	}
+
+	octets, err := aper.MarshalWithParams(alt.Interface(), rv.Type().Field(present).Tag.Get("aper"))
+	if err != nil {
+		return nil
+	}
+
+	out, err := json.Marshal(hex.EncodeToString(octets))
+	if err != nil {
+		return nil
+	}
+
+	return out
 }
 
 func decodeInitiatingMessage(im *ngapType.InitiatingMessage, resp *NGAPResponse) {
@@ -411,6 +453,8 @@ func decodeDownlinkRANStatusTransfer(msg *ngapType.DownlinkRANStatusTransfer, re
 			if ie.Value.RANStatusTransferTransparentContainer != nil {
 				decoded.RANStatusTransfer = decodeRANStatusTransferContainer(ie.Value.RANStatusTransferTransparentContainer)
 			}
+		default:
+			decoded.Value = unmodeledIEValue(ie.Value)
 		}
 
 		resp.IEs = append(resp.IEs, decoded)
@@ -452,6 +496,8 @@ func decodePaging(msg *ngapType.Paging, resp *NGAPResponse) {
 		if ie.Id.Value == ngapType.ProtocolIEIDUEPagingIdentity &&
 			ie.Value.UEPagingIdentity != nil && ie.Value.UEPagingIdentity.FiveGSTMSI != nil {
 			decoded.FiveGSTMSI = decodeFiveGSTMSI(ie.Value.UEPagingIdentity.FiveGSTMSI)
+		} else {
+			decoded.Value = unmodeledIEValue(ie.Value)
 		}
 
 		resp.IEs = append(resp.IEs, decoded)
@@ -493,6 +539,8 @@ func decodeErrorIndication(msg *ngapType.ErrorIndication, resp *NGAPResponse) {
 			if ie.Value.CriticalityDiagnostics != nil {
 				decoded.CriticalityDiagnostics = decodeCriticalityDiagnostics(ie.Value.CriticalityDiagnostics)
 			}
+		default:
+			decoded.Value = unmodeledIEValue(ie.Value)
 		}
 
 		resp.IEs = append(resp.IEs, decoded)
@@ -563,6 +611,8 @@ func decodePDUSessionResourceReleaseCommand(msg *ngapType.PDUSessionResourceRele
 				s := hex.EncodeToString(ie.Value.NASPDU.Value)
 				decoded.NasPDU = &s
 			}
+		default:
+			decoded.Value = unmodeledIEValue(ie.Value)
 		}
 
 		resp.IEs = append(resp.IEs, decoded)
@@ -620,6 +670,8 @@ func decodeInitialContextSetupRequest(msg *ngapType.InitialContextSetupRequest, 
 				s := hex.EncodeToString(ie.Value.UERadioCapability.Value)
 				decoded.UERadioCapability = &s
 			}
+		default:
+			decoded.Value = unmodeledIEValue(ie.Value)
 		}
 
 		resp.IEs = append(resp.IEs, decoded)
@@ -698,6 +750,8 @@ func decodeDownlinkNASTransport(msg *ngapType.DownlinkNASTransport, resp *NGAPRe
 					decoded.AllowedNSSAI = append(decoded.AllowedNSSAI, nssai)
 				}
 			}
+		default:
+			decoded.Value = unmodeledIEValue(ie.Value)
 		}
 
 		resp.IEs = append(resp.IEs, decoded)
@@ -751,6 +805,8 @@ func decodePDUSessionResourceSetupRequest(msg *ngapType.PDUSessionResourceSetupR
 					decoded.PDUSessionSetupItems = append(decoded.PDUSessionSetupItems, setupItem)
 				}
 			}
+		default:
+			decoded.Value = unmodeledIEValue(ie.Value)
 		}
 
 		resp.IEs = append(resp.IEs, decoded)
@@ -819,6 +875,8 @@ func decodeNGSetupResponse(msg *ngapType.NGSetupResponse, resp *NGAPResponse) {
 				v := int64(ie.Value.UERetentionInformation.Value)
 				decoded.UERetentionInformation = &v
 			}
+		default:
+			decoded.Value = unmodeledIEValue(ie.Value)
 		}
 
 		resp.IEs = append(resp.IEs, decoded)
@@ -848,6 +906,8 @@ func decodeNGSetupFailure(msg *ngapType.NGSetupFailure, resp *NGAPResponse) {
 			if ie.Value.CriticalityDiagnostics != nil {
 				decoded.CriticalityDiagnostics = decodeCriticalityDiagnostics(ie.Value.CriticalityDiagnostics)
 			}
+		default:
+			decoded.Value = unmodeledIEValue(ie.Value)
 		}
 
 		resp.IEs = append(resp.IEs, decoded)
@@ -858,25 +918,20 @@ func decodeCause(cause *ngapType.Cause) *CauseJSON {
 	c := &CauseJSON{}
 	switch cause.Present {
 	case ngapType.CausePresentRadioNetwork:
-		c.Present = "radio_network"
-		v := int64(cause.RadioNetwork.Value)
-		c.RadioNetwork = &v
+		c.Group = "radio_network"
+		c.Value = int(cause.RadioNetwork.Value)
 	case ngapType.CausePresentTransport:
-		c.Present = "transport"
-		v := int64(cause.Transport.Value)
-		c.Transport = &v
+		c.Group = "transport"
+		c.Value = int(cause.Transport.Value)
 	case ngapType.CausePresentNas:
-		c.Present = "nas"
-		v := int64(cause.Nas.Value)
-		c.NAS = &v
+		c.Group = "nas"
+		c.Value = int(cause.Nas.Value)
 	case ngapType.CausePresentProtocol:
-		c.Present = "protocol"
-		v := int64(cause.Protocol.Value)
-		c.Protocol = &v
+		c.Group = "protocol"
+		c.Value = int(cause.Protocol.Value)
 	case ngapType.CausePresentMisc:
-		c.Present = "misc"
-		v := int64(cause.Misc.Value)
-		c.Misc = &v
+		c.Group = "misc"
+		c.Value = int(cause.Misc.Value)
 	}
 	return c
 }
@@ -1069,6 +1124,8 @@ func decodeUEContextReleaseCommand(msg *ngapType.UEContextReleaseCommand, resp *
 			if ie.Value.Cause != nil {
 				decoded.Cause = decodeCause(ie.Value.Cause)
 			}
+		default:
+			decoded.Value = unmodeledIEValue(ie.Value)
 		}
 
 		resp.IEs = append(resp.IEs, decoded)

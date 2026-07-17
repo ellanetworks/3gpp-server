@@ -19,19 +19,19 @@ const (
 	tsSUPINum = "001010000000001"
 )
 
-func TestComputeResStarVector(t *testing.T) {
-	res, err := ComputeResStar(tsK, tsOPc, "000000000000", tsSUPI, tsSNN,
+func TestCompute5GAKAVector(t *testing.T) {
+	res, err := Compute5GAKA(tsK, tsOPc, "000000000000", tsSUPI, tsSNN,
 		mustHex(t, tsRAND), mustHex(t, tsAUTN))
 	if err != nil {
-		t.Fatalf("ComputeResStar: %v", err)
+		t.Fatalf("Compute5GAKA: %v", err)
 	}
 
 	// TS 33.501 §A.4
 	key := append(mustHex(t, tsCK), mustHex(t, tsIK)...)
 	wantResStar := kdf(t, key, 0x6B, []byte(tsSNN), mustHex(t, tsRAND), mustHex(t, tsRES))[16:32]
 
-	if !bytes.Equal(res.RESstar, wantResStar) {
-		t.Errorf("RES* = %x, want %x", res.RESstar, wantResStar)
+	if !bytes.Equal(res.RESStar, wantResStar) {
+		t.Errorf("RES* = %x, want %x", res.RESStar, wantResStar)
 	}
 
 	// TS 33.501 §A.2, §A.6, §A.7
@@ -44,23 +44,23 @@ func TestComputeResStarVector(t *testing.T) {
 	}
 }
 
-func TestComputeResStarMACFailure(t *testing.T) {
+func TestCompute5GAKAMACFailure(t *testing.T) {
 	autn := mustHex(t, tsAUTN)
 	autn[len(autn)-1] ^= 0xff
 
-	if _, err := ComputeResStar(tsK, tsOPc, "000000000000", tsSUPI, tsSNN, mustHex(t, tsRAND), autn); !errors.Is(err, ErrMACFailure) {
+	if _, err := Compute5GAKA(tsK, tsOPc, "000000000000", tsSUPI, tsSNN, mustHex(t, tsRAND), autn); !errors.Is(err, ErrMACFailure) {
 		t.Fatalf("err = %v, want ErrMACFailure", err)
 	}
 }
 
-func TestComputeResStarSQNOutOfRange(t *testing.T) {
-	if _, err := ComputeResStar(tsK, tsOPc, "ffffffffffff", tsSUPI, tsSNN, mustHex(t, tsRAND), mustHex(t, tsAUTN)); !errors.Is(err, ErrSQNOutOfRange) {
+func TestCompute5GAKASQNOutOfRange(t *testing.T) {
+	if _, err := Compute5GAKA(tsK, tsOPc, "ffffffffffff", tsSUPI, tsSNN, mustHex(t, tsRAND), mustHex(t, tsAUTN)); !errors.Is(err, ErrSQNOutOfRange) {
 		t.Fatalf("err = %v, want ErrSQNOutOfRange", err)
 	}
 }
 
-func TestComputeResStarAUTNTooShort(t *testing.T) {
-	_, err := ComputeResStar(tsK, tsOPc, "000000000000", tsSUPI, tsSNN, mustHex(t, tsRAND), make([]byte, 5))
+func TestCompute5GAKAAUTNTooShort(t *testing.T) {
+	_, err := Compute5GAKA(tsK, tsOPc, "000000000000", tsSUPI, tsSNN, mustHex(t, tsRAND), make([]byte, 5))
 	if err == nil || !strings.Contains(err.Error(), "AUTN too short") {
 		t.Fatalf("err = %v, want AUTN too short", err)
 	}

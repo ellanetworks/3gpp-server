@@ -65,7 +65,7 @@ func Test4GCrossENBReleaseHijack(t *testing.T) {
 	attackerUE := mustCreateENBUE(t, attackerENB)
 
 	resp := nasBody(t, attackerENB, attackerUE, fmt.Sprintf(
-		`{"message_type":"release_request","mme_ue_s1ap_id":%s,"enb_ue_s1ap_id":%s,"timeout_ms":3000}`, vMME, vENB))
+		`{"message_type":"release_request","mme_ue_s1ap_id_override":%s,"enb_ue_s1ap_id_override":%s,"timeout_ms":3000}`, vMME, vENB))
 
 	if got := jsonGet(resp, "s1ap.message_type"); got == "UEContextReleaseCommand" {
 		t.Fatalf("a rogue eNB released another eNB's UE (cross-association hijack); body: %s", resp)
@@ -86,7 +86,7 @@ func Test4GCrossENBUECapabilityHijack(t *testing.T) {
 	attackerUE := mustCreateENBUE(t, attackerENB)
 
 	resp := nasBody(t, attackerENB, attackerUE, fmt.Sprintf(
-		`{"message_type":"ue_capability_info","ue_radio_capability":"deadbeef","mme_ue_s1ap_id":%s,"enb_ue_s1ap_id":%s,"timeout_ms":3000}`, vMME, vENB))
+		`{"message_type":"ue_capability_info","ue_radio_capability":"deadbeef","mme_ue_s1ap_id_override":%s,"enb_ue_s1ap_id_override":%s,"timeout_ms":3000}`, vMME, vENB))
 
 	assertEPSErrorIndication(t, resp)
 }

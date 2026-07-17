@@ -173,6 +173,7 @@ func provisionExtraDataNetworks(token string) error {
 		{"internet6", `{"name":"internet6","ipv6_pool":"2001:db8:6::/48","dns":"2001:4860:4860::8888","mtu":1400}`},
 		{"internet46", `{"name":"internet46","ipv4_pool":"10.46.0.0/22","ipv6_pool":"2001:db8:46::/48","dns":"8.8.8.8","mtu":1400}`},
 		{"exhaust", `{"name":"exhaust","ipv4_pool":"10.99.0.0/30","dns":"8.8.8.8","mtu":1400}`},
+		{"exhaust4g", `{"name":"exhaust4g","ipv4_pool":"10.98.0.0/30","dns":"8.8.8.8","mtu":1400}`},
 	}
 	for _, dn := range dataNetworks {
 		if err := ensureProvisioned(token, "/api/v1/networking/data-networks", dn.name, dn.body); err != nil {
@@ -184,6 +185,7 @@ func provisionExtraDataNetworks(token string) error {
 		{"internet6-policy", `{"name":"internet6-policy","profile_name":"default","slice_name":"default","data_network_name":"internet6","session_ambr_uplink":"200 Mbps","session_ambr_downlink":"200 Mbps","var5qi":9,"arp":1}`},
 		{"internet46-policy", `{"name":"internet46-policy","profile_name":"default","slice_name":"default","data_network_name":"internet46","session_ambr_uplink":"200 Mbps","session_ambr_downlink":"200 Mbps","var5qi":9,"arp":1}`},
 		{"exhaust-policy", `{"name":"exhaust-policy","profile_name":"default","slice_name":"default","data_network_name":"exhaust","session_ambr_uplink":"200 Mbps","session_ambr_downlink":"200 Mbps","var5qi":9,"arp":1}`},
+		{"exhaust4g-policy", `{"name":"exhaust4g-policy","profile_name":"default","slice_name":"default","data_network_name":"exhaust4g","session_ambr_uplink":"200 Mbps","session_ambr_downlink":"200 Mbps","var5qi":9,"arp":1}`},
 	}
 	for _, p := range policies {
 		if err := ensureProvisioned(token, "/api/v1/policies", p.name, p.body); err != nil {

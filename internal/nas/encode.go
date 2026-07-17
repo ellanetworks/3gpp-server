@@ -5,6 +5,7 @@ package nas
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 
@@ -472,4 +473,118 @@ func buildIMEISV(imeisv string) (*nasType.IMEISV, error) {
 	pei.SetIdentityDigitP_15(0xF)
 
 	return pei, nil
+}
+
+type ServiceRequestOpts struct {
+	ServiceType uint8
+	NgKsi       uint8
+	Guti        *nasType.GUTI5G
+
+	// PDUSessionStatus sets the PDU Session Status IE, bit i = session i active.
+	PDUSessionStatus *[16]bool
+}
+
+// BuildServiceRequest builds a plain SERVICE REQUEST (TS 24.501 §8.2.16); a nil Guti zeroes the 5G-S-TMSI so an unknown UE can still emit one.
+func BuildServiceRequest(opts *ServiceRequestOpts) ([]byte, error) {
+	m := nas.NewMessage()
+	m.GmmMessage = nas.NewGmmMessage()
+	m.GmmHeader.SetMessageType(nas.MsgTypeServiceRequest)
+
+	sr := nasMessage.NewServiceRequest(0)
+	sr.SetExtendedProtocolDiscriminator(nasMessage.Epd5GSMobilityManagementMessage)
+	sr.SetSecurityHeaderType(nas.SecurityHeaderTypePlainNas)
+	sr.SetMessageType(nas.MsgTypeServiceRequest)
+	sr.SetServiceTypeValue(opts.ServiceType)
+	sr.SetNasKeySetIdentifiler(opts.NgKsi)
+
+	sr.SetTypeOfIdentity(nasMessage.MobileIdentity5GSType5gSTmsi)
+	if opts.Guti != nil {
+		sr.SetAMFSetID(opts.Guti.GetAMFSetID())
+		sr.SetAMFPointer(opts.Guti.GetAMFPointer())
+		sr.SetTMSI5G(opts.Guti.GetTMSI5G())
+	}
+	sr.TMSI5GS.SetLen(7)
+
+	if opts.PDUSessionStatus != nil {
+		flags := pduSessionBitmap(opts.PDUSessionStatus)
+
+		sr.PDUSessionStatus = nasType.NewPDUSessionStatus(nasMessage.ServiceRequestPDUSessionStatusType)
+		sr.PDUSessionStatus.SetLen(2)
+		sr.PDUSessionStatus.Buffer = make([]byte, 2)
+		binary.LittleEndian.PutUint16(sr.PDUSessionStatus.Buffer, flags)
+
+		if opts.ServiceType == nasMessage.ServiceTypeData {
+			sr.UplinkDataStatus = nasType.NewUplinkDataStatus(nasMessage.ServiceRequestUplinkDataStatusType)
+			sr.UplinkDataStatus.SetLen(2)
+			sr.UplinkDataStatus.Buffer = make([]byte, 2)
+			binary.LittleEndian.PutUint16(sr.UplinkDataStatus.Buffer, flags)
+		}
+	}
+
+	m.ServiceRequest = sr
+
+	data := new(bytes.Buffer)
+	if err := m.GmmMessageEncode(data); err != nil {
+		return nil, fmt.Errorf("nas: GMM encode ServiceRequest: %w", err)
+	}
+
+	return data.Bytes(), nil
+}
+
+func pduSessionBitmap(status *[16]bool) uint16 {
+	var flags uint16
+	for i, active := range status {
+		if active {
+			flags |= 1 << uint(i)
+		}
+	}
+
+	return flags
+}
+
+type DeregistrationRequestOpts struct {
+	Guti      *nasType.GUTI5G
+	Suci      *nasType.MobileIdentity5GS
+	NgKsi     uint8
+	SwitchOff uint8
+}
+
+// BuildDeregistrationRequest builds a UE-originating DEREGISTRATION REQUEST (TS 24.501 §8.2.12).
+func BuildDeregistrationRequest(opts *DeregistrationRequestOpts) ([]byte, error) {
+	m := nas.NewMessage()
+	m.GmmMessage = nas.NewGmmMessage()
+	m.GmmHeader.SetMessageType(nas.MsgTypeDeregistrationRequestUEOriginatingDeregistration)
+
+	dereg := nasMessage.NewDeregistrationRequestUEOriginatingDeregistration(0)
+	dereg.SetExtendedProtocolDiscriminator(nasMessage.Epd5GSMobilityManagementMessage)
+	dereg.SetSecurityHeaderType(nas.SecurityHeaderTypePlainNas)
+	dereg.SetSpareHalfOctet(0x00)
+	dereg.SetMessageType(nas.MsgTypeDeregistrationRequestUEOriginatingDeregistration)
+	dereg.SetTSC(nasMessage.TypeOfSecurityContextFlagNative)
+	dereg.SetNasKeySetIdentifiler(opts.NgKsi)
+
+	dereg.SetSwitchOff(opts.SwitchOff)
+	dereg.SetReRegistrationRequired(0)
+	dereg.SetAccessType(1)
+
+	if opts.Guti != nil {
+		dereg.MobileIdentity5GS = nasType.MobileIdentity5GS{
+			Iei:    opts.Guti.Iei,
+			Len:    opts.Guti.Len,
+			Buffer: opts.Guti.Octet[:],
+		}
+	} else if opts.Suci != nil {
+		dereg.MobileIdentity5GS = *opts.Suci
+	} else {
+		return nil, fmt.Errorf("nas: either Guti or Suci must be provided")
+	}
+
+	m.DeregistrationRequestUEOriginatingDeregistration = dereg
+
+	data := new(bytes.Buffer)
+	if err := m.GmmMessageEncode(data); err != nil {
+		return nil, fmt.Errorf("nas: GMM encode DeregistrationRequest: %w", err)
+	}
+
+	return data.Bytes(), nil
 }

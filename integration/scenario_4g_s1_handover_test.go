@@ -37,7 +37,7 @@ const targetENBUES1APID = 100
 const sourceToTargetContainer = "00"
 
 // The MME stores 0xC000 for the UE's advertised EEA0/1/2 + EIA0/1/2, the S1AP bitmap carrying no EEA0/EIA0 bit.
-const storedUESecurityCapabilities = "49152"
+const storedUESecurityCapabilities = "c000"
 
 // NCC seeds at 1 at Initial Context Setup and the source MME advances it by one on HANDOVER REQUIRED, so the first S1 handover after attach carries 2 (TS 33.401 §7.2.8.1.1, §7.2.8.4.3).
 func assertHandoverRequestSecurity(t *testing.T, hoReq []byte) {

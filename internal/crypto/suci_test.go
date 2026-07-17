@@ -127,6 +127,63 @@ func TestProfileBEncryptRoundTrip(t *testing.T) {
 		profileBEncKeyLen, profileBIcbLen, profileBMacKeyLen, profileBMacLen)
 }
 
+// A non-aliasing concatenation must yield exactly ephPub‖cipherText‖mac; an
+// in-place append into ephPub's spare capacity would clobber the ciphertext.
+func TestProfileAEncryptConcatLayout(t *testing.T) {
+	const msin = "0000000001"
+
+	hnPriv, err := ecdh.X25519().GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("generate HN key: %v", err)
+	}
+
+	ctHex, err := profileAEncrypt(msin, hnPriv.PublicKey())
+	if err != nil {
+		t.Fatalf("profileAEncrypt: %v", err)
+	}
+
+	out := mustHex(t, ctHex)
+	const ephLen = 32
+	ephPub, cipherText, mac := splitScheme(t, out, ephLen, profileAMacLen)
+
+	ephKey, err := ecdh.X25519().NewPublicKey(ephPub)
+	if err != nil {
+		t.Fatalf("ephemeral public-key prefix corrupted: %v", err)
+	}
+
+	shared, err := hnPriv.ECDH(ephKey)
+	if err != nil {
+		t.Fatalf("ECDH: %v", err)
+	}
+
+	kdfKey := x963KDF(t, shared, ephPub, profileAEncKeyLen+profileAMacKeyLen)
+	encKey := kdfKey[:profileAEncKeyLen]
+	iv := kdfKey[profileAEncKeyLen : profileAEncKeyLen+profileAIcbLen]
+	macKey := kdfKey[len(kdfKey)-profileAMacKeyLen:]
+
+	block, err := aes.NewCipher(encKey)
+	if err != nil {
+		t.Fatalf("AES cipher: %v", err)
+	}
+
+	plainBCD := mustHex(t, Tbcd(msin))
+	wantCT := make([]byte, len(plainBCD))
+	cipher.NewCTR(block, iv).XORKeyStream(wantCT, plainBCD)
+
+	h := hmac.New(sha256.New, macKey)
+	h.Write(wantCT)
+	wantMac := h.Sum(nil)[:profileAMacLen]
+
+	want := bytes.Join([][]byte{ephPub, wantCT, wantMac}, nil)
+	if !bytes.Equal(out, want) {
+		t.Fatalf("scheme output = %x, want %x", out, want)
+	}
+
+	if !bytes.Equal(cipherText, wantCT) || !bytes.Equal(mac, wantMac) {
+		t.Fatalf("concatenation layout mismatch: ct=%x mac=%x", cipherText, mac)
+	}
+}
+
 func splitScheme(t *testing.T, raw []byte, ephLen, macLen int) (ephPub, cipherText, mac []byte) {
 	t.Helper()
 

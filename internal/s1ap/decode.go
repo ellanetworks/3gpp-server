@@ -335,8 +335,8 @@ func decodePathSwitchRequestAcknowledge(value []byte, resp *S1APResponse) error 
 
 	if m.UESecurityCapabilities != nil {
 		resp.ReplayedUESecurityCapabilities = &UESecurityCapabilitiesJSON{
-			EncryptionAlgorithms:          int(m.UESecurityCapabilities.EncryptionAlgorithms),
-			IntegrityProtectionAlgorithms: int(m.UESecurityCapabilities.IntegrityProtectionAlgorithms),
+			EncryptionAlgorithms:          secCapHex(m.UESecurityCapabilities.EncryptionAlgorithms),
+			IntegrityProtectionAlgorithms: secCapHex(m.UESecurityCapabilities.IntegrityProtectionAlgorithms),
 		}
 	}
 
@@ -385,8 +385,8 @@ func decodeHandoverRequest(value []byte, resp *S1APResponse) error {
 	}
 
 	resp.UESecurityCapabilities = &UESecurityCapabilitiesJSON{
-		EncryptionAlgorithms:          int(m.UESecurityCapabilities.EncryptionAlgorithms),
-		IntegrityProtectionAlgorithms: int(m.UESecurityCapabilities.IntegrityProtectionAlgorithms),
+		EncryptionAlgorithms:          secCapHex(m.UESecurityCapabilities.EncryptionAlgorithms),
+		IntegrityProtectionAlgorithms: secCapHex(m.UESecurityCapabilities.IntegrityProtectionAlgorithms),
 	}
 
 	resp.SourceToTargetContainer = hex.EncodeToString(m.SourceToTarget)
@@ -679,6 +679,10 @@ func typeOfErrorName(v s1ap.TypeOfError) string {
 	default:
 		return "unknown"
 	}
+}
+
+func secCapHex(algorithms uint16) string {
+	return fmt.Sprintf("%04x", algorithms)
 }
 
 func causeGroupName(g s1ap.CauseGroup) string {

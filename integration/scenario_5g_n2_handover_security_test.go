@@ -373,6 +373,30 @@ func Test5GUEContextReleaseRequestCrossAssociationHijack(t *testing.T) {
 	assertUEStillConnected(t, victimGNB, victimUE)
 }
 
+func Test5GUECapabilityInfoCrossAssociationHijack(t *testing.T) {
+	victimGNB := mustCreateGnB(t)
+	attackerGNB := mustCreateGnB(t)
+
+	victimUE := mustCreateUE(t, victimGNB)
+	doRegistrationFlow(t, victimGNB, victimUE)
+	victimAmf, victimRan := ueNGAPIDs(t, victimGNB, victimUE)
+
+	attackerUE := mustCreateUE(t, attackerGNB)
+	doRegistrationFlow(t, attackerGNB, attackerUE)
+
+	status, body := doRequest(t, "POST", "/gnb/"+attackerGNB+"/ue/"+attackerUE+"/ngap",
+		fmt.Sprintf(`{"message_type":"ue_capability_info","ue_radio_capability":"deadbeef","amf_ue_ngap_id_override":%d,"ran_ue_ngap_id_override":%d}`, victimAmf, victimRan))
+	if status != 200 {
+		t.Fatalf("forged capability info: HTTP %d\n  body: %s", status, body)
+	}
+
+	if got := jsonGet(body, "ngap.message_type"); got != ngapErrorIndication {
+		t.Errorf("forged UE Radio Capability Info Indication: ngap.message_type = %q, want ErrorIndication (TS 38.413 §10.6)\n  body: %s", got, body)
+	}
+
+	assertUEStillConnected(t, victimGNB, victimUE)
+}
+
 func runInvalidPDUSessionHandover(t *testing.T, srcHex, tgtHex string, sessionID int) {
 	t.Helper()
 
