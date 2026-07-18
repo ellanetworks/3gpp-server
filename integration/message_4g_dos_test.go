@@ -25,7 +25,7 @@ func createENBID(t *testing.T, enbID int) string {
 	id := jsonGet(resp, "enb_id")
 	t.Cleanup(func() { doRequest(t, "DELETE", "/enb/"+id, "") })
 
-	if got := jsonGet(resp, "response.message_type"); got != "S1SetupResponse" {
+	if got := jsonGet(resp, "s1_setup_response.message_type"); got != "S1SetupResponse" {
 		t.Fatalf("eNB %d: response = %q, want S1SetupResponse; body: %s", enbID, got, resp)
 	}
 

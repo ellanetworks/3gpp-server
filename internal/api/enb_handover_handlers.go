@@ -46,6 +46,8 @@ func (h *Handler) SendENBS1AP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case req.RawS1APPDU != nil:
 		resp, herr = handleENBRawS1AP(ctx, t, &req)
+	case req.MessageType == "reset":
+		resp, herr = handleENBReset(ctx, enb, t, &req)
 	case req.MessageType == "path_switch_request":
 		resp, herr = handleENBPathSwitchRequest(ctx, enb, t, &req)
 	case req.MessageType == "handover_request_acknowledge":
@@ -65,6 +67,39 @@ func (h *Handler) SendENBS1AP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// Reset is non-UE-associated: it resets the whole S1 interface, or the UE
+// associations named in reset_ue_ids (TS 36.413 §8.7.1).
+func handleENBReset(ctx context.Context, enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBNASResponse, error) {
+	var connections []s1ap.ResetConnection
+
+	for _, ueID := range req.ResetUEIDs {
+		ue, ok := enb.GetUE(ueID)
+		if !ok {
+			return nil, httpErrorf(http.StatusNotFound, "ue %s not found", ueID)
+		}
+
+		mme := ue.MMEUES1APID
+		enbID := ue.ENBUES1APID
+		connections = append(connections, s1ap.ResetConnection{MMEUES1APID: &mme, ENBUES1APID: &enbID})
+	}
+
+	pdu, err := s1ap.BuildReset(len(connections) == 0, connections)
+	if err != nil {
+		return nil, httpErrorf(http.StatusInternalServerError, "build Reset: %v", err)
+	}
+
+	if err := t.Send(pdu, false); err != nil {
+		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
+	}
+
+	resp, err := t.WaitForMessage(ctx, "ResetAcknowledge", "ErrorIndication")
+	if err != nil {
+		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for ResetAcknowledge: %v", err)
+	}
+
+	return &SendENBNASResponse{S1AP: resp}, nil
 }
 
 func handleENBRawS1AP(ctx context.Context, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBNASResponse, error) {

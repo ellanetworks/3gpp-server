@@ -11,10 +11,10 @@ import (
 )
 
 type pduSessionSetupItem struct {
-	PDUSessionID int64  `json:"pdu_session_id"`
-	ULTeid       uint32 `json:"ul_teid"`
-	UPFN3IP      string `json:"upf_n3_ip"`
-	UPFN3IPv6    string `json:"upf_n3_ipv6"`
+	PDUSessionID              int64  `json:"pdu_session_id"`
+	ULTeid                    uint32 `json:"ul_teid"`
+	TransportLayerAddress     string `json:"transport_layer_address"`
+	TransportLayerAddressIPv6 string `json:"transport_layer_address_ipv6"`
 }
 
 func ngapPDUSessionSetupItems(body []byte) []pduSessionSetupItem {
@@ -56,17 +56,17 @@ func Test5GPDUSessionResourceSetup_TransportLayerAddress(t *testing.T) {
 
 	item := items[0]
 
-	if item.UPFN3IP == "" && item.UPFN3IPv6 == "" {
+	if item.TransportLayerAddress == "" && item.TransportLayerAddressIPv6 == "" {
 		t.Fatalf("UL NG-U UP TNL Information carries no decodable Transport Layer Address; it must be 32, 128 or 160 bits (TS 38.414 §5.3)\n  body: %s", setup)
 	}
 
-	if item.UPFN3IP != "" && item.UPFN3IP != n3IPv4.upfN3 {
-		t.Errorf("upf_n3_ip = %q, want the UPF N3 IPv4 %q — with both families signalled the IPv4 occupies the first 32 bits (TS 38.414 §5.3)\n  body: %s",
-			item.UPFN3IP, n3IPv4.upfN3, setup)
+	if item.TransportLayerAddress != "" && item.TransportLayerAddress != n3IPv4.upfN3 {
+		t.Errorf("transport_layer_address = %q, want the UPF N3 IPv4 %q — with both families signalled the IPv4 occupies the first 32 bits (TS 38.414 §5.3)\n  body: %s",
+			item.TransportLayerAddress, n3IPv4.upfN3, setup)
 	}
 
-	if item.UPFN3IPv6 != "" && item.UPFN3IPv6 != n3IPv6.upfN3 {
-		t.Errorf("upf_n3_ipv6 = %q, want the UPF N3 IPv6 %q — a 160-bit address carries the IPv6 in the 128 bits following the IPv4 (TS 38.414 §5.3)\n  body: %s",
-			item.UPFN3IPv6, n3IPv6.upfN3, setup)
+	if item.TransportLayerAddressIPv6 != "" && item.TransportLayerAddressIPv6 != n3IPv6.upfN3 {
+		t.Errorf("transport_layer_address_ipv6 = %q, want the UPF N3 IPv6 %q — a 160-bit address carries the IPv6 in the 128 bits following the IPv4 (TS 38.414 §5.3)\n  body: %s",
+			item.TransportLayerAddressIPv6, n3IPv6.upfN3, setup)
 	}
 }

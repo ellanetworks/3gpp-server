@@ -118,8 +118,8 @@ func (h *Handler) CreateENB(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, CreateENBResponse{
-		ENBID:    enb.ID,
-		Response: resp,
+		ENBID:           enb.ID,
+		S1SetupResponse: resp,
 	})
 }
 

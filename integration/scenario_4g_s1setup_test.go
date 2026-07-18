@@ -35,15 +35,15 @@ func Test4GScenarioS1Setup(t *testing.T) {
 		id := jsonGet(resp, "enb_id")
 		t.Cleanup(func() { doRequest(t, "DELETE", "/enb/"+id, "") })
 
-		if got := jsonGet(resp, "response.pdu_type"); got != "successful_outcome" {
+		if got := jsonGet(resp, "s1_setup_response.pdu_type"); got != "successful_outcome" {
 			t.Fatalf("pdu_type = %q, want successful_outcome; body: %s", got, resp)
 		}
 
-		if got := jsonGet(resp, "response.message_type"); got != "S1SetupResponse" {
+		if got := jsonGet(resp, "s1_setup_response.message_type"); got != "S1SetupResponse" {
 			t.Fatalf("message_type = %q, want S1SetupResponse; body: %s", got, resp)
 		}
 
-		if gummeis := jsonGet(resp, "response.s1_setup_response.served_gummeis"); gummeis == "" || gummeis == "null" || gummeis == "[]" {
+		if gummeis := jsonGet(resp, "s1_setup_response.served_gummeis"); gummeis == "" || gummeis == "null" || gummeis == "[]" {
 			t.Fatalf("served_gummeis is empty; body: %s", resp)
 		}
 	})

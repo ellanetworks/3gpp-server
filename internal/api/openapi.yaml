@@ -243,8 +243,6 @@ paths:
         - `error_indication` — ERROR INDICATION for the UE's connection (§8.7.2).
         - `release_request` — UE CONTEXT RELEASE REQUEST; the MME's Release Command
           is acknowledged with Release Complete.
-        - `reset` — RESET of this UE's connection (partOfS1-Interface), or of the
-          whole S1 interface with `reset_all` (§8.7.1).
         - `path_switch` — Target-eNB PATH SWITCH REQUEST after an X2 handover
           (§9.1.5.8), expecting a fresh {NH, NCC} in the acknowledge.
 
@@ -1351,7 +1349,7 @@ components:
         enb_id:
           type: string
           description: Store handle used in subsequent /enb/{enb_id} requests.
-        response:
+        s1_setup_response:
           $ref: "#/components/schemas/S1APResponse"
           description: First matching downlink, or null if none arrived in time.
 
@@ -1384,12 +1382,20 @@ components:
         raw_hex:
           type: string
           description: Full S1AP PDU as hex.
-        s1_setup_response:
-          type: object
-          description: Present on an S1SetupResponse; served GUMMEIs and MME capacity.
-        s1_setup_failure:
-          type: object
-          description: Present on an S1SetupFailure; cause and optional time-to-wait.
+        mme_name:
+          type: string
+          description: Present on an S1SetupResponse.
+        served_gummeis:
+          type: array
+          description: Present on an S1SetupResponse.
+          items:
+            type: object
+        relative_mme_capacity:
+          type: integer
+          description: Present on an S1SetupResponse.
+        time_to_wait:
+          type: string
+          description: Present on an S1SetupFailure when the MME signals a back-off.
         unknown_ies:
           type: array
           description: ProtocolIEs the received message carries that its message type does not model, in wire order.
@@ -1575,9 +1581,6 @@ components:
         esm_cause:
           type: integer
           description: On esm_status (or a modify reject), the ESM cause (TS 24.301 §9.9.4.4); #43 makes the MME deactivate the bearer. Defaults to #111.
-        reset_all:
-          type: boolean
-          description: On reset, reset the whole S1 interface (reset-all) rather than only this UE's connection (TS 36.413 §8.7.1).
         res_override:
           type: string
           description: Override the computed RES with these hex bytes (wrong-RES tests).
@@ -1606,7 +1609,7 @@ components:
       properties:
         message_type:
           type: string
-          enum: [handover_request_acknowledge, handover_notify, handover_failure, path_switch_request]
+          enum: [reset, handover_request_acknowledge, handover_notify, handover_failure, path_switch_request]
         raw_s1ap_pdu:
           type: string
           description: When set, hex S1AP PDU written verbatim onto the S1-MME association with no encoding or validation; message_type is ignored. Lets a test send any S1AP PDU, well-formed or not.
@@ -1717,6 +1720,12 @@ components:
           type: integer
         imeisv:
           type: string
+        ue_security_capability:
+          type: string
+          description: >
+            Advertised NEA/NIA support bitmap (hex), e.g. "2020" for NEA2/NIA2
+            only. Defaults to NEA0/1/2 + NIA0/1/2. Overridable per message via
+            the send-NGAP ue_security_capability field.
 
     CreateUEResponse:
       type: object

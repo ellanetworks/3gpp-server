@@ -89,7 +89,7 @@ func Test4GPathSwitchSourceResetPreservesMovedUE(t *testing.T) {
 
 	mmeID := moveENBPathToTarget(t, sourceENB, targetENB, ueID, 700005)
 
-	resp := nasStep(t, sourceENB, ueID, "reset")
+	_, resp := doRequest(t, "POST", "/enb/"+sourceENB+"/s1ap", `{"message_type":"reset","timeout_ms":4000}`)
 	if got := jsonGet(resp, "s1ap.message_type"); got != "ResetAcknowledge" {
 		t.Errorf("source reset: s1ap.message_type = %q, want ResetAcknowledge (TS 36.413 §8.7.1)\n  body: %s", got, resp)
 	}

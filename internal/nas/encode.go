@@ -53,6 +53,9 @@ type RegistrationRequestOverrides struct {
 }
 
 // BuildRegistrationRequest builds a plain REGISTRATION REQUEST (TS 24.501 §8.2.6).
+// NEA0/1/2 and NIA0/1/2; bit 7 = algorithm 0, bit 6 = 1, bit 5 = 2 (TS 24.501 §9.11.3.54).
+var DefaultUESecurityCapability = []byte{0xE0, 0xE0}
+
 func BuildRegistrationRequest(opts *RegistrationRequestOpts) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()

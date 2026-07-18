@@ -120,6 +120,8 @@ type CreateUERequest struct {
 	PDUSessionID     uint8  `json:"pdu_session_id,omitempty"`
 	PDUSessionType   uint8  `json:"pdu_session_type,omitempty"`
 	IMEISV           string `json:"imeisv,omitempty"`
+
+	UESecurityCapability string `json:"ue_security_capability,omitempty"`
 }
 
 type CreateUEResponse struct {

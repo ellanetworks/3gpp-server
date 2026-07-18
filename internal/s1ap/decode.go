@@ -91,7 +91,7 @@ func Decode(data []byte) (*S1APResponse, error) {
 
 			setUnknownIEs(resp, sr)
 
-			resp.S1SetupResponse = mapS1SetupResponse(sr)
+			mapS1SetupResponse(sr, resp)
 		case s1ap.ProcPathSwitchRequest:
 			resp.MessageType = "PathSwitchRequestAcknowledge"
 			if err := decodePathSwitchRequestAcknowledge(m.Value, resp); err != nil {
@@ -128,7 +128,7 @@ func Decode(data []byte) (*S1APResponse, error) {
 
 			setUnknownIEs(resp, sf)
 
-			resp.S1SetupFailure = mapS1SetupFailure(sf)
+			mapS1SetupFailure(sf, resp)
 
 			if sf.CriticalityDiagnostics != nil {
 				resp.CriticalityDiagnostics = decodeCriticalityDiagnostics(sf.CriticalityDiagnostics)
@@ -543,11 +543,14 @@ func setUnknownIEs(resp *S1APResponse, m unknownIECarrier) {
 	}
 }
 
-func mapS1SetupResponse(sr *s1ap.S1SetupResponse) *S1SetupResponseJSON {
-	out := &S1SetupResponseJSON{
-		MMEName:             sr.MMEName,
-		RelativeMMECapacity: int(sr.RelativeMMECapacity),
+func mapS1SetupResponse(sr *s1ap.S1SetupResponse, resp *S1APResponse) {
+	if sr.MMEName != "" {
+		name := sr.MMEName
+		resp.MMEName = &name
 	}
+
+	capacity := int(sr.RelativeMMECapacity)
+	resp.RelativeMMECapacity = &capacity
 
 	for _, it := range sr.ServedGUMMEIs {
 		g := ServedGUMMEIJSON{}
@@ -564,23 +567,17 @@ func mapS1SetupResponse(sr *s1ap.S1SetupResponse) *S1SetupResponseJSON {
 			g.ServedMMECs = append(g.ServedMMECs, hex.EncodeToString([]byte{byte(c)}))
 		}
 
-		out.ServedGUMMEIs = append(out.ServedGUMMEIs, g)
+		resp.ServedGUMMEIs = append(resp.ServedGUMMEIs, g)
 	}
-
-	return out
 }
 
-func mapS1SetupFailure(sf *s1ap.S1SetupFailure) *S1SetupFailureJSON {
-	out := &S1SetupFailureJSON{
-		Cause: CauseJSON{Group: causeGroupName(sf.Cause.Group), Value: sf.Cause.Value},
-	}
+func mapS1SetupFailure(sf *s1ap.S1SetupFailure, resp *S1APResponse) {
+	resp.Cause = &CauseJSON{Group: causeGroupName(sf.Cause.Group), Value: sf.Cause.Value}
 
 	if sf.TimeToWait != nil {
 		ttw := timeToWaitName(*sf.TimeToWait)
-		out.TimeToWait = &ttw
+		resp.TimeToWait = &ttw
 	}
-
-	return out
 }
 
 func procedureName(pc s1ap.ProcedureCode) string {

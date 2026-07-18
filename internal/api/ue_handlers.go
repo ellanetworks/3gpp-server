@@ -58,6 +58,8 @@ func (h *Handler) CreateUE(w http.ResponseWriter, r *http.Request) {
 		PDUSessionID:     req.PDUSessionID,
 		PDUSessionType:   req.PDUSessionType,
 		IMEISV:           req.IMEISV,
+
+		UESecurityCapability: req.UESecurityCapability,
 	})
 	if err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("failed to create UE context: %v", err))

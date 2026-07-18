@@ -81,10 +81,10 @@ type UESecurityCapabilitiesJSON struct {
 }
 
 type PDUSessionSetupItemJSON struct {
-	PDUSessionID int64  `json:"pdu_session_id"`
-	ULTeid       uint32 `json:"ul_teid,omitempty"`
-	UPFN3IP      string `json:"upf_n3_ip,omitempty"`
-	UPFN3IPv6    string `json:"upf_n3_ipv6,omitempty"`
+	PDUSessionID              int64  `json:"pdu_session_id"`
+	ULTeid                    uint32 `json:"ul_teid,omitempty"`
+	TransportLayerAddress     string `json:"transport_layer_address,omitempty"`
+	TransportLayerAddressIPv6 string `json:"transport_layer_address_ipv6,omitempty"`
 }
 
 type GlobalRANNodeIDJSON struct {

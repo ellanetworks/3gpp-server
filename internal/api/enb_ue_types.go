@@ -40,7 +40,6 @@ type SendENBNASRequest struct {
 	ReplayLast        bool    `json:"replay_last,omitempty"`
 	SwitchOff         bool    `json:"switch_off,omitempty"`
 	ReleaseCause      *int    `json:"release_cause,omitempty"`
-	ResetAll          bool    `json:"reset_all,omitempty"`
 	UERadioCapability string  `json:"ue_radio_capability,omitempty"`
 	MTMSIOverride     *uint32 `json:"mtmsi,omitempty"`
 	NASCountOverride  *uint32 `json:"nas_count,omitempty"`
@@ -76,6 +75,8 @@ type SendENBS1APRequest struct {
 	RawS1APPDU *string  `json:"raw_s1ap_pdu,omitempty"`
 	WaitFor    []string `json:"wait_for,omitempty"`
 	TimeoutMs  int      `json:"timeout_ms,omitempty"`
+
+	ResetUEIDs []string `json:"reset_ue_ids,omitempty"`
 
 	MMEUES1APID *uint32 `json:"mme_ue_s1ap_id,omitempty"`
 	ENBUES1APID *uint32 `json:"enb_ue_s1ap_id,omitempty"`

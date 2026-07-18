@@ -35,9 +35,9 @@ func captureTunnel(gnb *store.GNBContext, ue *store.UEContext, pduSessionID int6
 		if item.PDUSessionID == pduSessionID {
 			info.ULTeid = item.ULTeid
 			if gnbN3IsV6 {
-				info.UPFIP = firstNonEmpty(item.UPFN3IPv6, item.UPFN3IP)
+				info.UPFIP = firstNonEmpty(item.TransportLayerAddressIPv6, item.TransportLayerAddress)
 			} else {
-				info.UPFIP = firstNonEmpty(item.UPFN3IP, item.UPFN3IPv6)
+				info.UPFIP = firstNonEmpty(item.TransportLayerAddress, item.TransportLayerAddressIPv6)
 			}
 		}
 	}

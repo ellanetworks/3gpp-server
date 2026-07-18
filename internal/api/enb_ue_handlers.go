@@ -204,8 +204,6 @@ func (h *Handler) SendENBNAS(w http.ResponseWriter, r *http.Request) {
 		resp, herr = handleENBBearerResourceModification(enb, ue, t, &req)
 	case "esm_information_response":
 		resp, herr = handleENBEsmInformationResponse(enb, ue, t, &req)
-	case "reset":
-		resp, herr = handleENBReset(ctx, ue, t, &req)
 	case "security_mode_complete":
 		resp, herr = handleENBSecurityModeComplete(ctx, enb, ue, t, &req)
 	case "security_mode_reject":
@@ -799,29 +797,6 @@ func handleENBPathSwitch(ctx context.Context, enb *store.ENBContext, ue *store.U
 	}
 
 	return &SendENBNASResponse{S1AP: dl}, nil
-}
-
-func handleENBReset(ctx context.Context, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
-	var connections []s1ap.ResetConnection
-	if !req.ResetAll {
-		connections = []s1ap.ResetConnection{{MMEUES1APID: &ue.MMEUES1APID, ENBUES1APID: &ue.ENBUES1APID}}
-	}
-
-	pdu, err := s1ap.BuildReset(req.ResetAll, connections)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := t.Send(pdu, false); err != nil {
-		return nil, err
-	}
-
-	resp, err := t.WaitForMessage(ctx, "ResetAcknowledge")
-	if err != nil {
-		return &SendENBNASResponse{}, nil
-	}
-
-	return &SendENBNASResponse{S1AP: resp}, nil
 }
 
 func handleENBPdnConnectivity(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {

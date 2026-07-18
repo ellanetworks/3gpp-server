@@ -25,8 +25,8 @@ type CreateENBRequest struct {
 }
 
 type CreateENBResponse struct {
-	ENBID    string             `json:"enb_id"`
-	Response *s1ap.S1APResponse `json:"response"`
+	ENBID           string             `json:"enb_id"`
+	S1SetupResponse *s1ap.S1APResponse `json:"s1_setup_response"`
 }
 
 type ENBStateResponse struct {

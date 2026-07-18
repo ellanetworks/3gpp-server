@@ -237,6 +237,8 @@ func decodeHandoverCommand(msg *ngapType.HandoverCommand, resp *NGAPResponse) {
 				}
 				resp.ReleasePDUSessionIDs = ids
 			}
+		default:
+			resp.UnknownIEs = append(resp.UnknownIEs, unknownIE(ie.Id.Value, ie.Criticality.Value, ie.Value))
 		}
 	}
 }
@@ -249,6 +251,7 @@ func decodeNGResetAcknowledge(msg *ngapType.NGResetAcknowledge, resp *NGAPRespon
 	for _, ie := range msg.ProtocolIEs.List {
 		if ie.Id.Value != ngapType.ProtocolIEIDUEAssociatedLogicalNGConnectionList ||
 			ie.Value.UEAssociatedLogicalNGConnectionList == nil {
+			resp.UnknownIEs = append(resp.UnknownIEs, unknownIE(ie.Id.Value, ie.Criticality.Value, ie.Value))
 			continue
 		}
 
@@ -572,6 +575,8 @@ func decodeHandoverRequest(msg *ngapType.HandoverRequest, resp *NGAPResponse) {
 				s := hex.EncodeToString(c.Value)
 				resp.SourceToTargetContainer = &s
 			}
+		default:
+			resp.UnknownIEs = append(resp.UnknownIEs, unknownIE(ie.Id.Value, ie.Criticality.Value, ie.Value))
 		}
 	}
 }
@@ -648,8 +653,8 @@ func decodeInitialContextSetupRequest(msg *ngapType.InitialContextSetupRequest, 
 					setupItem := PDUSessionSetupItemJSON{PDUSessionID: item.PDUSessionID.Value}
 					if teid, ipv4, ipv6, ok := decodeULTunnel(item.PDUSessionResourceSetupRequestTransfer); ok {
 						setupItem.ULTeid = teid
-						setupItem.UPFN3IP = ipv4
-						setupItem.UPFN3IPv6 = ipv6
+						setupItem.TransportLayerAddress = ipv4
+						setupItem.TransportLayerAddressIPv6 = ipv6
 					}
 
 					resp.PDUSessionSetupItems = append(resp.PDUSessionSetupItems, setupItem)
@@ -761,8 +766,8 @@ func decodePDUSessionResourceSetupRequest(msg *ngapType.PDUSessionResourceSetupR
 					setupItem := PDUSessionSetupItemJSON{PDUSessionID: item.PDUSessionID.Value}
 					if teid, ipv4, ipv6, ok := decodeULTunnel(item.PDUSessionResourceSetupRequestTransfer); ok {
 						setupItem.ULTeid = teid
-						setupItem.UPFN3IP = ipv4
-						setupItem.UPFN3IPv6 = ipv6
+						setupItem.TransportLayerAddress = ipv4
+						setupItem.TransportLayerAddressIPv6 = ipv6
 					}
 
 					resp.PDUSessionSetupItems = append(resp.PDUSessionSetupItems, setupItem)

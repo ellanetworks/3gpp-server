@@ -79,11 +79,11 @@ func sendS1SetupPDU(t *testing.T, p *s1ap.S1SetupRequestParams) []byte {
 func assertS1SetupAccepted(t *testing.T, resp []byte) {
 	t.Helper()
 
-	if got := jsonGet(resp, "response.message_type"); got != "S1SetupResponse" {
+	if got := jsonGet(resp, "s1_setup_response.message_type"); got != "S1SetupResponse" {
 		t.Fatalf("message_type = %q, want S1SetupResponse; body: %s", got, resp)
 	}
 
-	if g := jsonGet(resp, "response.s1_setup_response.served_gummeis"); g == "" || g == "null" || g == "[]" {
+	if g := jsonGet(resp, "s1_setup_response.served_gummeis"); g == "" || g == "null" || g == "[]" {
 		t.Fatalf("S1 Setup Response missing mandatory Served GUMMEIs (TS 36.413 §9.1.8.5); body: %s", resp)
 	}
 }
@@ -93,11 +93,11 @@ func assertS1SetupAccepted(t *testing.T, resp []byte) {
 func assertS1SetupRejected(t *testing.T, resp []byte) {
 	t.Helper()
 
-	if got := jsonGet(resp, "response.message_type"); got != "S1SetupFailure" {
+	if got := jsonGet(resp, "s1_setup_response.message_type"); got != "S1SetupFailure" {
 		t.Fatalf("message_type = %q, want S1SetupFailure; body: %s", got, resp)
 	}
 
-	if c := jsonGet(resp, "response.s1_setup_failure.cause.group"); c == "" {
+	if c := jsonGet(resp, "s1_setup_response.cause.group"); c == "" {
 		t.Fatalf("S1 Setup Failure missing mandatory Cause (TS 36.413 §9.1.8.6); body: %s", resp)
 	}
 }
@@ -190,14 +190,14 @@ func Test4GS1SetupMalformed(t *testing.T) {
 				t.Fatalf("server failed to handle raw send (HTTP %d): %s", status, resp)
 			}
 
-			got := jsonGet(resp, "response.message_type")
+			got := jsonGet(resp, "s1_setup_response.message_type")
 			if got == "S1SetupResponse" {
 				t.Fatalf("MME accepted malformed PDU as S1 Setup; body: %s", resp)
 			}
 
 			// The cause value is unchecked: TS 36.413 §10.2 asks only for "an appropriate cause value".
 			if got != "ErrorIndication" {
-				t.Errorf("response.message_type = %q, want ErrorIndication — a PDU the ASN.1 decoder cannot decode is a Transfer Syntax Error (TS 36.413 §10.2); body: %s", got, resp)
+				t.Errorf("s1_setup_response.message_type = %q, want ErrorIndication — a PDU the ASN.1 decoder cannot decode is a Transfer Syntax Error (TS 36.413 §10.2); body: %s", got, resp)
 			}
 		})
 	}

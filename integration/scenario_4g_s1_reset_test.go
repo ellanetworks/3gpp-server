@@ -5,7 +5,10 @@
 
 package integration_test
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 func Test4GS1ResetAll(t *testing.T) {
 	enbID := mustCreateENB(t)
@@ -13,7 +16,7 @@ func Test4GS1ResetAll(t *testing.T) {
 
 	fullAttach(t, enbID, ueID)
 
-	resp := nasBody(t, enbID, ueID, `{"message_type":"reset","reset_all":true,"timeout_ms":4000}`)
+	_, resp := doRequest(t, "POST", "/enb/"+enbID+"/s1ap", `{"message_type":"reset","timeout_ms":4000}`)
 
 	if got := jsonGet(resp, "s1ap.message_type"); got != "ResetAcknowledge" {
 		t.Fatalf("S1 reset (all): s1ap.message_type = %q, want ResetAcknowledge (TS 36.413 §8.7.1.2.1); body: %s", got, resp)
@@ -37,7 +40,8 @@ func Test4GS1ResetPartial(t *testing.T) {
 	fullAttach(t, enbID, ueID)
 	mme, enb := enbUES1APIDs(t, enbID, ueID)
 
-	resp := nasBody(t, enbID, ueID, `{"message_type":"reset","timeout_ms":4000}`)
+	_, resp := doRequest(t, "POST", "/enb/"+enbID+"/s1ap",
+		fmt.Sprintf(`{"message_type":"reset","reset_ue_ids":[%q],"timeout_ms":4000}`, ueID))
 
 	if got := jsonGet(resp, "s1ap.message_type"); got != "ResetAcknowledge" {
 		t.Fatalf("S1 reset (partial): s1ap.message_type = %q, want ResetAcknowledge (TS 36.413 §8.7.1.2.1); body: %s", got, resp)

@@ -39,8 +39,10 @@ type S1APResponse struct {
 	MessageType string `json:"message_type"`
 	RawHex      string `json:"raw_hex"`
 
-	S1SetupResponse *S1SetupResponseJSON `json:"s1_setup_response,omitempty"`
-	S1SetupFailure  *S1SetupFailureJSON  `json:"s1_setup_failure,omitempty"`
+	MMEName             *string            `json:"mme_name,omitempty"`
+	ServedGUMMEIs       []ServedGUMMEIJSON `json:"served_gummeis,omitempty"`
+	RelativeMMECapacity *int               `json:"relative_mme_capacity,omitempty"`
+	TimeToWait          *string            `json:"time_to_wait,omitempty"`
 
 	MMEUES1APID                    *int64                      `json:"mme_ue_s1ap_id,omitempty"`
 	ENBUES1APID                    *int64                      `json:"enb_ue_s1ap_id,omitempty"`
@@ -104,21 +106,10 @@ type ERABModifyItemJSON struct {
 	ARPPriorityLevel int `json:"arp_priority_level"`
 }
 
-type S1SetupResponseJSON struct {
-	MMEName             string             `json:"mme_name,omitempty"`
-	ServedGUMMEIs       []ServedGUMMEIJSON `json:"served_gummeis"`
-	RelativeMMECapacity int                `json:"relative_mme_capacity"`
-}
-
 type ServedGUMMEIJSON struct {
 	ServedPLMNs    []string `json:"served_plmns"`
 	ServedGroupIDs []string `json:"served_group_ids"`
 	ServedMMECs    []string `json:"served_mmecs"`
-}
-
-type S1SetupFailureJSON struct {
-	Cause      CauseJSON `json:"cause"`
-	TimeToWait *string   `json:"time_to_wait,omitempty"`
 }
 
 // Value indexes the ASN.1 enumeration of the named Cause CHOICE group (TS 36.413 §9.2.1.3).
