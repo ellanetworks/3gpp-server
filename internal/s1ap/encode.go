@@ -7,10 +7,6 @@ import (
 	"github.com/ellanetworks/core/s1ap"
 )
 
-// BuildS1SetupRequest encodes an S1 Setup Request PDU for the given eNB
-// parameters. With no explicit SupportedTAs it advertises one supported TA whose
-// only broadcast PLMN is the eNB's own PLMN; ENBIDKind defaults to a macro
-// eNB-ID.
 func BuildS1SetupRequest(p *S1SetupRequestParams) ([]byte, error) {
 	enbPLMN, err := encodePLMN(p.MCC, p.MNC)
 	if err != nil {
@@ -37,7 +33,12 @@ func BuildS1SetupRequest(p *S1SetupRequestParams) ([]byte, error) {
 
 func buildSupportedTAs(p *S1SetupRequestParams, enbPLMN s1ap.PLMNIdentity) (s1ap.SupportedTAs, error) {
 	if len(p.SupportedTAs) == 0 {
-		return s1ap.SupportedTAs{{TAC: s1ap.TAC(p.TAC), BroadcastPLMNs: s1ap.BPLMNs{enbPLMN}}}, nil
+		tac, err := parseTAC(p.TAC)
+		if err != nil {
+			return nil, err
+		}
+
+		return s1ap.SupportedTAs{{TAC: s1ap.TAC(tac), BroadcastPLMNs: s1ap.BPLMNs{enbPLMN}}}, nil
 	}
 
 	out := make(s1ap.SupportedTAs, 0, len(p.SupportedTAs))
@@ -58,7 +59,12 @@ func buildSupportedTAs(p *S1SetupRequestParams, enbPLMN s1ap.PLMNIdentity) (s1ap
 			bplmns = append(bplmns, b)
 		}
 
-		out = append(out, s1ap.SupportedTAItem{TAC: s1ap.TAC(ta.TAC), BroadcastPLMNs: bplmns})
+		tac, err := parseTAC(ta.TAC)
+		if err != nil {
+			return nil, err
+		}
+
+		out = append(out, s1ap.SupportedTAItem{TAC: s1ap.TAC(tac), BroadcastPLMNs: bplmns})
 	}
 
 	return out, nil

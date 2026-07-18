@@ -3,12 +3,6 @@
 
 //go:build integration
 
-// State after an Xn handover: once a path switch moves a UE context to the
-// target NG-RAN node, the source node holds stale AP IDs. TS 38.413 §10.6
-// requires the AMF to reject UE-associated messages bearing those stale IDs with
-// an Error Indication, and — critically — not to act on them, so a stale or
-// rogue source cannot tear down or disturb the UE that now lives on the target.
-
 package integration_test
 
 import (
@@ -16,10 +10,7 @@ import (
 	"testing"
 )
 
-// movePathToTarget registers a UE with a PDU session on sourceGNB, then path-
-// switches it to targetGNB. Afterwards the AMF holds the UE on targetGNB and the
-// source's stored AP IDs are stale. Returns the source UE id and the (unchanged)
-// AMF UE NGAP ID.
+// The returned AMF UE NGAP ID is unchanged by the switch; the source's AP IDs go stale.
 func movePathToTarget(t *testing.T, sourceGNB, targetGNB, supi string, newRanID int64) (string, int64) {
 	t.Helper()
 
@@ -33,8 +24,6 @@ func movePathToTarget(t *testing.T, sourceGNB, targetGNB, supi string, newRanID 
 	return ueID, amfID
 }
 
-// assertUEStillSwitchable proves the UE context still exists (was not torn down)
-// by path-switching it again from gnbID and expecting an acknowledge.
 func assertUEStillSwitchable(t *testing.T, gnbID string, amfID, newRanID int64, context string) {
 	t.Helper()
 
@@ -43,10 +32,6 @@ func assertUEStillSwitchable(t *testing.T, gnbID string, amfID, newRanID int64, 
 	assertPathSwitchType(t, context, status, body, ngapPathSwitchRequestAcknowledge)
 }
 
-// TestPathSwitchStaleSourceUEContextReleaseRejected — §10.6: after the UE has
-// switched to the target, a UE Context Release Request from the source (bearing
-// the stale RAN UE NGAP ID) must be answered with an Error Indication, and must
-// not release the UE that now lives on the target.
 func Test5GPathSwitchStaleSourceUEContextReleaseRejected(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "000120", "ps-stale-rel-src")
 	targetGNB := createGnBWithID(t, "000121", "ps-stale-rel-tgt")
@@ -66,9 +51,6 @@ func Test5GPathSwitchStaleSourceUEContextReleaseRejected(t *testing.T) {
 	assertUEStillSwitchable(t, targetGNB, amfID, 211, "UE survives a stale source UE Context Release Request")
 }
 
-// TestPathSwitchStaleSourceUplinkNASRejected — §10.6: a NAS uplink from the
-// stale source association carries the old AP IDs and must be answered with an
-// Error Indication rather than served.
 func Test5GPathSwitchStaleSourceUplinkNASRejected(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "000122", "ps-stale-nas-src")
 	targetGNB := createGnBWithID(t, "000123", "ps-stale-nas-tgt")
@@ -86,9 +68,7 @@ func Test5GPathSwitchStaleSourceUplinkNASRejected(t *testing.T) {
 	}
 }
 
-// TestPathSwitchSourceNGResetPreservesMovedUE — §8.7.4: an NG Reset resets only
-// the connections on the resetting association. After the UE has switched to the
-// target, a full NG Reset from the source must not release it.
+// An NG Reset resets only the resetting association's connections (TS 38.413 §8.7.4).
 func Test5GPathSwitchSourceNGResetPreservesMovedUE(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "000124", "ps-stale-reset-src")
 	targetGNB := createGnBWithID(t, "000125", "ps-stale-reset-tgt")

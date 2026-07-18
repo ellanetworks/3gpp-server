@@ -31,8 +31,6 @@ func TestEncodePLMN(t *testing.T) {
 		}
 	}
 
-	// Malformed input must return an error, never panic (short MCC/MNC once caused
-	// an index-out-of-range panic reachable from HTTP input).
 	invalid := []struct {
 		name, mcc, mnc string
 	}{

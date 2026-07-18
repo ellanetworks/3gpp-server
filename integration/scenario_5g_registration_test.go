@@ -3,10 +3,6 @@
 
 //go:build integration
 
-// Scenario tests exercise multi-step 5G procedures end to end.
-// Unlike message tests (which verify individual NGAP messages in isolation),
-// scenario tests care about state transitions across steps.
-
 package integration_test
 
 import (
@@ -17,15 +13,17 @@ func Test5GScenarioRegistration(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 
 	var ueID string
+	supi := claimSubscriber(t)
+
 	t.Run("create UE and verify state", func(t *testing.T) {
-		ueID = mustCreateUE(t, gnbID)
+		ueID = mustCreateUEWithSUPI(t, gnbID, supi)
 
 		status, body := doRequest(t, "GET", "/gnb/"+gnbID+"/ue/"+ueID, "")
 		if status != 200 {
 			t.Fatalf("HTTP %d: %s", status, body)
 		}
 		checks := map[string]string{
-			"supi":              "imsi-001010000000001",
+			"supi":              supi,
 			"mcc":               "001",
 			"mnc":               "01",
 			"dnn":               "internet",
@@ -64,11 +62,11 @@ func Test5GScenarioRegistration(t *testing.T) {
 		if got := jsonGet(body, "nas.message_type"); got != nasSecurityModeCommand {
 			t.Fatalf("nas.message_type = %q, want security_mode_command", got)
 		}
-		if jsonGet(body, "nas.selected_ciphering_alg") == "" {
-			t.Error("missing selected_ciphering_alg")
+		if jsonGet(body, "nas.selected_ciphering_algorithm") == "" {
+			t.Error("missing selected_ciphering_algorithm")
 		}
-		if jsonGet(body, "nas.selected_integrity_alg") == "" {
-			t.Error("missing selected_integrity_alg")
+		if jsonGet(body, "nas.selected_integrity_algorithm") == "" {
+			t.Error("missing selected_integrity_algorithm")
 		}
 	})
 
@@ -85,9 +83,11 @@ func Test5GScenarioRegistration(t *testing.T) {
 		if got := jsonGet(body, "nas.message_type"); got != nasRegistrationAccept {
 			t.Fatalf("nas.message_type = %q, want registration_accept", got)
 		}
-		if jsonGet(body, "nas.guti") == "" {
+		if jsonGet(body, "nas.guti.5g_tmsi") == "" {
 			t.Error("missing GUTI in RegistrationAccept")
 		}
+
+		assertRegistrationAcceptTAIList(t, body)
 	})
 
 	t.Run("registration complete finishes the procedure", func(t *testing.T) {

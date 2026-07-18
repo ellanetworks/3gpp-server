@@ -5,13 +5,36 @@ package s1ap
 
 import (
 	"fmt"
+	"net"
+	"strconv"
 
 	"github.com/ellanetworks/core/s1ap"
 )
 
-// encodePLMN packs an MCC (3 digits) and MNC (2 or 3 digits) into the 3-octet
-// TBCD PLMN identity of TS 23.003 §2.6. A 2-digit MNC sets the spare nibble to
-// 0xF.
+func parseTAC(s string) (uint16, error) {
+	v, err := strconv.ParseUint(s, 16, 16)
+	if err != nil {
+		return 0, fmt.Errorf("tac must be a 2-octet hex string: %v", err)
+	}
+
+	return uint16(v), nil
+}
+
+// IPv4 must return in 4-byte form to keep the IE at its 32-bit width (TS 36.414 §5.3).
+func parseTransportAddr(s string) (net.IP, error) {
+	ip := net.ParseIP(s)
+	if ip == nil {
+		return nil, fmt.Errorf("invalid transport layer address %q", s)
+	}
+
+	if v4 := ip.To4(); v4 != nil {
+		return v4, nil
+	}
+
+	return ip, nil
+}
+
+// TBCD nibbles are swapped within each octet, and a 2-digit MNC takes an 0xF filler (TS 24.008 §10.5.1.3).
 func encodePLMN(mcc, mnc string) (s1ap.PLMNIdentity, error) {
 	if len(mcc) != 3 {
 		return s1ap.PLMNIdentity{}, fmt.Errorf("mcc must be 3 digits, got %q", mcc)

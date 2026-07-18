@@ -12,10 +12,7 @@ import (
 	"testing"
 )
 
-// kdf is the 3GPP generic key derivation function (TS 33.220 §B.2): the input
-// S is FC ‖ P0 ‖ L0 ‖ P1 ‖ L1 ‖ … with each Li the 2-octet big-endian length of
-// Pi, and the output is HMAC-SHA256(key, S). Reimplemented here, independent of
-// the production code, so the test validates the derivation rather than mirror it.
+// Reimplemented from TS 33.220 §B.2 so the assertions stay independent of the production derivation.
 func kdf(t *testing.T, key []byte, fc byte, params ...[]byte) []byte {
 	t.Helper()
 
@@ -42,8 +39,7 @@ func mustHex(t *testing.T, s string) []byte {
 	return b
 }
 
-// TS 35.208 Test Set 1 (Milenage), with AUTN assembled as (SQN⊕AK)‖AMF‖MAC-A and
-// the serving network PLMN 001/01 (TBCD 00f110).
+// TS 35.208 Test Set 1 (Milenage); AUTN is assembled as (SQN⊕AK)‖AMF‖MAC-A.
 const (
 	tsK        = "465b5ce8b199b49faa5f0a2ee238a6bc"
 	tsOPc      = "cd63cb71954a9f4e48a5994e37a02baf"
@@ -69,7 +65,6 @@ func TestComputeEPSAKAVector(t *testing.T) {
 		t.Errorf("RES = %s, want %s", got, tsRES)
 	}
 
-	// K_ASME = KDF(CK‖IK, 0x10, SNid, SQN⊕AK), recomputed independently.
 	key := append(mustHex(t, tsCK), mustHex(t, tsIK)...)
 	wantKasme := kdf(t, key, 0x10, mustHex(t, tsSNID), mustHex(t, tsSQNxorAK))
 
@@ -85,14 +80,13 @@ func TestDeriveEPSNASKeysVector(t *testing.T) {
 		t.Fatalf("ComputeEPSAKA: %v", err)
 	}
 
-	const eea, eia = 2, 2 // 128-EEA2 / 128-EIA2
+	const eea, eia = 2, 2
 
 	knasEnc, knasInt, err := DeriveEPSNASKeys(res.Kasme, eea, eia)
 	if err != nil {
 		t.Fatalf("DeriveEPSNASKeys: %v", err)
 	}
 
-	// K_NASenc/int = lower 128 bits of KDF(K_ASME, 0x15, alg-type, alg-id).
 	wantEnc := kdf(t, res.Kasme, 0x15, []byte{0x01}, []byte{eea})[16:32]
 	wantInt := kdf(t, res.Kasme, 0x15, []byte{0x02}, []byte{eia})[16:32]
 
@@ -107,7 +101,7 @@ func TestDeriveEPSNASKeysVector(t *testing.T) {
 
 func TestComputeEPSAKAMACFailure(t *testing.T) {
 	autn := mustHex(t, tsAUTN)
-	autn[len(autn)-1] ^= 0xff // corrupt the MAC-A field
+	autn[len(autn)-1] ^= 0xff
 
 	if _, err := ComputeEPSAKA(tsK, tsOPc, "000000000000", tsMCC, tsMNC, mustHex(t, tsRAND), autn); !errors.Is(err, ErrMACFailure) {
 		t.Fatalf("err = %v, want ErrMACFailure", err)

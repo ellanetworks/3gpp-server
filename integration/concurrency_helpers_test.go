@@ -13,19 +13,12 @@ import (
 	"testing"
 )
 
-// numTestSubscribers is the size of the subscriber pool TestMain provisions.
-// Low indices (1..6) are hard-coded by older single-UE tests; concurrency and
-// fast-sequence tests claim higher, non-overlapping blocks.
 const numTestSubscribers = 40
 
-// testSUPI returns the SUPI of the i-th pooled subscriber (1-based): MCC 001,
-// MNC 01, and a 10-digit MSIN, matching the keys createSubscriber provisions.
 func testSUPI(i int) string {
 	return fmt.Sprintf("imsi-00101%010d", i)
 }
 
-// post issues a POST without a *testing.T, so it is safe to call from a
-// goroutine (t.Fatalf must only run on the test's own goroutine).
 func post(path, body string) (int, []byte, error) {
 	resp, err := doHTTP("POST", testerURL+path, body)
 	if err != nil {
@@ -42,8 +35,6 @@ func post(path, body string) (int, []byte, error) {
 	return resp.StatusCode, b, nil
 }
 
-// createUEForSUPI creates a UE context for supi on gnbID and returns its store
-// id. Goroutine-safe (returns errors instead of calling *testing.T).
 func createUEForSUPI(gnbID, supi string) (string, error) {
 	body := fmt.Sprintf(`{
 		"supi": "%s",
@@ -72,14 +63,11 @@ func createUEForSUPI(gnbID, supi string) (string, error) {
 	return ueID, nil
 }
 
-// regResult is the outcome of a goroutine-safe registration.
 type regResult struct {
 	ueID string
 	guti string
 }
 
-// registerSUPI creates a UE for supi and runs a full initial registration,
-// returning its store id and the 5G-GUTI the AMF assigned. Goroutine-safe.
 func registerSUPI(gnbID, supi string) (regResult, error) {
 	ueID, err := createUEForSUPI(gnbID, supi)
 	if err != nil {
@@ -112,16 +100,13 @@ func registerSUPI(gnbID, supi string) (regResult, error) {
 		}
 
 		if s.wantNAS == nasRegistrationAccept {
-			guti = jsonGet(body, "nas.guti")
+			guti = jsonGet(body, "nas.guti.5g_tmsi")
 		}
 	}
 
 	return regResult{ueID: ueID, guti: guti}, nil
 }
 
-// establishSession sends a PDU Session Establishment Request and returns the UE
-// IP address the SMF allocated (from the PDU Session Establishment Accept).
-// Goroutine-safe.
 func establishSession(gnbID, ueID string, sessionID int) (string, error) {
 	status, body, err := post("/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
 		fmt.Sprintf(`{"message_type":"pdu_session_establishment_request","pdu_session_id":%d}`, sessionID))
@@ -136,7 +121,7 @@ func establishSession(gnbID, ueID string, sessionID int) (string, error) {
 	return jsonGet(body, "nas.pdu_address"), nil
 }
 
-// deregister sends a (switch-off) Deregistration Request. Goroutine-safe.
+// The server defaults to switch-off, which draws no Deregistration Accept.
 func deregister(gnbID, ueID string) error {
 	status, body, err := post("/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
 		`{"message_type":"deregistration_request"}`)
@@ -151,8 +136,7 @@ func deregister(gnbID, ueID string) error {
 	return nil
 }
 
-// runParallel runs fn(i) for i in [0,n) concurrently and reports the first error
-// from each worker. fn must be goroutine-safe — it must not touch *testing.T.
+// fn runs on its own goroutine and must not touch *testing.T.
 func runParallel(t *testing.T, n int, fn func(i int) error) {
 	t.Helper()
 
@@ -179,7 +163,6 @@ func runParallel(t *testing.T, n int, fn func(i int) error) {
 	}
 }
 
-// ueAmfNgapID returns the AMF UE NGAP ID the AMF assigned to a UE.
 func ueAmfNgapID(t *testing.T, gnbID, ueID string) int64 {
 	t.Helper()
 
@@ -189,11 +172,11 @@ func ueAmfNgapID(t *testing.T, gnbID, ueID string) int64 {
 	}
 
 	var st struct {
-		AmfUeNgapID int64 `json:"amf_ue_ngap_id"`
+		AMFUENGAPID int64 `json:"amf_ue_ngap_id"`
 	}
 	if err := json.Unmarshal(body, &st); err != nil {
 		t.Fatalf("decode ue state: %v\n  body: %s", err, body)
 	}
 
-	return st.AmfUeNgapID
+	return st.AMFUENGAPID
 }

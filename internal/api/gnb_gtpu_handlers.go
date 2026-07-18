@@ -11,19 +11,14 @@ import (
 	"net/http"
 	"net/netip"
 	"strconv"
-	"time"
 
 	"github.com/ellanetworks/3gpp-server/internal/gtpu"
 	"github.com/ellanetworks/3gpp-server/internal/store"
 )
 
-// UplinkRequest crafts an inner IP packet and sends it uplink through the N3
-// tunnel. Exactly one of icmp_echo / udp is used.
-type UplinkRequest struct {
+type GNBUplinkRequest struct {
 	PDUSessionID int64 `json:"pdu_session_id,omitempty"`
 
-	// TEID overrides the session's uplink TEID, to exercise the UPF's handling
-	// of a G-PDU for a TEID with no PDR (TS 29.281 §7.3.1).
 	TEID *uint32 `json:"teid,omitempty"`
 
 	ICMPEcho *struct {
@@ -39,24 +34,19 @@ type UplinkRequest struct {
 		PayloadHex string `json:"payload_hex,omitempty"`
 	} `json:"udp,omitempty"`
 
-	// Src overrides the inner source IP (default the session's UE IP) — for
-	// source-spoofing tests.
 	Src *string `json:"src,omitempty"`
 }
 
-// AwaitDownlinkRequest blocks for a downlink T-PDU on a session's DL TEID.
-type AwaitDownlinkRequest struct {
+type GNBAwaitDownlinkRequest struct {
 	PDUSessionID int64 `json:"pdu_session_id,omitempty"`
 	TimeoutMs    int   `json:"timeout_ms,omitempty"`
 }
 
-// gtpuSession resolves the GTP-U endpoint and tunnel state for a UE-associated
-// data-plane request, writing the appropriate error on failure.
-func (h *Handler) gtpuSession(w http.ResponseWriter, r *http.Request, pduSessionID int64) (*gtpu.Endpoint, *store.PDUSessionInfo, bool) {
+func (h *Handler) gnbGTPU(w http.ResponseWriter, r *http.Request, pduSessionID int64) (*gtpu.Endpoint, *store.PDUSessionInfo, bool) {
 	gnbID := r.PathValue("gnb_id")
 	ueID := r.PathValue("ue_id")
 
-	gnb, err := h.Store.GetGnB(gnbID)
+	gnb, err := h.Store.GetGNB(gnbID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("gnb not found: %v", err))
 		return nil, nil, false
@@ -81,7 +71,7 @@ func (h *Handler) gtpuSession(w http.ResponseWriter, r *http.Request, pduSession
 		}
 	}
 
-	info, ok := gnb.GetPDUSession(ue.RanUeNgapID, pduSessionID)
+	info, ok := ue.PDUSessions[uint8(pduSessionID)]
 	if !ok || info.ULTeid == 0 || info.UEIP == "" {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("no established N3 tunnel for PDU session %d", pduSessionID))
 		return nil, nil, false
@@ -90,16 +80,14 @@ func (h *Handler) gtpuSession(w http.ResponseWriter, r *http.Request, pduSession
 	return gt, info, true
 }
 
-// SendUplink encapsulates a crafted inner IP packet (sourced from the UE IP) and
-// sends it to the UPF on the session's uplink tunnel.
-func (h *Handler) SendUplink(w http.ResponseWriter, r *http.Request) {
-	var req UplinkRequest
+func (h *Handler) SendGNBUplink(w http.ResponseWriter, r *http.Request) {
+	var req GNBUplinkRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
 		return
 	}
 
-	gt, info, ok := h.gtpuSession(w, r, req.PDUSessionID)
+	gt, info, ok := h.gnbGTPU(w, r, req.PDUSessionID)
 	if !ok {
 		return
 	}
@@ -178,44 +166,50 @@ func (h *Handler) SendUplink(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"sent_bytes": len(inner)})
 }
 
-// AwaitDownlink blocks for a downlink T-PDU on the session's DL TEID and returns
-// the decoded inner packet.
-func (h *Handler) AwaitDownlink(w http.ResponseWriter, r *http.Request) {
-	var req AwaitDownlinkRequest
+func (h *Handler) AwaitGNBDownlink(w http.ResponseWriter, r *http.Request) {
+	var req GNBAwaitDownlinkRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
 		return
 	}
 
-	gt, info, ok := h.gtpuSession(w, r, req.PDUSessionID)
+	gt, info, ok := h.gnbGTPU(w, r, req.PDUSessionID)
 	if !ok {
 		return
 	}
 
-	timeout := 5 * time.Second
-	if req.TimeoutMs > 0 {
-		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
-	tpdu, err := gt.WaitForDownlink(ctx, info.DLTeid)
+	msg, err := gt.WaitForDownlink(ctx, info.DLTeid)
 	if err != nil {
 		writeError(w, http.StatusGatewayTimeout, err.Error())
 		return
 	}
 
-	resp := map[string]any{"raw_hex": hex.EncodeToString(tpdu)}
-	if inner, err := gtpu.ParseInner(tpdu); err == nil {
+	resp := map[string]any{"raw_hex": hex.EncodeToString(msg.Payload)}
+	if inner, err := gtpu.ParseInner(msg.Payload); err == nil {
 		resp["inner"] = inner
+	}
+
+	if msg.PDUSession != nil {
+		resp["pdu_session_container"] = msg.PDUSession
 	}
 
 	writeJSON(w, http.StatusOK, resp)
 }
 
-// GetTunnel returns the stored N3 tunnel state for a UE's PDU session.
-func (h *Handler) GetTunnel(w http.ResponseWriter, r *http.Request) {
+type GNBTunnelResponse struct {
+	PDUSessionID uint8  `json:"pdu_session_id"`
+	N3GnbIP      string `json:"n3_gnb_ip"`
+	DLTeid       uint32 `json:"dl_teid"`
+	QFI          uint8  `json:"qfi"`
+	ULTeid       uint32 `json:"ul_teid,omitempty"`
+	UPFIP        string `json:"upf_ip,omitempty"`
+	UEIP         string `json:"ue_ip,omitempty"`
+}
+
+func (h *Handler) GetGNBTunnel(w http.ResponseWriter, r *http.Request) {
 	pduSessionID := int64(0)
 	if v := r.URL.Query().Get("pdu_session_id"); v != "" {
 		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
@@ -223,17 +217,23 @@ func (h *Handler) GetTunnel(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_, info, ok := h.gtpuSession(w, r, pduSessionID)
+	_, info, ok := h.gnbGTPU(w, r, pduSessionID)
 	if !ok {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, info)
+	writeJSON(w, http.StatusOK, GNBTunnelResponse{
+		PDUSessionID: info.PDUSessionID,
+		N3GnbIP:      info.N3GnbIP,
+		DLTeid:       info.DLTeid,
+		QFI:          info.QFI,
+		ULTeid:       info.ULTeid,
+		UPFIP:        info.UPFIP,
+		UEIP:         info.UEIP,
+	})
 }
 
-// SendGTPUEcho sends a GTP-U Echo Request to the UPF and returns its Echo
-// Response (TS 29.281 §7.2.1).
-func (h *Handler) SendGTPUEcho(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SendGNBGTPUEcho(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 
 	var req struct {
@@ -258,12 +258,7 @@ func (h *Handler) SendGTPUEcho(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	timeout := 5 * time.Second
-	if req.TimeoutMs > 0 {
-		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
 	msg, err := gt.WaitForControl(ctx, gtpu.MsgEchoResponse)
@@ -272,12 +267,15 @@ func (h *Handler) SendGTPUEcho(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"echo_response": true, "seq": msg.Seq})
+	resp := map[string]any{"echo_response": true, "seq": msg.Seq}
+	if msg.Recovery != nil {
+		resp["recovery_restart_counter"] = *msg.Recovery
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
-// AwaitErrorIndication blocks for a GTP-U Error Indication from the UPF, sent
-// when the UPF receives a G-PDU for a TEID with no context (TS 29.281 §7.3.1).
-func (h *Handler) AwaitErrorIndication(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) AwaitGNBErrorIndication(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 
 	var req struct {
@@ -291,18 +289,27 @@ func (h *Handler) AwaitErrorIndication(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	timeout := 5 * time.Second
-	if req.TimeoutMs > 0 {
-		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
-	if _, err := gt.WaitForControl(ctx, gtpu.MsgErrorIndication); err != nil {
+	msg, err := gt.WaitForControl(ctx, gtpu.MsgErrorIndication)
+	if err != nil {
 		writeError(w, http.StatusGatewayTimeout, err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"error_indication": true})
+	writeJSON(w, http.StatusOK, errorIndicationJSON(msg))
+}
+
+func errorIndicationJSON(msg *gtpu.Message) map[string]any {
+	resp := map[string]any{"error_indication": true, "header_teid": msg.TEID}
+	if msg.TEIDDataI != nil {
+		resp["teid_data_i"] = *msg.TEIDDataI
+	}
+
+	if msg.PeerAddress != "" {
+		resp["gtpu_peer_address"] = msg.PeerAddress
+	}
+
+	return resp
 }

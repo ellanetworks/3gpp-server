@@ -3,11 +3,6 @@
 
 //go:build integration
 
-// 5GSM Procedure Transaction Identity error handling (TS 24.501 §7.3.1). The
-// network must police the PTI of every 5GSM message it receives: respond with a
-// 5GSM STATUS for a mismatched (#47) or unassigned (#81) PTI, and silently
-// ignore a reserved PTI. A failing test means Ella Core does not enforce §7.3.1.
-
 package integration_test
 
 import (
@@ -16,15 +11,12 @@ import (
 	"testing"
 )
 
+// TS 24.501 §9.6.
 const (
-	ptiUnassigned uint8 = 0   // "no procedure transaction identity assigned" (TS 24.501 §9.6)
-	ptiReserved   uint8 = 255 // reserved value (TS 24.501 §9.6)
+	ptiUnassigned uint8 = 0
+	ptiReserved   uint8 = 255
 )
 
-// TestPDUSessionReleaseComplete_PTIMismatch sends a PDU SESSION RELEASE COMPLETE
-// carrying an assigned PTI on an active session for which the network started no
-// release procedure, so the PTI matches none in use. Per TS 24.501 §7.3.1 a) the
-// network shall respond with a 5GSM STATUS carrying cause #47 "PTI mismatch".
 func Test5GPDUSessionReleaseComplete_PTIMismatch(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := establishRegisteredUE(t, gnbID)
@@ -41,13 +33,9 @@ func Test5GPDUSessionReleaseComplete_PTIMismatch(t *testing.T) {
 		t.Errorf("nas.inner_nas_message_type = %q, want 5gsm_status (TS 24.501 §7.3.1 a)\n  body: %s", got, resp)
 	}
 
-	assertNASCause(t, resp, "nas.cause_5gsm", cause5GSMPTIMismatch)
+	assertNASCause(t, resp, "nas.5gsm_cause", cause5GSMPTIMismatch)
 }
 
-// TestPDUSessionEstablishment_UnassignedPTI sends a PDU SESSION ESTABLISHMENT
-// REQUEST whose PTI is the unassigned value 0. Per TS 24.501 §7.3.1 c) the
-// network shall respond with a 5GSM STATUS carrying cause #81 "invalid PTI
-// value", not establish the session.
 func Test5GPDUSessionEstablishment_UnassignedPTI(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -71,14 +59,9 @@ func Test5GPDUSessionEstablishment_UnassignedPTI(t *testing.T) {
 		t.Errorf("nas.inner_nas_message_type = %q, want 5gsm_status (TS 24.501 §7.3.1 c)\n  body: %s", got, body)
 	}
 
-	assertNASCause(t, body, "nas.cause_5gsm", cause5GSMInvalidPTIValue)
+	assertNASCause(t, body, "nas.5gsm_cause", cause5GSMInvalidPTIValue)
 }
 
-// TestPDUSessionEstablishment_ReservedPTI sends a PDU SESSION ESTABLISHMENT
-// REQUEST whose PTI is the reserved value 255. Per TS 24.501 §7.3.1 d) the
-// network shall ignore the message: no response and no session. A response of
-// any kind (an Establishment Accept, a Reject, or a Resource Setup) is a §7.3.1
-// d) violation.
 func Test5GPDUSessionEstablishment_ReservedPTI(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
@@ -92,10 +75,6 @@ func Test5GPDUSessionEstablishment_ReservedPTI(t *testing.T) {
 	}
 }
 
-// TestPDUSessionModificationRequest_UnassignedPTI sends a PDU SESSION
-// MODIFICATION REQUEST on an active session with the unassigned PTI 0. The AMF
-// forwards it to the SMF, which per TS 24.501 §7.3.1 c) answers with a 5GSM
-// STATUS carrying cause #81 rather than a Modification Reject.
 func Test5GPDUSessionModificationRequest_UnassignedPTI(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := establishRegisteredUE(t, gnbID)
@@ -114,12 +93,9 @@ func Test5GPDUSessionModificationRequest_UnassignedPTI(t *testing.T) {
 		t.Errorf("nas.inner_nas_message_type = %q, want 5gsm_status (TS 24.501 §7.3.1 c)\n  body: %s", got, body)
 	}
 
-	assertNASCause(t, body, "nas.cause_5gsm", cause5GSMInvalidPTIValue)
+	assertNASCause(t, body, "nas.5gsm_cause", cause5GSMInvalidPTIValue)
 }
 
-// TestPDUSessionReleaseRequest_UnassignedPTI sends a PDU SESSION RELEASE REQUEST
-// with the unassigned PTI 0. Per TS 24.501 §7.3.1 c) the SMF answers with a 5GSM
-// STATUS carrying cause #81 rather than releasing the session.
 func Test5GPDUSessionReleaseRequest_UnassignedPTI(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := establishRegisteredUE(t, gnbID)
@@ -138,13 +114,9 @@ func Test5GPDUSessionReleaseRequest_UnassignedPTI(t *testing.T) {
 		t.Errorf("nas.inner_nas_message_type = %q, want 5gsm_status (TS 24.501 §7.3.1 c)\n  body: %s", got, body)
 	}
 
-	assertNASCause(t, body, "nas.cause_5gsm", cause5GSMInvalidPTIValue)
+	assertNASCause(t, body, "nas.5gsm_cause", cause5GSMInvalidPTIValue)
 }
 
-// TestPDUSessionModificationRequest_ReservedPTI sends a PDU SESSION MODIFICATION
-// REQUEST with the reserved PTI 255 on an active session. Per TS 24.501 §7.3.1
-// d) the SMF ignores the message: the AMF forwards nothing back, so the request
-// elicits no response.
 func Test5GPDUSessionModificationRequest_ReservedPTI(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := establishRegisteredUE(t, gnbID)
@@ -157,10 +129,6 @@ func Test5GPDUSessionModificationRequest_ReservedPTI(t *testing.T) {
 	}
 }
 
-// TestPDUSessionModificationComplete_PTIMismatch sends a PDU SESSION
-// MODIFICATION COMPLETE carrying an assigned PTI for which the network started
-// no modification procedure. Per TS 24.501 §7.3.1 a) the SMF answers with a 5GSM
-// STATUS carrying cause #47 "PTI mismatch".
 func Test5GPDUSessionModificationComplete_PTIMismatch(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := establishRegisteredUE(t, gnbID)
@@ -177,11 +145,9 @@ func Test5GPDUSessionModificationComplete_PTIMismatch(t *testing.T) {
 		t.Errorf("nas.inner_nas_message_type = %q, want 5gsm_status (TS 24.501 §7.3.1 a)\n  body: %s", got, resp)
 	}
 
-	assertNASCause(t, resp, "nas.cause_5gsm", cause5GSMPTIMismatch)
+	assertNASCause(t, resp, "nas.5gsm_cause", cause5GSMPTIMismatch)
 }
 
-// awaitUENGAP waits for an unsolicited downlink NGAP message addressed to the UE
-// and returns the response body (NGAP plus any decoded NAS).
 func awaitUENGAP(t *testing.T, gnbID, ueID string, messageTypes ...string) []byte {
 	t.Helper()
 

@@ -9,16 +9,10 @@ import (
 	"testing"
 )
 
-// Test4GAttachAcceptRetransmission: when the UE withholds the Attach Complete,
-// the MME's T3450 guard must retransmit the Attach Accept (TS 24.301 §5.6.2). The
-// emulated UE drives the attach up to the Attach Accept, then stays silent; the
-// retransmission arrives as a Downlink NAS Transport carrying the same Attach
-// Accept, observed on the per-UE await.
 func Test4GAttachAcceptRetransmission(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
 
-	// Drive the attach to the Attach Accept, then withhold the Attach Complete.
 	if got := jsonGet(nasStep(t, enbID, ueID, "attach_request"), "nas.message_type"); got != "authentication_request" {
 		t.Fatalf("attach_request: nas.message_type = %q, want authentication_request", got)
 	}

@@ -9,9 +9,6 @@ import (
 	"testing"
 )
 
-// TestSecurityModeComplete_NGAPIDFuzz sends a Security Mode Complete on an
-// established connection with a wrong UE NGAP ID and expects a spec-compliant
-// Error Indication (TS 38.413 §10.6, §8.7.5.2).
 func Test5GSecurityModeComplete_NGAPIDFuzz(t *testing.T) {
 	cases := []struct {
 		name string
@@ -41,34 +38,32 @@ func Test5GSecurityModeComplete_Fuzz(t *testing.T) {
 		body            string
 		wantHTTP        int
 		wantNGAPMsgType string
+		wantNASMsgType  string
+		wantCause5GMM   int
 	}{
 		{
 			name: "raw NAS: plain SecurityModeComplete (no integrity protection)",
-			// SECURITY MODE COMPLETE must be integrity protected with the new context and
-			// is not in the TS 24.501 §4.4.4.3 exempt list, so a plain one fails the
-			// integrity requirement and shall be discarded; the AMF keeps T3560 running
-			// and sends nothing. Silent drop is the mandated, secure outcome (504).
+			// 7E EPD, 00 SHT plain, 5e SecurityModeComplete: TS 24.501 §4.4.4.3 discards
+			// it unprotected — no reply.
 			body:     `{"message_type":"security_mode_complete","raw_nas_pdu":"7e005e00"}`,
 			wantHTTP: 504,
 		},
 		{
 			name: "raw NAS: integrity header but zeroed MAC",
-			// Integrity check fails (zeroed MAC) → discarded per TS 24.501 §4.4.4.3;
-			// the AMF must not act on unauthenticated NAS. Silent drop is correct (504).
+			// 7E 04 integrity-protected new context, zeroed MAC: integrity fails, so
+			// TS 24.501 §4.4.4.3 discards it — no reply.
 			body:     `{"message_type":"security_mode_complete","raw_nas_pdu":"7e04000000000000005e00"}`,
 			wantHTTP: 504,
 		},
 		{
 			name: "raw NAS: security header claiming ciphering, zeroed MAC",
-			// Claims integrity+ciphering but carries a zeroed MAC → integrity check
-			// fails → discarded per TS 24.501 §4.4.4.3. Silent drop is correct (504).
+			// SHT=02 integrity+cipher with a zeroed MAC: TS 24.501 §4.4.4.3 discards it — no reply.
 			body:     `{"message_type":"security_mode_complete","raw_nas_pdu":"7e02000000000000005e00"}`,
 			wantHTTP: 504,
 		},
 		{
 			name: "raw NAS: single byte",
-			// Too short to contain a complete message type IE → shall be ignored
-			// (TS 24.501 §7.2.1). Silent drop is the mandated behaviour (504).
+			// TS 24.501 §7.2.1: too short for a message type IE, so it is ignored — no reply.
 			body:     `{"message_type":"security_mode_complete","raw_nas_pdu":"7e"}`,
 			wantHTTP: 504,
 		},
@@ -83,13 +78,16 @@ func Test5GSecurityModeComplete_Fuzz(t *testing.T) {
 			body:            `{"message_type":"security_mode_complete","raw_nas_pdu":"deadbeefcafebabe0011223344556677"}`,
 			wantHTTP:        200,
 			wantNGAPMsgType: ngapDownlinkNASTransport,
-			// AMF should respond with a reject, not silently drop
 		},
 		{
+			// TS 24.501 §7.4: reception of a 5GMM message is foreseen in this state, so
+			// the AMF should answer an undefined message type with 5GMM STATUS and #97.
 			name:            "raw NAS: valid NAS header but unknown message type 0xff",
 			body:            `{"message_type":"security_mode_complete","raw_nas_pdu":"7e00ff"}`,
 			wantHTTP:        200,
 			wantNGAPMsgType: ngapDownlinkNASTransport,
+			wantNASMsgType:  nasStatus5GMM,
+			wantCause5GMM:   cause5GMMMessageTypeNonExistent,
 		},
 	}
 
@@ -124,6 +122,14 @@ func Test5GSecurityModeComplete_Fuzz(t *testing.T) {
 					t.Errorf("ngap.message_type = %q, want %q\n  body: %s", got, tt.wantNGAPMsgType, body)
 				}
 			}
+
+			if tt.wantNASMsgType != "" {
+				if got := jsonGet(body, "nas.message_type"); got != tt.wantNASMsgType {
+					t.Errorf("nas.message_type = %q, want %q\n  body: %s", got, tt.wantNASMsgType, body)
+				}
+			}
+
+			assertNASCause(t, body, "nas.5gmm_cause", tt.wantCause5GMM)
 
 			ngapMsgType := jsonGet(body, "ngap.message_type")
 			if ngapMsgType != ngapErrorIndication {

@@ -3,12 +3,6 @@
 
 //go:build integration
 
-// Adversarial N2 handover scenarios: a rogue or compromised gNB abusing the
-// handover messages to hijack, confuse, or exhaust the AMF. Where TS 38.413
-// defines a response (e.g. §10.6 → Error Indication) the test asserts it; where
-// the abnormal clause is Void (e.g. §8.4.3.3) it asserts the core neither
-// crashes nor acts on the forged message (the legitimate UE stays usable).
-
 package integration_test
 
 import (
@@ -17,7 +11,6 @@ import (
 	"testing"
 )
 
-// mustCreateUEWithSUPI creates a UE with a specific subscriber identity.
 func mustCreateUEWithSUPI(t *testing.T, gnbID, supi string) string {
 	t.Helper()
 
@@ -44,7 +37,6 @@ func mustCreateUEWithSUPI(t *testing.T, gnbID, supi string) string {
 	return ueID
 }
 
-// registerUEWithSUPI creates and registers a UE with a specific identity.
 func registerUEWithSUPI(t *testing.T, gnbID, supi string) string {
 	t.Helper()
 
@@ -54,7 +46,6 @@ func registerUEWithSUPI(t *testing.T, gnbID, supi string) string {
 	return ueID
 }
 
-// ueNGAPIDs returns the AMF and RAN UE NGAP IDs the AMF assigned to a UE.
 func ueNGAPIDs(t *testing.T, gnbID, ueID string) (amf, ran int64) {
 	t.Helper()
 
@@ -64,26 +55,23 @@ func ueNGAPIDs(t *testing.T, gnbID, ueID string) (amf, ran int64) {
 	}
 
 	var st struct {
-		AmfUeNgapID int64 `json:"amf_ue_ngap_id"`
-		RanUeNgapID int64 `json:"ran_ue_ngap_id"`
+		AMFUENGAPID int64 `json:"amf_ue_ngap_id"`
+		RANUENGAPID int64 `json:"ran_ue_ngap_id"`
 	}
 	if err := json.Unmarshal(body, &st); err != nil {
 		t.Fatalf("decode ue state: %v\n  body: %s", err, body)
 	}
 
-	return st.AmfUeNgapID, st.RanUeNgapID
+	return st.AMFUENGAPID, st.RANUENGAPID
 }
 
-// assertUEStillConnected fails unless the UE can still complete a UE-associated
-// transaction — used after an attack to prove the core did not act on the
-// forged message and tear the victim down.
 func assertUEStillConnected(t *testing.T, gnbID, ueID string) {
 	t.Helper()
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
 		`{"message_type":"pdu_session_establishment_request"}`)
 	if status != 200 {
-		t.Errorf("victim no longer usable after the attack (HTTP %d) — core may have acted on the forged message\n  body: %s", status, body)
+		t.Errorf("victim UE: pdu_session_establishment_request HTTP %d, want 200\n  body: %s", status, body)
 	}
 }
 
@@ -97,10 +85,6 @@ func containsInt64(ids []int64, want int64) bool {
 	return false
 }
 
-// TestN2HandoverAcknowledgeCrossAssociationHijack: a rogue gNB forges a Handover
-// Request Acknowledge bearing a victim UE's AMF UE NGAP ID. The ID is unknown on
-// the rogue's own association, so §10.6 requires an Error Indication there, and
-// the victim (on another gNB) must be untouched.
 func Test5GN2HandoverAcknowledgeCrossAssociationHijack(t *testing.T) {
 	victimGNB := createGnBWithID(t, "0000a0", "victim-gnb")
 	attackerGNB := createGnBWithID(t, "0000a1", "attacker-gnb")
@@ -118,8 +102,6 @@ func Test5GN2HandoverAcknowledgeCrossAssociationHijack(t *testing.T) {
 	assertUEStillConnected(t, victimGNB, victimUE)
 }
 
-// TestN2HandoverNotifyCrossAssociationHijack: same hijack via a forged Handover
-// Notify.
 func Test5GN2HandoverNotifyCrossAssociationHijack(t *testing.T) {
 	victimGNB := createGnBWithID(t, "0000a2", "victim-gnb")
 	attackerGNB := createGnBWithID(t, "0000a3", "attacker-gnb")
@@ -137,10 +119,6 @@ func Test5GN2HandoverNotifyCrossAssociationHijack(t *testing.T) {
 	assertUEStillConnected(t, victimGNB, victimUE)
 }
 
-// TestN2HandoverRequiredCrossAssociationHijack: an attacker's own UE sends a
-// Handover Required claiming the victim's AMF UE NGAP ID. It is inconsistent
-// with the attacker association's stored ID, so §10.6 requires an Error
-// Indication; the victim must be untouched.
 func Test5GN2HandoverRequiredCrossAssociationHijack(t *testing.T) {
 	victimGNB := createGnBWithID(t, "0000a4", "victim-gnb")
 	attackerGNB := createGnBWithID(t, "0000a5", "attacker-gnb")
@@ -160,9 +138,7 @@ func Test5GN2HandoverRequiredCrossAssociationHijack(t *testing.T) {
 	assertUEStillConnected(t, victimGNB, victimUE)
 }
 
-// TestN2HandoverNotifyPrematureNoHandover sends a Handover Notify for a UE that
-// is not being handed over. §8.4.3.3 is Void, so there is no defined response;
-// the core must not crash or tear the UE down.
+// TS 38.413 §8.4.3.3 is Void, so no response is defined; only the UE staying usable is asserted.
 func Test5GN2HandoverNotifyPrematureNoHandover(t *testing.T) {
 	gnb := createGnBWithID(t, "0000a7", "ho-premature")
 
@@ -178,14 +154,11 @@ func Test5GN2HandoverNotifyPrematureNoHandover(t *testing.T) {
 	assertUEStillConnected(t, gnb, ueID)
 }
 
-// TestN2HandoverAcknowledgeNonRequestedSession: the target admits a PDU session
-// the AMF never asked it to set up. The AMF has no context for it, so the
-// Handover Command must confirm only the genuinely-requested session.
 func Test5GN2HandoverAcknowledgeNonRequestedSession(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "0000a8", "ho-extra-src")
 	targetGNB := createGnBWithID(t, "0000a9", "ho-extra-tgt")
 
-	ueID := establishRegisteredUE(t, sourceGNB) // session 1 only
+	ueID := establishRegisteredUE(t, sourceGNB)
 
 	status, body := doRequest(t, "POST", "/gnb/"+sourceGNB+"/ue/"+ueID+"/ngap",
 		`{"message_type":"handover_required","target_gnb_id":"0000a9"}`)
@@ -201,7 +174,6 @@ func Test5GN2HandoverAcknowledgeNonRequestedSession(t *testing.T) {
 		t.Fatalf("HandoverRequest missing AMF UE NGAP ID\n  body: %s", hoReq)
 	}
 
-	// Admit the requested session 1 plus an unrequested session 2.
 	status, body = doRequest(t, "POST", "/gnb/"+targetGNB+"/ngap",
 		fmt.Sprintf(`{"message_type":"handover_request_acknowledge","amf_ue_ngap_id":%d,"ran_ue_ngap_id":100,"pdu_sessions":[{"id":1,"dl_teid":9001,"dl_ip":"10.3.0.3"},{"id":2,"dl_teid":9002,"dl_ip":"10.3.0.3"}]}`, targetAmf))
 	if status != 200 {
@@ -214,9 +186,6 @@ func Test5GN2HandoverAcknowledgeNonRequestedSession(t *testing.T) {
 	completeHandover(t, targetGNB, targetAmf, 100)
 }
 
-// TestN2HandoverAcknowledgeDuplicateSessions: the target admits the same PDU
-// session twice. The core must handle the duplicate without crashing and still
-// produce a Handover Command for the session.
 func Test5GN2HandoverAcknowledgeDuplicateSessions(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "0000aa", "ho-dup-src")
 	targetGNB := createGnBWithID(t, "0000ab", "ho-dup-tgt")
@@ -249,10 +218,7 @@ func Test5GN2HandoverAcknowledgeDuplicateSessions(t *testing.T) {
 	completeHandover(t, targetGNB, targetAmf, 100)
 }
 
-// TestN2HandoverRequiredUnknownTargetFlood fires repeated Handover Required to
-// an unknown target. Each must draw a Handover Preparation Failure and free the
-// handover procedure (TS 38.413 §8.4.1.3); a legitimate handover must still
-// work afterwards — guarding against a procedure-state leak.
+// The trailing legitimate handover catches a procedure-state leak across the flood.
 func Test5GN2HandoverRequiredUnknownTargetFlood(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "0000ac", "ho-flood-src")
 	targetGNB := createGnBWithID(t, "0000ad", "ho-flood-tgt")
@@ -269,7 +235,6 @@ func Test5GN2HandoverRequiredUnknownTargetFlood(t *testing.T) {
 		expectHandoverPreparationFailure(t, sourceGNB, fmt.Sprintf("unknown-target handover_required #%d", i))
 	}
 
-	// The procedure must be free for a real handover to a known target.
 	status, body := doRequest(t, "POST", "/gnb/"+sourceGNB+"/ue/"+ueID+"/ngap",
 		`{"message_type":"handover_required","target_gnb_id":"0000ad"}`)
 	if status != 200 {
@@ -281,8 +246,7 @@ func Test5GN2HandoverRequiredUnknownTargetFlood(t *testing.T) {
 	}
 }
 
-// TestN2HandoverToSelf points the Handover Required at the source gNB itself.
-// The behaviour is not crisply specified; the core must not crash.
+// TS 38.413 defines no behaviour for a handover to the serving gNB, so only liveness is asserted.
 func Test5GN2HandoverToSelf(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "0000ae", "ho-self")
 
@@ -294,13 +258,10 @@ func Test5GN2HandoverToSelf(t *testing.T) {
 		t.Fatalf("handover_required to self: HTTP %d\n  body: %s", status, body)
 	}
 
-	// Liveness: the core must still serve a fresh association.
+	// Liveness probe: an unasserted association that must still succeed.
 	createGnBWithID(t, "0000af", "ho-self-probe")
 }
 
-// TestN2HandoverRequiredDuplicateInProgress fires a second identical Handover
-// Required while the first is still being prepared. The duplicate must not
-// corrupt the in-progress handover, which must still complete.
 func Test5GN2HandoverRequiredDuplicateInProgress(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "0000b0", "ho-rep-src")
 	targetGNB := createGnBWithID(t, "0000b1", "ho-rep-tgt")
@@ -334,8 +295,6 @@ func Test5GN2HandoverRequiredDuplicateInProgress(t *testing.T) {
 	completeHandover(t, targetGNB, targetAmf, 100)
 }
 
-// establishRegisteredUEWithSUPI registers a specific subscriber and establishes
-// its PDU session.
 func establishRegisteredUEWithSUPI(t *testing.T, gnbID, supi string) string {
 	t.Helper()
 
@@ -350,11 +309,6 @@ func establishRegisteredUEWithSUPI(t *testing.T, gnbID, supi string) string {
 	return ueID
 }
 
-// TestN2HandoverAcknowledgeMalformedTransfer feeds the AMF a Handover Request
-// Acknowledge whose admitted-session transfer is malformed. The SMF cannot parse
-// it (this is the class of input that once crashed it), so the session cannot be
-// prepared and the AMF answers the source with a Handover Preparation Failure
-// (TS 38.413 §8.4.1.3) — without crashing.
 func Test5GN2HandoverAcknowledgeMalformedTransfer(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -397,10 +351,6 @@ func Test5GN2HandoverAcknowledgeMalformedTransfer(t *testing.T) {
 	}
 }
 
-// TestUEContextReleaseRequestCrossAssociationHijack: a rogue gNB forges a UE
-// Context Release Request bearing a victim's NGAP IDs, attempting to force-drop
-// the victim. The IDs are unknown on the rogue association, so §10.6 requires an
-// Error Indication there, and the victim must stay connected.
 func Test5GUEContextReleaseRequestCrossAssociationHijack(t *testing.T) {
 	victimGNB := createGnBWithID(t, "0002c0", "victim-gnb")
 	attackerGNB := createGnBWithID(t, "0002c1", "attacker-gnb")
@@ -423,6 +373,30 @@ func Test5GUEContextReleaseRequestCrossAssociationHijack(t *testing.T) {
 	assertUEStillConnected(t, victimGNB, victimUE)
 }
 
+func Test5GUECapabilityInfoCrossAssociationHijack(t *testing.T) {
+	victimGNB := mustCreateGnB(t)
+	attackerGNB := mustCreateGnB(t)
+
+	victimUE := mustCreateUE(t, victimGNB)
+	doRegistrationFlow(t, victimGNB, victimUE)
+	victimAmf, victimRan := ueNGAPIDs(t, victimGNB, victimUE)
+
+	attackerUE := mustCreateUE(t, attackerGNB)
+	doRegistrationFlow(t, attackerGNB, attackerUE)
+
+	status, body := doRequest(t, "POST", "/gnb/"+attackerGNB+"/ue/"+attackerUE+"/ngap",
+		fmt.Sprintf(`{"message_type":"ue_capability_info","ue_radio_capability":"deadbeef","amf_ue_ngap_id_override":%d,"ran_ue_ngap_id_override":%d}`, victimAmf, victimRan))
+	if status != 200 {
+		t.Fatalf("forged capability info: HTTP %d\n  body: %s", status, body)
+	}
+
+	if got := jsonGet(body, "ngap.message_type"); got != ngapErrorIndication {
+		t.Errorf("forged UE Radio Capability Info Indication: ngap.message_type = %q, want ErrorIndication (TS 38.413 §10.6)\n  body: %s", got, body)
+	}
+
+	assertUEStillConnected(t, victimGNB, victimUE)
+}
+
 func runInvalidPDUSessionHandover(t *testing.T, srcHex, tgtHex string, sessionID int) {
 	t.Helper()
 
@@ -440,23 +414,18 @@ func runInvalidPDUSessionHandover(t *testing.T, srcHex, tgtHex string, sessionID
 	expectHandoverPreparationFailure(t, srcGNB, fmt.Sprintf("handover_required with invalid PDU session id %d", sessionID))
 }
 
-// TestN2HandoverRequiredInvalidPDUSessionID: a Handover Required referencing an
-// out-of-range PDU session ID (valid range is 1..15) has nothing preparable, so
-// the AMF answers with a Handover Preparation Failure (TS 38.413 §8.4.1.3).
+// PDU session IDs 0 and 16 fall outside the valid 1..15 range (TS 24.007 §11.2.3.1b).
 func Test5GN2HandoverRequiredInvalidPDUSessionID(t *testing.T) {
 	t.Run("session-0", func(t *testing.T) { runInvalidPDUSessionHandover(t, "0002d0", "0002d1", 0) })
 	t.Run("session-16", func(t *testing.T) { runInvalidPDUSessionHandover(t, "0002d2", "0002d3", 16) })
 }
 
-// TestN2HandoverRequiredManyPDUSessions: a Handover Required listing many PDU
-// sessions, most of which the UE does not hold, must be handled gracefully — the
-// AMF prepares only the genuinely-established session.
 func Test5GN2HandoverRequiredManyPDUSessions(t *testing.T) {
 	srcGNB := createGnBWithID(t, "0002e0", "ho-many-src")
 	tgtHex := "0002e1"
 	targetGNB := createGnBWithID(t, tgtHex, "ho-many-tgt")
 
-	ueID := establishRegisteredUE(t, srcGNB) // only session 1 exists
+	ueID := establishRegisteredUE(t, srcGNB)
 
 	status, body := doRequest(t, "POST", "/gnb/"+srcGNB+"/ue/"+ueID+"/ngap",
 		fmt.Sprintf(`{"message_type":"handover_required","target_gnb_id":"%s","pdu_session_ids":[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]}`, tgtHex))

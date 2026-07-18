@@ -3,13 +3,6 @@
 
 //go:build integration
 
-// Subscription-change reconciliation: when an operator changes a subscriber's
-// provisioning while the UE is live, the network must reconcile the UE's state
-// per 3GPP. Here, moving a UE onto a slice that does not match its established
-// PDU session — TS 23.501 §5.15.5.2.2 mandates the network release that PDU
-// session. The 5GSM release cause is the SMF's choice (TS 24.501 §6.3.3), so the
-// test asserts the release and a valid release cause, not a specific value.
-
 package integration_test
 
 import (
@@ -20,7 +13,6 @@ import (
 	"testing"
 )
 
-// updateSubscriberProfile changes a subscriber's profile via the Ella Core API.
 func updateSubscriberProfile(t *testing.T, token, imsi, profile string) {
 	t.Helper()
 
@@ -33,7 +25,7 @@ func updateSubscriberProfile(t *testing.T, token, imsi, profile string) {
 	if err != nil {
 		t.Fatalf("update subscriber %s -> %s: %v", imsi, profile, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		b, _ := io.ReadAll(resp.Body)
@@ -41,19 +33,16 @@ func updateSubscriberProfile(t *testing.T, token, imsi, profile string) {
 	}
 }
 
-// validNetworkReleaseCauses are the 5GSM causes the SMF may set on a
-// network-requested PDU session release (TS 24.501 §6.3.3).
+// The cause is the SMF's choice on a network-requested release (TS 24.501 §6.3.3).
 var validNetworkReleaseCauses = map[string]bool{
 	"8": true, "26": true, "29": true, "36": true,
 	"38": true, "39": true, "46": true, "67": true, "69": true,
 }
 
-// assertValidReleaseCause fails unless the response carries a 5GSM cause from the
-// valid network-requested-release set (TS 24.501 §6.3.3).
 func assertValidReleaseCause(t *testing.T, body []byte) {
 	t.Helper()
 
-	got := jsonGet(body, "nas.cause_5gsm")
+	got := jsonGet(body, "nas.5gsm_cause")
 	if got == "" {
 		t.Errorf("network-requested release carries no 5GSM cause; the SMF shall set one (TS 24.501 §6.3.3)\n  body: %s", body)
 		return
@@ -64,11 +53,8 @@ func assertValidReleaseCause(t *testing.T, body []byte) {
 	}
 }
 
-// TestSubscriptionChange_SliceRemovedReleasesPDUSession establishes a PDU
-// session on the default slice, then moves the subscriber to a profile whose
-// slice (SST 2) does not match it. TS 23.501 §5.15.5.2.2: when a slice is no
-// longer available for a UE due to a subscription change, the orphaned PDU
-// session shall be released — the AMF/SMF send a network-requested release.
+// A profile whose slice (SST 2) does not match the established session orphans it,
+// which TS 23.501 §5.15.5.2.2 requires the network to release.
 func Test5GSubscriptionChange_SliceRemovedReleasesPDUSession(t *testing.T) {
 	token, err := provisionEllaCore()
 	if err != nil {
@@ -85,8 +71,7 @@ func Test5GSubscriptionChange_SliceRemovedReleasesPDUSession(t *testing.T) {
 		t.Fatalf("establish PDU session: HTTP %d\n  body: %s", status, body)
 	}
 
-	// Restore the subscriber regardless of outcome — the env is shared and
-	// persistent. Registered before the mutation so it always runs.
+	// Registered before the mutation so the shared subscriber is always restored.
 	t.Cleanup(func() { updateSubscriberProfile(t, token, subscriptionChangeIMSI, "default") })
 
 	updateSubscriberProfile(t, token, subscriptionChangeIMSI, "alternate")

@@ -5,10 +5,11 @@
 
 package integration_test
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
-// fullAttach drives a UE all the way to EMM-REGISTERED, failing the test on any
-// non-compliant step.
 func fullAttach(t *testing.T, enbID, ueID string) {
 	t.Helper()
 
@@ -27,17 +28,14 @@ func fullAttach(t *testing.T, enbID, ueID string) {
 	nasStep(t, enbID, ueID, "attach_complete")
 }
 
-// TestEPSPreS1SetupGating checks the MME refuses a UE-associated procedure on an
-// association that has not completed S1 Setup (TS 36.413 §8.7.1): it must not
-// authenticate the UE.
 func Test4GPreS1SetupGating(t *testing.T) {
-	body := `{
+	body := fmt.Sprintf(`{
 		"mme_address": "10.3.0.2:36412",
 		"enb_s1_address": "10.3.0.3",
-		"mcc": "001", "mnc": "01", "tac": "0001", "enb_id": 1,
+		"mcc": "001", "mnc": "01", "tac": "0001", "enb_id": %d,
 		"name": "no-s1setup-enb",
 		"skip_s1_setup": true
-	}`
+	}`, claimENBID())
 
 	status, resp := doRequest(t, "POST", "/enb", body)
 	if status != 201 {
@@ -49,40 +47,31 @@ func Test4GPreS1SetupGating(t *testing.T) {
 
 	ueID := mustCreateENBUE(t, enbID)
 
-	status, resp = doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas",
+	status, resp = doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap",
 		`{"message_type":"attach_request","timeout_ms":1500}`)
 
-	// The MME must not progress the attach. A silent drop (gateway timeout) or an
-	// Error Indication is compliant; issuing an Authentication Request is not.
+	// TS 36.413 §8.7.1 leaves a drop and an Error Indication both compliant.
 	if status == 200 && jsonGet(resp, "nas.message_type") == "authentication_request" {
 		t.Fatalf("MME authenticated a UE before S1 Setup completed (TS 36.413 §8.7.1); body: %s", resp)
 	}
 }
 
-// TestEPSForgedS1APIDInjection checks the MME does not act on a UE-associated NAS
-// message that references an MME-UE-S1AP-ID it never assigned (a forged UE
-// association, TS 36.413 §10.6), and stays healthy afterwards.
 func Test4GForgedS1APIDInjection(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
 
 	resp := nasBody(t, enbID, ueID,
-		`{"message_type":"inject_nas","mme_ue_s1ap_id":4294967000,"raw_nas_pdu":"00","timeout_ms":1500}`)
+		`{"message_type":"inject_nas","mme_ue_s1ap_id_override":4294967000,"raw_nas_pdu":"00","timeout_ms":1500}`)
 
-	// The MME must not route this as a valid NAS exchange into any context. An
-	// Error Indication or silence is acceptable; a Downlink NAS Transport is not.
+	// TS 36.413 §10.6 leaves silence and an Error Indication both compliant.
 	if got := jsonGet(resp, "s1ap.message_type"); got == "DownlinkNASTransport" {
 		t.Fatalf("MME routed NAS for a forged MME-UE-S1AP-ID; body: %s", resp)
 	}
 
-	// The MME must remain healthy: a fresh UE still attaches.
 	fresh := mustCreateENBUE(t, enbID)
 	fullAttach(t, enbID, fresh)
 }
 
-// TestEPSNASReplay replays a UE's last protected uplink (its Attach Complete, at a
-// now-stale NAS COUNT) and checks the MME discards it (TS 24.301 §4.4.3.5) without
-// adverse effect, staying healthy.
 func Test4GNASReplay(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)

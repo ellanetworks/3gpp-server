@@ -5,39 +5,44 @@ package store
 
 import "testing"
 
-// TestGnBContextDeleteUEPurgesSideMaps asserts DeleteUE removes the per-UE state
-// held in the ranUeID-keyed side-maps, not only the UEs map — otherwise every
-// created/deleted UE leaks its NGAP ID, PDU sessions, and AMBR.
-func TestGnBContextDeleteUEPurgesSideMaps(t *testing.T) {
-	g := NewGnBContext("g1", "001", "01", "000001", "000001", "gnb", 1, "", nil)
+func TestGNBContextMigrateUE(t *testing.T) {
+	src := NewGNBContext("g1", "001", "01", "000001", "000001", "src", 1, "", nil)
+	target := NewGNBContext("g2", "001", "01", "000001", "000002", "target", 1, "", nil)
 
-	ue := &UEContext{ID: "ue1", RanUeNgapID: 42}
-	g.CreateUE(ue)
-	g.UpdateNGAPIDs(42, 100)
-	g.StorePDUSession(42, &PDUSessionInfo{PDUSessionID: 1})
-	g.StoreUEAmbr(42, &UEAmbrInfo{UplinkBps: 1, DownlinkBps: 2})
+	ue := &UEContext{ID: "ue1", RANUENGAPID: 42, PDUSessions: map[uint8]*PDUSessionInfo{1: {PDUSessionID: 1}}}
+	src.CreateUE(ue)
 
-	if !g.DeleteUE("ue1") {
-		t.Fatal("DeleteUE returned false for an existing UE")
+	newRan, newAmf := int64(7), int64(99)
+	src.MigrateUE(target, ue, &newRan, &newAmf)
+
+	if _, ok := src.GetUE("ue1"); ok {
+		t.Error("source still holds the migrated UE")
 	}
 
-	if _, ok := g.GetAMFUENGAPID(42); ok {
-		t.Error("NGAPIDs still holds the deleted UE")
+	got, ok := target.GetUE("ue1")
+	if !ok {
+		t.Fatal("target does not hold the migrated UE")
 	}
 
-	if _, ok := g.GetPDUSession(42, 1); ok {
-		t.Error("PDUSessions still holds the deleted UE")
+	if got.RANUENGAPID != newRan {
+		t.Errorf("RANUENGAPID = %d, want %d", got.RANUENGAPID, newRan)
 	}
 
-	if len(g.PDUSessions) != 0 {
-		t.Errorf("PDUSessions map = %d entries, want 0", len(g.PDUSessions))
+	if got.AMFUENGAPID != newAmf {
+		t.Errorf("AMFUENGAPID = %d, want %d", got.AMFUENGAPID, newAmf)
 	}
 
-	if len(g.NGAPIDs) != 0 {
-		t.Errorf("NGAPIDs map = %d entries, want 0", len(g.NGAPIDs))
+	if _, ok := got.PDUSessions[1]; !ok {
+		t.Error("migrated UE lost its PDU session")
 	}
+}
 
-	if len(g.UEAmbr) != 0 {
-		t.Errorf("UEAmbr map = %d entries, want 0", len(g.UEAmbr))
+func TestGNBContextAllocateRanUeNgapID(t *testing.T) {
+	g := NewGNBContext("g1", "001", "01", "000001", "000001", "gnb", 1, "", nil)
+
+	for want := int64(1); want <= 3; want++ {
+		if got := g.AllocateRANUENGAPID(); got != want {
+			t.Errorf("AllocateRANUENGAPID() = %d, want %d", got, want)
+		}
 	}
 }

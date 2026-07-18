@@ -57,7 +57,7 @@ services:
     entrypoint:
       - /bin/sh
       - -c
-      - "socat -T5 UDP4-LISTEN:7,fork,reuseaddr EXEC:cat & while true; do ping -c1 -W1 10.6.0.2 >/dev/null 2>&1; sleep 2; done"
+      - "socat -T5 UDP4-LISTEN:7,fork,reuseaddr EXEC:cat"
     restart: unless-stopped
     networks:
       n6:

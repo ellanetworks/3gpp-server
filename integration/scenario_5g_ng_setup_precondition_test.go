@@ -3,12 +3,6 @@
 
 //go:build integration
 
-// NG Setup precondition (TS 38.413 §8.7.1.1): "This procedure shall be the
-// first NGAP procedure triggered after the TNL association has become
-// operational." Until NG Setup completes, the association has no NG-C interface
-// instance, so the AMF must not serve NGAP procedures on it — regardless of
-// message type.
-
 package integration_test
 
 import (
@@ -16,8 +10,6 @@ import (
 	"testing"
 )
 
-// createGnBWithoutNGSetup opens an SCTP association to the AMF but does not send
-// an NG Setup Request, modelling an NG-RAN node that has not completed NG Setup.
 func createGnBWithoutNGSetup(t *testing.T, gnbID, name string) string {
 	t.Helper()
 
@@ -46,12 +38,8 @@ func createGnBWithoutNGSetup(t *testing.T, gnbID, name string) string {
 	return id
 }
 
-// assertNotServedBeforeNGSetup sends one NGAP message on a fresh association
-// that never completed NG Setup and fails if the AMF served the procedure. The
-// handler only ever surfaces the procedure's own response or an Error
-// Indication, so a served procedure shows up as a 200 whose message type is not
-// ErrorIndication; a drop is a 504 and a refused/closed association a 502 — both
-// of which conform to TS 38.413 §8.7.1.1.
+// A drop (504) and a refused association (502) both leave the procedure unserved,
+// so both conform to TS 38.413 §8.7.1.1.
 func assertNotServedBeforeNGSetup(t *testing.T, context string, status int, body []byte) {
 	t.Helper()
 
@@ -62,18 +50,11 @@ func assertNotServedBeforeNGSetup(t *testing.T, context string, status int, body
 				"NG Setup shall be the first NGAP procedure (TS 38.413 §8.7.1.1)\n  body: %s", context, got, body)
 		}
 	case 502, 504:
-		// 504: AMF returned nothing (dropped). 502: AMF closed/refused the
-		// association. Both leave the procedure unserved.
 	default:
 		t.Fatalf("%s: unexpected HTTP %d\n  body: %s", context, status, body)
 	}
 }
 
-// TestNGAPMessagesBeforeNGSetupRejected fires a UE-associated initiating message
-// (Initial UE Message), a gNB-level UE-associated message (Path Switch Request),
-// and an interface-management message (NG Reset) on associations that never
-// completed NG Setup, and asserts the AMF serves none of them (TS 38.413
-// §8.7.1.1).
 func Test5GNGAPMessagesBeforeNGSetupRejected(t *testing.T) {
 	t.Run("InitialUEMessage", func(t *testing.T) {
 		gnb := createGnBWithoutNGSetup(t, "0000d0", "no-ngsetup-iue")

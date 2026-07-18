@@ -10,15 +10,11 @@ import (
 	"testing"
 )
 
-// ngapErrorIndicationIDs returns the AMF and RAN UE NGAP IDs carried in the
-// response's IE list (nil when absent).
 func ngapErrorIndicationIDs(body []byte) (amf, ran *int64) {
 	var top struct {
 		NGAP struct {
-			IEs []struct {
-				AmfUeNgapID *int64 `json:"amf_ue_ngap_id"`
-				RanUeNgapID *int64 `json:"ran_ue_ngap_id"`
-			} `json:"ies"`
+			AMFUENGAPID *int64 `json:"amf_ue_ngap_id"`
+			RANUENGAPID *int64 `json:"ran_ue_ngap_id"`
 		} `json:"ngap"`
 	}
 
@@ -26,25 +22,31 @@ func ngapErrorIndicationIDs(body []byte) (amf, ran *int64) {
 		return nil, nil
 	}
 
-	for _, ie := range top.NGAP.IEs {
-		if ie.AmfUeNgapID != nil {
-			amf = ie.AmfUeNgapID
-		}
-
-		if ie.RanUeNgapID != nil {
-			ran = ie.RanUeNgapID
-		}
-	}
-
-	return amf, ran
+	return top.NGAP.AMFUENGAPID, top.NGAP.RANUENGAPID
 }
 
-// assertSpecCompliantErrorIndication checks that a response to a UE-associated
-// message carrying a wrong AMF/RAN UE NGAP ID is an Error Indication with the
-// IEs TS 38.413 §10.6 and §8.7.5.2 require: it uses UE-associated signalling
-// (both UE NGAP IDs echoed) and carries a Cause. The exact §10.6 cause
-// (Unknown local / Inconsistent remote UE NGAP ID) is pinned in the core3 unit
-// tests for resolveUE.
+type criticalityDiagnosticsJSON struct {
+	ProcedureCode        *int64  `json:"procedure_code"`
+	TriggeringMessage    *string `json:"triggering_message"`
+	ProcedureCriticality *string `json:"procedure_criticality"`
+}
+
+func ngapCriticalityDiagnostics(body []byte) *criticalityDiagnosticsJSON {
+	var top struct {
+		NGAP struct {
+			CriticalityDiagnostics *criticalityDiagnosticsJSON `json:"criticality_diagnostics"`
+		} `json:"ngap"`
+	}
+
+	if err := json.Unmarshal(body, &top); err != nil {
+		return nil
+	}
+
+	return top.NGAP.CriticalityDiagnostics
+}
+
+// Which of the two TS 38.413 §10.6 causes applies depends on the mutated ID, so
+// only the presence of a Cause is asserted.
 func assertSpecCompliantErrorIndication(t *testing.T, body []byte) {
 	t.Helper()
 

@@ -9,16 +9,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
+	"github.com/ellanetworks/3gpp-server/internal/naseps"
 	"github.com/ellanetworks/3gpp-server/internal/s1ap"
 	"github.com/ellanetworks/3gpp-server/internal/store"
 	"github.com/ellanetworks/3gpp-server/internal/transport"
 )
 
-// SendENBS1AP drives a non-UE-associated S1AP message on the eNB's S1-MME
-// association — the target-eNB side of S1 handover, addressing a UE the eNB does
-// not own by the S1AP ID pair the MME assigned.
 func (h *Handler) SendENBS1AP(w http.ResponseWriter, r *http.Request) {
 	enb, err := h.Store.GetENB(r.PathValue("enb_id"))
 	if err != nil {
@@ -38,24 +35,27 @@ func (h *Handler) SendENBS1AP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// raw_s1ap_pdu bypasses message_type entirely.
-	if req.RawS1APPDU != nil {
-		h.handleRawS1AP(w, r, t, &req)
-		return
-	}
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
+	defer cancel()
 
 	var (
-		resp *SendENBNASResponse
+		resp *SendENBUES1APResponse
 		herr error
 	)
 
-	switch req.MessageType {
-	case "handover_request_acknowledge":
-		resp, herr = h.handoverRequestAcknowledge(enb, t, &req)
-	case "handover_notify":
-		resp, herr = h.handoverNotify(enb, t, &req)
-	case "handover_failure":
-		resp, herr = h.handoverFailure(t, &req)
+	switch {
+	case req.RawS1APPDU != nil:
+		resp, herr = handleENBRawS1AP(ctx, t, &req)
+	case req.MessageType == "reset":
+		resp, herr = handleENBReset(ctx, enb, t, &req)
+	case req.MessageType == "path_switch_request":
+		resp, herr = handleENBPathSwitchRequest(ctx, enb, t, &req)
+	case req.MessageType == "handover_request_acknowledge":
+		resp, herr = handleENBHandoverRequestAcknowledge(enb, t, &req)
+	case req.MessageType == "handover_notify":
+		resp, herr = handleENBHandoverNotify(enb, t, &req)
+	case req.MessageType == "handover_failure":
+		resp, herr = handleENBHandoverFailure(t, &req)
 	default:
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("unsupported message_type %q", req.MessageType))
 		return
@@ -69,43 +69,114 @@ func (h *Handler) SendENBS1AP(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-// handleRawS1AP writes a verbatim S1AP PDU onto the eNB's S1-MME association and
-// optionally blocks for a downlink of one of req.WaitFor's types.
-func (h *Handler) handleRawS1AP(w http.ResponseWriter, r *http.Request, t *transport.S1APTransport, req *SendENBS1APRequest) {
-	pdu, err := hex.DecodeString(*req.RawS1APPDU)
+// Reset is non-UE-associated: it resets the whole S1 interface, or the UE
+// associations named in reset_ue_ids (TS 36.413 §8.7.1).
+func handleENBReset(ctx context.Context, enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBUES1APResponse, error) {
+	var connections []s1ap.ResetConnection
+
+	for _, ueID := range req.ResetUEIDs {
+		ue, ok := enb.GetUE(ueID)
+		if !ok {
+			return nil, httpErrorf(http.StatusNotFound, "ue %s not found", ueID)
+		}
+
+		mme := ue.MMEUES1APID
+		enbID := ue.ENBUES1APID
+		connections = append(connections, s1ap.ResetConnection{MMEUES1APID: &mme, ENBUES1APID: &enbID})
+	}
+
+	pdu, err := s1ap.BuildReset(len(connections) == 0, connections)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("decode raw_s1ap_pdu: %v", err))
-		return
+		return nil, httpErrorf(http.StatusInternalServerError, "build Reset: %v", err)
 	}
 
 	if err := t.Send(pdu, false); err != nil {
-		writeError(w, http.StatusBadGateway, fmt.Sprintf("SCTP send: %v", err))
-		return
+		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
+	}
+
+	resp, err := t.WaitForMessage(ctx, "ResetAcknowledge", "ErrorIndication")
+	if err != nil {
+		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for ResetAcknowledge: %v", err)
+	}
+
+	return &SendENBUES1APResponse{S1AP: resp}, nil
+}
+
+func handleENBRawS1AP(ctx context.Context, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBUES1APResponse, error) {
+	pdu, err := hex.DecodeString(*req.RawS1APPDU)
+	if err != nil {
+		return nil, httpErrorf(http.StatusBadRequest, "decode raw_s1ap_pdu: %v", err)
+	}
+
+	if err := t.Send(pdu, false); err != nil {
+		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
 	}
 
 	if len(req.WaitFor) == 0 {
-		writeJSON(w, http.StatusOK, SendENBNASResponse{})
-		return
+		return &SendENBUES1APResponse{}, nil
 	}
-
-	timeout := 5 * time.Second
-	if req.TimeoutMs > 0 {
-		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), timeout)
-	defer cancel()
 
 	resp, err := t.WaitForMessage(ctx, req.WaitFor...)
 	if err != nil {
-		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for %v: %v", req.WaitFor, err))
-		return
+		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for %v: %v", req.WaitFor, err)
 	}
 
-	writeJSON(w, http.StatusOK, SendENBNASResponse{S1AP: resp})
+	return &SendENBUES1APResponse{S1AP: resp}, nil
 }
 
-func (h *Handler) handoverRequestAcknowledge(enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBNASResponse, error) {
+func handleENBPathSwitchRequest(ctx context.Context, enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBUES1APResponse, error) {
+	if req.MMEUES1APID == nil || req.ENBUES1APID == nil {
+		return nil, httpErrorf(http.StatusBadRequest, "mme_ue_s1ap_id and enb_ue_s1ap_id are required")
+	}
+
+	if len(req.ERABs) == 0 {
+		return nil, httpErrorf(http.StatusBadRequest, "erabs is required for path_switch_request")
+	}
+
+	erab := req.ERABs[0]
+
+	teid := erab.DLTeid
+	if teid == 0 {
+		teid = *req.ENBUES1APID + 0x1000
+	}
+
+	// The S1AP encoding drops the EEA0/EIA0 bit, so shift the octets left.
+	netcap := naseps.DefaultUENetworkCapability
+
+	encoded, err := s1ap.BuildPathSwitchRequest(s1ap.PathSwitchRequestParams{
+		ENBUES1APID:                   *req.ENBUES1APID,
+		SourceMMEUES1APID:             *req.MMEUES1APID,
+		ERABID:                        erab.ID,
+		TargetS1UAddr:                 enb.N3Addr,
+		TargetTEID:                    teid,
+		MCC:                           enb.MCC,
+		MNC:                           enb.MNC,
+		TAC:                           enb.TAC,
+		CellID:                        1,
+		EncryptionAlgorithms:          uint16(netcap[0]<<1) << 8,
+		IntegrityProtectionAlgorithms: uint16(netcap[1]<<1) << 8,
+	})
+	if err != nil {
+		return nil, httpErrorf(http.StatusInternalServerError, "build PathSwitchRequest: %v", err)
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
+	}
+
+	if len(req.WaitFor) == 0 {
+		return &SendENBUES1APResponse{}, nil
+	}
+
+	resp, err := t.WaitForMessage(ctx, req.WaitFor...)
+	if err != nil {
+		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for %v: %v", req.WaitFor, err)
+	}
+
+	return &SendENBUES1APResponse{S1AP: resp}, nil
+}
+
+func handleENBHandoverRequestAcknowledge(enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBUES1APResponse, error) {
 	if req.MMEUES1APID == nil || req.ENBUES1APID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "mme_ue_s1ap_id and enb_ue_s1ap_id are required")
 	}
@@ -148,10 +219,10 @@ func (h *Handler) handoverRequestAcknowledge(enb *store.ENBContext, t *transport
 		return nil, err
 	}
 
-	return &SendENBNASResponse{}, nil
+	return &SendENBUES1APResponse{}, nil
 }
 
-func (h *Handler) handoverNotify(enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBNASResponse, error) {
+func handleENBHandoverNotify(enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBUES1APResponse, error) {
 	if req.MMEUES1APID == nil || req.ENBUES1APID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "mme_ue_s1ap_id and enb_ue_s1ap_id are required")
 	}
@@ -177,15 +248,15 @@ func (h *Handler) handoverNotify(enb *store.ENBContext, t *transport.S1APTranspo
 		return nil, err
 	}
 
-	return &SendENBNASResponse{}, nil
+	return &SendENBUES1APResponse{}, nil
 }
 
-func (h *Handler) handoverFailure(t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBNASResponse, error) {
+func handleENBHandoverFailure(t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBUES1APResponse, error) {
 	if req.MMEUES1APID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "mme_ue_s1ap_id is required for handover_failure")
 	}
 
-	cause := s1ap.CauseHOFailureInTarget
+	cause := s1ap.CauseRadioNetworkHOFailureInTarget
 	if req.Cause != nil {
 		cause = *req.Cause
 	}
@@ -199,15 +270,15 @@ func (h *Handler) handoverFailure(t *transport.S1APTransport, req *SendENBS1APRe
 		return nil, err
 	}
 
-	return &SendENBNASResponse{}, nil
+	return &SendENBUES1APResponse{}, nil
 }
 
-func (h *Handler) handoverRequired(ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBHandoverRequired(st *store.Store, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	if req.TargetENBID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "target_enb_id is required for handover_required")
 	}
 
-	target, err := h.Store.GetENB(*req.TargetENBID)
+	target, err := st.GetENB(*req.TargetENBID)
 	if err != nil {
 		return nil, httpErrorf(http.StatusNotFound, "target enb not found: %v", err)
 	}
@@ -215,7 +286,7 @@ func (h *Handler) handoverRequired(ue *store.UEEPSContext, t *transport.S1APTran
 	encoded, err := s1ap.BuildHandoverRequired(s1ap.HandoverRequiredParams{
 		MMEUES1APID: sourceMMEID(ue, req),
 		ENBUES1APID: sourceENBID(ue, req),
-		Cause:       s1ap.CauseHandoverDesirableForRadioReasons,
+		Cause:       handoverRequiredCause(req),
 		TargetMCC:   target.MCC,
 		TargetMNC:   target.MNC,
 		TargetTAC:   target.TAC,
@@ -229,11 +300,11 @@ func (h *Handler) handoverRequired(ue *store.UEEPSContext, t *transport.S1APTran
 		return nil, err
 	}
 
-	return &SendENBNASResponse{}, nil
+	return &SendENBUES1APResponse{}, nil
 }
 
-func (h *Handler) handoverCancel(ctx context.Context, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
-	cause := s1ap.CauseHandoverCancelled
+func handleENBHandoverCancel(ctx context.Context, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
+	cause := s1ap.CauseRadioNetworkHandoverCancelled
 	if req.HandoverCancelCause != nil {
 		cause = *req.HandoverCancelCause
 	}
@@ -252,10 +323,10 @@ func (h *Handler) handoverCancel(ctx context.Context, ue *store.UEEPSContext, t 
 		return nil, err
 	}
 
-	return &SendENBNASResponse{S1AP: resp}, nil
+	return &SendENBUES1APResponse{S1AP: resp}, nil
 }
 
-func (h *Handler) enbStatusTransfer(ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBEnbStatusTransfer(ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	var container []byte
 
 	if req.StatusTransferContainer != nil {
@@ -276,12 +347,18 @@ func (h *Handler) enbStatusTransfer(ue *store.UEEPSContext, t *transport.S1APTra
 		return nil, err
 	}
 
-	return &SendENBNASResponse{}, nil
+	return &SendENBUES1APResponse{}, nil
 }
 
-// sourceMMEID and sourceENBID resolve the S1AP ID pair a source-eNB handover
-// message carries: the request override when present, else the UE's stored IDs.
-func sourceMMEID(ue *store.UEEPSContext, req *SendENBNASRequest) uint32 {
+func handoverRequiredCause(req *SendENBUES1APRequest) int {
+	if req != nil && req.HandoverRequiredCause != nil {
+		return *req.HandoverRequiredCause
+	}
+
+	return s1ap.CauseRadioNetworkHandoverDesirableForRadioReason
+}
+
+func sourceMMEID(ue *store.UEEPSContext, req *SendENBUES1APRequest) uint32 {
 	if req.MMEUES1APIDOverride != nil {
 		return *req.MMEUES1APIDOverride
 	}
@@ -289,7 +366,7 @@ func sourceMMEID(ue *store.UEEPSContext, req *SendENBNASRequest) uint32 {
 	return ue.MMEUES1APID
 }
 
-func sourceENBID(ue *store.UEEPSContext, req *SendENBNASRequest) uint32 {
+func sourceENBID(ue *store.UEEPSContext, req *SendENBUES1APRequest) uint32 {
 	if req.ENBUES1APIDOverride != nil {
 		return *req.ENBUES1APIDOverride
 	}
@@ -297,9 +374,6 @@ func sourceENBID(ue *store.UEEPSContext, req *SendENBNASRequest) uint32 {
 	return ue.ENBUES1APID
 }
 
-// MigrateENBUE moves a UE context to the target eNB's association, modelling the
-// UE arriving at the target after an S1 handover. The UE keeps its security
-// context; its S1AP ID pair becomes the target's values.
 func (h *Handler) MigrateENBUE(w http.ResponseWriter, r *http.Request) {
 	src, err := h.Store.GetENB(r.PathValue("enb_id"))
 	if err != nil {
@@ -325,21 +399,12 @@ func (h *Handler) MigrateENBUE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.MMEUES1APID != nil {
-		ue.MMEUES1APID = *req.MMEUES1APID
-	}
+	src.MigrateUE(target, ue, req.MMEUES1APID, req.ENBUES1APID)
 
-	if req.ENBUES1APID != nil {
-		ue.ENBUES1APID = *req.ENBUES1APID
-	}
-
-	src.DeleteUE(ue.ID)
-	target.AdoptUE(ue)
-
-	writeJSON(w, http.StatusOK, map[string]any{
-		"ue_id":          ue.ID,
-		"enb_id":         req.TargetENBID,
-		"mme_ue_s1ap_id": ue.MMEUES1APID,
-		"enb_ue_s1ap_id": ue.ENBUES1APID,
+	writeJSON(w, http.StatusOK, MigrateENBUEResponse{
+		UEID:        ue.ID,
+		ENBID:       req.TargetENBID,
+		MMEUES1APID: ue.MMEUES1APID,
+		ENBUES1APID: ue.ENBUES1APID,
 	})
 }

@@ -40,10 +40,11 @@ const (
 
 type HomeNetworkPublicKey struct {
 	ProtectionScheme string
-	PublicKey        *ecdh.PublicKey
+	PublicKey        *ecdh.PublicKey // nil for NullScheme
 	PublicKeyID      string
 }
 
+// Mcc and Mnc are empty unless SupiType is SupiTypeIMSI.
 type Suci struct {
 	SupiType         string
 	Mcc              string
@@ -77,6 +78,7 @@ func ParseSuci(input string) *Suci {
 	}
 }
 
+// TS 24.501 §9.11.3.4
 func Tbcd(value string) string {
 	valueBytes := []byte(value)
 	for (len(valueBytes) % 2) != 0 {
@@ -169,7 +171,9 @@ func profileAEncrypt(msin string, hnPubkey *ecdh.PublicKey) (string, error) {
 		return "", err
 	}
 
-	out := append(ephemeralPub, cipherText...)
+	out := make([]byte, 0, len(ephemeralPub)+len(cipherText)+len(mac))
+	out = append(out, ephemeralPub...)
+	out = append(out, cipherText...)
 	out = append(out, mac...)
 
 	return hex.EncodeToString(out), nil
@@ -215,7 +219,9 @@ func profileBEncrypt(msin string, hnPubkey *ecdh.PublicKey) (string, error) {
 		return "", err
 	}
 
-	out := append(ephemeralPubCompressed, cipherText...)
+	out := make([]byte, 0, len(ephemeralPubCompressed)+len(cipherText)+len(mac))
+	out = append(out, ephemeralPubCompressed...)
+	out = append(out, cipherText...)
 	out = append(out, mac...)
 
 	return hex.EncodeToString(out), nil
@@ -247,10 +253,6 @@ func ParseX25519PublicKey(raw []byte) (*ecdh.PublicKey, error) {
 	return ecdh.X25519().NewPublicKey(raw)
 }
 
-// ParseP256PublicKey accepts a home network public key in either uncompressed
-// SEC1 form (65 bytes, 0x04 prefix) or compressed form (33 bytes, 0x02/0x03
-// prefix). Operators commonly publish the compressed form (it is what Ella Core
-// returns), but crypto/ecdh only accepts uncompressed, so decompress first.
 func ParseP256PublicKey(raw []byte) (*ecdh.PublicKey, error) {
 	if len(raw) == 33 && (raw[0] == 0x02 || raw[0] == 0x03) {
 		x, y := elliptic.UnmarshalCompressed(elliptic.P256(), raw)
@@ -271,7 +273,11 @@ func ansiX963KDF(sharedKey, publicKey []byte, encKeyLen, macKeyLen, hashLen int)
 	for i := 0; i < kdfRounds; i++ {
 		counterBytes := make([]byte, 4)
 		binary.BigEndian.PutUint32(counterBytes, counter)
-		tmpK := sha256.Sum256(append(append(sharedKey, counterBytes...), publicKey...))
+		input := make([]byte, 0, len(sharedKey)+len(counterBytes)+len(publicKey))
+		input = append(input, sharedKey...)
+		input = append(input, counterBytes...)
+		input = append(input, publicKey...)
+		tmpK := sha256.Sum256(input)
 		kdfKey = append(kdfKey, tmpK[:]...)
 		counter++
 	}

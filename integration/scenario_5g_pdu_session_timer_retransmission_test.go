@@ -3,18 +3,6 @@
 
 //go:build integration
 
-// Network-requested-procedure retransmission timers (TS 24.501):
-//   - T3592 (§6.3.3, abnormal case a): the SMF retransmits the PDU Session
-//     Release Command on each expiry until the UE confirms with a Release
-//     Complete.
-//   - T3591 (§6.3.2.5): the SMF retransmits the PDU Session Modification Command
-//     on each expiry until the UE confirms with a Modification Complete.
-//
-// Both timers are 16 s (TS 24.501 table 10.3.2). Observing a single
-// retransmission proves the timer fires and resends; the abort-on-fifth-expiry
-// behaviour is covered by Ella Core's SMF unit tests. Each test waits more than
-// 16 s, so the suite is skipped unless ELLA_RUN_TIMER_RETRANSMISSION_TESTS is set.
-
 package integration_test
 
 import (
@@ -27,7 +15,7 @@ import (
 	"testing"
 )
 
-// procedureTimerWaitMs exceeds the 16 s T3591/T3592 interval with margin.
+// procedureTimerWaitMs exceeds the T3591/T3592 retransmission interval with margin.
 const procedureTimerWaitMs = 22000
 
 const (
@@ -43,8 +31,6 @@ func skipUnlessTimerTestsEnabled(t *testing.T) {
 	}
 }
 
-// awaitUENGAPWithin waits up to timeoutMs for an unsolicited downlink NGAP
-// message of one of messageTypes addressed to the UE.
 func awaitUENGAPWithin(t *testing.T, gnbID, ueID string, timeoutMs int, messageTypes ...string) []byte {
 	t.Helper()
 
@@ -59,9 +45,6 @@ func awaitUENGAPWithin(t *testing.T, gnbID, ueID string, timeoutMs int, messageT
 	return body
 }
 
-// TestT3592_ReleaseCommandRetransmitted drives a network-requested release and,
-// by withholding the Release Complete, observes the SMF retransmit the Release
-// Command when T3592 expires (TS 24.501 §6.3.3, abnormal case a).
 func Test5GT3592_ReleaseCommandRetransmitted(t *testing.T) {
 	skipUnlessTimerTestsEnabled(t)
 
@@ -77,22 +60,17 @@ func Test5GT3592_ReleaseCommandRetransmitted(t *testing.T) {
 		t.Fatalf("initial: ngap.message_type = %q, want PDUSessionResourceReleaseCommand\n  body: %s", got, body)
 	}
 
-	// The UE acknowledges neither the N1 Release Complete nor the N2 release
-	// response, so T3592 expires and the SMF resends the command.
+	// Withholding both the N1 and N2 responses is what expires T3592 (TS 24.501 §6.3.3.5 a).
 	resp := awaitUENGAPWithin(t, gnbID, ueID, procedureTimerWaitMs, ngapPDUSessionResourceReleaseCommand)
 	if got := jsonGet(resp, "nas.inner_nas_message_type"); got != nasPDUSessionReleaseCommand {
 		t.Errorf("retransmission: nas.inner_nas_message_type = %q, want pdu_session_release_command\n  body: %s", got, resp)
 	}
 
-	// Confirm the release so T3592 stops and the session is torn down.
+	// Unasserted: stops T3592 so the session tears down.
 	doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
 		`{"message_type":"pdu_session_release_complete"}`)
 }
 
-// TestT3591_ModificationCommandRetransmitted changes a session's AMBR so the
-// session reconciler issues a network-requested PDU Session Modification, then,
-// by withholding the Modification Complete, observes the SMF retransmit the
-// Modification Command when T3591 expires (TS 24.501 §6.3.2.5).
 func Test5GT3591_ModificationCommandRetransmitted(t *testing.T) {
 	skipUnlessTimerTestsEnabled(t)
 
@@ -101,14 +79,12 @@ func Test5GT3591_ModificationCommandRetransmitted(t *testing.T) {
 		t.Fatalf("provision Ella Core: %v", err)
 	}
 
-	// A dedicated data network, policy and subscriber so the AMBR can be mutated
-	// without disturbing other tests.
+	// A dedicated data network and policy so the AMBR can be mutated in isolation.
 	mustEllaProvision(t, token, "/api/v1/networking/data-networks", modTimerDNN,
 		fmt.Sprintf(`{"name":%q,"ipv4_pool":"10.77.0.0/24","dns":"8.8.8.8","mtu":1400}`, modTimerDNN))
 	mustEllaProvision(t, token, "/api/v1/policies", modTimerPolicy, modTimerPolicyBody("200 Mbps"))
 
-	// Baseline the AMBR so the later change is a guaranteed difference even when
-	// the test environment persists across runs.
+	// Unasserted: baselines the AMBR so the later change differs across reruns.
 	mustEllaUpdatePolicy(t, token, "200 Mbps")
 
 	gnbID := mustCreateGnB(t)
@@ -125,16 +101,11 @@ func Test5GT3591_ModificationCommandRetransmitted(t *testing.T) {
 		t.Fatalf("establish on %s: HTTP %d\n  body: %s", modTimerDNN, status, body)
 	}
 
-	// Changing the AMBR wakes the session reconciler, which drives a
-	// network-requested PDU Session Modification (TS 24.501 §6.3.2).
+	// An AMBR change drives a network-requested PDU Session Modification (TS 24.501 §6.3.2).
 	mustEllaUpdatePolicy(t, token, "300 Mbps")
 
-	// The Modification Command and its T3591 retransmissions are all
-	// PDUSessionResourceModifyRequests. Consume the first one observed (the
-	// initial command or, if it arrived before this waiter registered, an early
-	// retransmission), then require a further one: a second command for the same
-	// procedure is a retransmission, since the UE never sends a Modification
-	// Complete (TS 24.501 §6.3.2.5).
+	// The command and its T3591 retransmissions are indistinguishable, so the first
+	// await consumes whichever arrived and the second proves a retransmission.
 	awaitUENGAPWithin(t, gnbID, ueID, procedureTimerWaitMs, ngapPDUSessionResourceModifyRequest)
 	awaitUENGAPWithin(t, gnbID, ueID, procedureTimerWaitMs, ngapPDUSessionResourceModifyRequest)
 }
@@ -163,7 +134,7 @@ func mustEllaUpdatePolicy(t *testing.T, token, ambr string) {
 	if err != nil {
 		t.Fatalf("update policy: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 && resp.StatusCode != 201 {
 		b, _ := io.ReadAll(resp.Body)

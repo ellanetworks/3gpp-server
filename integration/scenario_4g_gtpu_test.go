@@ -10,11 +10,8 @@ import (
 	"testing"
 )
 
-// s1uUPFIP is the S-GW/UPF S1-U (N3) address the emulated eNB tunnels to.
-const s1uUPFIP = "10.3.0.2"
-
-// createGTPUENB creates an eNB that terminates the S1-U GTP-U data path.
-func createGTPUENB(t *testing.T, enbID int, name string) string {
+// Only one eNB can bind a given S1-U address:port, so callers must let cleanup run before reusing the same transport.
+func createGTPUENB(t *testing.T, enbID int, name string, n3 n3Transport) string {
 	t.Helper()
 
 	body := fmt.Sprintf(`{
@@ -22,8 +19,8 @@ func createGTPUENB(t *testing.T, enbID int, name string) string {
 		"enb_s1_address": "10.3.0.3",
 		"mcc": "001", "mnc": "01", "tac": "0001", "enb_id": %d,
 		"name": %q,
-		"enable_gtpu": true, "enb_n3_address": "10.3.0.3"
-	}`, enbID, name)
+		"enable_gtpu": true, "enb_n3_address": %q
+	}`, enbID, name, n3.ranN3)
 
 	status, resp := doRequest(t, "POST", "/enb", body)
 	if status != 201 {
@@ -36,31 +33,28 @@ func createGTPUENB(t *testing.T, enbID int, name string) string {
 	return id
 }
 
-// Test4GGTPUEcho: a GTP-U Echo Request the eNB sends on S1-U — the path-management
-// form with no extension header — must be answered with an Echo Response. A
-// GTP-U peer "shall be prepared to receive an Echo Request at any time and it
-// shall reply with an Echo Response" (TS 29.281 §7.2.1); a timeout means the UPF
-// dropped a conformant Echo Request.
 func Test4GGTPUEcho(t *testing.T) {
-	enbID := createGTPUENB(t, 1, "gtpu-echo-enb")
+	for _, n3 := range []n3Transport{n3IPv4, n3IPv6} {
+		t.Run(n3.name, func(t *testing.T) {
+			enbID := createGTPUENB(t, claimENBID(), "gtpu-echo-enb-"+n3.name, n3)
 
-	status, body := doRequest(t, "POST", "/enb/"+enbID+"/gtpu/echo",
-		fmt.Sprintf(`{"upf_ip":%q,"timeout_ms":5000}`, s1uUPFIP))
-	if status != 200 {
-		t.Fatalf("no GTP-U Echo Response (HTTP %d) on S1-U — the UPF did not answer a conformant Echo Request (TS 29.281 §7.2.1)\n  body: %s", status, body)
-	}
+			status, body := doRequest(t, "POST", "/enb/"+enbID+"/gtpu/echo",
+				fmt.Sprintf(`{"sgw_ip":%q,"timeout_ms":5000}`, n3.upfN3))
+			if status != 200 {
+				t.Fatalf("no GTP-U Echo Response (HTTP %d) on S1-U over %s — the UPF did not answer a conformant Echo Request (TS 29.281 §7.2.1)\n  body: %s", status, n3.name, body)
+			}
 
-	if got := jsonGet(body, "echo_response"); got != "true" {
-		t.Errorf("echo_response = %q, want true\n  body: %s", got, body)
+			if got := jsonGet(body, "echo_response"); got != "true" {
+				t.Errorf("echo_response = %q over %s, want true\n  body: %s", got, n3.name, body)
+			}
+
+			assertEchoResponseRecovery(t, body)
+		})
 	}
 }
 
-// Test4GGTPUWrongTEIDErrorIndication: a G-PDU carrying a non-zero TEID for which
-// the UPF has no PDR must be answered with a GTP-U Error Indication on S1-U
-// (TS 29.281 §7.3.1: the node "shall also return a GTP error indication to the
-// originating node").
 func Test4GGTPUWrongTEIDErrorIndication(t *testing.T) {
-	enbID := createGTPUENB(t, 1, "gtpu-errind-enb")
+	enbID := createGTPUENB(t, claimENBID(), "gtpu-errind-enb", n3IPv4)
 	ueID := mustCreateENBUE(t, enbID)
 	fullAttach(t, enbID, ueID)
 
@@ -74,39 +68,29 @@ func Test4GGTPUWrongTEIDErrorIndication(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("no GTP-U Error Indication for a G-PDU to an unknown TEID on S1-U (HTTP %d) — the UPF shall return one (TS 29.281 §7.3.1)\n  body: %s", status, body)
 	}
+
+	assertGTPUErrorIndication(t, body, n3IPv4.upfN3)
 }
 
-// Test4GGTPU_UDPRoundTrip proves the S1-U data path carries UDP, not only ICMP: a
-// UE uplink UDP datagram to the data-network responder returns as a decapsulated
-// downlink datagram echoed back — the UPF forwards and NATs UDP user-plane traffic.
 func Test4GGTPU_UDPRoundTrip(t *testing.T) {
-	enbID := createGTPUENB(t, 1, "gtpu-udp-enb")
+	enbID := createGTPUENB(t, claimENBID(), "gtpu-udp-enb", n3IPv4)
 	ueID := mustCreateENBUE(t, enbID)
 	fullAttach(t, enbID, ueID)
 
 	const payloadHex = "abad1dea"
 
-	// The UPF can lose the first packet while it resolves the N6 next-hop, so retry.
-	var dl []byte
-
-	for i := 0; i < 5; i++ {
-		uplink := fmt.Sprintf(`{"udp":{"dst":%q,"dst_port":%d,"payload_hex":%q}}`, dnResponderIP, udpEchoPort, payloadHex)
-		if s, b := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/uplink", uplink); s != 200 {
-			t.Fatalf("send udp uplink: HTTP %d: %s", s, b)
-		}
-
-		if s, b := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/downlink/await", `{"timeout_ms":2000}`); s == 200 {
-			dl = b
-			break
-		}
+	uplink := fmt.Sprintf(`{"udp":{"dst":%q,"dst_port":%d,"payload_hex":%q}}`, dnResponderIP, udpEchoPort, payloadHex)
+	if s, b := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/uplink", uplink); s != 200 {
+		t.Fatalf("send udp uplink: HTTP %d: %s", s, b)
 	}
 
-	if dl == nil {
+	s, dl := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/downlink/await", `{"timeout_ms":5000}`)
+	if s != 200 {
 		t.Fatal("no UDP downlink — the UPF did not forward/return UDP user-plane traffic")
 	}
 
 	checks := map[string]string{
-		"inner.protocol":     "17", // UDP
+		"inner.protocol":     "17",
 		"inner.src":          dnResponderIP,
 		"inner.udp_src_port": fmt.Sprintf("%d", udpEchoPort),
 		"inner.payload":      payloadHex,

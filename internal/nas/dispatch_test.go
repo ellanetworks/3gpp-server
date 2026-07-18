@@ -1,0 +1,45 @@
+// SPDX-FileCopyrightText: Ella Networks Inc.
+// SPDX-License-Identifier: BUSL-1.1
+
+package nas
+
+import "testing"
+
+// TS 24.501 §8.2.25; selected NAS security algorithms are ciphering in bits 8-5, integrity in bits 4-1 (§9.11.3.34).
+func plainSecurityModeCommand() []byte {
+	return []byte{
+		0x7e,             // extended protocol discriminator: 5GMM
+		0x00,             // spare half octet + security header type: plain
+		0x5d,             // message type: SECURITY MODE COMMAND
+		0x22,             // selected NAS security algorithms: ciphering NEA2, integrity NIA2
+		0x00,             // spare half octet + ngKSI: 0
+		0x02, 0xe0, 0xe0, // replayed UE security capabilities (LV, length 2)
+	}
+}
+
+func TestDecodeSurfacesIEsOfAnUnprotectedSecurityModeCommand(t *testing.T) {
+	resp, err := Decode(plainSecurityModeCommand())
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	if resp.SecurityHeaderType != "plain" {
+		t.Fatalf("security_header_type = %q, want plain", resp.SecurityHeaderType)
+	}
+
+	if resp.MessageType != "security_mode_command" {
+		t.Fatalf("message_type = %q, want security_mode_command", resp.MessageType)
+	}
+
+	if resp.SelectedCipheringAlgorithm == nil || *resp.SelectedCipheringAlgorithm != 2 {
+		t.Errorf("selected ciphering algorithm = %v, want 2 (NEA2)", resp.SelectedCipheringAlgorithm)
+	}
+
+	if resp.SelectedIntegrityAlgorithm == nil || *resp.SelectedIntegrityAlgorithm != 2 {
+		t.Errorf("selected integrity algorithm = %v, want 2 (NIA2)", resp.SelectedIntegrityAlgorithm)
+	}
+
+	if resp.NgKSI == nil || *resp.NgKSI != 0 {
+		t.Errorf("ngKSI = %v, want 0 (TS 24.501 §9.11.3.32)", resp.NgKSI)
+	}
+}

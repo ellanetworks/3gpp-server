@@ -1,18 +1,15 @@
 // SPDX-FileCopyrightText: Ella Networks Inc.
 // SPDX-License-Identifier: BUSL-1.1
 
-// Package gtpu implements the minimal GTP-U (TS 29.281) encode/decode and an
-// N3 endpoint so the emulated gNB can terminate the user-plane tunnel: send
-// uplink G-PDUs to the UPF, receive downlink G-PDUs, and exchange path-
-// management messages (Echo, Error Indication).
+// Package gtpu implements GTP-U (TS 29.281) encode/decode and an N3 endpoint.
 package gtpu
 
 import (
 	"encoding/binary"
 	"fmt"
+	"net/netip"
 )
 
-// GTP-U message types (TS 29.281 §7.1, table 6.1-1).
 const (
 	MsgEchoRequest     = 1
 	MsgEchoResponse    = 2
@@ -21,79 +18,89 @@ const (
 )
 
 const (
-	// Version 1, Protocol Type GTP (1), no extension/sequence/N-PDU flags.
-	flagsGPDU = 0x30
-	// Same flags with the sequence-number flag set (S=1).
+	flagsGPDU    = 0x30
 	flagsWithSeq = 0x32
-	// Same flags with the extension-header flag set (E=1).
 	flagsWithExt = 0x34
 
-	extPDUSessionContainer = 0x85 // next-extension-header type (TS 29.281)
-	pscPDUTypeUL           = 0x10 // PDU Type 1 (UL PDU Session Information) in the high nibble
+	extPDUSessionContainer = 0x85
+
+	pduTypeDL = 0
+	pduTypeUL = 1
 
 	port = 2152
 )
 
-// Port is the GTP-U UDP port.
+// TS 29.281 Table 8.1-1
+const (
+	ieRecovery    = 14
+	ieTEIDDataI   = 16
+	iePeerAddress = 133
+)
+
+var tvValueLengths = map[uint8]int{ieRecovery: 1, ieTEIDDataI: 4}
+
 const Port = port
 
-// Message is a decoded GTP-U message.
+// TS 38.415 §5.5.2
+type PDUSessionContainer struct {
+	PDUType uint8 `json:"pdu_type"`
+	QFI     uint8 `json:"qfi"`
+	RQI     *bool `json:"rqi,omitempty"`
+}
+
 type Message struct {
 	Type    uint8
 	TEID    uint32
 	Seq     uint16
 	HasSeq  bool
-	Payload []byte // T-PDU for a G-PDU; IE bytes for path-management messages
+	Payload []byte
+
+	PDUSession *PDUSessionContainer
+
+	Recovery    *uint8
+	TEIDDataI   *uint32
+	PeerAddress string
 }
 
-// EncodeGPDU wraps an inner IP packet (T-PDU) in a GTP-U G-PDU for the given
-// TEID.
 func EncodeGPDU(teid uint32, tpdu []byte) []byte {
 	out := make([]byte, 8+len(tpdu))
 	out[0] = flagsGPDU
 	out[1] = MsgGPDU
-	binary.BigEndian.PutUint16(out[2:4], uint16(len(tpdu)))
+	binary.BigEndian.PutUint16(out[2:4], uint16(len(out)-8))
 	binary.BigEndian.PutUint32(out[4:8], teid)
 	copy(out[8:], tpdu)
 
 	return out
 }
 
-// EncodeGPDUWithQFI wraps an inner IP packet in a G-PDU carrying the uplink PDU
-// Session Container extension header (TS 38.415) with the QFI — the form an
-// NG-RAN node sends uplink user data, and what a 5G UPF expects on N3.
+// The uplink PDU Session Container (TS 38.415) is what a 5G UPF expects on N3.
 func EncodeGPDUWithQFI(teid uint32, qfi uint8, tpdu []byte) []byte {
 	out := make([]byte, 16+len(tpdu))
 	out[0] = flagsWithExt
 	out[1] = MsgGPDU
-	binary.BigEndian.PutUint16(out[2:4], uint16(8+len(tpdu))) // 4-octet optional block + 4-octet PSC ext + T-PDU
+	binary.BigEndian.PutUint16(out[2:4], uint16(len(out)-8))
 	binary.BigEndian.PutUint32(out[4:8], teid)
-	// out[8:11] are sequence + N-PDU (zero); out[11] is the next-extension type.
 	out[11] = extPDUSessionContainer
-	// PDU Session Container extension header (4 octets): length, content, next.
-	out[12] = 0x01         // length in 4-octet units
-	out[13] = pscPDUTypeUL // PDU Type 1 (UL PDU Session Information) in the high nibble
-	out[14] = qfi & 0x3f   // QFI
-	out[15] = 0x00         // no further extension header
+	out[12] = 0x01
+	out[13] = pduTypeUL << 4
+	out[14] = qfi & 0x3f
+	out[15] = 0x00
 	copy(out[16:], tpdu)
 
 	return out
 }
 
-// EncodeEchoRequest builds a GTP-U Echo Request (TEID 0) with a sequence number
-// (TS 29.281 §7.2.1: Echo messages set the S flag).
 func EncodeEchoRequest(seq uint16) []byte {
 	out := make([]byte, 12)
 	out[0] = flagsWithSeq
 	out[1] = MsgEchoRequest
-	binary.BigEndian.PutUint16(out[2:4], 4) // length: TEID-trailing octets (seq + npdu + next-ext)
-	// TEID is 0 for path management.
+	binary.BigEndian.PutUint16(out[2:4], uint16(len(out)-8))
 	binary.BigEndian.PutUint16(out[8:10], seq)
 
 	return out
 }
 
-// Decode parses a GTP-U message header (TS 29.281 §5.1).
+// TS 29.281 §5.1
 func Decode(b []byte) (*Message, error) {
 	if len(b) < 8 {
 		return nil, fmt.Errorf("gtp-u message too short: %d bytes", len(b))
@@ -111,8 +118,6 @@ func Decode(b []byte) (*Message, error) {
 
 	length := int(binary.BigEndian.Uint16(b[2:4]))
 
-	// An optional 4-octet block (sequence number, N-PDU number, next-extension
-	// header type) is present when any of the S/PN/E flags are set.
 	payloadStart := 8
 
 	optional := flags&0x07 != 0
@@ -129,8 +134,6 @@ func Decode(b []byte) (*Message, error) {
 		nextExt := b[11]
 		payloadStart = 12
 
-		// Walk extension headers: each is length (4-octet units), content, and a
-		// next-extension-header type. The chain ends at type 0.
 		for nextExt != 0 {
 			if payloadStart >= len(b) {
 				break
@@ -141,12 +144,15 @@ func Decode(b []byte) (*Message, error) {
 				break
 			}
 
+			if nextExt == extPDUSessionContainer {
+				m.PDUSession = decodePDUSessionContainer(b[payloadStart+1 : payloadStart+extLen-1])
+			}
+
 			nextExt = b[payloadStart+extLen-1]
 			payloadStart += extLen
 		}
 	}
 
-	// length counts the octets after the first 8 (mandatory) header bytes.
 	end := 8 + length
 	if end > len(b) {
 		end = len(b)
@@ -158,5 +164,78 @@ func Decode(b []byte) (*Message, error) {
 
 	m.Payload = b[payloadStart:end]
 
+	if m.Type != MsgGPDU {
+		m.decodeIEs(m.Payload)
+	}
+
 	return m, nil
+}
+
+// TS 38.415 §5.5.2.1, §5.5.2.2
+func decodePDUSessionContainer(b []byte) *PDUSessionContainer {
+	if len(b) < 2 {
+		return nil
+	}
+
+	c := &PDUSessionContainer{
+		PDUType: b[0] >> 4,
+		QFI:     b[1] & 0x3f,
+	}
+
+	// TS 38.415 §5.5.3.4: the RQI is used only in the downlink direction.
+	if c.PDUType == pduTypeDL {
+		rqi := b[1]&0x40 != 0
+		c.RQI = &rqi
+	}
+
+	return c
+}
+
+// TS 29.281 §8.1: type bit 8 clear selects TV, set selects TLV with a 2-octet length.
+func (m *Message) decodeIEs(b []byte) {
+	for i := 0; i < len(b); {
+		ieType := b[i]
+
+		if ieType&0x80 == 0 {
+			n, known := tvValueLengths[ieType]
+			if !known || i+1+n > len(b) {
+				return
+			}
+
+			m.setIE(ieType, b[i+1:i+1+n])
+			i += 1 + n
+
+			continue
+		}
+
+		if i+3 > len(b) {
+			return
+		}
+
+		n := int(binary.BigEndian.Uint16(b[i+1 : i+3]))
+		if i+3+n > len(b) {
+			return
+		}
+
+		m.setIE(ieType, b[i+3:i+3+n])
+		i += 3 + n
+	}
+}
+
+func (m *Message) setIE(ieType uint8, value []byte) {
+	switch ieType {
+	case ieRecovery:
+		restartCounter := value[0]
+		m.Recovery = &restartCounter
+
+	case ieTEIDDataI:
+		teid := binary.BigEndian.Uint32(value)
+		m.TEIDDataI = &teid
+
+	case iePeerAddress:
+		// TS 29.281 §8.4: the length field admits only 4 (IPv4) or 16 (IPv6).
+		if addr, ok := netip.AddrFromSlice(value); ok {
+			m.PeerAddress = addr.Unmap().String()
+		}
+	}
 }

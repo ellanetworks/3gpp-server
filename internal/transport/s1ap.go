@@ -7,12 +7,9 @@ import (
 	s1apCodec "github.com/ellanetworks/3gpp-server/internal/s1ap"
 )
 
-// s1apPPID is the SCTP payload protocol identifier for S1AP, 18 (TS 36.412).
-// The ishidawataru/sctp SndRcvInfo carries the PPID in network byte order, so it
-// is stored pre-swapped — matching free5gc's ngap.PPID (0x3c000000 for 60).
+// sctp.SndRcvInfo carries the PPID in network byte order, so S1AP's 18 (TS 36.412) is stored pre-swapped.
 const s1apPPID uint32 = 18 << 24
 
-// S1APTransport is an S1AP association to an MME (PPID 18, TS 36.412).
 type S1APTransport struct {
 	*framed[s1apCodec.S1APResponse]
 }

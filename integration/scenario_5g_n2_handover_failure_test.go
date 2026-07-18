@@ -3,11 +3,6 @@
 
 //go:build integration
 
-// Handover Failure (TS 38.413 §8.4.2.3): the target gNB rejects a handover with
-// a HANDOVER FAILURE, and the AMF answers the source with a HANDOVER PREPARATION
-// FAILURE (§8.4.1.3). Abnormal AP-ID cases follow §10.6. Every assertion is the
-// spec-mandated outcome, so a failure means Ella Core deviates.
-
 package integration_test
 
 import (
@@ -15,9 +10,6 @@ import (
 	"testing"
 )
 
-// TestN2HandoverFailureRejection: the target rejects the prepared handover with
-// a HANDOVER FAILURE; the AMF must answer the source with a HANDOVER PREPARATION
-// FAILURE (TS 38.413 §8.4.2.3 → §8.4.1.3).
 func Test5GN2HandoverFailureRejection(t *testing.T) {
 	srcGNB := createGnBWithID(t, "000401", "ho-fail-src")
 	targetGNB := createGnBWithID(t, "000402", "ho-fail-tgt")
@@ -46,22 +38,17 @@ func Test5GN2HandoverFailureRejection(t *testing.T) {
 		t.Errorf("after Handover Failure: source got %q, want HandoverPreparationFailure (TS 38.413 §8.4.1.3)", got)
 	}
 
-	// Cause is a mandatory IE of HANDOVER PREPARATION FAILURE (TS 38.413 §9.2.3.3).
 	if !ngapHasCause(prepFail) {
 		t.Errorf("HandoverPreparationFailure missing mandatory Cause (TS 38.413 §9.2.3.3)\n  body: %s", prepFail)
 	}
 }
 
-// TestN2HandoverFailureThenReHandover: after a handover is rejected, a fresh
-// handover of the same UE must succeed — the rejection released the handover
-// procedure and the UE's resources (TS 38.413 §8.4.2.3).
 func Test5GN2HandoverFailureThenReHandover(t *testing.T) {
 	srcGNB := createGnBWithID(t, "000403", "ho-refail-src")
 	targetGNB := createGnBWithID(t, "000404", "ho-refail-tgt")
 
 	ueID := establishRegisteredUE(t, srcGNB)
 
-	// First handover, rejected by the target.
 	status, body := doRequest(t, "POST", "/gnb/"+srcGNB+"/ue/"+ueID+"/ngap",
 		`{"message_type":"handover_required","target_gnb_id":"000404"}`)
 	if status != 200 {
@@ -83,7 +70,6 @@ func Test5GN2HandoverFailureThenReHandover(t *testing.T) {
 		t.Fatalf("source got %q, want HandoverPreparationFailure", got)
 	}
 
-	// Second handover of the same UE must complete.
 	status, body = doRequest(t, "POST", "/gnb/"+srcGNB+"/ue/"+ueID+"/ngap",
 		`{"message_type":"handover_required","target_gnb_id":"000404"}`)
 	if status != 200 {
@@ -113,9 +99,6 @@ func Test5GN2HandoverFailureThenReHandover(t *testing.T) {
 	completeHandover(t, targetGNB, targetAmf2, 100)
 }
 
-// TestN2HandoverFailureUnknownAmfUeNgapID: a HANDOVER FAILURE bearing an AMF UE
-// NGAP ID the AMF never assigned carries an unknown local AP ID; §10.6 requires
-// an Error Indication.
 func Test5GN2HandoverFailureUnknownAmfUeNgapID(t *testing.T) {
 	targetGNB := createGnBWithID(t, "000405", "ho-fail-tgt")
 
@@ -128,10 +111,6 @@ func Test5GN2HandoverFailureUnknownAmfUeNgapID(t *testing.T) {
 	expectErrorIndication(t, targetGNB, "Handover Failure with unknown AMF UE NGAP ID")
 }
 
-// TestN2HandoverFailureCrossAssociationHijack: a rogue gNB forges a HANDOVER
-// FAILURE bearing a victim's AMF UE NGAP ID. The ID is unknown on the rogue's
-// own association, so §10.6 requires an Error Indication there, and the victim
-// must be untouched.
 func Test5GN2HandoverFailureCrossAssociationHijack(t *testing.T) {
 	victimGNB := createGnBWithID(t, "000406", "victim-gnb")
 	attackerGNB := createGnBWithID(t, "000407", "attacker-gnb")

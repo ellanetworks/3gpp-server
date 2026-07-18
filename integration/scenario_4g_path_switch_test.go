@@ -10,11 +10,7 @@ import (
 	"testing"
 )
 
-// TestEPSPathSwitch drives an X2-handover PATH SWITCH REQUEST after attach and
-// asserts the MME acknowledges it with a fresh key-chain {NH, NCC} (TS 36.413
-// §9.1.5.8, TS 33.401 §7.2.8). The MME seeds NCC=1 at Initial Context Setup and
-// increases it by one per path switch (§7.2.8.4), so the first switch returns
-// NCC=2 with a 256-bit NH.
+// NCC seeds at 1 at Initial Context Setup and advances by one per path switch, so the first switch returns 2 (TS 33.401 §7.2.8.4).
 func Test4GPathSwitch(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -41,9 +37,6 @@ func Test4GPathSwitch(t *testing.T) {
 	}
 }
 
-// TestEPSPathSwitchNCCIncrements checks the MME advances the {NH, NCC} chain on
-// every path switch: the NCC must increase by one each time (TS 33.401
-// §7.2.8.4.3), proving a fresh NH is derived rather than reused.
 func Test4GPathSwitchNCCIncrements(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -61,16 +54,13 @@ func Test4GPathSwitchNCCIncrements(t *testing.T) {
 	}
 }
 
-// TestEPSPathSwitchUnknownUE checks the MME rejects a PATH SWITCH REQUEST naming
-// a source MME-UE-S1AP-ID it never assigned, with cause unknown-mme-ue-s1ap-id
-// (TS 36.413 §9.2.1.3, radio-network #13).
 func Test4GPathSwitchUnknownUE(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
 
 	fullAttach(t, enbID, ueID)
 
-	resp := nasBody(t, enbID, ueID, `{"message_type":"path_switch","mme_ue_s1ap_id":2147483646,"timeout_ms":4000}`)
+	resp := nasBody(t, enbID, ueID, `{"message_type":"path_switch","mme_ue_s1ap_id_override":2147483646,"timeout_ms":4000}`)
 
 	if got := jsonGet(resp, "s1ap.message_type"); got != "PathSwitchRequestFailure" {
 		t.Fatalf("unknown-UE path switch: s1ap.message_type = %q, want PathSwitchRequestFailure; body: %s", got, resp)
@@ -81,9 +71,6 @@ func Test4GPathSwitchUnknownUE(t *testing.T) {
 	}
 }
 
-// TestEPSPathSwitchDuplicateERAB checks the MME rejects a PATH SWITCH REQUEST
-// whose to-be-switched list repeats an E-RAB ID, with cause
-// multiple-E-RAB-ID-instances (TS 36.413 §9.2.1.3, radio-network #31).
 func Test4GPathSwitchDuplicateERAB(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -101,10 +88,7 @@ func Test4GPathSwitchDuplicateERAB(t *testing.T) {
 	}
 }
 
-// TestEPSPathSwitchUnknownERAB checks the MME fails a PATH SWITCH REQUEST naming
-// an E-RAB the UE does not have (7; its only bearer is the default, E-RAB 5): no
-// E-RAB is switched, so the MME returns a failure with cause
-// transport-resource-unavailable (TS 36.413 §9.1.5.10, §9.2.1.3 transport #0).
+// The UE's only bearer is the default, E-RAB 5, so E-RAB 7 names none of its bearers.
 func Test4GPathSwitchUnknownERAB(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)

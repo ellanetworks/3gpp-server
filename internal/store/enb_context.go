@@ -4,32 +4,26 @@
 package store
 
 import (
-	"strconv"
 	"sync"
 	"sync/atomic"
 )
 
-// ENBContext is an emulated eNB's S1-MME association state, including the UE
-// contexts attached through it.
 type ENBContext struct {
 	ID    string
 	MCC   string
 	MNC   string
-	TAC   uint16
+	TAC   string
 	ENBID uint32
 	Name  string
 
-	// N3Addr is the eNB's S1-U transport address, advertised as the E-RAB
-	// endpoint in the Initial Context Setup Response.
 	N3Addr string
 
-	mu         sync.RWMutex
-	ues        map[string]*UEEPSContext
-	nextUEID   atomic.Int64
-	nextENBUES atomic.Int64
+	mu          sync.RWMutex
+	ues         map[string]*UEEPSContext
+	nextENBUEID atomic.Uint32
 }
 
-func NewENBContext(id, mcc, mnc string, tac uint16, enbID uint32, name string) *ENBContext {
+func NewENBContext(id, mcc, mnc, tac string, enbID uint32, name string) *ENBContext {
 	return &ENBContext{
 		ID:    id,
 		MCC:   mcc,
@@ -41,30 +35,11 @@ func NewENBContext(id, mcc, mnc string, tac uint16, enbID uint32, name string) *
 	}
 }
 
-// CreateUE allocates a UE context with a fresh eNB UE S1AP ID and store handle.
-func (e *ENBContext) CreateUE(imsi, k, opc, amf, sqn string) *UEEPSContext {
-	ue := &UEEPSContext{
-		ID:          strconv.FormatInt(e.nextUEID.Add(1), 10),
-		IMSI:        imsi,
-		K:           k,
-		OPc:         opc,
-		AMF:         amf,
-		SQN:         sqn,
-		ENBUES1APID: uint32(e.nextENBUES.Add(1)),
-		Bearers:     make(map[uint8]*EPSBearer),
-	}
-
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	e.ues[ue.ID] = ue
-
-	return ue
+func (e *ENBContext) AllocateENBUES1APID() uint32 {
+	return e.nextENBUEID.Add(1)
 }
 
-// AdoptUE inserts an existing UE context under this eNB, modelling the UE
-// arriving at a target eNB after an S1 handover. The context keeps its identity,
-// credentials, and EPS NAS security state.
-func (e *ENBContext) AdoptUE(ue *UEEPSContext) {
+func (e *ENBContext) CreateUE(ue *UEEPSContext) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.ues[ue.ID] = ue
@@ -83,6 +58,10 @@ func (e *ENBContext) DeleteUE(ueID string) bool {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
+	return e.deleteUELocked(ueID)
+}
+
+func (e *ENBContext) deleteUELocked(ueID string) bool {
 	if _, ok := e.ues[ueID]; !ok {
 		return false
 	}
@@ -90,4 +69,20 @@ func (e *ENBContext) DeleteUE(ueID string) bool {
 	delete(e.ues, ueID)
 
 	return true
+}
+
+func (e *ENBContext) MigrateUE(target *ENBContext, ue *UEEPSContext, mmeUES1APID, enbUES1APID *uint32) {
+	e.mu.Lock()
+	e.deleteUELocked(ue.ID)
+	e.mu.Unlock()
+
+	if mmeUES1APID != nil {
+		ue.MMEUES1APID = *mmeUES1APID
+	}
+
+	if enbUES1APID != nil {
+		ue.ENBUES1APID = *enbUES1APID
+	}
+
+	target.CreateUE(ue)
 }

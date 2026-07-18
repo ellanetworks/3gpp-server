@@ -11,9 +11,6 @@ import (
 	"github.com/ellanetworks/core/s1ap"
 )
 
-// Decode decodes a received S1AP PDU into its JSON form. Only the messages the
-// server currently drives are mapped to typed fields; any other PDU is reported
-// by its outcome and procedure code with the raw hex preserved.
 func Decode(data []byte) (*S1APResponse, error) {
 	pdu, err := s1ap.Unmarshal(data)
 	if err != nil {
@@ -92,7 +89,9 @@ func Decode(data []byte) (*S1APResponse, error) {
 				return nil, fmt.Errorf("parse S1SetupResponse: %w", err)
 			}
 
-			resp.S1SetupResponse = mapS1SetupResponse(sr)
+			setUnknownIEs(resp, sr)
+
+			mapS1SetupResponse(sr, resp)
 		case s1ap.ProcPathSwitchRequest:
 			resp.MessageType = "PathSwitchRequestAcknowledge"
 			if err := decodePathSwitchRequestAcknowledge(m.Value, resp); err != nil {
@@ -127,7 +126,9 @@ func Decode(data []byte) (*S1APResponse, error) {
 				return nil, fmt.Errorf("parse S1SetupFailure: %w", err)
 			}
 
-			resp.S1SetupFailure = mapS1SetupFailure(sf)
+			setUnknownIEs(resp, sf)
+
+			mapS1SetupFailure(sf, resp)
 
 			if sf.CriticalityDiagnostics != nil {
 				resp.CriticalityDiagnostics = decodeCriticalityDiagnostics(sf.CriticalityDiagnostics)
@@ -156,6 +157,8 @@ func decodeDownlinkNASTransport(value []byte, resp *S1APResponse) error {
 		return fmt.Errorf("parse DownlinkNASTransport: %w", err)
 	}
 
+	setUnknownIEs(resp, m)
+
 	setUEIDs(resp, int64(m.MMEUES1APID), int64(m.ENBUES1APID))
 	nas := hex.EncodeToString(m.NASPDU)
 	resp.NASPDU = &nas
@@ -169,6 +172,8 @@ func decodeInitialContextSetupRequest(value []byte, resp *S1APResponse) error {
 		return fmt.Errorf("parse InitialContextSetupRequest: %w", err)
 	}
 
+	setUnknownIEs(resp, m)
+
 	setUEIDs(resp, int64(m.MMEUES1APID), int64(m.ENBUES1APID))
 	resp.UEAggregateMaxBitRate = &UEAggregateMaxBitRateJSON{
 		DL: int64(m.UEAggregateMaximumBitRate.DL),
@@ -177,11 +182,10 @@ func decodeInitialContextSetupRequest(value []byte, resp *S1APResponse) error {
 
 	for _, it := range m.ERABToBeSetup {
 		item := ERABSetupItemJSON{ERABID: int(it.ERABID), GTPTEID: uint32(it.GTPTEID)}
-		item.TransportLayerAddress = transportLayerIP(it.TransportLayerAddress)
+		item.TransportLayerAddress, item.TransportLayerAddressIPv6 = transportLayerIPs(it.TransportLayerAddress)
 
 		resp.ERABSetupItems = append(resp.ERABSetupItems, item)
 
-		// The Attach Accept rides as the NAS-PDU of the default E-RAB item.
 		if len(it.NASPDU) > 0 && resp.NASPDU == nil {
 			nas := hex.EncodeToString(it.NASPDU)
 			resp.NASPDU = &nas
@@ -202,13 +206,14 @@ func decodeERABReleaseCommand(value []byte, resp *S1APResponse) error {
 		return fmt.Errorf("parse ERABReleaseCommand: %w", err)
 	}
 
+	setUnknownIEs(resp, m)
+
 	setUEIDs(resp, int64(m.MMEUES1APID), int64(m.ENBUES1APID))
 
 	for _, it := range m.ERABToBeReleased {
 		resp.ERABSetupItems = append(resp.ERABSetupItems, ERABSetupItemJSON{ERABID: int(it.ERABID)})
 	}
 
-	// The Deactivate EPS Bearer Context Request rides as the NAS-PDU.
 	if len(m.NASPDU) > 0 {
 		nas := hex.EncodeToString([]byte(m.NASPDU))
 		resp.NASPDU = &nas
@@ -223,6 +228,8 @@ func decodeERABModifyRequest(value []byte, resp *S1APResponse) error {
 		return fmt.Errorf("parse ERABModifyRequest: %w", err)
 	}
 
+	setUnknownIEs(resp, m)
+
 	setUEIDs(resp, int64(m.MMEUES1APID), int64(m.ENBUES1APID))
 
 	for _, it := range m.ERABToBeModified {
@@ -232,7 +239,6 @@ func decodeERABModifyRequest(value []byte, resp *S1APResponse) error {
 			ARPPriorityLevel: int(it.QoS.ARP.PriorityLevel),
 		})
 
-		// The Modify EPS Bearer Context Request rides as the default bearer's NAS-PDU.
 		if len(it.NASPDU) > 0 && resp.NASPDU == nil {
 			nas := hex.EncodeToString([]byte(it.NASPDU))
 			resp.NASPDU = &nas
@@ -247,6 +253,8 @@ func decodeResetAcknowledge(value []byte, resp *S1APResponse) error {
 	if err != nil {
 		return fmt.Errorf("parse ResetAcknowledge: %w", err)
 	}
+
+	setUnknownIEs(resp, m)
 
 	for _, c := range m.ConnectionList {
 		item := ResetConnectionJSON{}
@@ -272,17 +280,15 @@ func decodeERABSetupRequest(value []byte, resp *S1APResponse) error {
 		return fmt.Errorf("parse ERABSetupRequest: %w", err)
 	}
 
+	setUnknownIEs(resp, m)
+
 	setUEIDs(resp, int64(m.MMEUES1APID), int64(m.ENBUES1APID))
 
 	for _, it := range m.ERABToBeSetup {
-		item := ERABSetupItemJSON{
-			ERABID:                int(it.ERABID),
-			GTPTEID:               uint32(it.GTPTEID),
-			TransportLayerAddress: transportLayerIP(it.TransportLayerAddress),
-		}
+		item := ERABSetupItemJSON{ERABID: int(it.ERABID), GTPTEID: uint32(it.GTPTEID)}
+		item.TransportLayerAddress, item.TransportLayerAddressIPv6 = transportLayerIPs(it.TransportLayerAddress)
 		resp.ERABSetupItems = append(resp.ERABSetupItems, item)
 
-		// The Activate Default EPS Bearer Context Request rides as the E-RAB's NAS-PDU.
 		if len(it.NASPDU) > 0 && resp.NASPDU == nil {
 			nas := hex.EncodeToString([]byte(it.NASPDU))
 			resp.NASPDU = &nas
@@ -298,8 +304,8 @@ func decodeUEContextReleaseCommand(value []byte, resp *S1APResponse) error {
 		return fmt.Errorf("parse UEContextReleaseCommand: %w", err)
 	}
 
-	// The release names the UE by its S1AP ID pair (or a bare MME ID); surface the
-	// eNB ID when present so a waiter can match its UE.
+	setUnknownIEs(resp, m)
+
 	mme := int64(m.UES1APIDs.MMEUES1APID)
 	resp.MMEUES1APID = &mme
 
@@ -319,6 +325,8 @@ func decodePathSwitchRequestAcknowledge(value []byte, resp *S1APResponse) error 
 		return fmt.Errorf("parse PathSwitchRequestAcknowledge: %w", err)
 	}
 
+	setUnknownIEs(resp, m)
+
 	setUEIDs(resp, int64(m.MMEUES1APID), int64(m.ENBUES1APID))
 	resp.SecurityContext = &SecurityContextJSON{
 		NextHopChainingCount: int(m.SecurityContext.NextHopChainingCount),
@@ -327,8 +335,8 @@ func decodePathSwitchRequestAcknowledge(value []byte, resp *S1APResponse) error 
 
 	if m.UESecurityCapabilities != nil {
 		resp.ReplayedUESecurityCapabilities = &UESecurityCapabilitiesJSON{
-			EncryptionAlgorithms:          int(m.UESecurityCapabilities.EncryptionAlgorithms),
-			IntegrityProtectionAlgorithms: int(m.UESecurityCapabilities.IntegrityProtectionAlgorithms),
+			EncryptionAlgorithms:          secCapHex(m.UESecurityCapabilities.EncryptionAlgorithms),
+			IntegrityProtectionAlgorithms: secCapHex(m.UESecurityCapabilities.IntegrityProtectionAlgorithms),
 		}
 	}
 
@@ -340,6 +348,8 @@ func decodePathSwitchRequestFailure(value []byte, resp *S1APResponse) error {
 	if err != nil {
 		return fmt.Errorf("parse PathSwitchRequestFailure: %w", err)
 	}
+
+	setUnknownIEs(resp, m)
 
 	setUEIDs(resp, int64(m.MMEUES1APID), int64(m.ENBUES1APID))
 	resp.Cause = &CauseJSON{Group: causeGroupName(m.Cause.Group), Value: m.Cause.Value}
@@ -353,21 +363,33 @@ func decodeHandoverRequest(value []byte, resp *S1APResponse) error {
 		return fmt.Errorf("parse HandoverRequest: %w", err)
 	}
 
+	setUnknownIEs(resp, m)
+
 	mme := int64(m.MMEUES1APID)
 	resp.MMEUES1APID = &mme
 
 	for _, it := range m.ERABToBeSetup {
-		resp.ERABSetupItems = append(resp.ERABSetupItems, ERABSetupItemJSON{
-			ERABID:                int(it.ERABID),
-			GTPTEID:               uint32(it.GTPTEID),
-			TransportLayerAddress: transportLayerIP(it.TransportLayerAddress),
-		})
+		item := ERABSetupItemJSON{ERABID: int(it.ERABID), GTPTEID: uint32(it.GTPTEID)}
+		item.TransportLayerAddress, item.TransportLayerAddressIPv6 = transportLayerIPs(it.TransportLayerAddress)
+		resp.ERABSetupItems = append(resp.ERABSetupItems, item)
 	}
 
 	resp.SecurityContext = &SecurityContextJSON{
 		NextHopChainingCount: int(m.SecurityContext.NextHopChainingCount),
 		NextHop:              hex.EncodeToString(m.SecurityContext.NextHopParameter[:]),
 	}
+
+	resp.UEAggregateMaxBitRate = &UEAggregateMaxBitRateJSON{
+		DL: int64(m.UEAMBR.DL),
+		UL: int64(m.UEAMBR.UL),
+	}
+
+	resp.UESecurityCapabilities = &UESecurityCapabilitiesJSON{
+		EncryptionAlgorithms:          secCapHex(m.UESecurityCapabilities.EncryptionAlgorithms),
+		IntegrityProtectionAlgorithms: secCapHex(m.UESecurityCapabilities.IntegrityProtectionAlgorithms),
+	}
+
+	resp.SourceToTargetContainer = hex.EncodeToString(m.SourceToTarget)
 
 	return nil
 }
@@ -377,6 +399,8 @@ func decodeHandoverCommand(value []byte, resp *S1APResponse) error {
 	if err != nil {
 		return fmt.Errorf("parse HandoverCommand: %w", err)
 	}
+
+	setUnknownIEs(resp, m)
 
 	setUEIDs(resp, int64(m.MMEUES1APID), int64(m.ENBUES1APID))
 
@@ -393,6 +417,8 @@ func decodeHandoverPreparationFailure(value []byte, resp *S1APResponse) error {
 		return fmt.Errorf("parse HandoverPreparationFailure: %w", err)
 	}
 
+	setUnknownIEs(resp, m)
+
 	setUEIDs(resp, int64(m.MMEUES1APID), int64(m.ENBUES1APID))
 	resp.Cause = &CauseJSON{Group: causeGroupName(m.Cause.Group), Value: m.Cause.Value}
 
@@ -405,6 +431,8 @@ func decodeHandoverCancelAcknowledge(value []byte, resp *S1APResponse) error {
 		return fmt.Errorf("parse HandoverCancelAcknowledge: %w", err)
 	}
 
+	setUnknownIEs(resp, m)
+
 	setUEIDs(resp, int64(m.MMEUES1APID), int64(m.ENBUES1APID))
 
 	return nil
@@ -416,7 +444,10 @@ func decodeMMEStatusTransfer(value []byte, resp *S1APResponse) error {
 		return fmt.Errorf("parse MMEStatusTransfer: %w", err)
 	}
 
+	setUnknownIEs(resp, m)
+
 	setUEIDs(resp, int64(m.MMEUES1APID), int64(m.ENBUES1APID))
+	resp.StatusTransferContainer = hex.EncodeToString(m.Container)
 
 	return nil
 }
@@ -426,6 +457,8 @@ func decodeErrorIndication(value []byte, resp *S1APResponse) error {
 	if err != nil {
 		return fmt.Errorf("parse ErrorIndication: %w", err)
 	}
+
+	setUnknownIEs(resp, m)
 
 	if m.MMEUES1APID != nil {
 		v := int64(*m.MMEUES1APID)
@@ -454,6 +487,8 @@ func decodePaging(value []byte, resp *S1APResponse) error {
 		return fmt.Errorf("parse Paging: %w", err)
 	}
 
+	setUnknownIEs(resp, m)
+
 	resp.Paging = &PagingJSON{
 		MMEC:                 m.STMSI.MMEC,
 		MTMSI:                m.STMSI.MTMSI,
@@ -475,18 +510,17 @@ func cnDomainName(d s1ap.CNDomain) string {
 	}
 }
 
-// transportLayerIP renders an S1AP Transport Layer Address (TS 36.414): 4 octets
-// for IPv4, 16 for IPv6, or 20 for a dual-stack address carrying the IPv4
-// followed by the IPv6. The IPv4 is preferred when present, since the user-plane
-// data path is IPv4.
-func transportLayerIP(b []byte) string {
+// TransportLayerAddress: 32-bit IPv4, 128-bit IPv6, or 160-bit carrying the IPv4 in the first 32 bits (TS 36.414 §5.3).
+func transportLayerIPs(b []byte) (ipv4, ipv6 string) {
 	switch len(b) {
-	case 4, 20:
-		return net.IP(b[:4]).String()
+	case 4:
+		return net.IP(b).String(), ""
 	case 16:
-		return net.IP(b).String()
+		return "", net.IP(b).String()
+	case 20:
+		return net.IP(b[:4]).String(), net.IP(b[4:20]).String()
 	default:
-		return ""
+		return "", ""
 	}
 }
 
@@ -495,11 +529,28 @@ func setUEIDs(resp *S1APResponse, mme, enb int64) {
 	resp.ENBUES1APID = &enb
 }
 
-func mapS1SetupResponse(sr *s1ap.S1SetupResponse) *S1SetupResponseJSON {
-	out := &S1SetupResponseJSON{
-		MMEName:             sr.MMEName,
-		RelativeMMECapacity: int(sr.RelativeMMECapacity),
+type unknownIECarrier interface {
+	UnknownIEs() []s1ap.RawIE
+}
+
+func setUnknownIEs(resp *S1APResponse, m unknownIECarrier) {
+	for _, ie := range m.UnknownIEs() {
+		resp.UnknownIEs = append(resp.UnknownIEs, UnknownIEJSON{
+			ID:          int64(ie.ID),
+			Criticality: ie.Criticality.String(),
+			ValueHex:    hex.EncodeToString(ie.Value),
+		})
 	}
+}
+
+func mapS1SetupResponse(sr *s1ap.S1SetupResponse, resp *S1APResponse) {
+	if sr.MMEName != "" {
+		name := sr.MMEName
+		resp.MMEName = &name
+	}
+
+	capacity := int(sr.RelativeMMECapacity)
+	resp.RelativeMMECapacity = &capacity
 
 	for _, it := range sr.ServedGUMMEIs {
 		g := ServedGUMMEIJSON{}
@@ -516,29 +567,19 @@ func mapS1SetupResponse(sr *s1ap.S1SetupResponse) *S1SetupResponseJSON {
 			g.ServedMMECs = append(g.ServedMMECs, hex.EncodeToString([]byte{byte(c)}))
 		}
 
-		out.ServedGUMMEIs = append(out.ServedGUMMEIs, g)
+		resp.ServedGUMMEIs = append(resp.ServedGUMMEIs, g)
 	}
-
-	return out
 }
 
-func mapS1SetupFailure(sf *s1ap.S1SetupFailure) *S1SetupFailureJSON {
-	out := &S1SetupFailureJSON{
-		Cause: CauseJSON{Group: causeGroupName(sf.Cause.Group), Value: sf.Cause.Value},
-	}
+func mapS1SetupFailure(sf *s1ap.S1SetupFailure, resp *S1APResponse) {
+	resp.Cause = &CauseJSON{Group: causeGroupName(sf.Cause.Group), Value: sf.Cause.Value}
 
 	if sf.TimeToWait != nil {
 		ttw := timeToWaitName(*sf.TimeToWait)
-		out.TimeToWait = &ttw
+		resp.TimeToWait = &ttw
 	}
-
-	return out
 }
 
-// procedureName maps an S1AP procedure code to a stable message name so
-// unexpected downlinks get a usable message_type to await on and a readable JSON
-// label. For procedures with distinct outcomes (e.g. S1 Setup) the caller
-// refines the name per outcome.
 func procedureName(pc s1ap.ProcedureCode) string {
 	switch pc {
 	case s1ap.ProcS1Setup:
@@ -635,6 +676,10 @@ func typeOfErrorName(v s1ap.TypeOfError) string {
 	default:
 		return "unknown"
 	}
+}
+
+func secCapHex(algorithms uint16) string {
+	return fmt.Sprintf("%04x", algorithms)
 }
 
 func causeGroupName(g s1ap.CauseGroup) string {

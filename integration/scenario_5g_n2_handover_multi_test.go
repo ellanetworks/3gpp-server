@@ -3,10 +3,6 @@
 
 //go:build integration
 
-// N2 handover scenarios involving more than one PDU session and the follow-on
-// mobility registration (TS 38.413 §8.4, TS 23.502 §4.9.1.3). These assert the
-// concrete messages the AMF must produce, not merely that it stays alive.
-
 package integration_test
 
 import (
@@ -14,8 +10,6 @@ import (
 	"testing"
 )
 
-// completeHandover sends the Handover Notify that finishes the procedure, so
-// the UE is left in a clean state on the target (avoiding cross-test residue).
 func completeHandover(t *testing.T, targetGNB string, amfUeNgapID, ranUeNgapID int64) {
 	t.Helper()
 
@@ -26,7 +20,6 @@ func completeHandover(t *testing.T, targetGNB string, amfUeNgapID, ranUeNgapID i
 	}
 }
 
-// establishPDUSession establishes a specific PDU session for a UE.
 func establishPDUSession(t *testing.T, gnbID, ueID string, sessionID int) {
 	t.Helper()
 
@@ -37,14 +30,11 @@ func establishPDUSession(t *testing.T, gnbID, ueID string, sessionID int) {
 	}
 }
 
-// TestN2HandoverMultiplePDUSessions hands over a UE holding two PDU sessions.
-// The AMF must request both at the target (§9.2.3.1) and confirm both in the
-// Handover Command (§9.2.3.2).
 func Test5GN2HandoverMultiplePDUSessions(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "000011", "ho-multi-src")
 	targetGNB := createGnBWithID(t, "000012", "ho-multi-tgt")
 
-	ueID := establishRegisteredUE(t, sourceGNB) // session 1
+	ueID := establishRegisteredUE(t, sourceGNB)
 	establishPDUSession(t, sourceGNB, ueID, 2)
 
 	status, body := doRequest(t, "POST", "/gnb/"+sourceGNB+"/ue/"+ueID+"/ngap",
@@ -73,15 +63,11 @@ func Test5GN2HandoverMultiplePDUSessions(t *testing.T) {
 	completeHandover(t, targetGNB, targetAmfID, 100)
 }
 
-// TestN2HandoverPartialAdmission hands over two PDU sessions but the target
-// admits only one. Per §8.4.2.2/§8.4.1.2 the AMF must confirm the admitted
-// session in the Handover List and place the non-admitted one in the PDU
-// Session Resource To Release List of the Handover Command.
 func Test5GN2HandoverPartialAdmission(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "000013", "ho-part-src")
 	targetGNB := createGnBWithID(t, "000014", "ho-part-tgt")
 
-	ueID := establishRegisteredUE(t, sourceGNB) // session 1
+	ueID := establishRegisteredUE(t, sourceGNB)
 	establishPDUSession(t, sourceGNB, ueID, 2)
 
 	status, body := doRequest(t, "POST", "/gnb/"+sourceGNB+"/ue/"+ueID+"/ngap",
@@ -98,7 +84,6 @@ func Test5GN2HandoverPartialAdmission(t *testing.T) {
 		t.Fatalf("HandoverRequest missing AMF UE NGAP ID\n  body: %s", hoReq)
 	}
 
-	// Admit session 1, fail session 2.
 	status, body = doRequest(t, "POST", "/gnb/"+targetGNB+"/ngap",
 		fmt.Sprintf(`{"message_type":"handover_request_acknowledge","amf_ue_ngap_id":%d,"ran_ue_ngap_id":100,"pdu_sessions":[{"id":1,"dl_teid":9001,"dl_ip":"10.3.0.3"}],"failed_pdu_sessions":[2]}`, targetAmfID))
 	if status != 200 {
@@ -115,11 +100,6 @@ func Test5GN2HandoverPartialAdmission(t *testing.T) {
 	completeHandover(t, targetGNB, targetAmfID, 100)
 }
 
-// TestN2HandoverMobilityRegistrationUpdate completes an N2 handover, then has
-// the UE perform a Mobility Registration Update on the target over its existing
-// connection — the Registration Procedure of TS 23.502 §4.9.1.3.3 step 12. The
-// AMF must accept it with a Registration Accept (TS 24.501 §5.5.1.3), reusing
-// the migrated security context.
 func Test5GN2HandoverMobilityRegistrationUpdate(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "000015", "ho-mru-src")
 	targetGNB := createGnBWithID(t, "000016", "ho-mru-tgt")
@@ -155,14 +135,12 @@ func Test5GN2HandoverMobilityRegistrationUpdate(t *testing.T) {
 		t.Fatalf("handover_notify: HTTP %d\n  body: %s", status, body)
 	}
 
-	// The UE now lives on the target with the target-side NGAP IDs.
 	status, body = doRequest(t, "POST", "/gnb/"+sourceGNB+"/ue/"+ueID+"/migrate",
 		fmt.Sprintf(`{"target_gnb_id":"%s","ran_ue_ngap_id":%d,"amf_ue_ngap_id":%d}`, targetGNB, targetRanUeNgapID, targetAmfID))
 	if status != 200 {
 		t.Fatalf("migrate UE: HTTP %d\n  body: %s", status, body)
 	}
 
-	// Mobility Registration Update over the existing connection.
 	status, body = doRequest(t, "POST", "/gnb/"+targetGNB+"/ue/"+ueID+"/ngap",
 		`{"message_type":"registration_request","registration_type":2,"existing_connection":true}`)
 	if status != 200 {

@@ -3,11 +3,6 @@
 
 //go:build integration
 
-// Tests for DownlinkNASTransport (TS 38.413 §9.2.5.2) decode.
-// We trigger a DownlinkNASTransport by sending an InitialUEMessage, then verify
-// that every IE the AMF includes in the response is properly decoded and surfaced
-// in the JSON.
-
 package integration_test
 
 import (
@@ -40,57 +35,34 @@ func Test5GDownlinkNASTransport_Decode(t *testing.T) {
 	t.Run("mandatory IEs decoded", func(t *testing.T) {
 		var resp struct {
 			NGAP struct {
-				IEs []struct {
-					ID          int64   `json:"id"`
-					Criticality string  `json:"criticality"`
-					AmfUeNgapID *int64  `json:"amf_ue_ngap_id,omitempty"`
-					RanUeNgapID *int64  `json:"ran_ue_ngap_id,omitempty"`
-					NasPDU      *string `json:"nas_pdu,omitempty"`
-				} `json:"ies"`
+				AMFUENGAPID *int64  `json:"amf_ue_ngap_id,omitempty"`
+				RANUENGAPID *int64  `json:"ran_ue_ngap_id,omitempty"`
+				NasPDU      *string `json:"nas_pdu,omitempty"`
 			} `json:"ngap"`
 		}
 		if err := json.Unmarshal(body, &resp); err != nil {
 			t.Fatalf("unmarshal: %v", err)
 		}
 
-		var foundAMFID, foundRANID, foundNAS bool
-		for _, ie := range resp.NGAP.IEs {
-			switch {
-			case ie.AmfUeNgapID != nil:
-				foundAMFID = true
-				if *ie.AmfUeNgapID <= 0 {
-					t.Errorf("amf_ue_ngap_id = %d, want > 0", *ie.AmfUeNgapID)
-				}
-				if ie.ID != 10 {
-					t.Errorf("AMF UE NGAP ID ie.id = %d, want 10", ie.ID)
-				}
-			case ie.RanUeNgapID != nil:
-				foundRANID = true
-				if *ie.RanUeNgapID <= 0 {
-					t.Errorf("ran_ue_ngap_id = %d, want > 0", *ie.RanUeNgapID)
-				}
-				if ie.ID != 85 {
-					t.Errorf("RAN UE NGAP ID ie.id = %d, want 85", ie.ID)
-				}
-			case ie.NasPDU != nil:
-				foundNAS = true
-				if *ie.NasPDU == "" {
-					t.Error("nas_pdu is empty string")
-				}
-				if ie.ID != 38 {
-					t.Errorf("NAS-PDU ie.id = %d, want 38", ie.ID)
-				}
-			}
+		switch {
+		case resp.NGAP.AMFUENGAPID == nil:
+			t.Error("missing AMF UE NGAP ID in response")
+		case *resp.NGAP.AMFUENGAPID <= 0:
+			t.Errorf("amf_ue_ngap_id = %d, want > 0", *resp.NGAP.AMFUENGAPID)
 		}
 
-		if !foundAMFID {
-			t.Error("missing AMF UE NGAP ID (IE 10) in response")
+		switch {
+		case resp.NGAP.RANUENGAPID == nil:
+			t.Error("missing RAN UE NGAP ID in response")
+		case *resp.NGAP.RANUENGAPID <= 0:
+			t.Errorf("ran_ue_ngap_id = %d, want > 0", *resp.NGAP.RANUENGAPID)
 		}
-		if !foundRANID {
-			t.Error("missing RAN UE NGAP ID (IE 85) in response")
-		}
-		if !foundNAS {
-			t.Error("missing NAS-PDU (IE 38) in response")
+
+		switch {
+		case resp.NGAP.NasPDU == nil:
+			t.Error("missing NAS-PDU in response")
+		case *resp.NGAP.NasPDU == "":
+			t.Error("nas_pdu is empty string")
 		}
 	})
 
@@ -131,27 +103,4 @@ func Test5GDownlinkNASTransport_Decode(t *testing.T) {
 		}
 	})
 
-	t.Run("IE criticality values", func(t *testing.T) {
-		var resp struct {
-			NGAP struct {
-				IEs []struct {
-					ID          int64  `json:"id"`
-					Criticality string `json:"criticality"`
-				} `json:"ies"`
-			} `json:"ngap"`
-		}
-		if err := json.Unmarshal(body, &resp); err != nil {
-			t.Fatalf("unmarshal: %v", err)
-		}
-		for _, ie := range resp.NGAP.IEs {
-			if ie.Criticality == "" {
-				t.Errorf("IE %d has empty criticality", ie.ID)
-			}
-			switch ie.Criticality {
-			case "reject", "ignore", "notify":
-			default:
-				t.Errorf("IE %d has unexpected criticality %q", ie.ID, ie.Criticality)
-			}
-		}
-	})
 }

@@ -5,6 +5,7 @@ package nas
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 
@@ -20,8 +21,40 @@ type RegistrationRequestOpts struct {
 	SecurityCap      *nasType.UESecurityCapability
 	NgKsi            uint8
 
-	Overrides *NASRequest
+	Overrides *RegistrationRequestOverrides
 }
+
+// RegistrationRequestOverrides carries the optional REGISTRATION REQUEST IEs a caller may set (TS 24.501 §8.2.6).
+type RegistrationRequestOverrides struct {
+	NgKSI                        *uint8
+	MobileIdentityOverride       *string
+	UESecurityCapabilityOverride *string
+	FollowOnRequest              *uint8
+	NonCurrentNativeNASKSI       *uint8
+	Capability5GMM               *string
+	RequestedNSSAI               []SNSSAIJSON
+	LastVisitedRegisteredTAI     *string
+	S1UENetworkCapability        *string
+	UplinkDataStatus             *string
+	PDUSessionStatus             *string
+	MICOIndication               *uint8
+	UEStatus                     *uint8
+	AdditionalGUTI               *string
+	AllowedPDUSessionStatus      *string
+	UEsUsageSetting              *uint8
+	RequestedDRXParameters       *uint8
+	EPSNASMessageContainer       *string
+	LADNIndication               *string
+	PayloadContainer             *string
+	NetworkSlicingIndication     *uint8
+	UpdateType5GS                *string
+	NASMessageContainer          *string
+	EPSBearerContextStatus       *string
+}
+
+// BuildRegistrationRequest builds a plain REGISTRATION REQUEST (TS 24.501 §8.2.6).
+// NEA0/1/2 and NIA0/1/2; bit 7 = algorithm 0, bit 6 = 1, bit 5 = 2 (TS 24.501 §9.11.3.54).
+var DefaultUESecurityCapability = []byte{0xE0, 0xE0}
 
 func BuildRegistrationRequest(opts *RegistrationRequestOpts) ([]byte, error) {
 	m := nas.NewMessage()
@@ -49,7 +82,7 @@ func BuildRegistrationRequest(opts *RegistrationRequestOpts) ([]byte, error) {
 	if opts.Overrides != nil && opts.Overrides.MobileIdentityOverride != nil {
 		idBytes, err := hex.DecodeString(*opts.Overrides.MobileIdentityOverride)
 		if err != nil {
-			return nil, fmt.Errorf("decode mobile_identity_override: %w", err)
+			return nil, fmt.Errorf("nas: decode mobile_identity_override: %w", err)
 		}
 		registrationRequest.MobileIdentity5GS = nasType.MobileIdentity5GS{
 			Len:    uint16(len(idBytes)),
@@ -68,7 +101,7 @@ func BuildRegistrationRequest(opts *RegistrationRequestOpts) ([]byte, error) {
 	if opts.Overrides != nil && opts.Overrides.UESecurityCapabilityOverride != nil {
 		capBytes, err := hex.DecodeString(*opts.Overrides.UESecurityCapabilityOverride)
 		if err != nil {
-			return nil, fmt.Errorf("decode ue_security_capability: %w", err)
+			return nil, fmt.Errorf("nas: decode ue_security_capability: %w", err)
 		}
 		registrationRequest.UESecurityCapability = nasType.NewUESecurityCapability(nasMessage.RegistrationRequestUESecurityCapabilityType)
 		registrationRequest.UESecurityCapability.SetLen(uint8(len(capBytes)))
@@ -91,13 +124,13 @@ func BuildRegistrationRequest(opts *RegistrationRequestOpts) ([]byte, error) {
 
 	data := new(bytes.Buffer)
 	if err := m.GmmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GMM encode error: %w", err)
+		return nil, fmt.Errorf("nas: GMM encode error: %w", err)
 	}
 
 	return data.Bytes(), nil
 }
 
-func applyRegistrationRequestOverrides(rr *nasMessage.RegistrationRequest, req *NASRequest) {
+func applyRegistrationRequestOverrides(rr *nasMessage.RegistrationRequest, req *RegistrationRequestOverrides) {
 	if req.NonCurrentNativeNASKSI != nil {
 		rr.NoncurrentNativeNASKeySetIdentifier = new(nasType.NoncurrentNativeNASKeySetIdentifier)
 		rr.NoncurrentNativeNASKeySetIdentifier.SetIei(nasMessage.RegistrationRequestNoncurrentNativeNASKeySetIdentifierType)
@@ -265,6 +298,10 @@ func applyRegistrationRequestOverrides(rr *nasMessage.RegistrationRequest, req *
 	}
 }
 
+// maxAuthenticationResponseParameterLen is the IE's maximum, TS 24.501 §9.11.3.17.
+const maxAuthenticationResponseParameterLen = 16
+
+// BuildAuthenticationResponse builds an AUTHENTICATION RESPONSE (TS 24.501 §8.2.2).
 func BuildAuthenticationResponse(resStar []byte) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
@@ -278,10 +315,7 @@ func BuildAuthenticationResponse(resStar []byte) ([]byte, error) {
 
 	if len(resStar) > 0 {
 		authResp.AuthenticationResponseParameter = nasType.NewAuthenticationResponseParameter(nasMessage.AuthenticationResponseAuthenticationResponseParameterType)
-		n := len(resStar)
-		if n > 16 {
-			n = 16
-		}
+		n := min(len(resStar), maxAuthenticationResponseParameterLen)
 		authResp.AuthenticationResponseParameter.SetLen(uint8(n))
 		copy(authResp.AuthenticationResponseParameter.Octet[:], resStar[:n])
 	}
@@ -290,12 +324,13 @@ func BuildAuthenticationResponse(resStar []byte) ([]byte, error) {
 
 	data := new(bytes.Buffer)
 	if err := m.GmmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GMM encode AuthenticationResponse: %w", err)
+		return nil, fmt.Errorf("nas: GMM encode AuthenticationResponse: %w", err)
 	}
 
 	return data.Bytes(), nil
 }
 
+// BuildSecurityModeComplete builds a SECURITY MODE COMPLETE (TS 24.501 §8.2.26).
 func BuildSecurityModeComplete(regRequestPdu []byte, imeisv string) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
@@ -324,16 +359,13 @@ func BuildSecurityModeComplete(regRequestPdu []byte, imeisv string) ([]byte, err
 
 	data := new(bytes.Buffer)
 	if err := m.GmmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GMM encode SecurityModeComplete: %w", err)
+		return nil, fmt.Errorf("nas: GMM encode SecurityModeComplete: %w", err)
 	}
 
 	return data.Bytes(), nil
 }
 
-// BuildAuthenticationFailure builds an AUTHENTICATION FAILURE with the given
-// 5GMM cause (TS 24.501 §8.2.3). For cause #21 "synch failure" the caller
-// supplies the AUTS re-synchronisation token in the Authentication failure
-// parameter IE.
+// BuildAuthenticationFailure builds an AUTHENTICATION FAILURE (TS 24.501 §8.2.4).
 func BuildAuthenticationFailure(cause uint8, auts []byte) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
@@ -357,14 +389,13 @@ func BuildAuthenticationFailure(cause uint8, auts []byte) ([]byte, error) {
 
 	data := new(bytes.Buffer)
 	if err := m.GmmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GMM encode AuthenticationFailure: %w", err)
+		return nil, fmt.Errorf("nas: GMM encode AuthenticationFailure: %w", err)
 	}
 
 	return data.Bytes(), nil
 }
 
-// BuildSecurityModeReject builds a SECURITY MODE REJECT with the given 5GMM
-// cause (TS 24.501 §8.2.26).
+// BuildSecurityModeReject builds a SECURITY MODE REJECT (TS 24.501 §8.2.27).
 func BuildSecurityModeReject(cause uint8) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
@@ -381,15 +412,13 @@ func BuildSecurityModeReject(cause uint8) ([]byte, error) {
 
 	data := new(bytes.Buffer)
 	if err := m.GmmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GMM encode SecurityModeReject: %w", err)
+		return nil, fmt.Errorf("nas: GMM encode SecurityModeReject: %w", err)
 	}
 
 	return data.Bytes(), nil
 }
 
-// BuildIdentityResponse builds an IDENTITY RESPONSE carrying the given mobile
-// identity contents (TS 24.501 §8.2.22). The caller supplies the identity bytes
-// matching the type the AMF requested (e.g. the UE's SUCI).
+// BuildIdentityResponse builds an IDENTITY RESPONSE (TS 24.501 §8.2.22).
 func BuildIdentityResponse(mobileIdentity []byte) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
@@ -408,12 +437,13 @@ func BuildIdentityResponse(mobileIdentity []byte) ([]byte, error) {
 
 	data := new(bytes.Buffer)
 	if err := m.GmmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GMM encode IdentityResponse: %w", err)
+		return nil, fmt.Errorf("nas: GMM encode IdentityResponse: %w", err)
 	}
 
 	return data.Bytes(), nil
 }
 
+// BuildRegistrationComplete builds a REGISTRATION COMPLETE (TS 24.501 §8.2.8).
 func BuildRegistrationComplete() ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
@@ -429,7 +459,7 @@ func BuildRegistrationComplete() ([]byte, error) {
 
 	data := new(bytes.Buffer)
 	if err := m.GmmMessageEncode(data); err != nil {
-		return nil, fmt.Errorf("GMM encode RegistrationComplete: %w", err)
+		return nil, fmt.Errorf("nas: GMM encode RegistrationComplete: %w", err)
 	}
 
 	return data.Bytes(), nil
@@ -437,13 +467,13 @@ func BuildRegistrationComplete() ([]byte, error) {
 
 func buildIMEISV(imeisv string) (*nasType.IMEISV, error) {
 	if len(imeisv) != 16 {
-		return nil, fmt.Errorf("IMEISV must be 16 digits")
+		return nil, fmt.Errorf("nas: IMEISV must be 16 digits")
 	}
 
 	var d [16]uint8
 	for i := range 16 {
 		if imeisv[i] < '0' || imeisv[i] > '9' {
-			return nil, fmt.Errorf("IMEISV contains non-digit characters")
+			return nil, fmt.Errorf("nas: IMEISV contains non-digit characters")
 		}
 
 		d[i] = imeisv[i] - '0'
@@ -474,4 +504,118 @@ func buildIMEISV(imeisv string) (*nasType.IMEISV, error) {
 	pei.SetIdentityDigitP_15(0xF)
 
 	return pei, nil
+}
+
+type ServiceRequestOpts struct {
+	ServiceType uint8
+	NgKsi       uint8
+	Guti        *nasType.GUTI5G
+
+	// PDUSessionStatus sets the PDU Session Status IE, bit i = session i active.
+	PDUSessionStatus *[16]bool
+}
+
+// BuildServiceRequest builds a plain SERVICE REQUEST (TS 24.501 §8.2.16); a nil Guti zeroes the 5G-S-TMSI so an unknown UE can still emit one.
+func BuildServiceRequest(opts *ServiceRequestOpts) ([]byte, error) {
+	m := nas.NewMessage()
+	m.GmmMessage = nas.NewGmmMessage()
+	m.GmmHeader.SetMessageType(nas.MsgTypeServiceRequest)
+
+	sr := nasMessage.NewServiceRequest(0)
+	sr.SetExtendedProtocolDiscriminator(nasMessage.Epd5GSMobilityManagementMessage)
+	sr.SetSecurityHeaderType(nas.SecurityHeaderTypePlainNas)
+	sr.SetMessageType(nas.MsgTypeServiceRequest)
+	sr.SetServiceTypeValue(opts.ServiceType)
+	sr.SetNasKeySetIdentifiler(opts.NgKsi)
+
+	sr.SetTypeOfIdentity(nasMessage.MobileIdentity5GSType5gSTmsi)
+	if opts.Guti != nil {
+		sr.SetAMFSetID(opts.Guti.GetAMFSetID())
+		sr.SetAMFPointer(opts.Guti.GetAMFPointer())
+		sr.SetTMSI5G(opts.Guti.GetTMSI5G())
+	}
+	sr.TMSI5GS.SetLen(7)
+
+	if opts.PDUSessionStatus != nil {
+		flags := pduSessionBitmap(opts.PDUSessionStatus)
+
+		sr.PDUSessionStatus = nasType.NewPDUSessionStatus(nasMessage.ServiceRequestPDUSessionStatusType)
+		sr.PDUSessionStatus.SetLen(2)
+		sr.PDUSessionStatus.Buffer = make([]byte, 2)
+		binary.LittleEndian.PutUint16(sr.PDUSessionStatus.Buffer, flags)
+
+		if opts.ServiceType == nasMessage.ServiceTypeData {
+			sr.UplinkDataStatus = nasType.NewUplinkDataStatus(nasMessage.ServiceRequestUplinkDataStatusType)
+			sr.UplinkDataStatus.SetLen(2)
+			sr.UplinkDataStatus.Buffer = make([]byte, 2)
+			binary.LittleEndian.PutUint16(sr.UplinkDataStatus.Buffer, flags)
+		}
+	}
+
+	m.ServiceRequest = sr
+
+	data := new(bytes.Buffer)
+	if err := m.GmmMessageEncode(data); err != nil {
+		return nil, fmt.Errorf("nas: GMM encode ServiceRequest: %w", err)
+	}
+
+	return data.Bytes(), nil
+}
+
+func pduSessionBitmap(status *[16]bool) uint16 {
+	var flags uint16
+	for i, active := range status {
+		if active {
+			flags |= 1 << uint(i)
+		}
+	}
+
+	return flags
+}
+
+type DeregistrationRequestOpts struct {
+	Guti      *nasType.GUTI5G
+	Suci      *nasType.MobileIdentity5GS
+	NgKsi     uint8
+	SwitchOff uint8
+}
+
+// BuildDeregistrationRequest builds a UE-originating DEREGISTRATION REQUEST (TS 24.501 §8.2.12).
+func BuildDeregistrationRequest(opts *DeregistrationRequestOpts) ([]byte, error) {
+	m := nas.NewMessage()
+	m.GmmMessage = nas.NewGmmMessage()
+	m.GmmHeader.SetMessageType(nas.MsgTypeDeregistrationRequestUEOriginatingDeregistration)
+
+	dereg := nasMessage.NewDeregistrationRequestUEOriginatingDeregistration(0)
+	dereg.SetExtendedProtocolDiscriminator(nasMessage.Epd5GSMobilityManagementMessage)
+	dereg.SetSecurityHeaderType(nas.SecurityHeaderTypePlainNas)
+	dereg.SetSpareHalfOctet(0x00)
+	dereg.SetMessageType(nas.MsgTypeDeregistrationRequestUEOriginatingDeregistration)
+	dereg.SetTSC(nasMessage.TypeOfSecurityContextFlagNative)
+	dereg.SetNasKeySetIdentifiler(opts.NgKsi)
+
+	dereg.SetSwitchOff(opts.SwitchOff)
+	dereg.SetReRegistrationRequired(0)
+	dereg.SetAccessType(1)
+
+	if opts.Guti != nil {
+		dereg.MobileIdentity5GS = nasType.MobileIdentity5GS{
+			Iei:    opts.Guti.Iei,
+			Len:    opts.Guti.Len,
+			Buffer: opts.Guti.Octet[:],
+		}
+	} else if opts.Suci != nil {
+		dereg.MobileIdentity5GS = *opts.Suci
+	} else {
+		return nil, fmt.Errorf("nas: either Guti or Suci must be provided")
+	}
+
+	m.DeregistrationRequestUEOriginatingDeregistration = dereg
+
+	data := new(bytes.Buffer)
+	if err := m.GmmMessageEncode(data); err != nil {
+		return nil, fmt.Errorf("nas: GMM encode DeregistrationRequest: %w", err)
+	}
+
+	return data.Bytes(), nil
 }

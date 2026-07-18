@@ -10,26 +10,10 @@ import (
 	"testing"
 )
 
-// TestEPSUserPlaneSourceSpoofing checks the UPF drops uplink user data whose
-// inner source IP is not the UE's allocated address (UE source anti-spoofing,
-// GSMA security baseline). A rogue UE-A sends traffic with victim UE-B's source
-// IP: if the UPF forwards it, the data-network reply un-NATs to B's address and
-// is delivered to B's tunnel — proving A impersonated B's IP. The UPF must
-// instead drop A's spoofed-source uplink.
+// A forwarded spoof shows up as the data-network reply un-NATing to UE-B's
+// address and reaching UE-B's tunnel.
 func Test4GUserPlaneSourceSpoofing(t *testing.T) {
-	body := `{
-		"mme_address": "10.3.0.2:36412", "enb_s1_address": "10.3.0.3",
-		"mcc": "001", "mnc": "01", "tac": "0001", "enb_id": 1, "name": "gtpu-enb",
-		"enable_gtpu": true, "enb_n3_address": "10.3.0.3"
-	}`
-
-	status, resp := doRequest(t, "POST", "/enb", body)
-	if status != 201 {
-		t.Fatalf("create eNB: HTTP %d: %s", status, resp)
-	}
-
-	enbID := jsonGet(resp, "enb_id")
-	t.Cleanup(func() { doRequest(t, "DELETE", "/enb/"+enbID, "") })
+	enbID := createGTPUENB(t, claimENBID(), "gtpu-enb", n3IPv4)
 
 	ueA := createENBUEWithIMSI(t, enbID, testSUPI(1)[len("imsi-"):])
 	fullAttach(t, enbID, ueA)
@@ -44,23 +28,22 @@ func Test4GUserPlaneSourceSpoofing(t *testing.T) {
 		t.Fatal("could not determine victim UE-B's IP")
 	}
 
-	// Baseline: UE-A's legitimate user plane works, so a later "no delivery to B"
-	// reflects the UPF dropping the spoof, not a broken data path.
+	baseline := scrapeUPFCounters(t)
 	if !uplinkRoundTrips(t, enbID, ueA, nil, 0x10, 1) {
-		t.Fatal("UE-A baseline round-trip failed")
+		t.Fatalf("UE-A baseline round-trip failed\n%s", upfDelta(t, baseline))
 	}
 
 	drainDownlinks(t, enbID, ueA)
 	drainDownlinks(t, enbID, ueB)
 
-	for i := 0; i < 4; i++ {
-		up := fmt.Sprintf(`{"icmp_echo":{"dst":%q,"id":4444,"seq":66},"src":%q}`, dnResponderIP, victimIP)
-		if s, b := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueA+"/uplink", up); s != 200 {
-			t.Fatalf("uplink: HTTP %d: %s", s, b)
-		}
+	spoof := scrapeUPFCounters(t)
 
-		if s, b := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueB+"/downlink/await", `{"timeout_ms":1500}`); s == 200 {
-			t.Fatalf("UPF forwarded UE-A's spoofed-source uplink (source = UE-B's IP %s) and delivered the reply to UE-B — no UE source-address anti-spoofing; a UE can impersonate another subscriber's IP\n  downlink: %s", victimIP, b)
-		}
+	up := fmt.Sprintf(`{"icmp_echo":{"dst":%q,"id":4444,"seq":66},"src":%q}`, dnResponderIP, victimIP)
+	if s, b := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueA+"/uplink", up); s != 200 {
+		t.Fatalf("uplink: HTTP %d: %s", s, b)
+	}
+
+	if s, b := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueB+"/downlink/await", `{"timeout_ms":5000}`); s == 200 {
+		t.Fatalf("UPF forwarded UE-A's spoofed-source uplink (source = UE-B's IP %s) and delivered the reply to UE-B — no UE source-address anti-spoofing; a UE can impersonate another subscriber's IP\n  downlink: %s\n%s", victimIP, b, upfDelta(t, spoof))
 	}
 }

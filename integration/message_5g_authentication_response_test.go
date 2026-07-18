@@ -26,8 +26,6 @@ func Test5GAuthenticationResponse(t *testing.T) {
 			wantNASMsgType:  nasSecurityModeCommand,
 		},
 		{
-			// RES* mismatch for a SUCI-identified UE: the AMF aborts
-			// authentication with Authentication Reject (TS 33.501 §6.1.3.2.2).
 			name:            "wrong RES*: 16 bytes of zeros",
 			body:            `{"message_type":"authentication_response","res_star_override":"00000000000000000000000000000000"}`,
 			wantHTTP:        200,
@@ -42,18 +40,8 @@ func Test5GAuthenticationResponse(t *testing.T) {
 			wantNASMsgType:  nasAuthenticationReject,
 		},
 		{
-			// The free5gc NAS decoder requires a 16-octet RES*, so a shorter one
-			// makes the message undecodable and the AMF returns 5GMM STATUS #111
-			// rather than the §5.4.1.3.5 reject.
-			name:             "truncated RES*: 8 bytes",
-			body:             `{"message_type":"authentication_response","res_star_override":"0000000000000000"}`,
-			wantHTTP:         200,
-			wantNGAPMsgType:  ngapDownlinkNASTransport,
-			wantNASMsgType:   nasStatus5GMM,
-			wantNASCause5GMM: cause5GMMProtocolErrorUnspecified,
-		},
-		{
-			// 32 bytes still decode as a 16-octet RES* that mismatches → reject.
+			// The first 16 octets decode as a mismatching RES*, so this is a reject,
+			// not the §7.5.1 syntax error a truncated RES* raises.
 			name:            "oversized RES*: 32 bytes",
 			body:            `{"message_type":"authentication_response","res_star_override":"0000000000000000000000000000000000000000000000000000000000000000"}`,
 			wantHTTP:        200,
@@ -61,9 +49,6 @@ func Test5GAuthenticationResponse(t *testing.T) {
 			wantNASMsgType:  nasAuthenticationReject,
 		},
 		{
-			// With the Authentication response parameter IE omitted there is no
-			// RES* to verify, so the AMF rejects authentication (TS 24.501
-			// §5.4.1.3.5).
 			name:            "empty RES*",
 			body:            `{"message_type":"authentication_response","res_star_override":""}`,
 			wantHTTP:        200,
@@ -79,8 +64,7 @@ func Test5GAuthenticationResponse(t *testing.T) {
 		},
 		{
 			name: "raw NAS PDU: single byte",
-			// Too short to contain a complete message type IE → shall be ignored
-			// (TS 24.501 §7.2.1); the AMF keeps T3560 running. Silent drop (504).
+			// TS 24.501 §7.2.1: too short for a message type IE, so it is ignored — no reply.
 			body:     `{"message_type":"authentication_response","raw_nas_pdu":"7e"}`,
 			wantHTTP: 504,
 		},
@@ -124,20 +108,15 @@ func Test5GAuthenticationResponse(t *testing.T) {
 				}
 			}
 
-			assertNASCause(t, body, "nas.cause_5gmm", tt.wantNASCause5GMM)
+			assertNASCause(t, body, "nas.5gmm_cause", tt.wantNASCause5GMM)
 		})
 	}
 }
 
-// TestAuthenticationResponse_WithoutChallenge sends an Authentication Response
-// before any registration challenge was received. The server must still put it
-// on the wire (zeroed RES*, no local 400) so the AMF can react — it must not be
-// refused locally and must not hang.
 func Test5GAuthenticationResponse_WithoutChallenge(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
 
-	// No registration_request first — there is no stored RAND/AUTN.
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
 		`{"message_type":"authentication_response"}`)
 	if status == 504 {
@@ -145,5 +124,27 @@ func Test5GAuthenticationResponse_WithoutChallenge(t *testing.T) {
 	}
 	if status != 200 {
 		t.Fatalf("HTTP %d, want 200 (message must reach the AMF, not be refused locally)\n  body: %s", status, body)
+	}
+}
+
+// TS 24.501 §7.5.1: a status answering a syntactically incorrect mandatory IE
+// carries #96; the alternative treatment is open, so no message type is pinned.
+func Test5GAuthenticationResponse_TruncatedRESStar(t *testing.T) {
+	gnbID := mustCreateGnB(t)
+	ueID := mustCreateUE(t, gnbID)
+
+	if status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+		`{"message_type":"registration_request"}`); status != 200 {
+		t.Fatalf("registration_request: HTTP %d\n  body: %s", status, body)
+	}
+
+	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+		`{"message_type":"authentication_response","res_star_override":"0000000000000000"}`)
+	if status != 200 {
+		t.Fatalf("HTTP %d, want 200 — a syntactically incorrect mandatory IE must draw a reply (TS 24.501 §7.5.1)\n  body: %s", status, body)
+	}
+
+	if got := jsonGet(body, "nas.message_type"); got == nasStatus5GMM {
+		assertNASCause(t, body, "nas.5gmm_cause", cause5GMMInvalidMandatoryInformation)
 	}
 }

@@ -3,17 +3,14 @@
 
 //go:build integration
 
-// UE-requested PDU session release (TS 24.501 §6.3.3): the UE sends a PDU
-// Session Release Request; the SMF answers with a Release Command (inside an
-// NGAP PDU Session Resource Release Command); the UE confirms with a Release
-// Complete.
-
 package integration_test
 
-import "testing"
+import (
+	"fmt"
+	"strconv"
+	"testing"
+)
 
-// establishedPDUSession registers a UE and establishes its PDU session,
-// returning the gNB/UE IDs.
 func establishedPDUSession(t *testing.T) (string, string) {
 	t.Helper()
 
@@ -31,13 +28,13 @@ func establishedPDUSession(t *testing.T) (string, string) {
 	return gnbID, ueID
 }
 
-// TestPDUSessionRelease_UERequested releases an established session on the UE's
-// initiative and confirms with a Release Complete.
 func Test5GPDUSessionRelease_UERequested(t *testing.T) {
 	gnbID, ueID := establishedPDUSession(t)
 
+	const releasePTI = 7
+
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
-		`{"message_type":"pdu_session_release_request"}`)
+		fmt.Sprintf(`{"message_type":"pdu_session_release_request","pti":%d}`, releasePTI))
 	if status != 200 {
 		t.Fatalf("pdu_session_release_request: HTTP %d\n  body: %s", status, body)
 	}
@@ -46,18 +43,26 @@ func Test5GPDUSessionRelease_UERequested(t *testing.T) {
 		t.Errorf("ngap.message_type = %q, want PDUSessionResourceReleaseCommand\n  body: %s", got, body)
 	}
 	if got := jsonGet(body, "nas.inner_nas_message_type"); got != nasPDUSessionReleaseCommand {
-		t.Errorf("nas.inner_nas_message_type = %q, want pdu_session_release_command (TS 24.501 §6.3.3)\n  body: %s", got, body)
+		t.Fatalf("nas.inner_nas_message_type = %q, want pdu_session_release_command (TS 24.501 §6.3.3)\n  body: %s", got, body)
+	}
+
+	// TS 24.501 §6.3.3.2: a release triggered by a UE-requested release echoes the
+	// request's PTI and carries no Access type IE.
+	if got := jsonGet(body, "nas.pti"); got != strconv.Itoa(releasePTI) {
+		t.Errorf("nas.pti = %q, want %d — the Release Command must echo the Release Request's PTI (TS 24.501 §6.3.3.2)\n  body: %s", got, releasePTI, body)
+	}
+
+	if got := jsonGet(body, "nas.access_type_present"); got != "false" {
+		t.Errorf("nas.access_type_present = %q, want false — a UE-triggered Release Command must omit the Access type IE (TS 24.501 §6.3.3.2)\n  body: %s", got, body)
 	}
 
 	status, body = doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
-		`{"message_type":"pdu_session_release_complete"}`)
+		fmt.Sprintf(`{"message_type":"pdu_session_release_complete","pti":%d}`, releasePTI))
 	if status != 200 {
 		t.Fatalf("pdu_session_release_complete: HTTP %d\n  body: %s", status, body)
 	}
 }
 
-// TestPDUSessionRelease_ThenReestablish confirms the release actually tore the
-// session down: a fresh PDU Session Establishment Request afterwards succeeds.
 func Test5GPDUSessionRelease_ThenReestablish(t *testing.T) {
 	gnbID, ueID := establishedPDUSession(t)
 
@@ -83,9 +88,6 @@ func Test5GPDUSessionRelease_ThenReestablish(t *testing.T) {
 	}
 }
 
-// TestPDUSessionRelease_NGAPIDFuzz forges the AMF UE NGAP ID on the Release
-// Request's Uplink NAS Transport. That is an unknown local AP ID, so the AMF
-// shall initiate an Error Indication procedure (TS 38.413 §10.6).
 func Test5GPDUSessionRelease_NGAPIDFuzz(t *testing.T) {
 	gnbID, ueID := establishedPDUSession(t)
 

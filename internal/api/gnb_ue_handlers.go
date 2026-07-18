@@ -11,16 +11,16 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/store"
 )
 
-func (h *Handler) CreateUE(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateGNBUE(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 
-	gnb, err := h.Store.GetGnB(gnbID)
+	gnb, err := h.Store.GetGNB(gnbID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("gnb not found: %v", err))
 		return
 	}
 
-	var req CreateUERequest
+	var req CreateGNBUERequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
 		return
@@ -39,7 +39,7 @@ func (h *Handler) CreateUE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ranUeNgapID := gnb.AllocateRanUeNgapID()
+	ranUeNgapID := gnb.AllocateRANUENGAPID()
 	ueID := fmt.Sprintf("%d", ranUeNgapID)
 
 	ue, err := store.NewUEContext(ueID, ranUeNgapID, len(gnb.MNC), &store.CreateUEOpts{
@@ -58,6 +58,8 @@ func (h *Handler) CreateUE(w http.ResponseWriter, r *http.Request) {
 		PDUSessionID:     req.PDUSessionID,
 		PDUSessionType:   req.PDUSessionType,
 		IMEISV:           req.IMEISV,
+
+		UESecurityCapability: req.UESecurityCapability,
 	})
 	if err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("failed to create UE context: %v", err))
@@ -66,19 +68,19 @@ func (h *Handler) CreateUE(w http.ResponseWriter, r *http.Request) {
 
 	gnb.CreateUE(ue)
 
-	writeJSON(w, http.StatusCreated, CreateUEResponse{
+	writeJSON(w, http.StatusCreated, CreateGNBUEResponse{
 		UEID:        ue.ID,
 		SUPI:        ue.Supi,
 		SUCI:        ue.SuciString,
-		RanUeNgapID: ue.RanUeNgapID,
+		RANUENGAPID: ue.RANUENGAPID,
 	})
 }
 
-func (h *Handler) GetUE(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetGNBUE(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 	ueID := r.PathValue("ue_id")
 
-	gnb, err := h.Store.GetGnB(gnbID)
+	gnb, err := h.Store.GetGNB(gnbID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("gnb not found: %v", err))
 		return
@@ -90,19 +92,18 @@ func (h *Handler) GetUE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, UEStateResponse{
+	writeJSON(w, http.StatusOK, GNBUEStateResponse{
 		ID:               ue.ID,
 		SUPI:             ue.Supi,
 		SUCI:             ue.SuciString,
 		MCC:              ue.MCC,
 		MNC:              ue.MNC,
-		RanUeNgapID:      ue.RanUeNgapID,
-		AmfUeNgapID:      ue.AmfUeNgapID,
+		RANUENGAPID:      ue.RANUENGAPID,
+		AMFUENGAPID:      ue.AMFUENGAPID,
 		K:                ue.K,
 		OPc:              ue.OPc,
 		Amf:              ue.Amf,
 		Sqn:              ue.Sqn,
-		Snn:              ue.Snn,
 		DNN:              ue.DNN,
 		SST:              ue.SST,
 		SD:               ue.SD,
@@ -112,11 +113,11 @@ func (h *Handler) GetUE(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) PatchUE(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) PatchGNBUE(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 	ueID := r.PathValue("ue_id")
 
-	gnb, err := h.Store.GetGnB(gnbID)
+	gnb, err := h.Store.GetGNB(gnbID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("gnb not found: %v", err))
 		return
@@ -128,7 +129,7 @@ func (h *Handler) PatchUE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req PatchUERequest
+	var req PatchGNBUERequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
 		return
@@ -146,8 +147,8 @@ func (h *Handler) PatchUE(w http.ResponseWriter, r *http.Request) {
 	if req.Sqn != nil {
 		ue.Sqn = *req.Sqn
 	}
-	if req.AmfUeNgapID != nil {
-		ue.AmfUeNgapID = *req.AmfUeNgapID
+	if req.AMFUENGAPID != nil {
+		ue.AMFUENGAPID = *req.AMFUENGAPID
 	}
 	if req.DNN != nil {
 		ue.DNN = *req.DNN
@@ -165,11 +166,11 @@ func (h *Handler) PatchUE(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *Handler) DeleteUE(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DeleteGNBUE(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 	ueID := r.PathValue("ue_id")
 
-	gnb, err := h.Store.GetGnB(gnbID)
+	gnb, err := h.Store.GetGNB(gnbID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("gnb not found: %v", err))
 		return
@@ -183,14 +184,11 @@ func (h *Handler) DeleteUE(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// MigrateUE moves a UE's context to another gNB's association, modelling the UE
-// arriving at the target gNB after an N2 handover. The UE keeps its security
-// context; its RAN/AMF UE NGAP IDs become the ones used on the target.
-func (h *Handler) MigrateUE(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) MigrateGNBUE(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 	ueID := r.PathValue("ue_id")
 
-	src, err := h.Store.GetGnB(gnbID)
+	src, err := h.Store.GetGNB(gnbID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("gnb not found: %v", err))
 		return
@@ -202,37 +200,24 @@ func (h *Handler) MigrateUE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req MigrateUERequest
+	var req MigrateGNBUERequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
 		return
 	}
 
-	target, err := h.Store.GetGnB(req.TargetGnbID)
+	target, err := h.Store.GetGNB(req.TargetGnbID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, fmt.Sprintf("target gnb not found: %v", err))
 		return
 	}
 
-	// Purge the source's per-UE state under its current RAN-UE-NGAP-ID before any
-	// override rekeys the UE, so the source's side-maps are not left orphaned.
-	src.DeleteUE(ueID)
+	src.MigrateUE(target, ue, req.RANUENGAPID, req.AMFUENGAPID)
 
-	if req.RanUeNgapID != nil {
-		ue.RanUeNgapID = *req.RanUeNgapID
-	}
-
-	if req.AmfUeNgapID != nil {
-		ue.AmfUeNgapID = *req.AmfUeNgapID
-	}
-
-	target.CreateUE(ue)
-	target.UpdateNGAPIDs(ue.RanUeNgapID, ue.AmfUeNgapID)
-
-	writeJSON(w, http.StatusOK, map[string]any{
-		"ue_id":          ue.ID,
-		"gnb_id":         req.TargetGnbID,
-		"ran_ue_ngap_id": ue.RanUeNgapID,
-		"amf_ue_ngap_id": ue.AmfUeNgapID,
+	writeJSON(w, http.StatusOK, MigrateGNBUEResponse{
+		UEID:        ue.ID,
+		GNBID:       req.TargetGnbID,
+		RANUENGAPID: ue.RANUENGAPID,
+		AMFUENGAPID: ue.AMFUENGAPID,
 	})
 }

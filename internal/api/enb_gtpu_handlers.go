@@ -10,16 +10,12 @@ import (
 	"fmt"
 	"net/http"
 	"net/netip"
-	"time"
 
 	"github.com/ellanetworks/3gpp-server/internal/gtpu"
 	"github.com/ellanetworks/3gpp-server/internal/store"
 )
 
-// ENBUplinkRequest crafts an inner IP packet to send uplink on an EPS bearer.
 type ENBUplinkRequest struct {
-	// Ebi selects the bearer; 0 or the default EBI uses the default bearer, else
-	// an additional PDN's bearer (TS 24.301 §6.5.1).
 	Ebi uint8 `json:"ebi,omitempty"`
 
 	ICMPEcho *struct {
@@ -35,20 +31,13 @@ type ENBUplinkRequest struct {
 		PayloadHex string `json:"payload_hex,omitempty"`
 	} `json:"udp,omitempty"`
 
-	// Src overrides the inner source IP (default the selected bearer's UE IP) — for
-	// source-spoofing tests. TEID overrides the uplink TEID — for invalid-tunnel
-	// tests.
 	Src  *string `json:"src,omitempty"`
 	TEID *uint32 `json:"teid,omitempty"`
 }
 
-// enbBearer resolves the S1-U tunnel for the selected EPS bearer identity: the
-// default bearer when ebi is 0 or the default EBI, else an additional PDN's
-// bearer. The inner packet must be sourced from the returned ueIP or the UPF's
-// anti-spoofing filter drops it.
-func enbBearer(ue *store.UEEPSContext, ebi uint8) (ulTeid, dlTeid uint32, upfIP, ueIP string, ok bool) {
+func enbBearer(ue *store.UEEPSContext, ebi uint8) (ulTeid, dlTeid uint32, sgwIP, ueIP string, ok bool) {
 	if ebi == 0 || ebi == ue.EPSBearerID {
-		return ue.ULTeid, ue.DLTeid, ue.UPFIP, ue.UEIP, ue.ULTeid != 0
+		return ue.ULTeid, ue.DLTeid, ue.SGWIP, ue.UEIP, ue.ULTeid != 0
 	}
 
 	b, exists := ue.Bearers[ebi]
@@ -56,11 +45,9 @@ func enbBearer(ue *store.UEEPSContext, ebi uint8) (ulTeid, dlTeid uint32, upfIP,
 		return 0, 0, "", "", false
 	}
 
-	return b.ULTeid, b.DLTeid, b.UPFIP, b.UEIP, true
+	return b.ULTeid, b.DLTeid, b.SGWIP, b.UEIP, true
 }
 
-// enbGTPU resolves the eNB, UE, and the eNB's S1-U GTP-U endpoint for a
-// user-plane request.
 func (h *Handler) enbGTPU(w http.ResponseWriter, r *http.Request) (*store.UEEPSContext, *gtpu.Endpoint, bool) {
 	enb, err := h.Store.GetENB(r.PathValue("enb_id"))
 	if err != nil {
@@ -83,9 +70,6 @@ func (h *Handler) enbGTPU(w http.ResponseWriter, r *http.Request) (*store.UEEPSC
 	return ue, gt, true
 }
 
-// SendENBUplink encapsulates a crafted inner IP packet (sourced from the bearer's
-// UE IP) in a plain S1-U G-PDU and sends it to the S-GW/UPF on the selected
-// bearer's uplink TEID.
 func (h *Handler) SendENBUplink(w http.ResponseWriter, r *http.Request) {
 	ue, gt, ok := h.enbGTPU(w, r)
 	if !ok {
@@ -98,7 +82,7 @@ func (h *Handler) SendENBUplink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ulTeid, _, upfIP, ueIP, found := enbBearer(ue, req.Ebi)
+	ulTeid, _, sgwIP, ueIP, found := enbBearer(ue, req.Ebi)
 	if !found {
 		writeError(w, http.StatusBadRequest, "no user-plane tunnel for the selected bearer; complete an attach / pdn_connectivity on a GTP-U-enabled eNB")
 		return
@@ -164,7 +148,7 @@ func (h *Handler) SendENBUplink(w http.ResponseWriter, r *http.Request) {
 		ulTeid = *req.TEID
 	}
 
-	if err := gt.SendUplinkPlain(upfIP, ulTeid, inner); err != nil {
+	if err := gt.SendUplinkPlain(sgwIP, ulTeid, inner); err != nil {
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("gtp-u send: %v", err))
 		return
 	}
@@ -172,8 +156,6 @@ func (h *Handler) SendENBUplink(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"sent_bytes": len(inner)})
 }
 
-// SendENBGTPUEcho sends a GTP-U Echo Request to the S-GW/UPF on S1-U and returns
-// its Echo Response (TS 29.281 §7.2.1).
 func (h *Handler) SendENBGTPUEcho(w http.ResponseWriter, r *http.Request) {
 	enb, err := h.Store.GetENB(r.PathValue("enb_id"))
 	if err != nil {
@@ -188,27 +170,22 @@ func (h *Handler) SendENBGTPUEcho(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
-		UPFIP     string `json:"upf_ip"`
+		SGWIP     string `json:"sgw_ip"`
 		TimeoutMs int    `json:"timeout_ms,omitempty"`
 	}
 	_ = json.NewDecoder(r.Body).Decode(&req)
 
-	if req.UPFIP == "" {
-		writeError(w, http.StatusBadRequest, "upf_ip is required")
+	if req.SGWIP == "" {
+		writeError(w, http.StatusBadRequest, "sgw_ip is required")
 		return
 	}
 
-	if err := gt.SendEchoRequest(req.UPFIP, 1); err != nil {
+	if err := gt.SendEchoRequest(req.SGWIP, 1); err != nil {
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("gtp-u echo send: %v", err))
 		return
 	}
 
-	timeout := 5 * time.Second
-	if req.TimeoutMs > 0 {
-		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
 	msg, err := gt.WaitForControl(ctx, gtpu.MsgEchoResponse)
@@ -217,12 +194,14 @@ func (h *Handler) SendENBGTPUEcho(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"echo_response": true, "seq": msg.Seq})
+	resp := map[string]any{"echo_response": true, "seq": msg.Seq}
+	if msg.Recovery != nil {
+		resp["recovery_restart_counter"] = *msg.Recovery
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
-// AwaitENBErrorIndication blocks for a GTP-U Error Indication from the S-GW/UPF,
-// sent when it receives a G-PDU on S1-U for a TEID with no context (TS 29.281
-// §7.3.1).
 func (h *Handler) AwaitENBErrorIndication(w http.ResponseWriter, r *http.Request) {
 	enb, err := h.Store.GetENB(r.PathValue("enb_id"))
 	if err != nil {
@@ -241,24 +220,18 @@ func (h *Handler) AwaitENBErrorIndication(w http.ResponseWriter, r *http.Request
 	}
 	_ = json.NewDecoder(r.Body).Decode(&req)
 
-	timeout := 5 * time.Second
-	if req.TimeoutMs > 0 {
-		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
-	if _, err := gt.WaitForControl(ctx, gtpu.MsgErrorIndication); err != nil {
+	msg, err := gt.WaitForControl(ctx, gtpu.MsgErrorIndication)
+	if err != nil {
 		writeError(w, http.StatusGatewayTimeout, err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{"error_indication": true})
+	writeJSON(w, http.StatusOK, errorIndicationJSON(msg))
 }
 
-// AwaitENBDownlink blocks for a downlink T-PDU on the selected bearer's eNB TEID
-// and returns the decoded inner packet.
 func (h *Handler) AwaitENBDownlink(w http.ResponseWriter, r *http.Request) {
 	ue, gt, ok := h.enbGTPU(w, r)
 	if !ok {
@@ -277,22 +250,17 @@ func (h *Handler) AwaitENBDownlink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	timeout := 5 * time.Second
-	if req.TimeoutMs > 0 {
-		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
-	}
-
-	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
-	tpdu, err := gt.WaitForDownlink(ctx, dlTeid)
+	msg, err := gt.WaitForDownlink(ctx, dlTeid)
 	if err != nil {
 		writeError(w, http.StatusGatewayTimeout, err.Error())
 		return
 	}
 
-	resp := map[string]any{"raw_hex": hex.EncodeToString(tpdu)}
-	if inner, err := gtpu.ParseInner(tpdu); err == nil {
+	resp := map[string]any{"raw_hex": hex.EncodeToString(msg.Payload)}
+	if inner, err := gtpu.ParseInner(msg.Payload); err == nil {
 		resp["inner"] = inner
 	}
 

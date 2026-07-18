@@ -10,14 +10,10 @@ import (
 	"testing"
 )
 
-// ngapIEHasUERadioCapability reports whether any IE in the response carries the
-// given UE radio capability (hex).
 func ngapIEHasUERadioCapability(body []byte, want string) bool {
 	var top struct {
 		NGAP struct {
-			IEs []struct {
-				UERadioCapability *string `json:"ue_radio_capability"`
-			} `json:"ies"`
+			UERadioCapability *string `json:"ue_radio_capability"`
 		} `json:"ngap"`
 	}
 
@@ -25,18 +21,9 @@ func ngapIEHasUERadioCapability(body []byte, want string) bool {
 		return false
 	}
 
-	for _, ie := range top.NGAP.IEs {
-		if ie.UERadioCapability != nil && *ie.UERadioCapability == want {
-			return true
-		}
-	}
-
-	return false
+	return top.NGAP.UERadioCapability != nil && *top.NGAP.UERadioCapability == want
 }
 
-// Test5GUERadioCapabilityReplay checks the AMF stores the UE radio capability
-// reported in a UE RADIO CAPABILITY INFO INDICATION and replays it in a later
-// Initial Context Setup Request (TS 38.413 §8.14.1).
 func Test5GUERadioCapabilityReplay(t *testing.T) {
 	gnbID := mustCreateGnB(t)
 	ueID := mustCreateUE(t, gnbID)
