@@ -6,7 +6,6 @@ package ngap
 import (
 	"bytes"
 	"encoding/hex"
-	"encoding/json"
 	"testing"
 
 	"github.com/free5gc/aper"
@@ -72,13 +71,7 @@ func TestDecodeTimeToWaitNames(t *testing.T) {
 			t.Fatalf("decode: %v", err)
 		}
 
-		var got *string
-		for i := range resp.IEs {
-			if resp.IEs[i].ID == ngapType.ProtocolIEIDTimeToWait {
-				got = resp.IEs[i].TimeToWait
-			}
-		}
-
+		got := resp.TimeToWait
 		if got == nil {
 			t.Fatalf("TimeToWait enum %d: expected name %q, got no TimeToWait IE", enum, want)
 		}
@@ -133,24 +126,14 @@ func TestDecodeUEContextReleaseCommandBareAMFID(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	var idsIE *IE
-	for i := range resp.IEs {
-		if resp.IEs[i].ID == ngapType.ProtocolIEIDUENGAPIDs {
-			idsIE = &resp.IEs[i]
-		}
+	if resp.AMFUENGAPID == nil {
+		t.Fatalf("bare-AMF-ID CHOICE: expected AMFUENGAPID %d, got nil", amfID)
 	}
-
-	if idsIE == nil {
-		t.Fatal("expected a UE-NGAP-IDs IE, got none")
+	if *resp.AMFUENGAPID != amfID {
+		t.Errorf("bare-AMF-ID CHOICE: expected AMFUENGAPID %d, got %d", amfID, *resp.AMFUENGAPID)
 	}
-	if idsIE.AmfUeNgapID == nil {
-		t.Fatalf("bare-AMF-ID CHOICE: expected AmfUeNgapID %d, got nil", amfID)
-	}
-	if *idsIE.AmfUeNgapID != amfID {
-		t.Errorf("bare-AMF-ID CHOICE: expected AmfUeNgapID %d, got %d", amfID, *idsIE.AmfUeNgapID)
-	}
-	if idsIE.RanUeNgapID != nil {
-		t.Errorf("bare-AMF-ID CHOICE: expected no RanUeNgapID, got %d", *idsIE.RanUeNgapID)
+	if resp.RANUENGAPID != nil {
+		t.Errorf("bare-AMF-ID CHOICE: expected no RANUENGAPID, got %d", *resp.RANUENGAPID)
 	}
 }
 
@@ -194,37 +177,32 @@ func TestDecodeUnmodeledIEValueSurfaces(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	var modeled, surfaced *IE
-	for i := range resp.IEs {
-		switch resp.IEs[i].ID {
-		case ngapType.ProtocolIEIDAMFUENGAPID:
-			modeled = &resp.IEs[i]
-		case ngapType.ProtocolIEIDRedirectionVoiceFallback:
-			surfaced = &resp.IEs[i]
+	if resp.AMFUENGAPID == nil || *resp.AMFUENGAPID != amfID {
+		t.Fatalf("modeled AMF-UE-NGAP-ID = %v, want %d", resp.AMFUENGAPID, amfID)
+	}
+
+	var surfaced *UnknownIEJSON
+
+	for i := range resp.UnknownIEs {
+		if resp.UnknownIEs[i].ID == ngapType.ProtocolIEIDRedirectionVoiceFallback {
+			surfaced = &resp.UnknownIEs[i]
+		}
+
+		if resp.UnknownIEs[i].ID == ngapType.ProtocolIEIDAMFUENGAPID {
+			t.Fatalf("modeled IE %d reported as unknown", ngapType.ProtocolIEIDAMFUENGAPID)
 		}
 	}
 
-	if modeled == nil || modeled.AmfUeNgapID == nil || *modeled.AmfUeNgapID != amfID {
-		t.Fatalf("modeled AMF-UE-NGAP-ID IE = %+v, want AmfUeNgapID %d", modeled, amfID)
-	}
-	if modeled.Value != nil {
-		t.Fatalf("modeled IE value = %s, want nil", modeled.Value)
-	}
-
 	if surfaced == nil {
-		t.Fatalf("unmodeled IE %d absent from %+v", ngapType.ProtocolIEIDRedirectionVoiceFallback, resp.IEs)
+		t.Fatalf("unmodeled IE %d absent from %+v", ngapType.ProtocolIEIDRedirectionVoiceFallback, resp.UnknownIEs)
 	}
-	if surfaced.Value == nil {
-		t.Fatal("unmodeled IE value = nil, want octets present")
+	if surfaced.ValueHex == "" {
+		t.Fatal("unmodeled IE value_hex is empty, want octets present")
 	}
 
-	var got string
-	if err := json.Unmarshal(surfaced.Value, &got); err != nil {
-		t.Fatalf("unmodeled IE value = %s, want a JSON hex string: %v", surfaced.Value, err)
-	}
-	gotOctets, err := hex.DecodeString(got)
+	gotOctets, err := hex.DecodeString(surfaced.ValueHex)
 	if err != nil {
-		t.Fatalf("unmodeled IE value %q is not hex: %v", got, err)
+		t.Fatalf("unmodeled IE value_hex %q is not hex: %v", surfaced.ValueHex, err)
 	}
 
 	want, err := aper.MarshalWithParams(*rvf, "referenceFieldValue:146")

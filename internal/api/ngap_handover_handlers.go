@@ -20,14 +20,14 @@ func handleGnBHandoverRequired(gnb *store.GNBContext, ue *store.UEContext, t *tr
 
 	pduSessionID := pduSessionIDForRelease(ue)
 
-	amfUeNgapID := ue.AmfUeNgapID
-	if req.AmfUeNgapIDOverride != nil {
-		amfUeNgapID = *req.AmfUeNgapIDOverride
+	amfUeNgapID := ue.AMFUENGAPID
+	if req.AMFUENGAPIDOverride != nil {
+		amfUeNgapID = *req.AMFUENGAPIDOverride
 	}
 
-	ranUeNgapID := ue.RanUeNgapID
-	if req.RanUeNgapIDOverride != nil {
-		ranUeNgapID = *req.RanUeNgapIDOverride
+	ranUeNgapID := ue.RANUENGAPID
+	if req.RANUENGAPIDOverride != nil {
+		ranUeNgapID = *req.RANUENGAPIDOverride
 	}
 
 	pduSessionIDs := []int64{int64(pduSessionID)}
@@ -41,8 +41,8 @@ func handleGnBHandoverRequired(gnb *store.GNBContext, ue *store.UEContext, t *tr
 	}
 
 	encoded, err := ngap.BuildHandoverRequired(ngap.HandoverRequiredParams{
-		AmfUeNgapID:       amfUeNgapID,
-		RanUeNgapID:       ranUeNgapID,
+		AMFUENGAPID:       amfUeNgapID,
+		RANUENGAPID:       ranUeNgapID,
 		TargetGnbID:       *req.TargetGnbID,
 		MCC:               gnb.MCC,
 		MNC:               gnb.MNC,
@@ -90,14 +90,14 @@ func handleGnBRANStatusTransfer(ue *store.UEContext, t *transport.NGAPTransport,
 }
 
 func handleGnBHandoverCancel(ctx context.Context, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) (*SendNGAPResponse, error) {
-	amfUeNgapID := ue.AmfUeNgapID
-	if req.AmfUeNgapIDOverride != nil {
-		amfUeNgapID = *req.AmfUeNgapIDOverride
+	amfUeNgapID := ue.AMFUENGAPID
+	if req.AMFUENGAPIDOverride != nil {
+		amfUeNgapID = *req.AMFUENGAPIDOverride
 	}
 
-	ranUeNgapID := ue.RanUeNgapID
-	if req.RanUeNgapIDOverride != nil {
-		ranUeNgapID = *req.RanUeNgapIDOverride
+	ranUeNgapID := ue.RANUENGAPID
+	if req.RANUENGAPIDOverride != nil {
+		ranUeNgapID = *req.RANUENGAPIDOverride
 	}
 
 	cause := ngap.CauseRadioNetworkHandoverCancelled
@@ -123,7 +123,7 @@ func handleGnBHandoverCancel(ctx context.Context, ue *store.UEContext, t *transp
 }
 
 func handleGnBHandoverRequestAcknowledge(t *transport.NGAPTransport, req *SendGnBNGAPRequest) (*SendNGAPResponse, error) {
-	if req.AmfUeNgapID == nil || req.RanUeNgapID == nil {
+	if req.AMFUENGAPID == nil || req.RANUENGAPID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "amf_ue_ngap_id and ran_ue_ngap_id are required")
 	}
 
@@ -159,8 +159,8 @@ func handleGnBHandoverRequestAcknowledge(t *transport.NGAPTransport, req *SendGn
 	}
 
 	encoded, err := ngap.BuildHandoverRequestAcknowledge(ngap.HandoverRequestAcknowledgeParams{
-		AmfUeNgapID: *req.AmfUeNgapID,
-		RanUeNgapID: *req.RanUeNgapID,
+		AMFUENGAPID: *req.AMFUENGAPID,
+		RANUENGAPID: *req.RANUENGAPID,
 		Sessions:    sessions,
 		Failed:      req.FailedPDUSessions,
 	})
@@ -176,13 +176,13 @@ func handleGnBHandoverRequestAcknowledge(t *transport.NGAPTransport, req *SendGn
 }
 
 func handleGnBHandoverNotify(gnb *store.GNBContext, t *transport.NGAPTransport, req *SendGnBNGAPRequest) (*SendNGAPResponse, error) {
-	if req.AmfUeNgapID == nil || req.RanUeNgapID == nil {
+	if req.AMFUENGAPID == nil || req.RANUENGAPID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "amf_ue_ngap_id and ran_ue_ngap_id are required")
 	}
 
 	encoded, err := ngap.BuildHandoverNotify(ngap.HandoverNotifyParams{
-		AmfUeNgapID: *req.AmfUeNgapID,
-		RanUeNgapID: *req.RanUeNgapID,
+		AMFUENGAPID: *req.AMFUENGAPID,
+		RANUENGAPID: *req.RANUENGAPID,
 		MCC:         gnb.MCC,
 		MNC:         gnb.MNC,
 		TAC:         gnb.TAC,
@@ -200,7 +200,7 @@ func handleGnBHandoverNotify(gnb *store.GNBContext, t *transport.NGAPTransport, 
 }
 
 func handleGnBHandoverFailure(t *transport.NGAPTransport, req *SendGnBNGAPRequest) (*SendNGAPResponse, error) {
-	if req.AmfUeNgapID == nil {
+	if req.AMFUENGAPID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "amf_ue_ngap_id is required for handover_failure")
 	}
 
@@ -209,7 +209,7 @@ func handleGnBHandoverFailure(t *transport.NGAPTransport, req *SendGnBNGAPReques
 		cause = *req.Cause
 	}
 
-	encoded, err := ngap.BuildHandoverFailure(*req.AmfUeNgapID, cause)
+	encoded, err := ngap.BuildHandoverFailure(*req.AMFUENGAPID, cause)
 	if err != nil {
 		return nil, httpErrorf(http.StatusInternalServerError, "build HandoverFailure: %v", err)
 	}

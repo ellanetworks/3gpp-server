@@ -29,8 +29,8 @@ type UESecurityCapabilities struct {
 }
 
 type PathSwitchRequestParams struct {
-	RanUeNgapID       int64
-	SourceAmfUeNgapID int64
+	RANUENGAPID       int64
+	SourceAMFUENGAPID int64
 	MCC               string
 	MNC               string
 	TAC               string
@@ -64,10 +64,10 @@ func BuildPathSwitchRequest(p PathSwitchRequestParams) ([]byte, error) {
 	}
 
 	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentReject,
-		ngapType.PathSwitchRequestIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: p.RanUeNgapID}
+		ngapType.PathSwitchRequestIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: p.RANUENGAPID}
 
 	add(ngapType.ProtocolIEIDSourceAMFUENGAPID, ngapType.CriticalityPresentReject,
-		ngapType.PathSwitchRequestIEsPresentSourceAMFUENGAPID).SourceAMFUENGAPID = &ngapType.AMFUENGAPID{Value: p.SourceAmfUeNgapID}
+		ngapType.PathSwitchRequestIEsPresentSourceAMFUENGAPID).SourceAMFUENGAPID = &ngapType.AMFUENGAPID{Value: p.SourceAMFUENGAPID}
 
 	plmnID, err := encodePLMN(p.MCC, p.MNC)
 	if err != nil {

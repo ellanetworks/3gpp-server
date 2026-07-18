@@ -65,12 +65,12 @@ func Test4GSecurityModeAlgorithmSelection(t *testing.T) {
 				t.Fatalf("Security Mode Command NAS-MAC did not verify; body: %s", smc)
 			}
 
-			if got := jsonGet(smc, "nas.integrity_algorithm"); !contains(tt.wantInt, got) {
-				t.Fatalf("integrity_algorithm = %q, want one of %v (from the advertised set, non-EIA0); body: %s", got, tt.wantInt, smc)
+			if got := jsonGet(smc, "nas.selected_integrity_algorithm"); !contains(tt.wantInt, got) {
+				t.Fatalf("selected_integrity_algorithm = %q, want one of %v (from the advertised set, non-EIA0); body: %s", got, tt.wantInt, smc)
 			}
 
-			if got := jsonGet(smc, "nas.ciphering_algorithm"); !contains(tt.wantCiph, got) {
-				t.Fatalf("ciphering_algorithm = %q, want one of %v; body: %s", got, tt.wantCiph, smc)
+			if got := jsonGet(smc, "nas.selected_ciphering_algorithm"); !contains(tt.wantCiph, got) {
+				t.Fatalf("selected_ciphering_algorithm = %q, want one of %v; body: %s", got, tt.wantCiph, smc)
 			}
 		})
 	}

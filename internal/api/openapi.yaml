@@ -1876,7 +1876,7 @@ components:
         always_on_requested:
           type: boolean
           description: "Add the Always-on PDU session requested IE to a pdu_session_establishment_request (TS 24.501 §8.3.1.7). The network must answer with an Always-on PDU session indication in the Establishment Accept (§6.4.1)."
-        cause_5gsm:
+        5gsm_cause:
           type: integer
           description: "5GSM cause for a UE-originated reject/status message (TS 24.501 §9.11.4.2). Applies to the pdu_session_modification_command_reject / status_5gsm endpoints. Defaults to #111 protocol error, unspecified."
         handover_required_cause:
@@ -1980,6 +1980,9 @@ components:
 
     NGAPResponse:
       type: object
+      description: >-
+        Decoded NGAP message. Each ProtocolIE the message type models is surfaced as
+        its own typed field; IEs it does not model are collected in unknown_ies.
       properties:
         pdu_type:
           type: string
@@ -1990,11 +1993,120 @@ components:
         raw_hex:
           type: string
           description: Full NGAP PDU as hex.
-        ies:
+        amf_ue_ngap_id:
+          type: integer
+        ran_ue_ngap_id:
+          type: integer
+        nas_pdu:
+          type: string
+          description: NAS PDU as hex.
+        cause:
+          type: object
+          description: Cause group and the index of its ASN.1 enumeration (TS 38.413 §9.3.1.2).
+        criticality_diagnostics:
+          type: object
+        time_to_wait:
+          type: string
+        global_ran_node_id:
+          type: object
+        ran_node_name:
+          type: string
+        supported_ta_list:
+          type: object
+        default_paging_drx:
+          type: integer
+        user_location_information:
+          type: object
+        rrc_establishment_cause:
+          type: integer
+        five_g_s_tmsi:
+          type: object
+        ue_context_request:
+          type: integer
+        amf_name:
+          type: string
+        served_guami_list:
           type: array
           items:
             type: object
-            description: Decoded IE with typed fields.
+        relative_amf_capacity:
+          type: integer
+        plmn_support_list:
+          type: array
+          items:
+            type: object
+        ue_retention_information:
+          type: integer
+        amf_set_id_ie:
+          type: string
+        allowed_nssai:
+          type: array
+          items:
+            type: object
+        selected_plmn_identity:
+          type: string
+        old_amf:
+          type: string
+        ran_paging_priority:
+          type: integer
+        mobility_restriction_list:
+          type: object
+        index_to_rfsp:
+          type: integer
+        ue_aggregate_max_bit_rate:
+          type: object
+          description: UE-AMBR downlink and uplink bit rates.
+        ue_radio_capability:
+          type: string
+        pdu_session_setup_items:
+          type: array
+          items:
+            type: object
+        pdu_session_ids:
+          type: array
+          items:
+            type: integer
+        release_pdu_session_ids:
+          type: array
+          items:
+            type: integer
+        next_hop_chaining_count:
+          type: integer
+        next_hop:
+          type: string
+          description: Next Hop key (NH) as hex (TS 33.501 §6.9.2.3.2).
+        ue_security_capabilities:
+          type: object
+        ran_status_transfer:
+          type: object
+        source_to_target_transparent_container:
+          type: string
+        reset_connections:
+          type: array
+          description: UE-associated logical NG-connections echoed in an NG Reset Acknowledge, in wire order.
+          items:
+            type: object
+            properties:
+              amf_ue_ngap_id:
+                type: integer
+              ran_ue_ngap_id:
+                type: integer
+        unknown_ies:
+          type: array
+          description: ProtocolIEs the received message carries that its message type does not model, in wire order.
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              criticality:
+                type: string
+                description: >-
+                  reject, ignore, or notify: how a receiver must act on an IE it does not
+                  comprehend (TS 38.413 §10.3.2).
+              value_hex:
+                type: string
+                description: Raw open-type value bytes as hex; empty when aper discarded them.
 
     NASResponse:
       type: object
@@ -2019,7 +2131,7 @@ components:
         eap_message:
           type: string
           description: EAP message (hex).
-        cause_5gmm:
+        5gmm_cause:
           type: integer
           description: 5GMM cause code (for reject messages).
         identity_type:

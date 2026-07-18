@@ -31,23 +31,12 @@ func ngapRANStatusTransfer(body []byte) (map[string]any, bool) {
 		return nil, false
 	}
 
-	ies, ok := ngapObj["ies"].([]any)
+	c, ok := ngapObj["ran_status_transfer"].(map[string]any)
 	if !ok {
 		return nil, false
 	}
 
-	for _, ie := range ies {
-		iem, ok := ie.(map[string]any)
-		if !ok {
-			continue
-		}
-
-		if c, ok := iem["ran_status_transfer"].(map[string]any); ok {
-			return c, true
-		}
-	}
-
-	return nil, false
+	return c, true
 }
 
 func ngapFirstRanUeNgapID(body []byte) (int64, bool) {
@@ -61,20 +50,8 @@ func ngapFirstRanUeNgapID(body []byte) (int64, bool) {
 		return 0, false
 	}
 
-	ies, ok := ngapObj["ies"].([]any)
-	if !ok {
-		return 0, false
-	}
-
-	for _, ie := range ies {
-		iem, ok := ie.(map[string]any)
-		if !ok {
-			continue
-		}
-
-		if v, ok := iem["ran_ue_ngap_id"].(float64); ok {
-			return int64(v), true
-		}
+	if v, ok := ngapObj["ran_ue_ngap_id"].(float64); ok {
+		return int64(v), true
 	}
 
 	return 0, false

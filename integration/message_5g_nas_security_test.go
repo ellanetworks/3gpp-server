@@ -40,8 +40,8 @@ func Test5GBadMACServiceRequest(t *testing.T) {
 		t.Fatalf("nas.message_type = %q, want service_reject (TS 24.501 §4.4.4.3)\n  body: %s", got, body)
 	}
 
-	if got := jsonGet(body, "nas.cause_5gmm"); got != "9" {
-		t.Errorf("service_reject cause_5gmm = %q, want 9 (TS 24.501 §4.4.4.3)\n  body: %s", got, body)
+	if got := jsonGet(body, "nas.5gmm_cause"); got != "9" {
+		t.Errorf("service_reject 5gmm_cause = %q, want 9 (TS 24.501 §4.4.4.3)\n  body: %s", got, body)
 	}
 }
 
@@ -69,8 +69,8 @@ func Test5GServiceRequestStaleNASCount(t *testing.T) {
 		t.Fatalf("nas.message_type = %q, want service_reject (TS 24.501 §4.4.4.3)\n  body: %s", got, body)
 	}
 
-	if got := jsonGet(body, "nas.cause_5gmm"); got != "9" {
-		t.Errorf("service_reject cause_5gmm = %q, want 9 (TS 24.501 §4.4.4.3)\n  body: %s", got, body)
+	if got := jsonGet(body, "nas.5gmm_cause"); got != "9" {
+		t.Errorf("service_reject 5gmm_cause = %q, want 9 (TS 24.501 §4.4.4.3)\n  body: %s", got, body)
 	}
 }
 

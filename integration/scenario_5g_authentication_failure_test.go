@@ -28,7 +28,7 @@ func authChallengePending(t *testing.T) (string, string) {
 func sendAuthFailure(t *testing.T, gnbID, ueID string, cause int) (int, []byte) {
 	t.Helper()
 
-	body := fmt.Sprintf(`{"message_type":"authentication_failure","cause_5gmm":%d}`, cause)
+	body := fmt.Sprintf(`{"message_type":"authentication_failure","5gmm_cause":%d}`, cause)
 
 	return doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap", body)
 }
@@ -110,7 +110,7 @@ func Test5GAuthenticationFailure_NGAPIDFuzz(t *testing.T) {
 	gnbID, ueID := authChallengePending(t)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
-		`{"message_type":"authentication_failure","cause_5gmm":20,"amf_ue_ngap_id_override":99999}`)
+		`{"message_type":"authentication_failure","5gmm_cause":20,"amf_ue_ngap_id_override":99999}`)
 	if status == 504 {
 		t.Fatalf("authentication failure hung (HTTP 504)\n  body: %s", body)
 	}

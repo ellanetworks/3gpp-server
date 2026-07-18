@@ -108,7 +108,7 @@ func Test5GAuthenticationResponse(t *testing.T) {
 				}
 			}
 
-			assertNASCause(t, body, "nas.cause_5gmm", tt.wantNASCause5GMM)
+			assertNASCause(t, body, "nas.5gmm_cause", tt.wantNASCause5GMM)
 		})
 	}
 }
@@ -145,6 +145,6 @@ func Test5GAuthenticationResponse_TruncatedRESStar(t *testing.T) {
 	}
 
 	if got := jsonGet(body, "nas.message_type"); got == nasStatus5GMM {
-		assertNASCause(t, body, "nas.cause_5gmm", cause5GMMInvalidMandatoryInformation)
+		assertNASCause(t, body, "nas.5gmm_cause", cause5GMMInvalidMandatoryInformation)
 	}
 }

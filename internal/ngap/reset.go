@@ -10,8 +10,8 @@ import (
 )
 
 type NGResetConnection struct {
-	AmfUeNgapID *int64
-	RanUeNgapID *int64
+	AMFUENGAPID *int64
+	RANUENGAPID *int64
 }
 
 func BuildNGReset(all bool, connections []NGResetConnection) ([]byte, error) {
@@ -54,12 +54,12 @@ func BuildNGReset(all bool, connections []NGResetConnection) ([]byte, error) {
 
 		for _, c := range connections {
 			item := ngapType.UEAssociatedLogicalNGConnectionItem{}
-			if c.AmfUeNgapID != nil {
-				item.AMFUENGAPID = &ngapType.AMFUENGAPID{Value: *c.AmfUeNgapID}
+			if c.AMFUENGAPID != nil {
+				item.AMFUENGAPID = &ngapType.AMFUENGAPID{Value: *c.AMFUENGAPID}
 			}
 
-			if c.RanUeNgapID != nil {
-				item.RANUENGAPID = &ngapType.RANUENGAPID{Value: *c.RanUeNgapID}
+			if c.RANUENGAPID != nil {
+				item.RANUENGAPID = &ngapType.RANUENGAPID{Value: *c.RANUENGAPID}
 			}
 
 			list.List = append(list.List, item)

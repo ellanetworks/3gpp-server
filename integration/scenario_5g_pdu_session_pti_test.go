@@ -33,7 +33,7 @@ func Test5GPDUSessionReleaseComplete_PTIMismatch(t *testing.T) {
 		t.Errorf("nas.inner_nas_message_type = %q, want 5gsm_status (TS 24.501 §7.3.1 a)\n  body: %s", got, resp)
 	}
 
-	assertNASCause(t, resp, "nas.cause_5gsm", cause5GSMPTIMismatch)
+	assertNASCause(t, resp, "nas.5gsm_cause", cause5GSMPTIMismatch)
 }
 
 func Test5GPDUSessionEstablishment_UnassignedPTI(t *testing.T) {
@@ -59,7 +59,7 @@ func Test5GPDUSessionEstablishment_UnassignedPTI(t *testing.T) {
 		t.Errorf("nas.inner_nas_message_type = %q, want 5gsm_status (TS 24.501 §7.3.1 c)\n  body: %s", got, body)
 	}
 
-	assertNASCause(t, body, "nas.cause_5gsm", cause5GSMInvalidPTIValue)
+	assertNASCause(t, body, "nas.5gsm_cause", cause5GSMInvalidPTIValue)
 }
 
 func Test5GPDUSessionEstablishment_ReservedPTI(t *testing.T) {
@@ -93,7 +93,7 @@ func Test5GPDUSessionModificationRequest_UnassignedPTI(t *testing.T) {
 		t.Errorf("nas.inner_nas_message_type = %q, want 5gsm_status (TS 24.501 §7.3.1 c)\n  body: %s", got, body)
 	}
 
-	assertNASCause(t, body, "nas.cause_5gsm", cause5GSMInvalidPTIValue)
+	assertNASCause(t, body, "nas.5gsm_cause", cause5GSMInvalidPTIValue)
 }
 
 func Test5GPDUSessionReleaseRequest_UnassignedPTI(t *testing.T) {
@@ -114,7 +114,7 @@ func Test5GPDUSessionReleaseRequest_UnassignedPTI(t *testing.T) {
 		t.Errorf("nas.inner_nas_message_type = %q, want 5gsm_status (TS 24.501 §7.3.1 c)\n  body: %s", got, body)
 	}
 
-	assertNASCause(t, body, "nas.cause_5gsm", cause5GSMInvalidPTIValue)
+	assertNASCause(t, body, "nas.5gsm_cause", cause5GSMInvalidPTIValue)
 }
 
 func Test5GPDUSessionModificationRequest_ReservedPTI(t *testing.T) {
@@ -145,7 +145,7 @@ func Test5GPDUSessionModificationComplete_PTIMismatch(t *testing.T) {
 		t.Errorf("nas.inner_nas_message_type = %q, want 5gsm_status (TS 24.501 §7.3.1 a)\n  body: %s", got, resp)
 	}
 
-	assertNASCause(t, resp, "nas.cause_5gsm", cause5GSMPTIMismatch)
+	assertNASCause(t, resp, "nas.5gsm_cause", cause5GSMPTIMismatch)
 }
 
 func awaitUENGAP(t *testing.T, gnbID, ueID string, messageTypes ...string) []byte {

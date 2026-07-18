@@ -17,8 +17,8 @@ type SendNGAPRequest struct {
 
 	RRCEstablishmentCauseOverride *int64 `json:"rrc_establishment_cause,omitempty"`
 	UEContextRequestOverride      *int64 `json:"ue_context_request,omitempty"`
-	AmfUeNgapIDOverride           *int64 `json:"amf_ue_ngap_id_override,omitempty"`
-	RanUeNgapIDOverride           *int64 `json:"ran_ue_ngap_id_override,omitempty"`
+	AMFUENGAPIDOverride           *int64 `json:"amf_ue_ngap_id_override,omitempty"`
+	RANUENGAPIDOverride           *int64 `json:"ran_ue_ngap_id_override,omitempty"`
 
 	ResStarOverride *string `json:"res_star_override,omitempty"`
 
@@ -36,7 +36,7 @@ type SendNGAPRequest struct {
 
 	AlwaysOnRequested *bool `json:"always_on_requested,omitempty"`
 
-	Cause5GSMOverride *uint8 `json:"cause_5gsm,omitempty"`
+	FiveGSMCauseOverride *uint8 `json:"5gsm_cause,omitempty"`
 
 	NgKSI                        *uint8                `json:"ng_ksi,omitempty"`
 	MobileIdentityOverride       *string               `json:"mobile_identity_override,omitempty"`
@@ -64,7 +64,7 @@ type SendNGAPRequest struct {
 
 	FollowOnRequest *uint8 `json:"follow_on_request,omitempty"`
 
-	Cause5GMM *uint8 `json:"cause_5gmm,omitempty"`
+	FiveGMMCause *uint8 `json:"5gmm_cause,omitempty"`
 
 	TargetGnbID *string `json:"target_gnb_id,omitempty"`
 

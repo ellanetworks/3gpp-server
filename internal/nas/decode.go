@@ -131,7 +131,7 @@ func decodeRegistrationReject(m *gonas.Message, resp *NASResponse) {
 		return
 	}
 	cause := int(m.RegistrationReject.GetCauseValue())
-	resp.CauseGMM = &cause
+	resp.FiveGMMCause = &cause
 }
 
 func decodeServiceReject(m *gonas.Message, resp *NASResponse) {
@@ -139,7 +139,7 @@ func decodeServiceReject(m *gonas.Message, resp *NASResponse) {
 		return
 	}
 	cause := int(m.ServiceReject.GetCauseValue())
-	resp.CauseGMM = &cause
+	resp.FiveGMMCause = &cause
 }
 
 func decodeSecurityModeCommand(m *gonas.Message, resp *NASResponse) {
@@ -148,10 +148,10 @@ func decodeSecurityModeCommand(m *gonas.Message, resp *NASResponse) {
 	}
 
 	cipherAlg := int(m.SelectedNASSecurityAlgorithms.GetTypeOfCipheringAlgorithm())
-	resp.SelectedCipheringAlg = &cipherAlg
+	resp.SelectedCipheringAlgorithm = &cipherAlg
 
 	integAlg := int(m.SelectedNASSecurityAlgorithms.GetTypeOfIntegrityProtectionAlgorithm())
-	resp.SelectedIntegrityAlg = &integAlg
+	resp.SelectedIntegrityAlgorithm = &integAlg
 
 	ksi := int(m.SecurityModeCommand.GetNasKeySetIdentifiler())
 	resp.NgKSI = &ksi
@@ -193,7 +193,7 @@ func decodeServiceAccept(m *gonas.Message, resp *NASResponse) {
 }
 
 // SecurityHeaderTypeString renders a 5GS security header type for JSON (TS 24.501 §9.3).
-func SecurityHeaderTypeString(t uint8) string {
+func SecurityHeaderTypeString(t SecurityHeaderType) string {
 	switch t {
 	case gonas.SecurityHeaderTypePlainNas:
 		return "plain"
@@ -217,7 +217,7 @@ func decodeDLNASTransport(m *gonas.Message, resp *NASResponse) error {
 
 	if m.DLNASTransport.Cause5GMM != nil {
 		cause := int(m.DLNASTransport.GetCauseValue())
-		resp.CauseGMM = &cause
+		resp.FiveGMMCause = &cause
 	}
 
 	payload := m.DLNASTransport.GetPayloadContainerContents()
@@ -251,12 +251,12 @@ func decodeDLNASTransport(m *gonas.Message, resp *NASResponse) error {
 	case gonas.MsgTypePDUSessionModificationReject:
 		if inner.PDUSessionModificationReject != nil {
 			cause := int(inner.PDUSessionModificationReject.GetCauseValue())
-			resp.Cause5GSM = &cause
+			resp.FiveGSMCause = &cause
 		}
 	case gonas.MsgTypeStatus5GSM:
 		if inner.Status5GSM != nil {
 			cause := int(inner.Status5GSM.GetCauseValue())
-			resp.Cause5GSM = &cause
+			resp.FiveGSMCause = &cause
 		}
 	}
 
@@ -363,7 +363,7 @@ func decodeStatus5GMM(m *gonas.Message, resp *NASResponse) {
 	}
 
 	cause := int(m.Status5GMM.GetCauseValue())
-	resp.CauseGMM = &cause
+	resp.FiveGMMCause = &cause
 }
 
 func gmmMessageTypeName(t uint8) string {

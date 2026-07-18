@@ -31,12 +31,12 @@ func TestDecodeSurfacesIEsOfAnUnprotectedSecurityModeCommand(t *testing.T) {
 		t.Fatalf("message_type = %q, want security_mode_command", resp.MessageType)
 	}
 
-	if resp.SelectedCipheringAlg == nil || *resp.SelectedCipheringAlg != 2 {
-		t.Errorf("selected ciphering algorithm = %v, want 2 (NEA2)", resp.SelectedCipheringAlg)
+	if resp.SelectedCipheringAlgorithm == nil || *resp.SelectedCipheringAlgorithm != 2 {
+		t.Errorf("selected ciphering algorithm = %v, want 2 (NEA2)", resp.SelectedCipheringAlgorithm)
 	}
 
-	if resp.SelectedIntegrityAlg == nil || *resp.SelectedIntegrityAlg != 2 {
-		t.Errorf("selected integrity algorithm = %v, want 2 (NIA2)", resp.SelectedIntegrityAlg)
+	if resp.SelectedIntegrityAlgorithm == nil || *resp.SelectedIntegrityAlgorithm != 2 {
+		t.Errorf("selected integrity algorithm = %v, want 2 (NIA2)", resp.SelectedIntegrityAlgorithm)
 	}
 
 	if resp.NgKSI == nil || *resp.NgKSI != 0 {

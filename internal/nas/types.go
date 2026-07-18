@@ -29,18 +29,14 @@ type NASResponse struct {
 	NgKSI        *int   `json:"ng_ksi,omitempty"`
 	EAPMessage   string `json:"eap_message,omitempty"`
 
-	SelectedCipheringAlg *int `json:"selected_ciphering_alg,omitempty"`
-	SelectedIntegrityAlg *int `json:"selected_integrity_alg,omitempty"`
-	IMEISVRequested      bool `json:"imeisv_requested,omitempty"`
+	SelectedCipheringAlgorithm *int `json:"selected_ciphering_algorithm,omitempty"`
+	SelectedIntegrityAlgorithm *int `json:"selected_integrity_algorithm,omitempty"`
+	IMEISVRequested            bool `json:"imeisv_requested,omitempty"`
 
 	GUTI    *GUTI5GJSON `json:"guti,omitempty"`
 	TAIList string      `json:"tai_list,omitempty"`
 
 	PDUSessionStatus string `json:"pdu_session_status,omitempty"`
-
-	CauseGMM *int `json:"cause_5gmm,omitempty"`
-
-	IdentityType *int `json:"identity_type,omitempty"`
 
 	// The numeric IEs below are pointers so a decoded value of 0 stays distinct from an absent IE under omitempty.
 	PDUSessionID   *int   `json:"pdu_session_id,omitempty"`
@@ -56,7 +52,10 @@ type NASResponse struct {
 	AuthorizedQoSRules  string `json:"authorized_qos_rules,omitempty"`
 	AlwaysOnIndication  *int   `json:"always_on_indication,omitempty"`
 
-	Cause5GSM *int `json:"cause_5gsm,omitempty"`
+	FiveGMMCause *int `json:"5gmm_cause,omitempty"`
+	FiveGSMCause *int `json:"5gsm_cause,omitempty"`
+
+	IdentityType *int `json:"identity_type,omitempty"`
 
 	InnerNASMessageType string `json:"inner_nas_message_type,omitempty"`
 

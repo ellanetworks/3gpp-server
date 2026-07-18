@@ -55,7 +55,7 @@ func Test5GPDUSessionEstablishment_ReservedPDUSessionID(t *testing.T) {
 		t.Fatalf("ngap.message_type = %q, want DownlinkNASTransport\n  body: %s", got, body)
 	}
 
-	assertNASCause(t, body, "nas.cause_5gmm", cause5GMMPayloadWasNotForwarded)
+	assertNASCause(t, body, "nas.5gmm_cause", cause5GMMPayloadWasNotForwarded)
 }
 
 func Test5GPDUSessionEstablishment_DuplicateReestablishes(t *testing.T) {
@@ -144,7 +144,7 @@ func Test5GPDUSessionEstablishment_Fuzz(t *testing.T) {
 				}
 			}
 
-			assertNASCause(t, body, "nas.cause_5gmm", tt.wantNASCause5GMM)
+			assertNASCause(t, body, "nas.5gmm_cause", tt.wantNASCause5GMM)
 
 			if tt.wantInnerNASType != "" {
 				if got := jsonGet(body, "nas.inner_nas_message_type"); got != tt.wantInnerNASType {
@@ -238,7 +238,7 @@ func Test5GPDUSessionEstablishment_InnerSMFuzz(t *testing.T) {
 				t.Errorf("nas.inner_nas_message_type = %q, want %q\n  body: %s", got, tt.wantInnerNASType, resp)
 			}
 
-			assertNASCause(t, resp, "nas.cause_5gsm", tt.wantNASCause5GSM)
+			assertNASCause(t, resp, "nas.5gsm_cause", tt.wantNASCause5GSM)
 		})
 	}
 }
@@ -330,7 +330,7 @@ func Test5GPDUSessionEstablishment_InnerSMRequestIEFuzz(t *testing.T) {
 				t.Errorf("nas.inner_nas_message_type = %q, want %q\n  body: %s", got, tt.wantInnerNASType, resp)
 			}
 
-			assertNASCause(t, resp, "nas.cause_5gsm", tt.wantNASCause5GSM)
+			assertNASCause(t, resp, "nas.5gsm_cause", tt.wantNASCause5GSM)
 		})
 	}
 }

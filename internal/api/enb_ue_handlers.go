@@ -290,8 +290,8 @@ func handleENBAttachRequest(ctx context.Context, enb *store.ENBContext, ue *stor
 
 	ue.RAND, _ = hex.DecodeString(nas.RAND)
 	ue.AUTN, _ = hex.DecodeString(nas.AUTN)
-	if nas.KSI != nil {
-		ue.KSI = uint8(*nas.KSI)
+	if nas.NASKeySetIdentifier != nil {
+		ue.KSI = uint8(*nas.NASKeySetIdentifier)
 	}
 
 	return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
@@ -403,14 +403,14 @@ func handleENBAuthenticationResponse(ctx context.Context, enb *store.ENBContext,
 		return nil, err
 	}
 
-	if smc.CipheringAlgorithm == nil || smc.IntegrityAlgorithm == nil {
+	if smc.SelectedCipheringAlgorithm == nil || smc.SelectedIntegrityAlgorithm == nil {
 		return nil, fmt.Errorf("expected Security Mode Command, got %s", smc.MessageType)
 	}
 
-	ue.EEA = uint8(*smc.CipheringAlgorithm)
-	ue.EIA = uint8(*smc.IntegrityAlgorithm)
+	ue.CipheringAlg = uint8(*smc.SelectedCipheringAlgorithm)
+	ue.IntegrityAlg = uint8(*smc.SelectedIntegrityAlgorithm)
 
-	if ue.KnasEnc, ue.KnasInt, err = crypto.DeriveEPSNASKeys(ue.Kasme, ue.EEA, ue.EIA); err != nil {
+	if ue.KnasEnc, ue.KnasInt, err = crypto.DeriveEPSNASKeys(ue.Kasme, ue.CipheringAlg, ue.IntegrityAlg); err != nil {
 		return nil, err
 	}
 
@@ -418,7 +418,7 @@ func handleENBAuthenticationResponse(ctx context.Context, enb *store.ENBContext,
 	ue.ULCount = 0
 	ue.DLCount = 0
 
-	_, verr := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+	_, verr := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 	verified := verr == nil
 
 	return &SendENBNASResponse{S1AP: dl, NAS: annotateSecurityHeaderType(smc, nasBytes), MACVerified: &verified}, nil
@@ -518,7 +518,7 @@ func handleENBSecurityModeComplete(ctx context.Context, enb *store.ENBContext, u
 		return nil, err
 	}
 
-	protected, err := naseps.Protect(smc, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+	protected, err := naseps.Protect(smc, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 	if err != nil {
 		return nil, err
 	}
@@ -546,7 +546,7 @@ func handleENBSecurityModeComplete(ctx context.Context, enb *store.ENBContext, u
 		return nil, err
 	}
 
-	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 	if err != nil {
 		return nil, fmt.Errorf("unprotect attach accept: %w", err)
 	}
@@ -648,7 +648,7 @@ func handleENBAttachComplete(ctx context.Context, enb *store.ENBContext, ue *sto
 		return nil, err
 	}
 
-	protected, err := naseps.Protect(ac, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+	protected, err := naseps.Protect(ac, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 	if err != nil {
 		return nil, err
 	}
@@ -665,7 +665,7 @@ func handleENBAttachComplete(ctx context.Context, enb *store.ENBContext, ue *sto
 
 	if dl := waitDownlinkTolerant(wctx, t, ue, "DownlinkNASTransport"); dl != nil && dl.NASPDU != nil {
 		if nasBytes, berr := nasPDUBytes(dl); berr == nil {
-			if plain, perr := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc); perr == nil {
+			if plain, perr := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt); perr == nil {
 				resp.S1AP = dl
 				resp.NAS, _ = naseps.Decode(plain)
 				resp.NAS = annotateSecurityHeaderType(resp.NAS, nasBytes)
@@ -849,7 +849,7 @@ func handleENBPdnConnectivity(ctx context.Context, enb *store.ENBContext, ue *st
 		return nil, err
 	}
 
-	protected, err := naseps.Protect(esm, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+	protected, err := naseps.Protect(esm, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 	if err != nil {
 		return nil, err
 	}
@@ -868,7 +868,7 @@ func handleENBPdnConnectivity(ctx context.Context, enb *store.ENBContext, ue *st
 		return nil, err
 	}
 
-	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 	if err != nil {
 		return nil, fmt.Errorf("unprotect pdn connectivity reply: %w", err)
 	}
@@ -940,7 +940,7 @@ func acceptAdditionalBearer(enb *store.ENBContext, ue *store.UEEPSContext, t *tr
 		return err
 	}
 
-	protectedAccept, err := naseps.Protect(accept, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+	protectedAccept, err := naseps.Protect(accept, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 	if err != nil {
 		return err
 	}
@@ -968,7 +968,7 @@ func handleENBPdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *stor
 		return nil, err
 	}
 
-	protected, err := naseps.Protect(esm, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+	protected, err := naseps.Protect(esm, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 	if err != nil {
 		return nil, err
 	}
@@ -987,7 +987,7 @@ func handleENBPdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *stor
 		return nil, err
 	}
 
-	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 	if err != nil {
 		return nil, fmt.Errorf("unprotect pdn disconnect reply: %w", err)
 	}
@@ -1028,7 +1028,7 @@ func handleENBPdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *stor
 			return nil, berr
 		}
 
-		protectedAccept, perr := naseps.Protect(accept, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+		protectedAccept, perr := naseps.Protect(accept, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 		if perr != nil {
 			return nil, perr
 		}
@@ -1130,7 +1130,7 @@ func handleENBDeactivateBearerAccept(enb *store.ENBContext, ue *store.UEEPSConte
 }
 
 func sendESM(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, esm []byte, req *SendENBNASRequest) (*SendENBNASResponse, error) {
-	protected, err := naseps.Protect(esm, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+	protected, err := naseps.Protect(esm, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 	if err != nil {
 		return nil, err
 	}
@@ -1224,7 +1224,7 @@ func handleENBTrackingAreaUpdate(ctx context.Context, enb *store.ENBContext, ue 
 		count = *req.NASCountOverride
 	}
 
-	protected, err := naseps.Protect(tau, naseps.SHTIntegrityProtectedCiphered, count, ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+	protected, err := naseps.Protect(tau, naseps.SHTIntegrityProtectedCiphered, count, ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 	if err != nil {
 		return nil, err
 	}
@@ -1257,7 +1257,7 @@ func handleENBTrackingAreaUpdate(ctx context.Context, enb *store.ENBContext, ue 
 		return &SendENBNASResponse{S1AP: dl, NAS: annotateSecurityHeaderType(nas, nasBytes)}, derr
 	}
 
-	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 	if err != nil {
 		return nil, fmt.Errorf("unprotect TAU accept: %w", err)
 	}
@@ -1284,7 +1284,7 @@ func handleENBTrackingAreaUpdate(ctx context.Context, enb *store.ENBContext, ue 
 			return nil, berr
 		}
 
-		protectedC, perr := naseps.Protect(complete, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+		protectedC, perr := naseps.Protect(complete, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 		if perr != nil {
 			return nil, perr
 		}
@@ -1354,7 +1354,7 @@ func handleENBServiceRequest(ctx context.Context, enb *store.ENBContext, ue *sto
 		KSI:     ue.KSI,
 		Count:   count,
 		KnasInt: ue.KnasInt,
-		EIA:     ue.EIA,
+		EIA:     ue.IntegrityAlg,
 	})
 	if err != nil {
 		return nil, err
@@ -1439,7 +1439,7 @@ func handleENBDetach(ctx context.Context, enb *store.ENBContext, ue *store.UEEPS
 			return nil, err
 		}
 
-		nasPDU, err = naseps.Protect(pdu, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+		nasPDU, err = naseps.Protect(pdu, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 		if err != nil {
 			return nil, err
 		}
@@ -1466,7 +1466,7 @@ func handleENBDetach(ctx context.Context, enb *store.ENBContext, ue *store.UEEPS
 			return nil, berr
 		}
 
-		plain, perr := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+		plain, perr := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 		if perr != nil {
 			return nil, fmt.Errorf("unprotect detach accept: %w", perr)
 		}
@@ -1552,7 +1552,6 @@ func waitDownlink(ctx context.Context, t *transport.S1APTransport, ue *store.UEE
 func learnMMEID(ue *store.UEEPSContext, resp *s1ap.S1APResponse) {
 	if resp.MMEUES1APID != nil {
 		ue.MMEUES1APID = uint32(*resp.MMEUES1APID)
-		ue.MMEIDKnown = true
 	}
 }
 

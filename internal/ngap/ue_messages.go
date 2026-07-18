@@ -47,12 +47,12 @@ func buildInitialUEMessageIE(ie *IE) (*ngapType.InitialUEMessageIEs, error) {
 
 	switch ie.ID {
 	case ngapType.ProtocolIEIDRANUENGAPID:
-		if ie.RanUeNgapID == nil {
+		if ie.RANUENGAPID == nil {
 			return nil, fmt.Errorf("ran_ue_ngap_id is required")
 		}
 		out.Value.Present = ngapType.InitialUEMessageIEsPresentRANUENGAPID
 		out.Value.RANUENGAPID = new(ngapType.RANUENGAPID)
-		out.Value.RANUENGAPID.Value = *ie.RanUeNgapID
+		out.Value.RANUENGAPID.Value = *ie.RANUENGAPID
 
 	case ngapType.ProtocolIEIDNASPDU:
 		if ie.NasPDU == nil {
@@ -202,11 +202,11 @@ func buildInitialUEMessageIE(ie *IE) (*ngapType.InitialUEMessageIEs, error) {
 type InitialUEMessageOverrides struct {
 	RRCEstablishmentCause *int64
 	UEContextRequest      *int64
-	RanUeNgapID           *int64
+	RANUENGAPID           *int64
 }
 
 type InitialUEMessageFromStateParams struct {
-	RanUeNgapID int64
+	RANUENGAPID int64
 	NASPDU      []byte
 	MCC         string
 	MNC         string
@@ -225,9 +225,9 @@ func BuildInitialUEMessageFromState(p InitialUEMessageFromStateParams) (*NGAPMes
 	plmnHex := hex.EncodeToString(plmnID)
 	nasPDUHex := hex.EncodeToString(p.NASPDU)
 
-	effectiveRanID := p.RanUeNgapID
-	if p.Overrides != nil && p.Overrides.RanUeNgapID != nil {
-		effectiveRanID = *p.Overrides.RanUeNgapID
+	effectiveRanID := p.RANUENGAPID
+	if p.Overrides != nil && p.Overrides.RANUENGAPID != nil {
+		effectiveRanID = *p.Overrides.RANUENGAPID
 	}
 
 	rrcCause := int64(ngapType.RRCEstablishmentCausePresentMoSignalling)
@@ -239,7 +239,7 @@ func BuildInitialUEMessageFromState(p InitialUEMessageFromStateParams) (*NGAPMes
 		{
 			ID:          ngapType.ProtocolIEIDRANUENGAPID,
 			Criticality: "reject",
-			RanUeNgapID: &effectiveRanID,
+			RANUENGAPID: &effectiveRanID,
 		},
 		{
 			ID:          ngapType.ProtocolIEIDNASPDU,
@@ -310,13 +310,13 @@ type FiveGSTMSIFromGUTI struct {
 }
 
 type UplinkNASTransportOverrides struct {
-	AmfUeNgapID *int64
-	RanUeNgapID *int64
+	AMFUENGAPID *int64
+	RANUENGAPID *int64
 }
 
 type UplinkNASTransportParams struct {
-	AmfUeNgapID int64
-	RanUeNgapID int64
+	AMFUENGAPID int64
+	RANUENGAPID int64
 	NASPDU      []byte
 	MCC         string
 	MNC         string
@@ -326,14 +326,14 @@ type UplinkNASTransportParams struct {
 }
 
 func BuildUplinkNASTransport(p UplinkNASTransportParams) ([]byte, error) {
-	amfUeNgapID := p.AmfUeNgapID
-	if p.Overrides != nil && p.Overrides.AmfUeNgapID != nil {
-		amfUeNgapID = *p.Overrides.AmfUeNgapID
+	amfUeNgapID := p.AMFUENGAPID
+	if p.Overrides != nil && p.Overrides.AMFUENGAPID != nil {
+		amfUeNgapID = *p.Overrides.AMFUENGAPID
 	}
 
-	ranUeNgapID := p.RanUeNgapID
-	if p.Overrides != nil && p.Overrides.RanUeNgapID != nil {
-		ranUeNgapID = *p.Overrides.RanUeNgapID
+	ranUeNgapID := p.RANUENGAPID
+	if p.Overrides != nil && p.Overrides.RANUENGAPID != nil {
+		ranUeNgapID = *p.Overrides.RANUENGAPID
 	}
 	plmnBytes, err := encodePLMN(p.MCC, p.MNC)
 	if err != nil {
@@ -431,8 +431,8 @@ func buildPDUSessionResourceSetupResponseTransfer(teid uint32, ip string) ([]byt
 }
 
 type PDUSessionResourceSetupResponseParams struct {
-	AmfUeNgapID  int64
-	RanUeNgapID  int64
+	AMFUENGAPID  int64
+	RANUENGAPID  int64
 	PDUSessionID int64
 	DLTeid       uint32
 	DLIP         string
@@ -462,9 +462,9 @@ func BuildPDUSessionResourceSetupResponse(p PDUSessionResourceSetupResponseParam
 	}
 
 	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentIgnore,
-		ngapType.PDUSessionResourceSetupResponseIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: p.AmfUeNgapID}
+		ngapType.PDUSessionResourceSetupResponseIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: p.AMFUENGAPID}
 	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentIgnore,
-		ngapType.PDUSessionResourceSetupResponseIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: p.RanUeNgapID}
+		ngapType.PDUSessionResourceSetupResponseIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: p.RANUENGAPID}
 
 	transfer, err := buildPDUSessionResourceSetupResponseTransfer(p.DLTeid, p.DLIP)
 	if err != nil {

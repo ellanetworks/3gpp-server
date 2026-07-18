@@ -353,7 +353,7 @@ func DecodePDUSessionEstablishmentAccept(nasResp *NASResponse, gsmMsg *gonas.Gsm
 
 	if msg.Cause5GSM != nil {
 		cause := int(msg.GetCauseValue())
-		nasResp.Cause5GSM = &cause
+		nasResp.FiveGSMCause = &cause
 	}
 }
 
@@ -368,7 +368,7 @@ func DecodePDUSessionReleaseCommand(nasResp *NASResponse, gsmMsg *gonas.GsmMessa
 	nasResp.PTI = &pti
 
 	cause := int(msg.GetCauseValue())
-	nasResp.Cause5GSM = &cause
+	nasResp.FiveGSMCause = &cause
 
 	accessType := releaseCommandHasAccessType(raw)
 	nasResp.AccessTypePresent = &accessType
@@ -435,5 +435,5 @@ func DecodePDUSessionEstablishmentReject(nasResp *NASResponse, gsmMsg *gonas.Gsm
 	}
 
 	cause := int(gsmMsg.PDUSessionEstablishmentReject.GetCauseValue())
-	nasResp.Cause5GSM = &cause
+	nasResp.FiveGSMCause = &cause
 }

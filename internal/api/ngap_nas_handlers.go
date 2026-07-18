@@ -50,25 +50,25 @@ func registrationOverrides(req *SendNGAPRequest) *nasCodec.RegistrationRequestOv
 }
 
 func uplinkOverrides(req *SendNGAPRequest) *ngap.UplinkNASTransportOverrides {
-	if req.AmfUeNgapIDOverride == nil && req.RanUeNgapIDOverride == nil {
+	if req.AMFUENGAPIDOverride == nil && req.RANUENGAPIDOverride == nil {
 		return nil
 	}
 
 	return &ngap.UplinkNASTransportOverrides{
-		AmfUeNgapID: req.AmfUeNgapIDOverride,
-		RanUeNgapID: req.RanUeNgapIDOverride,
+		AMFUENGAPID: req.AMFUENGAPIDOverride,
+		RANUENGAPID: req.RANUENGAPIDOverride,
 	}
 }
 
 func initialUEOverrides(req *SendNGAPRequest) *ngap.InitialUEMessageOverrides {
-	if req.RRCEstablishmentCauseOverride == nil && req.UEContextRequestOverride == nil && req.RanUeNgapIDOverride == nil {
+	if req.RRCEstablishmentCauseOverride == nil && req.UEContextRequestOverride == nil && req.RANUENGAPIDOverride == nil {
 		return nil
 	}
 
 	return &ngap.InitialUEMessageOverrides{
 		RRCEstablishmentCause: req.RRCEstablishmentCauseOverride,
 		UEContextRequest:      req.UEContextRequestOverride,
-		RanUeNgapID:           req.RanUeNgapIDOverride,
+		RANUENGAPID:           req.RANUENGAPIDOverride,
 	}
 }
 
@@ -84,7 +84,7 @@ func handleGnBRegistrationRequest(ctx context.Context, gnb *store.GNBContext, ue
 		}
 
 		ngapMsg, err := ngap.BuildInitialUEMessageFromState(ngap.InitialUEMessageFromStateParams{
-			RanUeNgapID: ue.RanUeNgapID,
+			RANUENGAPID: ue.RANUENGAPID,
 			NASPDU:      nasPDU,
 			MCC:         gnb.MCC,
 			MNC:         gnb.MNC,
@@ -137,7 +137,7 @@ func handleGnBRegistrationRequest(ctx context.Context, gnb *store.GNBContext, ue
 	}
 
 	ngapMsg, err := ngap.BuildInitialUEMessageFromState(ngap.InitialUEMessageFromStateParams{
-		RanUeNgapID: ue.RanUeNgapID,
+		RANUENGAPID: ue.RANUENGAPID,
 		NASPDU:      nasPDU,
 		MCC:         gnb.MCC,
 		MNC:         gnb.MNC,
@@ -172,10 +172,10 @@ func handleGnBAuthenticationResponse(ctx context.Context, gnb *store.GNBContext,
 			if err != nil {
 				return nil, httpErrorf(http.StatusBadRequest, "decode res_star_override: %v", err)
 			}
-		} else if len(ue.LastRAND) == 0 || len(ue.LastAUTN) == 0 {
+		} else if len(ue.RAND) == 0 || len(ue.AUTN) == 0 {
 			resStar = make([]byte, 16)
 		} else {
-			akaResult, err := crypto.Compute5GAKA(ue.K, ue.OPc, ue.Sqn, ue.Supi, ue.MCC, ue.MNC, ue.LastRAND, ue.LastAUTN)
+			akaResult, err := crypto.Compute5GAKA(ue.K, ue.OPc, ue.Sqn, ue.Supi, ue.MCC, ue.MNC, ue.RAND, ue.AUTN)
 			if err != nil {
 				return nil, httpErrorf(http.StatusInternalServerError, "5G-AKA: %v", err)
 			}
@@ -239,7 +239,7 @@ func handleGnBSecurityModeComplete(ctx context.Context, gnb *store.GNBContext, u
 }
 
 func handleGnBRegistrationComplete(ctx context.Context, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) (*SendNGAPResponse, error) {
-	icsResp, err := ngap.BuildInitialContextSetupResponse(ue.AmfUeNgapID, ue.RanUeNgapID)
+	icsResp, err := ngap.BuildInitialContextSetupResponse(ue.AMFUENGAPID, ue.RANUENGAPID)
 	if err != nil {
 		return nil, httpErrorf(http.StatusInternalServerError, "build InitialContextSetupResponse: %v", err)
 	}
@@ -305,8 +305,8 @@ func handleGnBDeregistrationRequest(ctx context.Context, gnb *store.GNBContext, 
 	}
 
 	encoded, err := ngap.BuildUplinkNASTransport(ngap.UplinkNASTransportParams{
-		AmfUeNgapID: ue.AmfUeNgapID,
-		RanUeNgapID: ue.RanUeNgapID,
+		AMFUENGAPID: ue.AMFUENGAPID,
+		RANUENGAPID: ue.RANUENGAPID,
 		NASPDU:      nasPDU,
 		MCC:         gnb.MCC,
 		MNC:         gnb.MNC,
@@ -332,19 +332,14 @@ func handleGnBDeregistrationRequest(ctx context.Context, gnb *store.GNBContext, 
 
 	var macVerified *bool
 
-	for _, ie := range ngapResp.IEs {
-		if ie.NasPDU != nil {
-			nasPDUBytes, err := hex.DecodeString(*ie.NasPDU)
-			if err != nil {
-				continue
-			}
-
+	if ngapResp.NasPDU != nil {
+		if nasPDUBytes, err := hex.DecodeString(*ngapResp.NasPDU); err == nil {
 			nasResp, macVerified = decodeGNBDownlinkNAS(ue, nasPDUBytes)
 		}
 	}
 
 	if ngapResp.MessageType == "UEContextReleaseCommand" {
-		releaseComplete, err := ngap.BuildUEContextReleaseComplete(ue.AmfUeNgapID, ue.RanUeNgapID)
+		releaseComplete, err := ngap.BuildUEContextReleaseComplete(ue.AMFUENGAPID, ue.RANUENGAPID)
 		if err == nil {
 			_ = t.Send(releaseComplete, false)
 		}
@@ -363,14 +358,14 @@ func handleGnBUEContextReleaseRequest(ctx context.Context, ue *store.UEContext, 
 		cause = *req.ReleaseCause
 	}
 
-	amfUeNgapID := ue.AmfUeNgapID
-	if req.AmfUeNgapIDOverride != nil {
-		amfUeNgapID = *req.AmfUeNgapIDOverride
+	amfUeNgapID := ue.AMFUENGAPID
+	if req.AMFUENGAPIDOverride != nil {
+		amfUeNgapID = *req.AMFUENGAPIDOverride
 	}
 
-	ranUeNgapID := ue.RanUeNgapID
-	if req.RanUeNgapIDOverride != nil {
-		ranUeNgapID = *req.RanUeNgapIDOverride
+	ranUeNgapID := ue.RANUENGAPID
+	if req.RANUENGAPIDOverride != nil {
+		ranUeNgapID = *req.RANUENGAPIDOverride
 	}
 
 	encoded, err := ngap.BuildUEContextReleaseRequest(amfUeNgapID, ranUeNgapID, cause)
@@ -389,7 +384,7 @@ func handleGnBUEContextReleaseRequest(ctx context.Context, ue *store.UEContext, 
 	}
 
 	if ngapResp.MessageType == "UEContextReleaseCommand" {
-		releaseComplete, err := ngap.BuildUEContextReleaseComplete(ue.AmfUeNgapID, ue.RanUeNgapID)
+		releaseComplete, err := ngap.BuildUEContextReleaseComplete(ue.AMFUENGAPID, ue.RANUENGAPID)
 		if err == nil {
 			_ = t.Send(releaseComplete, false)
 		}
@@ -449,14 +444,14 @@ func handleGnBAuthenticationFailure(ctx context.Context, gnb *store.GNBContext, 
 		nasPDU = raw
 	} else {
 		cause := uint8(nasMessage.Cause5GMMMACFailure)
-		if req.Cause5GMM != nil {
-			cause = *req.Cause5GMM
+		if req.FiveGMMCause != nil {
+			cause = *req.FiveGMMCause
 		}
 
 		var auts []byte
 
 		if cause == nasMessage.Cause5GMMSynchFailure {
-			a, err := crypto.ComputeAUTS(ue.K, ue.OPc, ue.Sqn, ue.LastRAND)
+			a, err := crypto.ComputeAUTS(ue.K, ue.OPc, ue.Sqn, ue.RAND)
 			if err != nil {
 				return nil, httpErrorf(http.StatusInternalServerError, "compute AUTS: %v", err)
 			}
@@ -487,8 +482,8 @@ func handleGnBSecurityModeReject(ctx context.Context, gnb *store.GNBContext, ue 
 		nasPDU = raw
 	} else {
 		cause := uint8(nasMessage.Cause5GMMUESecurityCapabilitiesMismatch)
-		if req.Cause5GMM != nil {
-			cause = *req.Cause5GMM
+		if req.FiveGMMCause != nil {
+			cause = *req.FiveGMMCause
 		}
 
 		pdu, err := nasCodec.BuildSecurityModeReject(cause)
@@ -550,7 +545,7 @@ func serviceRequestPDUStatus(ue *store.UEContext, req *SendNGAPRequest) (*[16]bo
 }
 
 func handleGnBServiceRequest(ctx context.Context, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) (*SendNGAPResponse, error) {
-	ue.RanUeNgapID = gnb.AllocateRanUeNgapID()
+	ue.RANUENGAPID = gnb.AllocateRANUENGAPID()
 
 	var nasPDU []byte
 
@@ -602,7 +597,7 @@ func handleGnBServiceRequest(ctx context.Context, gnb *store.GNBContext, ue *sto
 	}
 
 	ngapMsg, err := ngap.BuildInitialUEMessageFromState(ngap.InitialUEMessageFromStateParams{
-		RanUeNgapID: ue.RanUeNgapID,
+		RANUENGAPID: ue.RANUENGAPID,
 		NASPDU:      nasPDU,
 		MCC:         gnb.MCC,
 		MNC:         gnb.MNC,
@@ -634,24 +629,19 @@ func handleGnBServiceRequest(ctx context.Context, gnb *store.GNBContext, ue *sto
 
 	var macVerified *bool
 
-	for _, ie := range ngapResp.IEs {
-		// An Error Indication echoes the AP IDs it was sent; it assigns none.
-		if ie.AmfUeNgapID != nil && ngapResp.MessageType != "ErrorIndication" {
-			ue.AmfUeNgapID = *ie.AmfUeNgapID
-		}
+	// An Error Indication echoes the AP IDs it was sent; it assigns none.
+	if ngapResp.AMFUENGAPID != nil && ngapResp.MessageType != "ErrorIndication" {
+		ue.AMFUENGAPID = *ngapResp.AMFUENGAPID
+	}
 
-		if ie.NasPDU != nil {
-			nasPDUBytes, derr := hex.DecodeString(*ie.NasPDU)
-			if derr != nil {
-				continue
-			}
-
+	if ngapResp.NasPDU != nil {
+		if nasPDUBytes, derr := hex.DecodeString(*ngapResp.NasPDU); derr == nil {
 			nasResp, macVerified = decodeGNBDownlinkNAS(ue, nasPDUBytes)
 		}
 	}
 
 	if ngapResp.MessageType == "InitialContextSetupRequest" {
-		icsResp, berr := ngap.BuildInitialContextSetupResponse(ue.AmfUeNgapID, ue.RanUeNgapID)
+		icsResp, berr := ngap.BuildInitialContextSetupResponse(ue.AMFUENGAPID, ue.RANUENGAPID)
 		if berr == nil {
 			_ = t.Send(icsResp, false)
 		}
@@ -686,8 +676,8 @@ func handleGnBInjectNAS(ctx context.Context, gnb *store.GNBContext, ue *store.UE
 	}
 
 	encoded, err := ngap.BuildUplinkNASTransport(ngap.UplinkNASTransportParams{
-		AmfUeNgapID: ue.AmfUeNgapID,
-		RanUeNgapID: ue.RanUeNgapID,
+		AMFUENGAPID: ue.AMFUENGAPID,
+		RANUENGAPID: ue.RANUENGAPID,
 		NASPDU:      nasPDU,
 		MCC:         gnb.MCC,
 		MNC:         gnb.MNC,

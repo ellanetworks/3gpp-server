@@ -44,24 +44,24 @@ type UEContext struct {
 	Suci       nasType.MobileIdentity5GS
 	SuciString string
 
-	RanUeNgapID int64
-	AmfUeNgapID int64
+	RANUENGAPID int64
+	AMFUENGAPID int64
 
-	UeSecurityCapability     *nasType.UESecurityCapability
-	IntegrityAlg             uint8
-	CipheringAlg             uint8
-	KnasEnc                  [16]uint8
-	KnasInt                  [16]uint8
-	Kamf                     []byte
-	NgKsi                    uint8
-	ULCount                  uint32
-	DLCount                  uint32
-	SecurityContextAvailable bool
+	UeSecurityCapability *nasType.UESecurityCapability
+	CipheringAlg         uint8
+	IntegrityAlg         uint8
+	KnasEnc              [16]uint8
+	KnasInt              [16]uint8
+	Kamf                 []byte
+	NgKsi                uint8
+	ULCount              uint32
+	DLCount              uint32
+	SecurityActive       bool
 
 	LastUplinkNAS []byte
 
-	LastRAND []byte
-	LastAUTN []byte
+	RAND []byte
+	AUTN []byte
 
 	DNN            string
 	PDUSessionID   uint8
@@ -186,7 +186,7 @@ func NewUEContext(id string, ranUeNgapID int64, mncLength int, opts *CreateUEOpt
 		PublicKeyHex:         opts.PublicKeyHex,
 		Suci:                 suci,
 		SuciString:           suciStr,
-		RanUeNgapID:          ranUeNgapID,
+		RANUENGAPID:          ranUeNgapID,
 		UeSecurityCapability: secCap,
 		DNN:                  opts.DNN,
 		PDUSessionID:         opts.PDUSessionID,

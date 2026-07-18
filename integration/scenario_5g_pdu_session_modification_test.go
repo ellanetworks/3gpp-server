@@ -33,7 +33,7 @@ func Test5GPDUSessionModification_Rejected(t *testing.T) {
 		t.Errorf("nas.inner_nas_message_type = %q, want pdu_session_modification_reject (TS 24.501 §6.4.2.4)\n  body: %s", got, body)
 	}
 
-	if got := jsonGet(body, "nas.cause_5gsm"); got == "" {
+	if got := jsonGet(body, "nas.5gsm_cause"); got == "" {
 		t.Errorf("Modification Reject missing its mandatory 5GSM cause IE (TS 24.501 §8.3.8)\n  body: %s", body)
 	}
 }
@@ -58,7 +58,7 @@ func Test5GPDUSessionModification_NoActiveSession(t *testing.T) {
 		t.Fatalf("ngap.message_type = %q, want DownlinkNASTransport\n  body: %s", got, body)
 	}
 
-	assertNASCause(t, body, "nas.cause_5gmm", cause5GMMPayloadWasNotForwarded)
+	assertNASCause(t, body, "nas.5gmm_cause", cause5GMMPayloadWasNotForwarded)
 }
 
 func Test5GPDUSessionModification_ExistingPduSessionRequestType(t *testing.T) {
@@ -101,5 +101,5 @@ func Test5GPDUSessionModification_EmergencyRequestType(t *testing.T) {
 		t.Fatalf("ngap.message_type = %q, want DownlinkNASTransport\n  body: %s", got, resp)
 	}
 
-	assertNASCause(t, resp, "nas.cause_5gmm", cause5GMMPayloadWasNotForwarded)
+	assertNASCause(t, resp, "nas.5gmm_cause", cause5GMMPayloadWasNotForwarded)
 }

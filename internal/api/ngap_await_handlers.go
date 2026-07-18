@@ -17,17 +17,7 @@ import (
 // An amfID of 0 means the AMF has not assigned one yet, so it cannot match.
 func ueNGAPMatcher(ranID, amfID int64) func(*ngap.NGAPResponse) bool {
 	return func(resp *ngap.NGAPResponse) bool {
-		var msgRan, msgAmf *int64
-
-		for i := range resp.IEs {
-			if resp.IEs[i].RanUeNgapID != nil {
-				msgRan = resp.IEs[i].RanUeNgapID
-			}
-
-			if resp.IEs[i].AmfUeNgapID != nil {
-				msgAmf = resp.IEs[i].AmfUeNgapID
-			}
-		}
+		msgRan, msgAmf := resp.RANUENGAPID, resp.AMFUENGAPID
 
 		if msgRan == nil && msgAmf == nil {
 			return true
@@ -75,7 +65,7 @@ func (h *Handler) AwaitUEMessage(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), req.timeout)
 	defer cancel()
 
-	ngapResp, err := t.WaitForMessageMatching(ctx, ueNGAPMatcher(ue.RanUeNgapID, ue.AmfUeNgapID), req.MessageTypes...)
+	ngapResp, err := t.WaitForMessageMatching(ctx, ueNGAPMatcher(ue.RANUENGAPID, ue.AMFUENGAPID), req.MessageTypes...)
 	if err != nil {
 		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for %v: %v", req.MessageTypes, err))
 		return
@@ -87,17 +77,10 @@ func (h *Handler) AwaitUEMessage(w http.ResponseWriter, r *http.Request) {
 func decodeNASFromNGAP(ue *store.UEContext, ngapResp *ngap.NGAPResponse) *nasCodec.NASResponse {
 	var nasResp *nasCodec.NASResponse
 
-	for _, ie := range ngapResp.IEs {
-		if ie.NasPDU == nil {
-			continue
+	if ngapResp.NasPDU != nil {
+		if nasPDUBytes, err := hex.DecodeString(*ngapResp.NasPDU); err == nil {
+			nasResp, _ = decodeGNBDownlinkNAS(ue, nasPDUBytes)
 		}
-
-		nasPDUBytes, err := hex.DecodeString(*ie.NasPDU)
-		if err != nil {
-			continue
-		}
-
-		nasResp, _ = decodeGNBDownlinkNAS(ue, nasPDUBytes)
 	}
 
 	return nasResp

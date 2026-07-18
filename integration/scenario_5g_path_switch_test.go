@@ -36,9 +36,7 @@ func assertPathSwitchType(t *testing.T, ctx string, status int, body []byte, wan
 func ngapReleasedPDUSessionIDs(body []byte) []int64 {
 	var top struct {
 		NGAP struct {
-			IEs []struct {
-				ReleasePDUSessionIDs []int64 `json:"release_pdu_session_ids"`
-			} `json:"ies"`
+			ReleasePDUSessionIDs []int64 `json:"release_pdu_session_ids"`
 		} `json:"ngap"`
 	}
 
@@ -46,12 +44,7 @@ func ngapReleasedPDUSessionIDs(body []byte) []int64 {
 		return nil
 	}
 
-	var ids []int64
-	for _, ie := range top.NGAP.IEs {
-		ids = append(ids, ie.ReleasePDUSessionIDs...)
-	}
-
-	return ids
+	return top.NGAP.ReleasePDUSessionIDs
 }
 
 func Test5GPathSwitchRequestUnknownUEFails(t *testing.T) {
@@ -160,8 +153,6 @@ const (
 	ieSourceAMFUENGAPID                    = 100
 	iePDUSessionResourceToBeSwitchedDLList = 76
 	ieUESecurityCapabilities               = 119
-	ieSecurityContext                      = 93
-	ieAllowedNSSAI                         = 0
 )
 
 func Test5GPathSwitchRequestAcknowledgeCarriesMandatoryIEs(t *testing.T) {
@@ -176,14 +167,11 @@ func Test5GPathSwitchRequestAcknowledgeCarriesMandatoryIEs(t *testing.T) {
 
 	assertPathSwitchType(t, "acknowledge mandatory IEs", status, body, ngapPathSwitchRequestAcknowledge)
 
-	secCtx := ngapIEByID(body, ieSecurityContext)
-	if secCtx == nil {
-		t.Errorf("acknowledge is missing the mandatory Security Context IE (TS 38.413 §9.2.3.9)\n  body: %s", body)
-	} else if _, ok := secCtx["next_hop_chaining_count"]; !ok {
-		t.Errorf("Security Context IE carries no Next Hop Chaining Count (TS 33.501 §6.9.2.3.2)\n  body: %s", body)
+	if ngapField(body, "next_hop_chaining_count") == nil {
+		t.Errorf("acknowledge is missing the mandatory Security Context IE and its Next Hop Chaining Count (TS 38.413 §9.2.3.9, TS 33.501 §6.9.2.3.2)\n  body: %s", body)
 	}
 
-	if ngapIEByID(body, ieAllowedNSSAI) == nil {
+	if ngapField(body, "allowed_nssai") == nil {
 		t.Errorf("acknowledge is missing the mandatory Allowed NSSAI IE (TS 38.413 §9.2.3.9)\n  body: %s", body)
 	}
 }
@@ -191,14 +179,9 @@ func Test5GPathSwitchRequestAcknowledgeCarriesMandatoryIEs(t *testing.T) {
 func pathSwitchNCC(t *testing.T, body []byte) int64 {
 	t.Helper()
 
-	ie := ngapIEByID(body, ieSecurityContext)
-	if ie == nil {
-		t.Fatalf("acknowledge missing Security Context IE\n  body: %s", body)
-	}
-
-	v, ok := ie["next_hop_chaining_count"].(float64)
+	v, ok := ngapField(body, "next_hop_chaining_count").(float64)
 	if !ok {
-		t.Fatalf("Security Context IE carries no next_hop_chaining_count\n  body: %s", body)
+		t.Fatalf("acknowledge missing Security Context Next Hop Chaining Count\n  body: %s", body)
 	}
 
 	return int64(v)

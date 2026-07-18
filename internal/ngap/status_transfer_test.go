@@ -142,24 +142,8 @@ func TestDecodeDownlinkRANStatusTransfer(t *testing.T) {
 		t.Fatalf("message_type = %q, want DownlinkRANStatusTransfer", resp.MessageType)
 	}
 
-	var (
-		gotAmf, gotRan *int64
-		gotContainer   *RANStatusTransferJSON
-	)
-
-	for i := range resp.IEs {
-		if resp.IEs[i].AmfUeNgapID != nil {
-			gotAmf = resp.IEs[i].AmfUeNgapID
-		}
-
-		if resp.IEs[i].RanUeNgapID != nil {
-			gotRan = resp.IEs[i].RanUeNgapID
-		}
-
-		if resp.IEs[i].RANStatusTransfer != nil {
-			gotContainer = resp.IEs[i].RANStatusTransfer
-		}
-	}
+	gotAmf, gotRan := resp.AMFUENGAPID, resp.RANUENGAPID
+	gotContainer := resp.RANStatusTransfer
 
 	if gotAmf == nil || *gotAmf != 11 {
 		t.Errorf("amf_ue_ngap_id = %v, want 11", gotAmf)

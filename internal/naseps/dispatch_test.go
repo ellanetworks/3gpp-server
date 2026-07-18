@@ -61,15 +61,15 @@ func TestDecodeSurfacesSecurityModeCommandIEs(t *testing.T) {
 		t.Fatalf("security_header_type = %q, want plain", resp.SecurityHeaderType)
 	}
 
-	if resp.CipheringAlgorithm == nil || *resp.CipheringAlgorithm != 2 {
-		t.Errorf("ciphering_algorithm = %v, want 2 (EEA2)", resp.CipheringAlgorithm)
+	if resp.SelectedCipheringAlgorithm == nil || *resp.SelectedCipheringAlgorithm != 2 {
+		t.Errorf("selected_ciphering_algorithm = %v, want 2 (EEA2)", resp.SelectedCipheringAlgorithm)
 	}
 
-	if resp.IntegrityAlgorithm == nil || *resp.IntegrityAlgorithm != 2 {
-		t.Errorf("integrity_algorithm = %v, want 2 (EIA2)", resp.IntegrityAlgorithm)
+	if resp.SelectedIntegrityAlgorithm == nil || *resp.SelectedIntegrityAlgorithm != 2 {
+		t.Errorf("selected_integrity_algorithm = %v, want 2 (EIA2)", resp.SelectedIntegrityAlgorithm)
 	}
 
-	if resp.KSI == nil || *resp.KSI != 7 {
-		t.Errorf("nas_key_set_identifier = %v, want 7", resp.KSI)
+	if resp.NASKeySetIdentifier == nil || *resp.NASKeySetIdentifier != 7 {
+		t.Errorf("nas_key_set_identifier = %v, want 7", resp.NASKeySetIdentifier)
 	}
 }

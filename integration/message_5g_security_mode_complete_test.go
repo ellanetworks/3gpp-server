@@ -129,7 +129,7 @@ func Test5GSecurityModeComplete_Fuzz(t *testing.T) {
 				}
 			}
 
-			assertNASCause(t, body, "nas.cause_5gmm", tt.wantCause5GMM)
+			assertNASCause(t, body, "nas.5gmm_cause", tt.wantCause5GMM)
 
 			ngapMsgType := jsonGet(body, "ngap.message_type")
 			if ngapMsgType != ngapErrorIndication {

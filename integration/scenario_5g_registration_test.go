@@ -62,11 +62,11 @@ func Test5GScenarioRegistration(t *testing.T) {
 		if got := jsonGet(body, "nas.message_type"); got != nasSecurityModeCommand {
 			t.Fatalf("nas.message_type = %q, want security_mode_command", got)
 		}
-		if jsonGet(body, "nas.selected_ciphering_alg") == "" {
-			t.Error("missing selected_ciphering_alg")
+		if jsonGet(body, "nas.selected_ciphering_algorithm") == "" {
+			t.Error("missing selected_ciphering_algorithm")
 		}
-		if jsonGet(body, "nas.selected_integrity_alg") == "" {
-			t.Error("missing selected_integrity_alg")
+		if jsonGet(body, "nas.selected_integrity_algorithm") == "" {
+			t.Error("missing selected_integrity_algorithm")
 		}
 	})
 

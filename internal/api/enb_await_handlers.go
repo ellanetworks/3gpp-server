@@ -105,7 +105,7 @@ func decodeENBDownlinkNAS(ue *store.UEEPSContext, resp *s1ap.S1APResponse) *nase
 		return nil
 	}
 
-	plain, err := naseps.Unprotect(b, uint32(b[5]), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+	plain, err := naseps.Unprotect(b, uint32(b[5]), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 	if err != nil {
 		return nil
 	}

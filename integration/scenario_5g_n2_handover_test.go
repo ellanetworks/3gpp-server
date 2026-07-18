@@ -59,20 +59,8 @@ func ngapFirstAmfUeNgapID(body []byte) (int64, bool) {
 		return 0, false
 	}
 
-	ies, ok := ngapObj["ies"].([]any)
-	if !ok {
-		return 0, false
-	}
-
-	for _, ie := range ies {
-		iem, ok := ie.(map[string]any)
-		if !ok {
-			continue
-		}
-
-		if v, ok := iem["amf_ue_ngap_id"].(float64); ok {
-			return int64(v), true
-		}
+	if v, ok := ngapObj["amf_ue_ngap_id"].(float64); ok {
+		return int64(v), true
 	}
 
 	return 0, false
@@ -81,9 +69,7 @@ func ngapFirstAmfUeNgapID(body []byte) (int64, bool) {
 func ngapPDUSessionIDs(body []byte) []int64 {
 	var top struct {
 		NGAP struct {
-			IEs []struct {
-				PDUSessionIDs []int64 `json:"pdu_session_ids"`
-			} `json:"ies"`
+			PDUSessionIDs []int64 `json:"pdu_session_ids"`
 		} `json:"ngap"`
 	}
 
@@ -91,20 +77,13 @@ func ngapPDUSessionIDs(body []byte) []int64 {
 		return nil
 	}
 
-	var ids []int64
-	for _, ie := range top.NGAP.IEs {
-		ids = append(ids, ie.PDUSessionIDs...)
-	}
-
-	return ids
+	return top.NGAP.PDUSessionIDs
 }
 
 func ngapReleasePDUSessionIDs(body []byte) []int64 {
 	var top struct {
 		NGAP struct {
-			IEs []struct {
-				ReleasePDUSessionIDs []int64 `json:"release_pdu_session_ids"`
-			} `json:"ies"`
+			ReleasePDUSessionIDs []int64 `json:"release_pdu_session_ids"`
 		} `json:"ngap"`
 	}
 
@@ -112,12 +91,7 @@ func ngapReleasePDUSessionIDs(body []byte) []int64 {
 		return nil
 	}
 
-	var ids []int64
-	for _, ie := range top.NGAP.IEs {
-		ids = append(ids, ie.ReleasePDUSessionIDs...)
-	}
-
-	return ids
+	return top.NGAP.ReleasePDUSessionIDs
 }
 
 func sameInt64Set(a, b []int64) bool {
@@ -159,12 +133,10 @@ func assertCarriesPDUSessions(t *testing.T, body []byte, want []int64, context s
 func ngapAMBR(body []byte) (dl, ul int64, ok bool) {
 	var top struct {
 		NGAP struct {
-			IEs []struct {
-				AMBR *struct {
-					DL int64 `json:"dl"`
-					UL int64 `json:"ul"`
-				} `json:"ue_aggregate_max_bit_rate"`
-			} `json:"ies"`
+			AMBR *struct {
+				DL int64 `json:"dl"`
+				UL int64 `json:"ul"`
+			} `json:"ue_aggregate_max_bit_rate"`
 		} `json:"ngap"`
 	}
 
@@ -172,10 +144,8 @@ func ngapAMBR(body []byte) (dl, ul int64, ok bool) {
 		return 0, 0, false
 	}
 
-	for _, ie := range top.NGAP.IEs {
-		if ie.AMBR != nil {
-			return ie.AMBR.DL, ie.AMBR.UL, true
-		}
+	if top.NGAP.AMBR != nil {
+		return top.NGAP.AMBR.DL, top.NGAP.AMBR.UL, true
 	}
 
 	return 0, 0, false
@@ -184,11 +154,9 @@ func ngapAMBR(body []byte) (dl, ul int64, ok bool) {
 func ngapHasCause(body []byte) bool {
 	var top struct {
 		NGAP struct {
-			IEs []struct {
-				Cause *struct {
-					Group string `json:"group"`
-				} `json:"cause"`
-			} `json:"ies"`
+			Cause *struct {
+				Group string `json:"group"`
+			} `json:"cause"`
 		} `json:"ngap"`
 	}
 
@@ -196,22 +164,14 @@ func ngapHasCause(body []byte) bool {
 		return false
 	}
 
-	for _, ie := range top.NGAP.IEs {
-		if ie.Cause != nil && ie.Cause.Group != "" {
-			return true
-		}
-	}
-
-	return false
+	return top.NGAP.Cause != nil && top.NGAP.Cause.Group != ""
 }
 
 // The Security Context IE is surfaced only via its Next Hop Chaining Count.
 func ngapHasSecurityContext(body []byte) bool {
 	var top struct {
 		NGAP struct {
-			IEs []struct {
-				NCC *int64 `json:"next_hop_chaining_count"`
-			} `json:"ies"`
+			NCC *int64 `json:"next_hop_chaining_count"`
 		} `json:"ngap"`
 	}
 
@@ -219,13 +179,7 @@ func ngapHasSecurityContext(body []byte) bool {
 		return false
 	}
 
-	for _, ie := range top.NGAP.IEs {
-		if ie.NCC != nil {
-			return true
-		}
-	}
-
-	return false
+	return top.NGAP.NCC != nil
 }
 
 // Drives an inter-NG-RAN N2 handover, preparation then execution (TS 23.502 §4.9.1.3).

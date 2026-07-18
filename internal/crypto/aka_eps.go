@@ -20,12 +20,12 @@ const (
 	algTypeNASInt uint8 = 0x02
 )
 
-type EPSAKAResult struct {
+type AKAEPSResult struct {
 	RES   []byte
 	Kasme []byte
 }
 
-func ComputeEPSAKA(k, opc, sqn, mcc, mnc string, rand, autn []byte) (*EPSAKAResult, error) {
+func ComputeEPSAKA(k, opc, sqn, mcc, mnc string, rand, autn []byte) (*AKAEPSResult, error) {
 	opcBytes, err := hex.DecodeString(opc)
 	if err != nil {
 		return nil, fmt.Errorf("decode OPc: %w", err)
@@ -72,28 +72,7 @@ func ComputeEPSAKA(k, opc, sqn, mcc, mnc string, rand, autn []byte) (*EPSAKAResu
 		return nil, fmt.Errorf("derive K_ASME: %w", err)
 	}
 
-	return &EPSAKAResult{RES: RES, Kasme: kasme}, nil
-}
-
-func DeriveEPSNASKeys(kasme []byte, cipheringAlg, integrityAlg uint8) (knasEnc, knasInt [16]byte, err error) {
-	enc, err := ueauth.GetKDFValue(kasme, fcAlgorithmKD,
-		[]byte{algTypeNASEnc}, ueauth.KDFLen([]byte{algTypeNASEnc}),
-		[]byte{cipheringAlg}, ueauth.KDFLen([]byte{cipheringAlg}))
-	if err != nil {
-		return knasEnc, knasInt, fmt.Errorf("derive K_NASenc: %w", err)
-	}
-
-	intg, err := ueauth.GetKDFValue(kasme, fcAlgorithmKD,
-		[]byte{algTypeNASInt}, ueauth.KDFLen([]byte{algTypeNASInt}),
-		[]byte{integrityAlg}, ueauth.KDFLen([]byte{integrityAlg}))
-	if err != nil {
-		return knasEnc, knasInt, fmt.Errorf("derive K_NASint: %w", err)
-	}
-
-	copy(knasEnc[:], enc[16:32])
-	copy(knasInt[:], intg[16:32])
-
-	return knasEnc, knasInt, nil
+	return &AKAEPSResult{RES: RES, Kasme: kasme}, nil
 }
 
 func tbcdPLMN(mcc, mnc string) ([]byte, error) {

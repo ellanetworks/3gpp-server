@@ -24,7 +24,6 @@ type UEEPSContext struct {
 
 	ENBUES1APID uint32
 	MMEUES1APID uint32
-	MMEIDKnown  bool
 
 	UENetworkCapability []byte // nil uses the default
 
@@ -34,8 +33,8 @@ type UEEPSContext struct {
 	Kasme          []byte
 	KnasEnc        [16]byte
 	KnasInt        [16]byte
-	EEA            uint8
-	EIA            uint8
+	CipheringAlg   uint8
+	IntegrityAlg   uint8
 	ULCount        uint32
 	DLCount        uint32
 	SecurityActive bool

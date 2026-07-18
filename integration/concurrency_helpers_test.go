@@ -172,11 +172,11 @@ func ueAmfNgapID(t *testing.T, gnbID, ueID string) int64 {
 	}
 
 	var st struct {
-		AmfUeNgapID int64 `json:"amf_ue_ngap_id"`
+		AMFUENGAPID int64 `json:"amf_ue_ngap_id"`
 	}
 	if err := json.Unmarshal(body, &st); err != nil {
 		t.Fatalf("decode ue state: %v\n  body: %s", err, body)
 	}
 
-	return st.AmfUeNgapID
+	return st.AMFUENGAPID
 }

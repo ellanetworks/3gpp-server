@@ -50,8 +50,8 @@ type SendGnBNGAPRequest struct {
 
 	ResetUEIDs []string `json:"reset_ue_ids,omitempty"`
 
-	AmfUeNgapID *int64               `json:"amf_ue_ngap_id,omitempty"`
-	RanUeNgapID *int64               `json:"ran_ue_ngap_id,omitempty"`
+	AMFUENGAPID *int64               `json:"amf_ue_ngap_id,omitempty"`
+	RANUENGAPID *int64               `json:"ran_ue_ngap_id,omitempty"`
 	PDUSessions []HandoverPDUSession `json:"pdu_sessions,omitempty"`
 
 	UESecurityCapabilities *UESecurityCapabilitiesInput `json:"ue_security_capabilities,omitempty"`
@@ -63,15 +63,15 @@ type SendGnBNGAPRequest struct {
 
 type MigrateUERequest struct {
 	TargetGnbID string `json:"target_gnb_id"`
-	RanUeNgapID *int64 `json:"ran_ue_ngap_id,omitempty"`
-	AmfUeNgapID *int64 `json:"amf_ue_ngap_id,omitempty"`
+	RANUENGAPID *int64 `json:"ran_ue_ngap_id,omitempty"`
+	AMFUENGAPID *int64 `json:"amf_ue_ngap_id,omitempty"`
 }
 
 type MigrateUEResponse struct {
 	UEID        string `json:"ue_id"`
 	GnBID       string `json:"gnb_id"`
-	RanUeNgapID int64  `json:"ran_ue_ngap_id"`
-	AmfUeNgapID int64  `json:"amf_ue_ngap_id"`
+	RANUENGAPID int64  `json:"ran_ue_ngap_id"`
+	AMFUENGAPID int64  `json:"amf_ue_ngap_id"`
 }
 
 type HandoverPDUSession struct {
@@ -126,7 +126,7 @@ type CreateUEResponse struct {
 	UEID        string `json:"ue_id"`
 	SUPI        string `json:"supi"`
 	SUCI        string `json:"suci"`
-	RanUeNgapID int64  `json:"ran_ue_ngap_id"`
+	RANUENGAPID int64  `json:"ran_ue_ngap_id"`
 }
 
 type UEStateResponse struct {
@@ -135,8 +135,8 @@ type UEStateResponse struct {
 	SUCI             string `json:"suci"`
 	MCC              string `json:"mcc"`
 	MNC              string `json:"mnc"`
-	RanUeNgapID      int64  `json:"ran_ue_ngap_id"`
-	AmfUeNgapID      int64  `json:"amf_ue_ngap_id"`
+	RANUENGAPID      int64  `json:"ran_ue_ngap_id"`
+	AMFUENGAPID      int64  `json:"amf_ue_ngap_id"`
 	K                string `json:"k"`
 	OPc              string `json:"opc"`
 	Amf              string `json:"amf"`
@@ -154,7 +154,7 @@ type PatchUERequest struct {
 	OPc         *string `json:"opc,omitempty"`
 	Amf         *string `json:"amf,omitempty"`
 	Sqn         *string `json:"sqn,omitempty"`
-	AmfUeNgapID *int64  `json:"amf_ue_ngap_id,omitempty"`
+	AMFUENGAPID *int64  `json:"amf_ue_ngap_id,omitempty"`
 	DNN         *string `json:"dnn,omitempty"`
 	SST         *int32  `json:"sst,omitempty"`
 	SD          *string `json:"sd,omitempty"`

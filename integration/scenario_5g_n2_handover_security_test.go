@@ -55,14 +55,14 @@ func ueNGAPIDs(t *testing.T, gnbID, ueID string) (amf, ran int64) {
 	}
 
 	var st struct {
-		AmfUeNgapID int64 `json:"amf_ue_ngap_id"`
-		RanUeNgapID int64 `json:"ran_ue_ngap_id"`
+		AMFUENGAPID int64 `json:"amf_ue_ngap_id"`
+		RANUENGAPID int64 `json:"ran_ue_ngap_id"`
 	}
 	if err := json.Unmarshal(body, &st); err != nil {
 		t.Fatalf("decode ue state: %v\n  body: %s", err, body)
 	}
 
-	return st.AmfUeNgapID, st.RanUeNgapID
+	return st.AMFUENGAPID, st.RANUENGAPID
 }
 
 func assertUEStillConnected(t *testing.T, gnbID, ueID string) {

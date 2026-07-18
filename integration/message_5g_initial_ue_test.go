@@ -495,7 +495,7 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 			wantNGAPMsgType: ngapDownlinkNASTransport,
 			wantNASMsgType:  nasStatus5GMM,
 			wantNASFields: map[string]fieldCheck{
-				"cause_5gmm": {wantExact: strconv.Itoa(cause5GMMMessageTypeNonExistent)},
+				"5gmm_cause": {wantExact: strconv.Itoa(cause5GMMMessageTypeNonExistent)},
 			},
 		},
 		{

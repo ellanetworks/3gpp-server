@@ -31,15 +31,13 @@ func captureTunnel(gnb *store.GNBContext, ue *store.UEContext, pduSessionID int6
 		gnbN3IsV6 = a.Is6()
 	}
 
-	for _, ie := range ngapResp.IEs {
-		for _, item := range ie.PDUSessionSetupItems {
-			if item.PDUSessionID == pduSessionID {
-				info.ULTeid = item.ULTeid
-				if gnbN3IsV6 {
-					info.UPFIP = firstNonEmpty(item.UPFN3IPv6, item.UPFN3IP)
-				} else {
-					info.UPFIP = firstNonEmpty(item.UPFN3IP, item.UPFN3IPv6)
-				}
+	for _, item := range ngapResp.PDUSessionSetupItems {
+		if item.PDUSessionID == pduSessionID {
+			info.ULTeid = item.ULTeid
+			if gnbN3IsV6 {
+				info.UPFIP = firstNonEmpty(item.UPFN3IPv6, item.UPFN3IP)
+			} else {
+				info.UPFIP = firstNonEmpty(item.UPFN3IP, item.UPFN3IPv6)
 			}
 		}
 	}
@@ -115,8 +113,8 @@ func handleGnBPDUSessionEstablishmentRequest(ctx context.Context, gnb *store.GNB
 	}
 
 	encoded, err := ngap.BuildUplinkNASTransport(ngap.UplinkNASTransportParams{
-		AmfUeNgapID: ue.AmfUeNgapID,
-		RanUeNgapID: ue.RanUeNgapID,
+		AMFUENGAPID: ue.AMFUENGAPID,
+		RANUENGAPID: ue.RANUENGAPID,
 		NASPDU:      securedPDU,
 		MCC:         gnb.MCC,
 		MNC:         gnb.MNC,
@@ -142,23 +140,18 @@ func handleGnBPDUSessionEstablishmentRequest(ctx context.Context, gnb *store.GNB
 
 	var macVerified *bool
 
-	for _, ie := range ngapResp.IEs {
-		if ie.NasPDU != nil {
-			nasPDUBytes, err := hex.DecodeString(*ie.NasPDU)
-			if err != nil {
-				continue
-			}
-
+	if ngapResp.NasPDU != nil {
+		if nasPDUBytes, err := hex.DecodeString(*ngapResp.NasPDU); err == nil {
 			nasResp, macVerified = decodeGNBDownlinkNAS(ue, nasPDUBytes)
 		}
 	}
 
 	if ngapResp.MessageType == "PDUSessionResourceSetupRequest" {
-		dlTeid := uint32(ue.RanUeNgapID)<<8 | uint32(pduSessionID)
+		dlTeid := uint32(ue.RANUENGAPID)<<8 | uint32(pduSessionID)
 
 		pduSetupResp, err := ngap.BuildPDUSessionResourceSetupResponse(ngap.PDUSessionResourceSetupResponseParams{
-			AmfUeNgapID:  ue.AmfUeNgapID,
-			RanUeNgapID:  ue.RanUeNgapID,
+			AMFUENGAPID:  ue.AMFUENGAPID,
+			RANUENGAPID:  ue.RANUENGAPID,
 			PDUSessionID: int64(pduSessionID),
 			DLTeid:       dlTeid,
 			DLIP:         gnb.N3Addr,
@@ -295,8 +288,8 @@ func handleGnBPDUSessionReleaseComplete(gnb *store.GNBContext, ue *store.UEConte
 	}
 
 	encoded, err := ngap.BuildUplinkNASTransport(ngap.UplinkNASTransportParams{
-		AmfUeNgapID: ue.AmfUeNgapID,
-		RanUeNgapID: ue.RanUeNgapID,
+		AMFUENGAPID: ue.AMFUENGAPID,
+		RANUENGAPID: ue.RANUENGAPID,
 		NASPDU:      secured,
 		MCC:         gnb.MCC,
 		MNC:         gnb.MNC,
@@ -347,8 +340,8 @@ func handleGnBPDUSessionModificationComplete(gnb *store.GNBContext, ue *store.UE
 	}
 
 	encoded, err := ngap.BuildUplinkNASTransport(ngap.UplinkNASTransportParams{
-		AmfUeNgapID: ue.AmfUeNgapID,
-		RanUeNgapID: ue.RanUeNgapID,
+		AMFUENGAPID: ue.AMFUENGAPID,
+		RANUENGAPID: ue.RANUENGAPID,
 		NASPDU:      secured,
 		MCC:         gnb.MCC,
 		MNC:         gnb.MNC,
@@ -368,8 +361,8 @@ func handleGnBPDUSessionModificationComplete(gnb *store.GNBContext, ue *store.UE
 }
 
 func cause5GSMFor(req *SendNGAPRequest) uint8 {
-	if req != nil && req.Cause5GSMOverride != nil {
-		return *req.Cause5GSMOverride
+	if req != nil && req.FiveGSMCauseOverride != nil {
+		return *req.FiveGSMCauseOverride
 	}
 
 	return nasMessage.Cause5GSMProtocolErrorUnspecified
@@ -389,8 +382,8 @@ func sendInner5GSM(gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAP
 	}
 
 	encoded, err := ngap.BuildUplinkNASTransport(ngap.UplinkNASTransportParams{
-		AmfUeNgapID: ue.AmfUeNgapID,
-		RanUeNgapID: ue.RanUeNgapID,
+		AMFUENGAPID: ue.AMFUENGAPID,
+		RANUENGAPID: ue.RANUENGAPID,
 		NASPDU:      secured,
 		MCC:         gnb.MCC,
 		MNC:         gnb.MNC,

@@ -33,7 +33,7 @@ func Test5GPDUSessionEstablishment_UnknownDNN(t *testing.T) {
 		t.Errorf("nas.inner_nas_message_type = %q, want pdu_session_establishment_reject\n  body: %s", got, body)
 	}
 
-	assertNASCause(t, body, "nas.cause_5gsm", cause5GSMMissingOrUnknownDNNInASlice)
+	assertNASCause(t, body, "nas.5gsm_cause", cause5GSMMissingOrUnknownDNNInASlice)
 }
 
 func mustCreateUEWithDNN(t *testing.T, gnbID, dnn string) string {

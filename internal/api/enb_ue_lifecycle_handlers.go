@@ -60,7 +60,6 @@ func (h *Handler) PatchENBUE(w http.ResponseWriter, r *http.Request) {
 
 	if req.MMEUES1APID != nil {
 		ue.MMEUES1APID = *req.MMEUES1APID
-		ue.MMEIDKnown = true
 	}
 
 	w.WriteHeader(http.StatusNoContent)

@@ -22,28 +22,17 @@ func pathSwitchRequest(t *testing.T, gnbID, body string) []byte {
 	return resp
 }
 
-func ngapIEByID(body []byte, id int64) map[string]any {
+func ngapField(body []byte, key string) any {
 	var top struct {
-		NGAP struct {
-			IEs []map[string]any `json:"ies"`
-		} `json:"ngap"`
+		NGAP map[string]any `json:"ngap"`
 	}
 
 	if err := json.Unmarshal(body, &top); err != nil {
 		return nil
 	}
 
-	for _, ie := range top.NGAP.IEs {
-		if v, ok := ie["id"].(float64); ok && int64(v) == id {
-			return ie
-		}
-	}
-
-	return nil
+	return top.NGAP[key]
 }
-
-// TS 38.413 §9.4.7.
-const ngapProtocolIEIDUESecurityCapabilities = 119
 
 func Test5GPathSwitchRequestSuccess(t *testing.T) {
 	sourceGNB := createGnBWithID(t, "0000c0", "ps-src")
@@ -71,8 +60,8 @@ func Test5GPathSwitchRequestSuccess(t *testing.T) {
 		t.Errorf("acknowledge AMF UE NGAP ID = %d (present=%v), want %d (TS 38.413 §8.4.4.2)\n  body: %s", gotAmf, ok, amf, resp)
 	}
 
-	if got := jsonGet(resp, "ngap.ies"); got == "" {
-		t.Errorf("acknowledge carries no IEs\n  body: %s", resp)
+	if ngapField(resp, "pdu_session_ids") == nil {
+		t.Errorf("acknowledge does not report the switched PDU session (TS 38.413 §9.2.3.9)\n  body: %s", resp)
 	}
 }
 
@@ -124,14 +113,9 @@ func Test5GPathSwitchRequestSecurityCapabilityMismatchAcknowledged(t *testing.T)
 		t.Fatalf("path switch with mismatched UE security capabilities: message_type = %q, want PathSwitchRequestAcknowledge (the AMF must not reject; TS 33.501 §6.7.3.1)\n  body: %s", got, resp)
 	}
 
-	ie := ngapIEByID(resp, ngapProtocolIEIDUESecurityCapabilities)
-	if ie == nil {
-		t.Fatalf("acknowledge omits the UE Security Capabilities IE; on a mismatch the AMF must return its locally stored capabilities (TS 33.501 §6.7.3.1)\n  body: %s", resp)
-	}
-
-	caps, _ := ie["ue_security_capabilities"].(map[string]any)
+	caps, _ := ngapField(resp, "ue_security_capabilities").(map[string]any)
 	if caps == nil {
-		t.Fatalf("UE Security Capabilities IE carries no decoded value\n  body: %s", resp)
+		t.Fatalf("acknowledge omits the UE Security Capabilities IE; on a mismatch the AMF must return its locally stored capabilities (TS 33.501 §6.7.3.1)\n  body: %s", resp)
 	}
 
 	// A UE always supports a non-null integrity algorithm (TS 33.501 §5.11.2), so

@@ -47,7 +47,7 @@ func NewGNBContext(id, mcc, mnc, tac, gnbID, name string, sst int32, sd string, 
 	}
 }
 
-func (g *GNBContext) AllocateRanUeNgapID() int64 {
+func (g *GNBContext) AllocateRANUENGAPID() int64 {
 	return g.nextRanUeID.Add(1)
 }
 
@@ -88,11 +88,11 @@ func (g *GNBContext) MigrateUE(target *GNBContext, ue *UEContext, ranUeNgapID, a
 	g.mu.Unlock()
 
 	if ranUeNgapID != nil {
-		ue.RanUeNgapID = *ranUeNgapID
+		ue.RANUENGAPID = *ranUeNgapID
 	}
 
 	if amfUeNgapID != nil {
-		ue.AmfUeNgapID = *amfUeNgapID
+		ue.AMFUENGAPID = *amfUeNgapID
 	}
 
 	target.CreateUE(ue)

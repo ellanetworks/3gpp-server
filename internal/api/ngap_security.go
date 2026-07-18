@@ -16,7 +16,7 @@ import (
 // encodeGNBUplinkNAS wraps a plain 5GS NAS message with the UE's security context, advancing the
 // UL NAS COUNT and applying any negative-test overrides when req is non-nil (TS 24.501 §4.4).
 func encodeGNBUplinkNAS(ue *store.UEContext, plain []byte, sht uint8, req *SendNGAPRequest) ([]byte, error) {
-	if !ue.SecurityContextAvailable && len(ue.Kamf) == 0 {
+	if !ue.SecurityActive && len(ue.Kamf) == 0 {
 		return nil, fmt.Errorf("no security context available")
 	}
 
@@ -76,7 +76,7 @@ func decodeGNBDownlinkNAS(ue *store.UEContext, message []byte) (*nasCodec.NASRes
 		}
 	}
 
-	if !ue.SecurityContextAvailable {
+	if !ue.SecurityActive {
 		inner, perr := nasCodec.PeekProtectedPayload(message)
 		if perr != nil {
 			return nil, nil
@@ -99,12 +99,12 @@ func decodeGNBDownlinkNAS(ue *store.UEContext, message []byte) (*nasCodec.NASRes
 }
 
 func establishGNBSecurityContext(ue *store.UEContext, smc *nasCodec.NASResponse) {
-	if smc == nil || smc.SelectedCipheringAlg == nil || smc.SelectedIntegrityAlg == nil {
+	if smc == nil || smc.SelectedCipheringAlgorithm == nil || smc.SelectedIntegrityAlgorithm == nil {
 		return
 	}
 
-	ue.CipheringAlg = uint8(*smc.SelectedCipheringAlg)
-	ue.IntegrityAlg = uint8(*smc.SelectedIntegrityAlg)
+	ue.CipheringAlg = uint8(*smc.SelectedCipheringAlgorithm)
+	ue.IntegrityAlg = uint8(*smc.SelectedIntegrityAlgorithm)
 
 	knasEnc, knasInt, err := crypto.Derive5GNASKeys(ue.Kamf, ue.CipheringAlg, ue.IntegrityAlg)
 	if err != nil {
@@ -114,7 +114,7 @@ func establishGNBSecurityContext(ue *store.UEContext, smc *nasCodec.NASResponse)
 	ue.KnasEnc = knasEnc
 	ue.KnasInt = knasInt
 	ue.DLCount = 0
-	ue.SecurityContextAvailable = true
+	ue.SecurityActive = true
 }
 
 func annotateGNBSecurityHeaderType(resp *nasCodec.NASResponse, sht uint8, message []byte) *nasCodec.NASResponse {

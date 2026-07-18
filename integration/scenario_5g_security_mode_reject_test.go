@@ -38,7 +38,7 @@ func securityModePending(t *testing.T) (string, string) {
 func Test5GSecurityModeReject(t *testing.T) {
 	gnbID, ueID := securityModePending(t)
 
-	body := fmt.Sprintf(`{"message_type":"security_mode_reject","cause_5gmm":%d}`, cause5GMMUESecurityCapabilitiesMismatch)
+	body := fmt.Sprintf(`{"message_type":"security_mode_reject","5gmm_cause":%d}`, cause5GMMUESecurityCapabilitiesMismatch)
 	status, resp := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap", body)
 	if status != 200 {
 		t.Fatalf("HTTP %d, want 200\n  body: %s", status, resp)
@@ -59,7 +59,7 @@ func Test5GSecurityModeReject_NGAPIDFuzz(t *testing.T) {
 	gnbID, ueID := securityModePending(t)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
-		`{"message_type":"security_mode_reject","cause_5gmm":23,"amf_ue_ngap_id_override":99999}`)
+		`{"message_type":"security_mode_reject","5gmm_cause":23,"amf_ue_ngap_id_override":99999}`)
 	if status == 504 {
 		t.Fatalf("security mode reject hung (HTTP 504)\n  body: %s", body)
 	}

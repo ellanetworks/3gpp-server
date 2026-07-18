@@ -13,10 +13,8 @@ import (
 func ngapErrorIndicationIDs(body []byte) (amf, ran *int64) {
 	var top struct {
 		NGAP struct {
-			IEs []struct {
-				AmfUeNgapID *int64 `json:"amf_ue_ngap_id"`
-				RanUeNgapID *int64 `json:"ran_ue_ngap_id"`
-			} `json:"ies"`
+			AMFUENGAPID *int64 `json:"amf_ue_ngap_id"`
+			RANUENGAPID *int64 `json:"ran_ue_ngap_id"`
 		} `json:"ngap"`
 	}
 
@@ -24,17 +22,7 @@ func ngapErrorIndicationIDs(body []byte) (amf, ran *int64) {
 		return nil, nil
 	}
 
-	for _, ie := range top.NGAP.IEs {
-		if ie.AmfUeNgapID != nil {
-			amf = ie.AmfUeNgapID
-		}
-
-		if ie.RanUeNgapID != nil {
-			ran = ie.RanUeNgapID
-		}
-	}
-
-	return amf, ran
+	return top.NGAP.AMFUENGAPID, top.NGAP.RANUENGAPID
 }
 
 type criticalityDiagnosticsJSON struct {
@@ -46,9 +34,7 @@ type criticalityDiagnosticsJSON struct {
 func ngapCriticalityDiagnostics(body []byte) *criticalityDiagnosticsJSON {
 	var top struct {
 		NGAP struct {
-			IEs []struct {
-				CriticalityDiagnostics *criticalityDiagnosticsJSON `json:"criticality_diagnostics"`
-			} `json:"ies"`
+			CriticalityDiagnostics *criticalityDiagnosticsJSON `json:"criticality_diagnostics"`
 		} `json:"ngap"`
 	}
 
@@ -56,13 +42,7 @@ func ngapCriticalityDiagnostics(body []byte) *criticalityDiagnosticsJSON {
 		return nil
 	}
 
-	for _, ie := range top.NGAP.IEs {
-		if ie.CriticalityDiagnostics != nil {
-			return ie.CriticalityDiagnostics
-		}
-	}
-
-	return nil
+	return top.NGAP.CriticalityDiagnostics
 }
 
 // Which of the two TS 38.413 §10.6 causes applies depends on the mutated ID, so

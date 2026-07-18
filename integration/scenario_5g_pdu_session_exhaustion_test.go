@@ -42,7 +42,7 @@ func Test5GPDUSessionEstablishment_IPPoolExhausted(t *testing.T) {
 		t.Errorf("nas.inner_nas_message_type = %q, want pdu_session_establishment_reject\n  body: %s", got, body)
 	}
 
-	assertNASCause(t, body, "nas.cause_5gsm", cause5GSMInsufficientResources)
+	assertNASCause(t, body, "nas.5gsm_cause", cause5GSMInsufficientResources)
 
 	// The Establishment Reject is the complete response, so any follow-up NAS is a violation.
 	if st, extra := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ue3+"/await",

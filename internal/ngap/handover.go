@@ -22,8 +22,8 @@ type HandoverAdmittedSession struct {
 }
 
 type HandoverRequiredParams struct {
-	AmfUeNgapID       int64
-	RanUeNgapID       int64
+	AMFUENGAPID       int64
+	RANUENGAPID       int64
 	TargetGnbID       string
 	MCC               string
 	MNC               string
@@ -56,10 +56,10 @@ func BuildHandoverRequired(p HandoverRequiredParams) ([]byte, error) {
 	}
 
 	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentReject,
-		ngapType.HandoverRequiredIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: p.AmfUeNgapID}
+		ngapType.HandoverRequiredIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: p.AMFUENGAPID}
 
 	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentReject,
-		ngapType.HandoverRequiredIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: p.RanUeNgapID}
+		ngapType.HandoverRequiredIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: p.RANUENGAPID}
 
 	add(ngapType.ProtocolIEIDHandoverType, ngapType.CriticalityPresentReject,
 		ngapType.HandoverRequiredIEsPresentHandoverType).HandoverType = &ngapType.HandoverType{Value: ngapType.HandoverTypePresentIntra5gs}
@@ -123,8 +123,8 @@ func BuildHandoverRequired(p HandoverRequiredParams) ([]byte, error) {
 }
 
 type HandoverRequestAcknowledgeParams struct {
-	AmfUeNgapID int64
-	RanUeNgapID int64
+	AMFUENGAPID int64
+	RANUENGAPID int64
 	Sessions    []HandoverAdmittedSession
 	Failed      []int64
 }
@@ -152,10 +152,10 @@ func BuildHandoverRequestAcknowledge(p HandoverRequestAcknowledgeParams) ([]byte
 	}
 
 	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentIgnore,
-		ngapType.HandoverRequestAcknowledgeIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: p.AmfUeNgapID}
+		ngapType.HandoverRequestAcknowledgeIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: p.AMFUENGAPID}
 
 	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentIgnore,
-		ngapType.HandoverRequestAcknowledgeIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: p.RanUeNgapID}
+		ngapType.HandoverRequestAcknowledgeIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: p.RANUENGAPID}
 
 	admitted := &ngapType.PDUSessionResourceAdmittedList{}
 	for _, s := range p.Sessions {
@@ -424,8 +424,8 @@ func BuildUplinkRANStatusTransfer(amfUeNgapID, ranUeNgapID int64, drbs []DRBStat
 }
 
 type HandoverNotifyParams struct {
-	AmfUeNgapID int64
-	RanUeNgapID int64
+	AMFUENGAPID int64
+	RANUENGAPID int64
 	MCC         string
 	MNC         string
 	TAC         string
@@ -455,10 +455,10 @@ func BuildHandoverNotify(p HandoverNotifyParams) ([]byte, error) {
 	}
 
 	add(ngapType.ProtocolIEIDAMFUENGAPID, ngapType.CriticalityPresentReject,
-		ngapType.HandoverNotifyIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: p.AmfUeNgapID}
+		ngapType.HandoverNotifyIEsPresentAMFUENGAPID).AMFUENGAPID = &ngapType.AMFUENGAPID{Value: p.AMFUENGAPID}
 
 	add(ngapType.ProtocolIEIDRANUENGAPID, ngapType.CriticalityPresentReject,
-		ngapType.HandoverNotifyIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: p.RanUeNgapID}
+		ngapType.HandoverNotifyIEsPresentRANUENGAPID).RANUENGAPID = &ngapType.RANUENGAPID{Value: p.RANUENGAPID}
 
 	plmnID, err := encodePLMN(p.MCC, p.MNC)
 	if err != nil {

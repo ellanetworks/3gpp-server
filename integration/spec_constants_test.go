@@ -180,31 +180,17 @@ func ngapCause(body []byte, responseKey string) (string, int) {
 		return "", 0
 	}
 
-	ies, ok := resp["ies"].([]any)
+	cause, ok := resp["cause"].(map[string]any)
 	if !ok {
 		return "", 0
 	}
 
-	for _, ie := range ies {
-		iem, ok := ie.(map[string]any)
-		if !ok {
-			continue
-		}
-
-		cause, ok := iem["cause"].(map[string]any)
-		if !ok {
-			continue
-		}
-
-		group, _ := cause["group"].(string)
-		if v, ok := cause["value"].(float64); ok {
-			return group, int(v)
-		}
-
-		return group, 0
+	group, _ := cause["group"].(string)
+	if v, ok := cause["value"].(float64); ok {
+		return group, int(v)
 	}
 
-	return "", 0
+	return group, 0
 }
 
 func assertNGAPCauseMisc(t *testing.T, body []byte, responseKey string, want int) {

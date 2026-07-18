@@ -52,13 +52,13 @@ func cipherFor(eea uint8) (common.Cipher, error) {
 }
 
 // Protect wraps a plain NAS message in the EPS security wrapper (TS 24.301 §9.1.1).
-func Protect(plain []byte, sht SecurityHeaderType, count uint32, eia, eea uint8, knasInt, knasEnc [16]byte) ([]byte, error) {
-	integ, err := integrityFor(eia)
+func Protect(plain []byte, sht SecurityHeaderType, count uint32, cipheringAlg, integrityAlg uint8, knasEnc, knasInt [16]byte) ([]byte, error) {
+	integ, err := integrityFor(integrityAlg)
 	if err != nil {
 		return nil, err
 	}
 
-	ciph, err := cipherFor(eea)
+	ciph, err := cipherFor(cipheringAlg)
 	if err != nil {
 		return nil, err
 	}
@@ -67,13 +67,13 @@ func Protect(plain []byte, sht SecurityHeaderType, count uint32, eia, eea uint8,
 }
 
 // Unprotect verifies the NAS-MAC of a downlink message and returns the recovered plain message (TS 24.301 §9.1.1).
-func Unprotect(b []byte, count uint32, eia, eea uint8, knasInt, knasEnc [16]byte) ([]byte, error) {
-	integ, err := integrityFor(eia)
+func Unprotect(b []byte, count uint32, cipheringAlg, integrityAlg uint8, knasEnc, knasInt [16]byte) ([]byte, error) {
+	integ, err := integrityFor(integrityAlg)
 	if err != nil {
 		return nil, err
 	}
 
-	ciph, err := cipherFor(eea)
+	ciph, err := cipherFor(cipheringAlg)
 	if err != nil {
 		return nil, err
 	}

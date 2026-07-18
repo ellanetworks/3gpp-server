@@ -119,7 +119,7 @@ func Test5GPDUSessionModificationCommandReject_PTIMismatch(t *testing.T) {
 		t.Errorf("nas.inner_nas_message_type = %q, want 5gsm_status (TS 24.501 §7.3.1 a)\n  body: %s", got, resp)
 	}
 
-	assertNASCause(t, resp, "nas.cause_5gsm", cause5GSMPTIMismatch)
+	assertNASCause(t, resp, "nas.5gsm_cause", cause5GSMPTIMismatch)
 }
 
 // TS 24.501 §7.4 leaves the reaction to an unsolicited 5GSM STATUS to the

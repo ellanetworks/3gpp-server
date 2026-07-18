@@ -70,58 +70,60 @@ func Decode(plain []byte) (*NASResponse, error) {
 		return nil, fmt.Errorf("naseps: peek message type: %w", err)
 	}
 
+	resp.MessageType = emmMessageTypeName(mt)
+
 	switch mt {
 	case eps.MsgAuthenticationRequest:
-		resp.MessageType = "authentication_request"
 		return resp, decodeAuthenticationRequest(plain, resp)
-	case eps.MsgAuthenticationReject:
-		resp.MessageType = "authentication_reject"
-		return resp, nil
 	case eps.MsgSecurityModeCommand:
-		resp.MessageType = "security_mode_command"
 		return resp, decodeSecurityModeCommand(plain, resp)
 	case eps.MsgAttachAccept:
-		resp.MessageType = "attach_accept"
 		return resp, decodeAttachAccept(plain, resp)
 	case eps.MsgAttachReject:
-		resp.MessageType = "attach_reject"
 		return resp, decodeAttachReject(plain, resp)
 	case eps.MsgIdentityRequest:
-		resp.MessageType = "identity_request"
 		return resp, decodeIdentityRequest(plain, resp)
 	case eps.MsgTrackingAreaUpdateAccept:
-		resp.MessageType = "tracking_area_update_accept"
 		return resp, decodeTAUAccept(plain, resp)
+	case eps.MsgTrackingAreaUpdateReject, eps.MsgServiceReject:
+		// Both are header(2) + EMM cause(1) (TS 24.301 §8.2.27, §8.2.24).
+		if len(plain) >= 3 {
+			c := int(plain[2])
+			resp.EMMCause = &c
+		}
+	}
+
+	return resp, nil
+}
+
+func emmMessageTypeName(t eps.MessageType) string {
+	switch t {
+	case eps.MsgAuthenticationRequest:
+		return "authentication_request"
+	case eps.MsgAuthenticationReject:
+		return "authentication_reject"
+	case eps.MsgSecurityModeCommand:
+		return "security_mode_command"
+	case eps.MsgAttachAccept:
+		return "attach_accept"
+	case eps.MsgAttachReject:
+		return "attach_reject"
+	case eps.MsgIdentityRequest:
+		return "identity_request"
+	case eps.MsgTrackingAreaUpdateAccept:
+		return "tracking_area_update_accept"
 	case eps.MsgTrackingAreaUpdateReject:
-		resp.MessageType = "tracking_area_update_reject"
-		// TAU REJECT is header(2) + EMM cause(1) (TS 24.301 §8.2.27).
-		if len(plain) >= 3 {
-			c := int(plain[2])
-			resp.EMMCause = &c
-		}
-
-		return resp, nil
+		return "tracking_area_update_reject"
 	case eps.MsgServiceReject:
-		resp.MessageType = "service_reject"
-		// SERVICE REJECT is header(2) + EMM cause(1) (TS 24.301 §8.2.24).
-		if len(plain) >= 3 {
-			c := int(plain[2])
-			resp.EMMCause = &c
-		}
-
-		return resp, nil
+		return "service_reject"
 	case eps.MsgEMMStatus:
-		resp.MessageType = "emm_status"
-		return resp, nil
+		return "emm_status"
 	case eps.MsgDetachRequest:
-		resp.MessageType = "detach_request"
-		return resp, nil
+		return "detach_request"
 	case eps.MsgDetachAccept:
-		resp.MessageType = "detach_accept"
-		return resp, nil
+		return "detach_accept"
 	default:
-		resp.MessageType = fmt.Sprintf("emm_message_%#x", uint8(mt))
-		return resp, nil
+		return fmt.Sprintf("emm_message_%#x", uint8(t))
 	}
 }
 
@@ -134,7 +136,7 @@ func decodeAuthenticationRequest(b []byte, resp *NASResponse) error {
 	resp.RAND = hex.EncodeToString(m.RAND[:])
 	resp.AUTN = hex.EncodeToString(m.AUTN)
 	ksi := int(m.NASKeySetIdentifier)
-	resp.KSI = &ksi
+	resp.NASKeySetIdentifier = &ksi
 
 	return nil
 }
@@ -149,11 +151,11 @@ func decodeSecurityModeCommand(b []byte, resp *NASResponse) error {
 	intg := int(m.IntegrityAlgorithm)
 	imeisv := m.IMEISVRequested
 	ksi := int(m.NASKeySetIdentifier)
-	resp.CipheringAlgorithm = &ciph
-	resp.IntegrityAlgorithm = &intg
-	resp.KSI = &ksi
+	resp.SelectedCipheringAlgorithm = &ciph
+	resp.SelectedIntegrityAlgorithm = &intg
+	resp.NASKeySetIdentifier = &ksi
 	resp.ReplayedUESecurityCapabilities = hex.EncodeToString(m.ReplayedUESecurityCapabilities)
-	resp.IMEISVRequested = &imeisv
+	resp.IMEISVRequested = imeisv
 
 	return nil
 }

@@ -30,17 +30,15 @@ func formatConnections(conns []ngapConnection) string {
 	return "[" + strings.Join(parts, " ") + "]"
 }
 
-// decodeNGResetAcknowledge flattens each UE-associated Logical NG-connection Item
-// into its own IE, so IE order is list order.
 func ngapResetConnections(t *testing.T, body []byte) []ngapConnection {
 	t.Helper()
 
 	var top struct {
 		NGAP struct {
-			IEs []struct {
-				AmfUeNgapID *int64 `json:"amf_ue_ngap_id"`
-				RanUeNgapID *int64 `json:"ran_ue_ngap_id"`
-			} `json:"ies"`
+			ResetConnections []struct {
+				AMFUENGAPID *int64 `json:"amf_ue_ngap_id"`
+				RANUENGAPID *int64 `json:"ran_ue_ngap_id"`
+			} `json:"reset_connections"`
 		} `json:"ngap"`
 	}
 
@@ -50,17 +48,17 @@ func ngapResetConnections(t *testing.T, body []byte) []ngapConnection {
 
 	var conns []ngapConnection
 
-	for i, ie := range top.NGAP.IEs {
-		if ie.AmfUeNgapID == nil && ie.RanUeNgapID == nil {
+	for i, c := range top.NGAP.ResetConnections {
+		if c.AMFUENGAPID == nil && c.RANUENGAPID == nil {
 			continue
 		}
 
-		if ie.AmfUeNgapID == nil || ie.RanUeNgapID == nil {
+		if c.AMFUENGAPID == nil || c.RANUENGAPID == nil {
 			t.Errorf("NG Reset Acknowledge connection %d omits an AP ID that the NG RESET carried; both must be echoed (TS 38.413 §8.7.4.2.2)\n  body: %s", i, body)
 			continue
 		}
 
-		conns = append(conns, ngapConnection{amf: *ie.AmfUeNgapID, ran: *ie.RanUeNgapID})
+		conns = append(conns, ngapConnection{amf: *c.AMFUENGAPID, ran: *c.RANUENGAPID})
 	}
 
 	return conns

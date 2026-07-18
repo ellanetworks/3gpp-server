@@ -5,36 +5,36 @@ package naseps
 
 type NASResponse struct {
 	MessageType        string `json:"message_type"`
-	RawHex             string `json:"raw_hex"`
 	SecurityHeaderType string `json:"security_header_type,omitempty"`
 
-	RAND string `json:"rand,omitempty"`
-	AUTN string `json:"autn,omitempty"`
-	KSI  *int   `json:"nas_key_set_identifier,omitempty"`
+	RAND                string `json:"rand,omitempty"`
+	AUTN                string `json:"autn,omitempty"`
+	NASKeySetIdentifier *int   `json:"nas_key_set_identifier,omitempty"`
 
-	CipheringAlgorithm             *int   `json:"ciphering_algorithm,omitempty"`
-	IntegrityAlgorithm             *int   `json:"integrity_algorithm,omitempty"`
+	SelectedCipheringAlgorithm     *int   `json:"selected_ciphering_algorithm,omitempty"`
+	SelectedIntegrityAlgorithm     *int   `json:"selected_integrity_algorithm,omitempty"`
 	ReplayedUESecurityCapabilities string `json:"replayed_ue_security_capabilities,omitempty"`
-	IMEISVRequested                *bool  `json:"imeisv_requested,omitempty"`
+	IMEISVRequested                bool   `json:"imeisv_requested,omitempty"`
 
-	EPSAttachResult   *int      `json:"eps_attach_result,omitempty"`
-	GUTI              *GUTIJSON `json:"guti,omitempty"`
-	TAIList           string    `json:"tai_list,omitempty"`
-	EPSBearerIdentity *int      `json:"eps_bearer_identity,omitempty"`
-	BearerPTI         *int      `json:"bearer_pti,omitempty"`
-	PDNAddress        string    `json:"pdn_address,omitempty"`
-	APN               string    `json:"apn,omitempty"`
-	BearerESMCause    *int      `json:"bearer_esm_cause,omitempty"`
+	GUTI    *GUTIJSON `json:"guti,omitempty"`
+	TAIList string    `json:"tai_list,omitempty"`
+
+	EPSAttachResult *int `json:"eps_attach_result,omitempty"`
+	EPSUpdateResult *int `json:"eps_update_result,omitempty"`
+
+	EPSBearerIdentity *int   `json:"eps_bearer_identity,omitempty"`
+	BearerPTI         *int   `json:"bearer_pti,omitempty"`
+	PDNAddress        string `json:"pdn_address,omitempty"`
+	APN               string `json:"apn,omitempty"`
+	APNAMBR           string `json:"apn_ambr,omitempty"`
+	BearerESMCause    *int   `json:"bearer_esm_cause,omitempty"`
 
 	EMMCause *int `json:"emm_cause,omitempty"`
-
 	ESMCause *int `json:"esm_cause,omitempty"`
 
 	IdentityType *int `json:"identity_type,omitempty"`
 
-	EPSUpdateResult *int `json:"eps_update_result,omitempty"`
-
-	APNAMBR string `json:"apn_ambr,omitempty"`
+	RawHex string `json:"raw_hex"`
 }
 
 type GUTIJSON struct {

@@ -42,7 +42,7 @@ var validNetworkReleaseCauses = map[string]bool{
 func assertValidReleaseCause(t *testing.T, body []byte) {
 	t.Helper()
 
-	got := jsonGet(body, "nas.cause_5gsm")
+	got := jsonGet(body, "nas.5gsm_cause")
 	if got == "" {
 		t.Errorf("network-requested release carries no 5GSM cause; the SMF shall set one (TS 24.501 §6.3.3)\n  body: %s", body)
 		return

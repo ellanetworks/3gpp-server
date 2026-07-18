@@ -103,14 +103,14 @@ func assertTypeAccept(t *testing.T, body []byte, wantSelType, wantCause int) {
 	}
 
 	if wantCause == 0 {
-		if got := jsonGet(body, "nas.cause_5gsm"); got != "" {
-			t.Errorf("nas.cause_5gsm = %q, want absent (full requested type granted)\n  body: %s", got, body)
+		if got := jsonGet(body, "nas.5gsm_cause"); got != "" {
+			t.Errorf("nas.5gsm_cause = %q, want absent (full requested type granted)\n  body: %s", got, body)
 		}
 
 		return
 	}
 
-	assertNASCause(t, body, "nas.cause_5gsm", wantCause)
+	assertNASCause(t, body, "nas.5gsm_cause", wantCause)
 }
 
 func assertTypeReject(t *testing.T, body []byte, wantCause int) {
@@ -124,7 +124,7 @@ func assertTypeReject(t *testing.T, body []byte, wantCause int) {
 		t.Fatalf("nas.inner_nas_message_type = %q, want pdu_session_establishment_reject\n  body: %s", got, body)
 	}
 
-	assertNASCause(t, body, "nas.cause_5gsm", wantCause)
+	assertNASCause(t, body, "nas.5gsm_cause", wantCause)
 }
 
 func mustCreateUETypeDNN(t *testing.T, gnbID, dnn string, pduType int) string {

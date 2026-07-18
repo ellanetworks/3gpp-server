@@ -170,19 +170,19 @@ func (h *Handler) SendGnBNGAP(w http.ResponseWriter, r *http.Request) {
 }
 
 func effectiveRanID(req *SendNGAPRequest, ue *store.UEContext) int64 {
-	if req != nil && req.RanUeNgapIDOverride != nil {
-		return *req.RanUeNgapIDOverride
+	if req != nil && req.RANUENGAPIDOverride != nil {
+		return *req.RANUENGAPIDOverride
 	}
 
-	return ue.RanUeNgapID
+	return ue.RANUENGAPID
 }
 
 func effectiveAmfID(req *SendNGAPRequest, ue *store.UEContext) int64 {
-	if req != nil && req.AmfUeNgapIDOverride != nil {
-		return *req.AmfUeNgapIDOverride
+	if req != nil && req.AMFUENGAPIDOverride != nil {
+		return *req.AMFUENGAPIDOverride
 	}
 
-	return ue.AmfUeNgapID
+	return ue.AMFUENGAPID
 }
 
 func firstNonEmpty(vals ...string) string {
@@ -206,8 +206,8 @@ func sendAndWait(ctx context.Context, ue *store.UEContext, t *transport.NGAPTran
 
 func sendUplinkAndWait(ctx context.Context, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest, nasPDU []byte, waitFor ...string) (*SendNGAPResponse, error) {
 	encoded, err := ngap.BuildUplinkNASTransport(ngap.UplinkNASTransportParams{
-		AmfUeNgapID: ue.AmfUeNgapID,
-		RanUeNgapID: ue.RanUeNgapID,
+		AMFUENGAPID: ue.AMFUENGAPID,
+		RANUENGAPID: ue.RANUENGAPID,
 		NASPDU:      nasPDU,
 		MCC:         gnb.MCC,
 		MNC:         gnb.MNC,
@@ -236,18 +236,13 @@ func sendRawAndWait(ctx context.Context, ue *store.UEContext, t *transport.NGAPT
 
 	var macVerified *bool
 
-	for _, ie := range ngapResp.IEs {
-		// An Error Indication echoes the AP IDs it was sent; it assigns none.
-		if ie.AmfUeNgapID != nil && ngapResp.MessageType != "ErrorIndication" {
-			ue.AmfUeNgapID = *ie.AmfUeNgapID
-		}
+	// An Error Indication echoes the AP IDs it was sent; it assigns none.
+	if ngapResp.AMFUENGAPID != nil && ngapResp.MessageType != "ErrorIndication" {
+		ue.AMFUENGAPID = *ngapResp.AMFUENGAPID
+	}
 
-		if ie.NasPDU != nil {
-			nasPDUBytes, err := hex.DecodeString(*ie.NasPDU)
-			if err != nil {
-				continue
-			}
-
+	if ngapResp.NasPDU != nil {
+		if nasPDUBytes, err := hex.DecodeString(*ngapResp.NasPDU); err == nil {
 			if len(ue.Kamf) > 0 {
 				nasResp, macVerified = decodeGNBDownlinkNAS(ue, nasPDUBytes)
 			} else {
@@ -257,11 +252,11 @@ func sendRawAndWait(ctx context.Context, ue *store.UEContext, t *transport.NGAPT
 			if nasResp != nil && nasResp.RAND != "" {
 				randBytes, _ := hex.DecodeString(nasResp.RAND)
 				autnBytes, _ := hex.DecodeString(nasResp.AUTN)
-				ue.LastRAND = randBytes
-				ue.LastAUTN = autnBytes
+				ue.RAND = randBytes
+				ue.AUTN = autnBytes
 			}
 
-			if nasResp != nil && nasResp.NgKSI != nil && nasResp.SelectedCipheringAlg != nil {
+			if nasResp != nil && nasResp.NgKSI != nil && nasResp.SelectedCipheringAlgorithm != nil {
 				ue.NgKsi = uint8(*nasResp.NgKSI)
 			}
 
@@ -272,19 +267,19 @@ func sendRawAndWait(ctx context.Context, ue *store.UEContext, t *transport.NGAPT
 	}
 
 	if ngapResp.MessageType == "InitialContextSetupRequest" {
-		if icsResp, berr := ngap.BuildInitialContextSetupResponse(ue.AmfUeNgapID, ue.RanUeNgapID); berr == nil {
+		if icsResp, berr := ngap.BuildInitialContextSetupResponse(ue.AMFUENGAPID, ue.RANUENGAPID); berr == nil {
 			_ = t.Send(icsResp, false)
 		}
 	}
 
 	if ngapResp.MessageType == "PDUSessionResourceReleaseCommand" {
-		if relResp, berr := ngap.BuildPDUSessionResourceReleaseResponse(ue.AmfUeNgapID, ue.RanUeNgapID); berr == nil {
+		if relResp, berr := ngap.BuildPDUSessionResourceReleaseResponse(ue.AMFUENGAPID, ue.RANUENGAPID); berr == nil {
 			_ = t.Send(relResp, false)
 		}
 	}
 
 	if ngapResp.MessageType == "UEContextReleaseCommand" {
-		if relComplete, berr := ngap.BuildUEContextReleaseComplete(ue.AmfUeNgapID, ue.RanUeNgapID); berr == nil {
+		if relComplete, berr := ngap.BuildUEContextReleaseComplete(ue.AMFUENGAPID, ue.RANUENGAPID); berr == nil {
 			_ = t.Send(relComplete, false)
 		}
 	}

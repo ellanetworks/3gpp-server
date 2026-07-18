@@ -71,5 +71,5 @@ func Test5GRegistrationReject_InvalidHomeNetworkKey(t *testing.T) {
 		t.Fatalf("nas.message_type = %q, want registration_reject\n  body: %s", got, body)
 	}
 
-	assertNASCause(t, body, "nas.cause_5gmm", cause5GMMUEIdentityCannotBeDerived)
+	assertNASCause(t, body, "nas.5gmm_cause", cause5GMMUEIdentityCannotBeDerived)
 }

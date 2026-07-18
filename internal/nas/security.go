@@ -15,8 +15,12 @@ import (
 
 var ErrMACMismatch = errors.New("nas: NAS-MAC mismatch")
 
+// SecurityHeaderType is the 5GS security header type (TS 24.501 §9.3); free5gc
+// models it as a bare uint8, so this is an alias rather than a defined type.
+type SecurityHeaderType = uint8
+
 // SecurityHeader returns the 5GS security header type of a NAS PDU (TS 24.501 §9.3).
-func SecurityHeader(message []byte) (uint8, error) {
+func SecurityHeader(message []byte) (SecurityHeaderType, error) {
 	if len(message) < 2 {
 		return 0, fmt.Errorf("nas: NAS PDU too short: %d bytes", len(message))
 	}
@@ -38,7 +42,7 @@ func PeekProtectedPayload(message []byte) ([]byte, error) {
 }
 
 // Protect wraps a plain 5GS NAS message in the security wrapper at the given COUNT (TS 24.501 §9.1.1).
-func Protect(plain []byte, sht uint8, count uint32, cipheringAlg, integrityAlg uint8, knasEnc, knasInt [16]byte) ([]byte, error) {
+func Protect(plain []byte, sht SecurityHeaderType, count uint32, cipheringAlg, integrityAlg uint8, knasEnc, knasInt [16]byte) ([]byte, error) {
 	m := gonas.NewMessage()
 	if err := m.PlainNasDecode(&plain); err != nil {
 		return nil, fmt.Errorf("nas: plain NAS decode: %w", err)
@@ -103,7 +107,7 @@ func Unprotect(message []byte, count uint32, cipheringAlg, integrityAlg uint8, k
 	return inner, nil
 }
 
-func ciphered(sht uint8) bool {
+func ciphered(sht SecurityHeaderType) bool {
 	return sht == gonas.SecurityHeaderTypeIntegrityProtectedAndCiphered ||
 		sht == gonas.SecurityHeaderTypeIntegrityProtectedAndCipheredWithNew5gNasSecurityContext
 }

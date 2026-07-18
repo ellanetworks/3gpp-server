@@ -15,7 +15,7 @@ import (
 )
 
 func handleGnBPathSwitchRequest(ctx context.Context, gnb *store.GNBContext, t *transport.NGAPTransport, req *SendGnBNGAPRequest) (*SendNGAPResponse, error) {
-	if req.AmfUeNgapID == nil || req.RanUeNgapID == nil {
+	if req.AMFUENGAPID == nil || req.RANUENGAPID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "amf_ue_ngap_id and ran_ue_ngap_id are required")
 	}
 
@@ -56,8 +56,8 @@ func handleGnBPathSwitchRequest(ctx context.Context, gnb *store.GNBContext, t *t
 	}
 
 	encoded, err := ngap.BuildPathSwitchRequest(ngap.PathSwitchRequestParams{
-		RanUeNgapID:       *req.RanUeNgapID,
-		SourceAmfUeNgapID: *req.AmfUeNgapID,
+		RANUENGAPID:       *req.RANUENGAPID,
+		SourceAMFUENGAPID: *req.AMFUENGAPID,
 		MCC:               gnb.MCC,
 		MNC:               gnb.MNC,
 		TAC:               gnb.TAC,
@@ -164,9 +164,9 @@ func handleGnBNGReset(ctx context.Context, gnb *store.GNBContext, t *transport.N
 			return nil, httpErrorf(http.StatusNotFound, "ue %s not found", ueID)
 		}
 
-		amf := ue.AmfUeNgapID
-		ran := ue.RanUeNgapID
-		connections = append(connections, ngap.NGResetConnection{AmfUeNgapID: &amf, RanUeNgapID: &ran})
+		amf := ue.AMFUENGAPID
+		ran := ue.RANUENGAPID
+		connections = append(connections, ngap.NGResetConnection{AMFUENGAPID: &amf, RANUENGAPID: &ran})
 	}
 
 	encoded, err := ngap.BuildNGReset(len(connections) == 0, connections)

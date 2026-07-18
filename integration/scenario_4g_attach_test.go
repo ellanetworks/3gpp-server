@@ -74,7 +74,7 @@ func Test4GScenarioAttach(t *testing.T) {
 		}
 
 		// TS 33.401 §5.1.4.1 / TS 24.301 §5.4.3.3: EIA0 is only for emergency/RLOS.
-		if got := jsonGet(resp, "nas.integrity_algorithm"); got == "0" || got == "" {
+		if got := jsonGet(resp, "nas.selected_integrity_algorithm"); got == "0" || got == "" {
 			t.Fatalf("MME selected NAS integrity algorithm %q for a normal attach; want non-EIA0; body: %s", got, resp)
 		}
 

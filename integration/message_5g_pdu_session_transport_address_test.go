@@ -20,9 +20,7 @@ type pduSessionSetupItem struct {
 func ngapPDUSessionSetupItems(body []byte) []pduSessionSetupItem {
 	var top struct {
 		NGAP struct {
-			IEs []struct {
-				Items []pduSessionSetupItem `json:"pdu_session_setup_items"`
-			} `json:"ies"`
+			Items []pduSessionSetupItem `json:"pdu_session_setup_items"`
 		} `json:"ngap"`
 	}
 
@@ -30,13 +28,7 @@ func ngapPDUSessionSetupItems(body []byte) []pduSessionSetupItem {
 		return nil
 	}
 
-	for _, ie := range top.NGAP.IEs {
-		if len(ie.Items) > 0 {
-			return ie.Items
-		}
-	}
-
-	return nil
+	return top.NGAP.Items
 }
 
 // TS 38.414 §5.3 makes the 32-, 128- and 160-bit forms all conformant, so no

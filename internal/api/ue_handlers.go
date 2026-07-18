@@ -39,7 +39,7 @@ func (h *Handler) CreateUE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ranUeNgapID := gnb.AllocateRanUeNgapID()
+	ranUeNgapID := gnb.AllocateRANUENGAPID()
 	ueID := fmt.Sprintf("%d", ranUeNgapID)
 
 	ue, err := store.NewUEContext(ueID, ranUeNgapID, len(gnb.MNC), &store.CreateUEOpts{
@@ -70,7 +70,7 @@ func (h *Handler) CreateUE(w http.ResponseWriter, r *http.Request) {
 		UEID:        ue.ID,
 		SUPI:        ue.Supi,
 		SUCI:        ue.SuciString,
-		RanUeNgapID: ue.RanUeNgapID,
+		RANUENGAPID: ue.RANUENGAPID,
 	})
 }
 
@@ -96,8 +96,8 @@ func (h *Handler) GetUE(w http.ResponseWriter, r *http.Request) {
 		SUCI:             ue.SuciString,
 		MCC:              ue.MCC,
 		MNC:              ue.MNC,
-		RanUeNgapID:      ue.RanUeNgapID,
-		AmfUeNgapID:      ue.AmfUeNgapID,
+		RANUENGAPID:      ue.RANUENGAPID,
+		AMFUENGAPID:      ue.AMFUENGAPID,
 		K:                ue.K,
 		OPc:              ue.OPc,
 		Amf:              ue.Amf,
@@ -145,8 +145,8 @@ func (h *Handler) PatchUE(w http.ResponseWriter, r *http.Request) {
 	if req.Sqn != nil {
 		ue.Sqn = *req.Sqn
 	}
-	if req.AmfUeNgapID != nil {
-		ue.AmfUeNgapID = *req.AmfUeNgapID
+	if req.AMFUENGAPID != nil {
+		ue.AMFUENGAPID = *req.AMFUENGAPID
 	}
 	if req.DNN != nil {
 		ue.DNN = *req.DNN
@@ -210,12 +210,12 @@ func (h *Handler) MigrateUE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	src.MigrateUE(target, ue, req.RanUeNgapID, req.AmfUeNgapID)
+	src.MigrateUE(target, ue, req.RANUENGAPID, req.AMFUENGAPID)
 
 	writeJSON(w, http.StatusOK, MigrateUEResponse{
 		UEID:        ue.ID,
 		GnBID:       req.TargetGnbID,
-		RanUeNgapID: ue.RanUeNgapID,
-		AmfUeNgapID: ue.AmfUeNgapID,
+		RANUENGAPID: ue.RANUENGAPID,
+		AMFUENGAPID: ue.AMFUENGAPID,
 	})
 }

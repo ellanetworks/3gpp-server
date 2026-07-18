@@ -170,22 +170,43 @@ func requiredTrafficFlowQoS() []byte {
 	return []byte{0x01, qci}
 }
 
+func esmMessageTypeName(t eps.ESMMessageType) string {
+	switch t {
+	case eps.MsgActivateDefaultEPSBearerContextRequest:
+		return "activate_default_eps_bearer_context_request"
+	case eps.MsgPDNConnectivityReject:
+		return "pdn_connectivity_reject"
+	case eps.MsgPDNDisconnectReject:
+		return "pdn_disconnect_reject"
+	case eps.MsgDeactivateEPSBearerContextRequest:
+		return "deactivate_eps_bearer_context_request"
+	case eps.MsgModifyEPSBearerContextRequest:
+		return "modify_eps_bearer_context_request"
+	case eps.MsgESMStatus:
+		return "esm_status"
+	case eps.ESMMessageType(msgBearerResourceAllocationReject):
+		return "bearer_resource_allocation_reject"
+	case eps.ESMMessageType(msgBearerResourceModificationReject):
+		return "bearer_resource_modification_reject"
+	default:
+		return fmt.Sprintf("esm_message_%#x", uint8(t))
+	}
+}
+
 func decodeESM(plain []byte, resp *NASResponse) (*NASResponse, error) {
 	mt, err := eps.PeekESMMessageType(plain)
 	if err != nil {
 		return nil, fmt.Errorf("naseps: peek ESM message type: %w", err)
 	}
 
+	resp.MessageType = esmMessageTypeName(mt)
+
 	switch mt {
 	case eps.MsgActivateDefaultEPSBearerContextRequest:
-		resp.MessageType = "activate_default_eps_bearer_context_request"
-
 		if err := decodeDefaultBearer(plain, resp); err != nil {
 			return nil, fmt.Errorf("naseps: parse activate default EPS bearer context request: %w", err)
 		}
 	case eps.MsgPDNConnectivityReject:
-		resp.MessageType = "pdn_connectivity_reject"
-
 		m, err := eps.ParsePDNConnectivityReject(plain)
 		if err != nil {
 			return nil, fmt.Errorf("naseps: parse PDN connectivity reject: %w", err)
@@ -193,8 +214,6 @@ func decodeESM(plain []byte, resp *NASResponse) (*NASResponse, error) {
 
 		setESM(resp, int(m.EPSBearerIdentity), int(m.ProcedureTransactionIdentity), &m.ESMCause)
 	case eps.MsgPDNDisconnectReject:
-		resp.MessageType = "pdn_disconnect_reject"
-
 		m, err := eps.ParsePDNDisconnectReject(plain)
 		if err != nil {
 			return nil, fmt.Errorf("naseps: parse PDN disconnect reject: %w", err)
@@ -202,8 +221,6 @@ func decodeESM(plain []byte, resp *NASResponse) (*NASResponse, error) {
 
 		setESM(resp, int(m.EPSBearerIdentity), int(m.ProcedureTransactionIdentity), &m.ESMCause)
 	case eps.MsgDeactivateEPSBearerContextRequest:
-		resp.MessageType = "deactivate_eps_bearer_context_request"
-
 		m, err := eps.ParseDeactivateEPSBearerContextRequest(plain)
 		if err != nil {
 			return nil, fmt.Errorf("naseps: parse deactivate EPS bearer context request: %w", err)
@@ -211,8 +228,6 @@ func decodeESM(plain []byte, resp *NASResponse) (*NASResponse, error) {
 
 		setESM(resp, int(m.EPSBearerIdentity), int(m.ProcedureTransactionIdentity), &m.ESMCause)
 	case eps.MsgModifyEPSBearerContextRequest:
-		resp.MessageType = "modify_eps_bearer_context_request"
-
 		m, err := eps.ParseModifyEPSBearerContextRequest(plain)
 		if err != nil {
 			return nil, fmt.Errorf("naseps: parse modify EPS bearer context request: %w", err)
@@ -227,8 +242,6 @@ func decodeESM(plain []byte, resp *NASResponse) (*NASResponse, error) {
 			resp.APNAMBR = hex.EncodeToString(m.APNAMBR)
 		}
 	case eps.MsgESMStatus:
-		resp.MessageType = "esm_status"
-
 		m, err := eps.ParseESMStatus(plain)
 		if err != nil {
 			return nil, fmt.Errorf("naseps: parse ESM status: %w", err)
@@ -236,19 +249,13 @@ func decodeESM(plain []byte, resp *NASResponse) (*NASResponse, error) {
 
 		setESM(resp, int(m.EPSBearerIdentity), int(m.ProcedureTransactionIdentity), &m.ESMCause)
 	case eps.ESMMessageType(msgBearerResourceAllocationReject):
-		resp.MessageType = "bearer_resource_allocation_reject"
-
 		if err := decodeBearerResourceReject(plain, resp); err != nil {
 			return nil, fmt.Errorf("naseps: parse bearer resource allocation reject: %w", err)
 		}
 	case eps.ESMMessageType(msgBearerResourceModificationReject):
-		resp.MessageType = "bearer_resource_modification_reject"
-
 		if err := decodeBearerResourceReject(plain, resp); err != nil {
 			return nil, fmt.Errorf("naseps: parse bearer resource modification reject: %w", err)
 		}
-	default:
-		resp.MessageType = fmt.Sprintf("esm_message_%#x", uint8(mt))
 	}
 
 	return resp, nil
