@@ -19,6 +19,7 @@ type NASResponse struct {
 
 	EPSAttachResult   *int      `json:"eps_attach_result,omitempty"`
 	GUTI              *GUTIJSON `json:"guti,omitempty"`
+	TAIList           string    `json:"tai_list,omitempty"`
 	EPSBearerIdentity *int      `json:"eps_bearer_identity,omitempty"`
 	BearerPTI         *int      `json:"bearer_pti,omitempty"`
 	PDNAddress        string    `json:"pdn_address,omitempty"`

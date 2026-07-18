@@ -20,7 +20,9 @@ type AKA5GResult struct {
 	Kamf    []byte
 }
 
-func Compute5GAKA(k, opc, sqn, supi, snn string, rand, autn []byte) (*AKA5GResult, error) {
+func Compute5GAKA(k, opc, sqn, supi, mcc, mnc string, rand, autn []byte) (*AKA5GResult, error) {
+	snn := DeriveSNN(mcc, mnc)
+
 	opcBytes, err := hex.DecodeString(opc)
 	if err != nil {
 		return nil, fmt.Errorf("decode OPc: %w", err)

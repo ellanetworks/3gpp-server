@@ -10,7 +10,7 @@ import (
 
 // TS 33.501 §A.8
 func TestDerive5GNASKeysVector(t *testing.T) {
-	res, err := Compute5GAKA(tsK, tsOPc, "000000000000", tsSUPI, tsSNN,
+	res, err := Compute5GAKA(tsK, tsOPc, "000000000000", tsSUPI, tsMCC, tsMNC,
 		mustHex(t, tsRAND), mustHex(t, tsAUTN))
 	if err != nil {
 		t.Fatalf("Compute5GAKA: %v", err)

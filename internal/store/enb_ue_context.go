@@ -14,12 +14,13 @@ type EPSBearer struct {
 }
 
 type UEEPSContext struct {
-	ID   string
-	IMSI string
-	K    string
-	OPc  string
-	AMF  string
-	SQN  string
+	ID     string
+	IMSI   string
+	IMEISV string
+	K      string
+	OPc    string
+	AMF    string
+	SQN    string
 
 	ENBUES1APID uint32
 	MMEUES1APID uint32
@@ -63,17 +64,19 @@ type UEEPSContext struct {
 }
 
 type CreateUEEPSOpts struct {
-	IMSI string
-	K    string
-	OPc  string
-	AMF  string
-	SQN  string
+	IMSI   string
+	IMEISV string
+	K      string
+	OPc    string
+	AMF    string
+	SQN    string
 }
 
 func NewUEEPSContext(id string, enbUES1APID uint32, opts *CreateUEEPSOpts) *UEEPSContext {
 	return &UEEPSContext{
 		ID:          id,
 		IMSI:        opts.IMSI,
+		IMEISV:      opts.IMEISV,
 		K:           opts.K,
 		OPc:         opts.OPc,
 		AMF:         opts.AMF,
@@ -90,9 +93,12 @@ func (u *UEEPSContext) NextUL() uint32 {
 	return c
 }
 
-func (u *UEEPSContext) NextDL() uint32 {
-	c := u.DLCount
-	u.DLCount++
+func (u *UEEPSContext) NextDL(sequenceNumber uint8) uint32 {
+	if uint8(u.DLCount&0xff) > sequenceNumber {
+		u.DLCount = (u.DLCount & 0xffffff00) + 0x100 + uint32(sequenceNumber)
+	} else {
+		u.DLCount = (u.DLCount & 0xffffff00) + uint32(sequenceNumber)
+	}
 
-	return c
+	return u.DLCount
 }

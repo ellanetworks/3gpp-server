@@ -11,6 +11,7 @@ import (
 )
 
 type PatchENBUERequest struct {
+	IMEISV      *string `json:"imeisv,omitempty"`
 	K           *string `json:"k,omitempty"`
 	OPc         *string `json:"opc,omitempty"`
 	AMF         *string `json:"amf,omitempty"`
@@ -35,6 +36,10 @@ func (h *Handler) PatchENBUE(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
 		return
+	}
+
+	if req.IMEISV != nil {
+		ue.IMEISV = *req.IMEISV
 	}
 
 	if req.K != nil {

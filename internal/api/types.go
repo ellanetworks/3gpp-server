@@ -141,7 +141,6 @@ type UEStateResponse struct {
 	OPc              string `json:"opc"`
 	Amf              string `json:"amf"`
 	Sqn              string `json:"sqn"`
-	Snn              string `json:"snn"`
 	DNN              string `json:"dnn,omitempty"`
 	SST              int32  `json:"sst,omitempty"`
 	SD               string `json:"sd,omitempty"`

@@ -75,17 +75,17 @@ func ComputeEPSAKA(k, opc, sqn, mcc, mnc string, rand, autn []byte) (*EPSAKAResu
 	return &EPSAKAResult{RES: RES, Kasme: kasme}, nil
 }
 
-func DeriveEPSNASKeys(kasme []byte, encAlg, intAlg uint8) (knasEnc, knasInt [16]byte, err error) {
+func DeriveEPSNASKeys(kasme []byte, cipheringAlg, integrityAlg uint8) (knasEnc, knasInt [16]byte, err error) {
 	enc, err := ueauth.GetKDFValue(kasme, fcAlgorithmKD,
 		[]byte{algTypeNASEnc}, ueauth.KDFLen([]byte{algTypeNASEnc}),
-		[]byte{encAlg}, ueauth.KDFLen([]byte{encAlg}))
+		[]byte{cipheringAlg}, ueauth.KDFLen([]byte{cipheringAlg}))
 	if err != nil {
 		return knasEnc, knasInt, fmt.Errorf("derive K_NASenc: %w", err)
 	}
 
 	intg, err := ueauth.GetKDFValue(kasme, fcAlgorithmKD,
 		[]byte{algTypeNASInt}, ueauth.KDFLen([]byte{algTypeNASInt}),
-		[]byte{intAlg}, ueauth.KDFLen([]byte{intAlg}))
+		[]byte{integrityAlg}, ueauth.KDFLen([]byte{integrityAlg}))
 	if err != nil {
 		return knasEnc, knasInt, fmt.Errorf("derive K_NASint: %w", err)
 	}

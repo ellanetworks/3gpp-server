@@ -144,9 +144,11 @@ func decodePathSwitchRequestAcknowledge(msg *ngapType.PathSwitchRequestAcknowled
 				}
 			}
 		case ngapType.ProtocolIEIDSecurityContext:
-			if ie.Value.SecurityContext != nil {
-				v := ie.Value.SecurityContext.NextHopChainingCount.Value
+			if sc := ie.Value.SecurityContext; sc != nil {
+				v := sc.NextHopChainingCount.Value
 				decoded.NextHopChainingCount = &v
+				nh := hex.EncodeToString(sc.NextHopNH.Value.Bytes)
+				decoded.NextHop = &nh
 			}
 		default:
 			decoded.Value = unmodeledIEValue(ie.Value)
@@ -578,7 +580,17 @@ func decodeHandoverRequest(msg *ngapType.HandoverRequest, resp *NGAPResponse) {
 		case ngapType.ProtocolIEIDSecurityContext:
 			if sc := ie.Value.SecurityContext; sc != nil {
 				ncc := sc.NextHopChainingCount.Value
-				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityName(ie.Criticality.Value), NextHopChainingCount: &ncc})
+				nh := hex.EncodeToString(sc.NextHopNH.Value.Bytes)
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityName(ie.Criticality.Value), NextHopChainingCount: &ncc, NextHop: &nh})
+			}
+		case ngapType.ProtocolIEIDUESecurityCapabilities:
+			if caps := ie.Value.UESecurityCapabilities; caps != nil {
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityName(ie.Criticality.Value), UESecurityCapabilities: decodeUESecurityCapabilities(caps)})
+			}
+		case ngapType.ProtocolIEIDSourceToTargetTransparentContainer:
+			if c := ie.Value.SourceToTargetTransparentContainer; c != nil {
+				s := hex.EncodeToString(c.Value)
+				resp.IEs = append(resp.IEs, IE{ID: ie.Id.Value, Criticality: criticalityName(ie.Criticality.Value), SourceToTargetContainer: &s})
 			}
 		}
 	}
@@ -669,6 +681,19 @@ func decodeInitialContextSetupRequest(msg *ngapType.InitialContextSetupRequest, 
 			if ie.Value.UERadioCapability != nil {
 				s := hex.EncodeToString(ie.Value.UERadioCapability.Value)
 				decoded.UERadioCapability = &s
+			}
+		case ngapType.ProtocolIEIDPDUSessionResourceSetupListCxtReq:
+			if ie.Value.PDUSessionResourceSetupListCxtReq != nil {
+				for _, item := range ie.Value.PDUSessionResourceSetupListCxtReq.List {
+					setupItem := PDUSessionSetupItemJSON{PDUSessionID: item.PDUSessionID.Value}
+					if teid, ipv4, ipv6, ok := decodeULTunnel(item.PDUSessionResourceSetupRequestTransfer); ok {
+						setupItem.ULTeid = teid
+						setupItem.UPFN3IP = ipv4
+						setupItem.UPFN3IPv6 = ipv6
+					}
+
+					decoded.PDUSessionSetupItems = append(decoded.PDUSessionSetupItems, setupItem)
+				}
 			}
 		default:
 			decoded.Value = unmodeledIEValue(ie.Value)

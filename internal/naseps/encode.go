@@ -157,8 +157,36 @@ func BuildAuthenticationFailure(cause uint8, auts []byte) ([]byte, error) {
 }
 
 // BuildSecurityModeComplete builds a plain SECURITY MODE COMPLETE (TS 24.301 §8.2.21).
-func BuildSecurityModeComplete(imeisv []byte) ([]byte, error) {
-	return (&eps.SecurityModeComplete{IMEISV: imeisv}).Marshal()
+// An empty imeisv omits the IMEISV mobile identity.
+func BuildSecurityModeComplete(imeisv string) ([]byte, error) {
+	var mobid []byte
+
+	if imeisv != "" {
+		var err error
+		if mobid, err = imeisvMobileIdentity(imeisv); err != nil {
+			return nil, err
+		}
+	}
+
+	return (&eps.SecurityModeComplete{IMEISV: mobid}).Marshal()
+}
+
+// imeisvMobileIdentity encodes 16 IMEISV digits as a mobile identity value:
+// first digit | odd/even | type-of-identity IMEISV (011), then the remaining
+// digits TBCD-packed with a 1111 end mark (TS 24.008 §10.5.1.4).
+func imeisvMobileIdentity(imeisv string) ([]byte, error) {
+	if len(imeisv) != 16 {
+		return nil, fmt.Errorf("naseps: IMEISV must be 16 digits")
+	}
+
+	rest, err := common.EncodeTBCD(imeisv[1:])
+	if err != nil {
+		return nil, err
+	}
+
+	oddEven := byte(len(imeisv) & 1)
+
+	return append([]byte{(imeisv[0]-'0')<<4 | oddEven<<3 | 3}, rest...), nil
 }
 
 // BuildSecurityModeReject builds a plain SECURITY MODE REJECT (TS 24.301 §8.2.22).

@@ -66,11 +66,12 @@ func (h *Handler) CreateENBUE(w http.ResponseWriter, r *http.Request) {
 	ueID := fmt.Sprintf("%d", enbUES1APID)
 
 	ue := store.NewUEEPSContext(ueID, enbUES1APID, &store.CreateUEEPSOpts{
-		IMSI: imsi,
-		K:    req.K,
-		OPc:  req.OPc,
-		AMF:  req.AMF,
-		SQN:  req.SQN,
+		IMSI:   imsi,
+		IMEISV: req.IMEISV,
+		K:      req.K,
+		OPc:    req.OPc,
+		AMF:    req.AMF,
+		SQN:    req.SQN,
 	})
 
 	if req.UENetworkCapability != "" {
@@ -109,6 +110,7 @@ func (h *Handler) GetENBUE(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, ENBUEStateResponse{
 		UEID:           ue.ID,
 		IMSI:           ue.IMSI,
+		IMEISV:         ue.IMEISV,
 		UEIP:           ue.UEIP,
 		SecurityActive: ue.SecurityActive,
 		MMEUES1APID:    ue.MMEUES1APID,
@@ -331,6 +333,17 @@ func handleENBAttachRequestRaw(ctx context.Context, enb *store.ENBContext, ue *s
 	return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
 }
 
+// epsDLSequenceNumber returns the NAS sequence number of a downlink security-protected
+// EPS NAS message (TS 24.301 §9.1: 1-octet header, 4-octet MAC, then the sequence number).
+func epsDLSequenceNumber(nasBytes []byte) uint8 {
+	const snOffset = 5
+	if len(nasBytes) <= snOffset {
+		return 0
+	}
+
+	return nasBytes[snOffset]
+}
+
 func handleENBAuthenticationResponse(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
 	aka, err := crypto.ComputeEPSAKA(ue.K, ue.OPc, ue.SQN, enb.MCC, enb.MNC, ue.RAND, ue.AUTN)
 	if err != nil {
@@ -405,7 +418,7 @@ func handleENBAuthenticationResponse(ctx context.Context, enb *store.ENBContext,
 	ue.ULCount = 0
 	ue.DLCount = 0
 
-	_, verr := naseps.Unprotect(nasBytes, ue.NextDL(), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+	_, verr := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
 	verified := verr == nil
 
 	return &SendENBNASResponse{S1AP: dl, NAS: annotateSecurityHeaderType(smc, nasBytes), MACVerified: &verified}, nil
@@ -500,7 +513,7 @@ func handleENBSecurityModeComplete(ctx context.Context, enb *store.ENBContext, u
 		return nil, fmt.Errorf("no NAS security context; run authentication_response first")
 	}
 
-	smc, err := naseps.BuildSecurityModeComplete(nil)
+	smc, err := naseps.BuildSecurityModeComplete(ue.IMEISV)
 	if err != nil {
 		return nil, err
 	}
@@ -533,7 +546,7 @@ func handleENBSecurityModeComplete(ctx context.Context, enb *store.ENBContext, u
 		return nil, err
 	}
 
-	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
 	if err != nil {
 		return nil, fmt.Errorf("unprotect attach accept: %w", err)
 	}
@@ -652,7 +665,7 @@ func handleENBAttachComplete(ctx context.Context, enb *store.ENBContext, ue *sto
 
 	if dl := waitDownlinkTolerant(wctx, t, ue, "DownlinkNASTransport"); dl != nil && dl.NASPDU != nil {
 		if nasBytes, berr := nasPDUBytes(dl); berr == nil {
-			if plain, perr := naseps.Unprotect(nasBytes, ue.NextDL(), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc); perr == nil {
+			if plain, perr := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc); perr == nil {
 				resp.S1AP = dl
 				resp.NAS, _ = naseps.Decode(plain)
 				resp.NAS = annotateSecurityHeaderType(resp.NAS, nasBytes)
@@ -855,7 +868,7 @@ func handleENBPdnConnectivity(ctx context.Context, enb *store.ENBContext, ue *st
 		return nil, err
 	}
 
-	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
 	if err != nil {
 		return nil, fmt.Errorf("unprotect pdn connectivity reply: %w", err)
 	}
@@ -974,7 +987,7 @@ func handleENBPdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *stor
 		return nil, err
 	}
 
-	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
 	if err != nil {
 		return nil, fmt.Errorf("unprotect pdn disconnect reply: %w", err)
 	}
@@ -1244,7 +1257,7 @@ func handleENBTrackingAreaUpdate(ctx context.Context, enb *store.ENBContext, ue 
 		return &SendENBNASResponse{S1AP: dl, NAS: annotateSecurityHeaderType(nas, nasBytes)}, derr
 	}
 
-	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
 	if err != nil {
 		return nil, fmt.Errorf("unprotect TAU accept: %w", err)
 	}
@@ -1453,7 +1466,7 @@ func handleENBDetach(ctx context.Context, enb *store.ENBContext, ue *store.UEEPS
 			return nil, berr
 		}
 
-		plain, perr := naseps.Unprotect(nasBytes, ue.NextDL(), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+		plain, perr := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
 		if perr != nil {
 			return nil, fmt.Errorf("unprotect detach accept: %w", perr)
 		}
@@ -1557,25 +1570,8 @@ func annotateSecurityHeaderType(nas *naseps.NASResponse, downlink []byte) *nasep
 	}
 
 	if sht, err := naseps.SecurityHeader(downlink); err == nil {
-		nas.SecurityHeaderType = epsSecurityHeaderTypeString(sht)
+		nas.SecurityHeaderType = naseps.SecurityHeaderTypeString(sht)
 	}
 
 	return nas
-}
-
-func epsSecurityHeaderTypeString(sht naseps.SecurityHeaderType) string {
-	switch sht {
-	case naseps.SHTPlain:
-		return "plain"
-	case naseps.SHTIntegrityProtected:
-		return "integrity_protected"
-	case naseps.SHTIntegrityProtectedCiphered:
-		return "integrity_protected_and_ciphered"
-	case naseps.SHTIntegrityProtectedNewContext:
-		return "integrity_protected_with_new_eps_security_context"
-	case naseps.SHTIntegrityProtectedCipheredNew:
-		return "integrity_protected_and_ciphered_with_new_eps_security_context"
-	default:
-		return fmt.Sprintf("unknown(%d)", uint8(sht))
-	}
 }

@@ -10,6 +10,26 @@ import (
 	"github.com/ellanetworks/core/nas/eps"
 )
 
+// SecurityHeaderTypeString renders an EPS security header type for JSON (TS 24.301 §9.3.1).
+func SecurityHeaderTypeString(t SecurityHeaderType) string {
+	switch t {
+	case SHTPlain:
+		return "plain"
+	case SHTIntegrityProtected:
+		return "integrity_protected"
+	case SHTIntegrityProtectedCiphered:
+		return "integrity_protected_and_ciphered"
+	case SHTIntegrityProtectedNewContext:
+		return "integrity_protected_with_new_eps_security_context"
+	case SHTIntegrityProtectedCipheredNew:
+		return "integrity_protected_and_ciphered_with_new_eps_security_context"
+	case eps.SHTServiceRequest:
+		return "service_request"
+	default:
+		return fmt.Sprintf("unknown(%d)", uint8(t))
+	}
+}
+
 func SecurityHeader(b []byte) (SecurityHeaderType, error) {
 	if len(b) == 0 {
 		return 0, fmt.Errorf("naseps: empty NAS message")
@@ -42,6 +62,8 @@ func Decode(plain []byte) (*NASResponse, error) {
 	if plain[0]&0x0F == eps.PDESM {
 		return decodeESM(plain, resp)
 	}
+
+	resp.SecurityHeaderType = SecurityHeaderTypeString(SecurityHeaderType(plain[0] >> 4))
 
 	mt, err := eps.PeekMessageType(plain)
 	if err != nil {
@@ -126,8 +148,10 @@ func decodeSecurityModeCommand(b []byte, resp *NASResponse) error {
 	ciph := int(m.CipheringAlgorithm)
 	intg := int(m.IntegrityAlgorithm)
 	imeisv := m.IMEISVRequested
+	ksi := int(m.NASKeySetIdentifier)
 	resp.CipheringAlgorithm = &ciph
 	resp.IntegrityAlgorithm = &intg
+	resp.KSI = &ksi
 	resp.ReplayedUESecurityCapabilities = hex.EncodeToString(m.ReplayedUESecurityCapabilities)
 	resp.IMEISVRequested = &imeisv
 
@@ -142,6 +166,10 @@ func decodeAttachAccept(b []byte, resp *NASResponse) error {
 
 	result := int(m.EPSAttachResult)
 	resp.EPSAttachResult = &result
+
+	if len(m.TAIList) > 0 {
+		resp.TAIList = hex.EncodeToString(m.TAIList)
+	}
 
 	if m.EMMCause != nil {
 		c := int(*m.EMMCause)

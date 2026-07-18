@@ -63,8 +63,6 @@ type UEContext struct {
 	LastRAND []byte
 	LastAUTN []byte
 
-	Snn string
-
 	DNN            string
 	PDUSessionID   uint8
 	PDUSessionType uint8
@@ -166,8 +164,6 @@ func NewUEContext(id string, ranUeNgapID int64, mncLength int, opts *CreateUEOpt
 
 	suciStr := crypto.BuildSuciString(mcc, mnc, routingInd, protScheme, pubKeyID, suciBuffer)
 
-	snn := crypto.DeriveSNN(mcc, mnc)
-
 	secCap := &nasType.UESecurityCapability{
 		Iei:    nasMessage.RegistrationRequestUESecurityCapabilityType,
 		Len:    2,
@@ -192,7 +188,6 @@ func NewUEContext(id string, ranUeNgapID int64, mncLength int, opts *CreateUEOpt
 		SuciString:           suciStr,
 		RanUeNgapID:          ranUeNgapID,
 		UeSecurityCapability: secCap,
-		Snn:                  snn,
 		DNN:                  opts.DNN,
 		PDUSessionID:         opts.PDUSessionID,
 		PDUSessionType:       opts.PDUSessionType,

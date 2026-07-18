@@ -47,13 +47,15 @@ type IE struct {
 	IndexToRFSP             *int64                       `json:"index_to_rfsp,omitempty"`
 	UEAggregateMaxBitRate   *UEAggregateMaxBitRateJSON   `json:"ue_aggregate_max_bit_rate,omitempty"`
 
-	UERadioCapability      *string                     `json:"ue_radio_capability,omitempty"`
-	PDUSessionSetupItems   []PDUSessionSetupItemJSON   `json:"pdu_session_setup_items,omitempty"`
-	PDUSessionIDs          []int64                     `json:"pdu_session_ids,omitempty"`
-	ReleasePDUSessionIDs   []int64                     `json:"release_pdu_session_ids,omitempty"`
-	NextHopChainingCount   *int64                      `json:"next_hop_chaining_count,omitempty"`
-	UESecurityCapabilities *UESecurityCapabilitiesJSON `json:"ue_security_capabilities,omitempty"`
-	RANStatusTransfer      *RANStatusTransferJSON      `json:"ran_status_transfer,omitempty"`
+	UERadioCapability       *string                     `json:"ue_radio_capability,omitempty"`
+	PDUSessionSetupItems    []PDUSessionSetupItemJSON   `json:"pdu_session_setup_items,omitempty"`
+	PDUSessionIDs           []int64                     `json:"pdu_session_ids,omitempty"`
+	ReleasePDUSessionIDs    []int64                     `json:"release_pdu_session_ids,omitempty"`
+	NextHopChainingCount    *int64                      `json:"next_hop_chaining_count,omitempty"`
+	NextHop                 *string                     `json:"next_hop,omitempty"`
+	UESecurityCapabilities  *UESecurityCapabilitiesJSON `json:"ue_security_capabilities,omitempty"`
+	RANStatusTransfer       *RANStatusTransferJSON      `json:"ran_status_transfer,omitempty"`
+	SourceToTargetContainer *string                     `json:"source_to_target_transparent_container,omitempty"`
 }
 
 type COUNTValueJSON struct {

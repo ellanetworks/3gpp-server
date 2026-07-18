@@ -20,7 +20,7 @@ const (
 )
 
 func TestCompute5GAKAVector(t *testing.T) {
-	res, err := Compute5GAKA(tsK, tsOPc, "000000000000", tsSUPI, tsSNN,
+	res, err := Compute5GAKA(tsK, tsOPc, "000000000000", tsSUPI, tsMCC, tsMNC,
 		mustHex(t, tsRAND), mustHex(t, tsAUTN))
 	if err != nil {
 		t.Fatalf("Compute5GAKA: %v", err)
@@ -48,19 +48,19 @@ func TestCompute5GAKAMACFailure(t *testing.T) {
 	autn := mustHex(t, tsAUTN)
 	autn[len(autn)-1] ^= 0xff
 
-	if _, err := Compute5GAKA(tsK, tsOPc, "000000000000", tsSUPI, tsSNN, mustHex(t, tsRAND), autn); !errors.Is(err, ErrMACFailure) {
+	if _, err := Compute5GAKA(tsK, tsOPc, "000000000000", tsSUPI, tsMCC, tsMNC, mustHex(t, tsRAND), autn); !errors.Is(err, ErrMACFailure) {
 		t.Fatalf("err = %v, want ErrMACFailure", err)
 	}
 }
 
 func TestCompute5GAKASQNOutOfRange(t *testing.T) {
-	if _, err := Compute5GAKA(tsK, tsOPc, "ffffffffffff", tsSUPI, tsSNN, mustHex(t, tsRAND), mustHex(t, tsAUTN)); !errors.Is(err, ErrSQNOutOfRange) {
+	if _, err := Compute5GAKA(tsK, tsOPc, "ffffffffffff", tsSUPI, tsMCC, tsMNC, mustHex(t, tsRAND), mustHex(t, tsAUTN)); !errors.Is(err, ErrSQNOutOfRange) {
 		t.Fatalf("err = %v, want ErrSQNOutOfRange", err)
 	}
 }
 
 func TestCompute5GAKAAUTNTooShort(t *testing.T) {
-	_, err := Compute5GAKA(tsK, tsOPc, "000000000000", tsSUPI, tsSNN, mustHex(t, tsRAND), make([]byte, 5))
+	_, err := Compute5GAKA(tsK, tsOPc, "000000000000", tsSUPI, tsMCC, tsMNC, mustHex(t, tsRAND), make([]byte, 5))
 	if err == nil || !strings.Contains(err.Error(), "AUTN too short") {
 		t.Fatalf("err = %v, want AUTN too short", err)
 	}

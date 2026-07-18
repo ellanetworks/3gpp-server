@@ -325,6 +325,7 @@ paths:
             schema:
               type: object
               properties:
+                imeisv: { type: string }
                 k: { type: string }
                 opc: { type: string }
                 amf: { type: string }
@@ -1415,6 +1416,9 @@ components:
           type: string
           description: "15-digit IMSI (an 'imsi-' prefix is accepted)."
           example: "001010000000001"
+        imeisv:
+          type: string
+          description: "16-digit IMEISV, returned in Security Mode Complete when set (TS 24.301 §5.4.3)."
         k:
           type: string
           description: Subscriber key K (hex).
@@ -1447,6 +1451,8 @@ components:
         ue_id:
           type: string
         imsi:
+          type: string
+        imeisv:
           type: string
         ue_ip:
           type: string
@@ -1751,9 +1757,6 @@ components:
           type: string
         sqn:
           type: string
-        snn:
-          type: string
-          description: Serving Network Name (derived from MCC/MNC).
         dnn:
           type: string
         sst:

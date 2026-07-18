@@ -10,6 +10,7 @@ import (
 
 type CreateENBUERequest struct {
 	IMSI                string `json:"imsi"`
+	IMEISV              string `json:"imeisv,omitempty"`
 	K                   string `json:"k"`
 	OPc                 string `json:"opc"`
 	AMF                 string `json:"amf,omitempty"`
@@ -108,6 +109,7 @@ type ENBUEBearer struct {
 type ENBUEStateResponse struct {
 	UEID           string        `json:"ue_id"`
 	IMSI           string        `json:"imsi"`
+	IMEISV         string        `json:"imeisv,omitempty"`
 	UEIP           string        `json:"ue_ip"`
 	SecurityActive bool          `json:"security_active"`
 	MMEUES1APID    uint32        `json:"mme_ue_s1ap_id"`

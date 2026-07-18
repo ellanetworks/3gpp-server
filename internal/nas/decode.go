@@ -155,6 +155,10 @@ func decodeSecurityModeCommand(m *gonas.Message, resp *NASResponse) {
 
 	ksi := int(m.SecurityModeCommand.GetNasKeySetIdentifiler())
 	resp.NgKSI = &ksi
+
+	if m.IMEISVRequest != nil {
+		resp.IMEISVRequested = true
+	}
 }
 
 func decodeRegistrationAccept(m *gonas.Message, resp *NASResponse) {

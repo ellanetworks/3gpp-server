@@ -175,7 +175,7 @@ func handleGnBAuthenticationResponse(ctx context.Context, gnb *store.GNBContext,
 		} else if len(ue.LastRAND) == 0 || len(ue.LastAUTN) == 0 {
 			resStar = make([]byte, 16)
 		} else {
-			akaResult, err := crypto.Compute5GAKA(ue.K, ue.OPc, ue.Sqn, ue.Supi, ue.Snn, ue.LastRAND, ue.LastAUTN)
+			akaResult, err := crypto.Compute5GAKA(ue.K, ue.OPc, ue.Sqn, ue.Supi, ue.MCC, ue.MNC, ue.LastRAND, ue.LastAUTN)
 			if err != nil {
 				return nil, httpErrorf(http.StatusInternalServerError, "5G-AKA: %v", err)
 			}

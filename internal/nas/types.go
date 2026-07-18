@@ -31,6 +31,7 @@ type NASResponse struct {
 
 	SelectedCipheringAlg *int `json:"selected_ciphering_alg,omitempty"`
 	SelectedIntegrityAlg *int `json:"selected_integrity_alg,omitempty"`
+	IMEISVRequested      bool `json:"imeisv_requested,omitempty"`
 
 	GUTI    *GUTI5GJSON `json:"guti,omitempty"`
 	TAIList string      `json:"tai_list,omitempty"`

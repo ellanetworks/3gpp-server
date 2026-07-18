@@ -102,7 +102,6 @@ func (h *Handler) GetUE(w http.ResponseWriter, r *http.Request) {
 		OPc:              ue.OPc,
 		Amf:              ue.Amf,
 		Sqn:              ue.Sqn,
-		Snn:              ue.Snn,
 		DNN:              ue.DNN,
 		SST:              ue.SST,
 		SD:               ue.SD,

@@ -100,7 +100,7 @@ type DRBStatusTransferInput struct {
 }
 
 type SendNGAPResponse struct {
-	NGAP        *ngap.NGAPResponse    `json:"ngap"`
+	NGAP        *ngap.NGAPResponse    `json:"ngap,omitempty"`
 	NAS         *nasTypes.NASResponse `json:"nas,omitempty"`
 	MACVerified *bool                 `json:"mac_verified,omitempty"`
 }
