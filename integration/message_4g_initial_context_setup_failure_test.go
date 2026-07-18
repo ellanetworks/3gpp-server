@@ -26,7 +26,7 @@ func Test4GInitialContextSetupFailure(t *testing.T) {
 
 	nasStep(t, enbID, ueID, "initial_context_setup_failure")
 
-	status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas",
+	status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap",
 		`{"message_type":"release_request","timeout_ms":3000}`)
 	if status != 200 {
 		t.Fatalf("release_request: HTTP %d\n  body: %s", status, resp)

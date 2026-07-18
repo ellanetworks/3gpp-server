@@ -26,7 +26,7 @@ func attachChallenge(t *testing.T, enbID string) string {
 func nasBody(t *testing.T, enbID, ueID, body string) []byte {
 	t.Helper()
 
-	status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas", body)
+	status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap", body)
 	if status != 200 {
 		t.Fatalf("nas step: HTTP %d: %s", status, resp)
 	}

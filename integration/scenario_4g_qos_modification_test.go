@@ -76,15 +76,15 @@ func Test4GQoSModification(t *testing.T) {
 		}
 	}
 
-	if status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas", `{"message_type":"modify_response"}`); status != 200 {
+	if status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap", `{"message_type":"modify_response"}`); status != 200 {
 		t.Fatalf("modify_response: HTTP %d\n  body: %s", status, resp)
 	}
 
-	if status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas", `{"message_type":"modify_eps_bearer_context_accept"}`); status != 200 {
+	if status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap", `{"message_type":"modify_eps_bearer_context_accept"}`); status != 200 {
 		t.Fatalf("modify_eps_bearer_context_accept: HTTP %d\n  body: %s", status, resp)
 	}
 
-	status, relResp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas",
+	status, relResp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap",
 		`{"message_type":"release_request","timeout_ms":5000}`)
 	if status != 200 {
 		t.Fatalf("release_request: HTTP %d\n  body: %s", status, relResp)

@@ -120,7 +120,7 @@ func (h *Handler) GetENBUE(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) SendENBNAS(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SendENBUES1AP(w http.ResponseWriter, r *http.Request) {
 	enb, err := h.Store.GetENB(r.PathValue("enb_id"))
 	if err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
@@ -139,7 +139,7 @@ func (h *Handler) SendENBNAS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req SendENBNASRequest
+	var req SendENBUES1APRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
 		return
@@ -149,7 +149,7 @@ func (h *Handler) SendENBNAS(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	var (
-		resp *SendENBNASResponse
+		resp *SendENBUES1APResponse
 		herr error
 	)
 
@@ -223,7 +223,7 @@ func (h *Handler) SendENBNAS(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-func handleENBAttachRequest(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBAttachRequest(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	if req.RawNASPDU != nil {
 		return handleENBAttachRequestRaw(ctx, enb, ue, t, *req.RawNASPDU, req.RRCEstablishmentCauseOverride)
 	}
@@ -292,10 +292,10 @@ func handleENBAttachRequest(ctx context.Context, enb *store.ENBContext, ue *stor
 		ue.KSI = uint8(*nas.NASKeySetIdentifier)
 	}
 
-	return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
+	return &SendENBUES1APResponse{S1AP: dl, NAS: nas}, nil
 }
 
-func handleENBAttachRequestRaw(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, rawHex string, rrcCause *int64) (*SendENBNASResponse, error) {
+func handleENBAttachRequestRaw(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, rawHex string, rrcCause *int64) (*SendENBUES1APResponse, error) {
 	raw, err := hex.DecodeString(rawHex)
 	if err != nil {
 		return nil, httpErrorf(http.StatusBadRequest, "raw_nas_pdu must be hex: %v", err)
@@ -315,7 +315,7 @@ func handleENBAttachRequestRaw(ctx context.Context, enb *store.ENBContext, ue *s
 
 	dl := waitDownlinkTolerant(ctx, t, ue, "DownlinkNASTransport", "UEContextReleaseCommand", "ErrorIndication")
 	if dl == nil {
-		return &SendENBNASResponse{}, nil
+		return &SendENBUES1APResponse{}, nil
 	}
 
 	learnMMEID(ue, dl)
@@ -328,7 +328,7 @@ func handleENBAttachRequestRaw(ctx context.Context, enb *store.ENBContext, ue *s
 		}
 	}
 
-	return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
+	return &SendENBUES1APResponse{S1AP: dl, NAS: nas}, nil
 }
 
 // epsDLSequenceNumber returns the NAS sequence number of a downlink security-protected
@@ -342,7 +342,7 @@ func epsDLSequenceNumber(nasBytes []byte) uint8 {
 	return nasBytes[snOffset]
 }
 
-func handleENBAuthenticationResponse(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBAuthenticationResponse(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	aka, err := crypto.ComputeEPSAKA(ue.K, ue.OPc, ue.SQN, enb.MCC, enb.MNC, ue.RAND, ue.AUTN)
 	if err != nil {
 		return nil, fmt.Errorf("eps-aka: %w", err)
@@ -387,7 +387,7 @@ func handleENBAuthenticationResponse(ctx context.Context, enb *store.ENBContext,
 			return nil, derr
 		}
 
-		return &SendENBNASResponse{S1AP: dl, NAS: annotateSecurityHeaderType(nas, nasBytes)}, nil
+		return &SendENBUES1APResponse{S1AP: dl, NAS: annotateSecurityHeaderType(nas, nasBytes)}, nil
 	}
 
 	// The Security Mode Command is not ciphered, so the algorithms it selects are readable before their keys exist.
@@ -419,10 +419,10 @@ func handleENBAuthenticationResponse(ctx context.Context, enb *store.ENBContext,
 	_, verr := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 	verified := verr == nil
 
-	return &SendENBNASResponse{S1AP: dl, NAS: annotateSecurityHeaderType(smc, nasBytes), MACVerified: &verified}, nil
+	return &SendENBUES1APResponse{S1AP: dl, NAS: annotateSecurityHeaderType(smc, nasBytes), MACVerified: &verified}, nil
 }
 
-func handleENBIdentityResponse(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBIdentityResponse(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	pdu, err := naseps.BuildIdentityResponse(ue.IMSI)
 	if err != nil {
 		return nil, err
@@ -454,10 +454,10 @@ func handleENBIdentityResponse(ctx context.Context, enb *store.ENBContext, ue *s
 		ue.AUTN, _ = hex.DecodeString(nas.AUTN)
 	}
 
-	return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
+	return &SendENBUES1APResponse{S1AP: dl, NAS: nas}, nil
 }
 
-func handleENBAuthenticationFailure(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBAuthenticationFailure(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	if req.Cause == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "cause is required for authentication_failure")
 	}
@@ -503,10 +503,10 @@ func handleENBAuthenticationFailure(ctx context.Context, enb *store.ENBContext, 
 		ue.AUTN, _ = hex.DecodeString(nas.AUTN)
 	}
 
-	return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
+	return &SendENBUES1APResponse{S1AP: dl, NAS: nas}, nil
 }
 
-func handleENBSecurityModeComplete(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBSecurityModeComplete(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	if !ue.SecurityActive {
 		return nil, fmt.Errorf("no NAS security context; run authentication_response first")
 	}
@@ -531,7 +531,7 @@ func handleENBSecurityModeComplete(ctx context.Context, enb *store.ENBContext, u
 	}
 
 	if req.CorruptMAC {
-		return &SendENBNASResponse{S1AP: waitDownlinkTolerant(ctx, t, ue, "InitialContextSetupRequest")}, nil
+		return &SendENBUES1APResponse{S1AP: waitDownlinkTolerant(ctx, t, ue, "InitialContextSetupRequest")}, nil
 	}
 
 	dl, err := waitDownlink(ctx, t, ue, "InitialContextSetupRequest")
@@ -585,7 +585,7 @@ func handleENBSecurityModeComplete(ctx context.Context, enb *store.ENBContext, u
 	ue.DLTeid = ue.ENBUES1APID
 	ue.UEIP = ueIPFromPDNAddress(nas.PDNAddress)
 
-	return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
+	return &SendENBUES1APResponse{S1AP: dl, NAS: nas}, nil
 }
 
 func ueIPFromPDNAddress(pdnHex string) string {
@@ -600,7 +600,7 @@ func ueIPFromPDNAddress(pdnHex string) string {
 // TS 24.301 §9.9.3.9.
 const emmCauseSecurityCapMismatch uint8 = 23
 
-func handleENBSecurityModeReject(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBSecurityModeReject(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	cause := emmCauseSecurityCapMismatch
 	if req.Cause != nil {
 		cause = uint8(*req.Cause)
@@ -620,10 +620,10 @@ func handleENBSecurityModeReject(ctx context.Context, enb *store.ENBContext, ue 
 		return nil, err
 	}
 
-	return &SendENBNASResponse{S1AP: dl}, nil
+	return &SendENBUES1APResponse{S1AP: dl}, nil
 }
 
-func handleENBAttachComplete(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBAttachComplete(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	icsResp, err := s1ap.BuildInitialContextSetupResponse(s1ap.InitialContextSetupResponseParams{
 		MMEUES1APID: ue.MMEUES1APID, ENBUES1APID: ue.ENBUES1APID,
 		ERABID: ue.ERABID, ENBN3Addr: enb.N3Addr, GTPTEID: ue.ENBUES1APID,
@@ -659,7 +659,7 @@ func handleENBAttachComplete(ctx context.Context, enb *store.ENBContext, ue *sto
 	wctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	resp := &SendENBNASResponse{}
+	resp := &SendENBUES1APResponse{}
 
 	if dl := waitDownlinkTolerant(wctx, t, ue, "DownlinkNASTransport"); dl != nil && dl.NASPDU != nil {
 		if nasBytes, berr := nasPDUBytes(dl); berr == nil {
@@ -674,7 +674,7 @@ func handleENBAttachComplete(ctx context.Context, enb *store.ENBContext, ue *sto
 	return resp, nil
 }
 
-func sendUplink(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, nasPDU []byte, req *SendENBNASRequest) error {
+func sendUplink(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, nasPDU []byte, req *SendENBUES1APRequest) error {
 	mmeID, enbID := forgeIDs(ue, req)
 
 	ul, err := s1ap.BuildUplinkNASTransport(s1ap.UplinkNASTransportParams{
@@ -690,7 +690,7 @@ func sendUplink(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1AP
 	return t.Send(ul, false)
 }
 
-func handleENBUeCapabilityInfo(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBUeCapabilityInfo(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	cap := []byte{0x01, 0x02, 0x03, 0x04, 0x05}
 	if req.UERadioCapability != "" {
 		b, err := hex.DecodeString(req.UERadioCapability)
@@ -717,10 +717,10 @@ func handleENBUeCapabilityInfo(ctx context.Context, enb *store.ENBContext, ue *s
 
 	resp, _ := t.WaitForMessage(wctx, "ErrorIndication")
 
-	return &SendENBNASResponse{S1AP: resp}, nil
+	return &SendENBUES1APResponse{S1AP: resp}, nil
 }
 
-func forgeIDs(ue *store.UEEPSContext, req *SendENBNASRequest) (uint32, uint32) {
+func forgeIDs(ue *store.UEEPSContext, req *SendENBUES1APRequest) (uint32, uint32) {
 	mmeID, enbID := ue.MMEUES1APID, ue.ENBUES1APID
 	if req == nil {
 		return mmeID, enbID
@@ -737,7 +737,7 @@ func forgeIDs(ue *store.UEEPSContext, req *SendENBNASRequest) (uint32, uint32) {
 	return mmeID, enbID
 }
 
-func handleENBPathSwitch(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBPathSwitch(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	if !ue.SecurityActive {
 		return nil, fmt.Errorf("no UE context; complete an attach first")
 	}
@@ -793,13 +793,13 @@ func handleENBPathSwitch(ctx context.Context, enb *store.ENBContext, ue *store.U
 
 	dl := waitDownlinkTolerant(ctx, t, ue, "PathSwitchRequestAcknowledge", "PathSwitchRequestFailure")
 	if dl == nil {
-		return &SendENBNASResponse{}, nil
+		return &SendENBUES1APResponse{}, nil
 	}
 
-	return &SendENBNASResponse{S1AP: dl}, nil
+	return &SendENBUES1APResponse{S1AP: dl}, nil
 }
 
-func handleENBPdnConnectivity(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBPdnConnectivity(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	if !ue.SecurityActive {
 		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
 	}
@@ -835,7 +835,7 @@ func handleENBPdnConnectivity(ctx context.Context, enb *store.ENBContext, ue *st
 
 	dl := waitDownlinkTolerant(ctx, t, ue, "ERABSetupRequest", "DownlinkNASTransport")
 	if dl == nil {
-		return &SendENBNASResponse{}, nil
+		return &SendENBUES1APResponse{}, nil
 	}
 
 	nasBytes, err := nasPDUBytes(dl)
@@ -856,22 +856,22 @@ func handleENBPdnConnectivity(ctx context.Context, enb *store.ENBContext, ue *st
 	annotateSecurityHeaderType(nas, nasBytes)
 
 	if dl.MessageType != "ERABSetupRequest" || nas.MessageType != "activate_default_eps_bearer_context_request" {
-		return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
+		return &SendENBUES1APResponse{S1AP: dl, NAS: nas}, nil
 	}
 
 	// Withholding the accept leaves timer T3485 running so its retransmission is observable (TS 24.301 §6.4.1.6 a).
 	if req.WithholdAccept {
-		return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
+		return &SendENBUES1APResponse{S1AP: dl, NAS: nas}, nil
 	}
 
 	if err := acceptAdditionalBearer(enb, ue, t, dl, nas, req); err != nil {
 		return nil, err
 	}
 
-	return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
+	return &SendENBUES1APResponse{S1AP: dl, NAS: nas}, nil
 }
 
-func acceptAdditionalBearer(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, dl *s1ap.S1APResponse, nas *naseps.NASResponse, req *SendENBNASRequest) error {
+func acceptAdditionalBearer(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, dl *s1ap.S1APResponse, nas *naseps.NASResponse, req *SendENBUES1APRequest) error {
 	if nas.EPSBearerIdentity == nil {
 		return fmt.Errorf("activate default without an EPS bearer identity")
 	}
@@ -923,7 +923,7 @@ func acceptAdditionalBearer(enb *store.ENBContext, ue *store.UEEPSContext, t *tr
 	return sendUplink(enb, ue, t, protectedAccept, req)
 }
 
-func handleENBPdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBPdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	if !ue.SecurityActive {
 		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
 	}
@@ -954,7 +954,7 @@ func handleENBPdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *stor
 
 	dl := waitDownlinkTolerant(ctx, t, ue, "ERABReleaseCommand", "DownlinkNASTransport")
 	if dl == nil {
-		return &SendENBNASResponse{}, nil
+		return &SendENBUES1APResponse{}, nil
 	}
 
 	nasBytes, err := nasPDUBytes(dl)
@@ -976,7 +976,7 @@ func handleENBPdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *stor
 
 	// Withholding the accept leaves timer T3495 running so its retransmission is observable (TS 24.301 §6.4.4.5 a).
 	if req.WithholdAccept {
-		return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
+		return &SendENBUES1APResponse{S1AP: dl, NAS: nas}, nil
 	}
 
 	if nas.MessageType == "deactivate_eps_bearer_context_request" && nas.EPSBearerIdentity != nil {
@@ -1015,13 +1015,13 @@ func handleENBPdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *stor
 		delete(ue.Bearers, deactEBI)
 	}
 
-	return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
+	return &SendENBUES1APResponse{S1AP: dl, NAS: nas}, nil
 }
 
 // TS 24.301 §9.9.4.4.
 const esmCauseProtocolErrorUnspec uint8 = 111
 
-func handleENBStatusESM(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBStatusESM(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	if !ue.SecurityActive {
 		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
 	}
@@ -1039,7 +1039,7 @@ func handleENBStatusESM(enb *store.ENBContext, ue *store.UEEPSContext, t *transp
 	return sendESM(enb, ue, t, esm, req)
 }
 
-func handleENBBearerResourceAllocation(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBBearerResourceAllocation(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	if !ue.SecurityActive {
 		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
 	}
@@ -1052,7 +1052,7 @@ func handleENBBearerResourceAllocation(enb *store.ENBContext, ue *store.UEEPSCon
 	return sendESM(enb, ue, t, esm, req)
 }
 
-func handleENBBearerResourceModification(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBBearerResourceModification(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	if !ue.SecurityActive {
 		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
 	}
@@ -1065,7 +1065,7 @@ func handleENBBearerResourceModification(enb *store.ENBContext, ue *store.UEEPSC
 	return sendESM(enb, ue, t, esm, req)
 }
 
-func handleENBEsmInformationResponse(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBEsmInformationResponse(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	if !ue.SecurityActive {
 		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
 	}
@@ -1078,7 +1078,7 @@ func handleENBEsmInformationResponse(enb *store.ENBContext, ue *store.UEEPSConte
 	return sendESM(enb, ue, t, esm, req)
 }
 
-func handleENBModifyBearerAccept(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBModifyBearerAccept(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	if !ue.SecurityActive {
 		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
 	}
@@ -1091,7 +1091,7 @@ func handleENBModifyBearerAccept(enb *store.ENBContext, ue *store.UEEPSContext, 
 	return sendESM(enb, ue, t, esm, req)
 }
 
-func handleENBDeactivateBearerAccept(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBDeactivateBearerAccept(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	if !ue.SecurityActive {
 		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
 	}
@@ -1104,7 +1104,7 @@ func handleENBDeactivateBearerAccept(enb *store.ENBContext, ue *store.UEEPSConte
 	return sendESM(enb, ue, t, esm, req)
 }
 
-func sendESM(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, esm []byte, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func sendESM(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, esm []byte, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	protected, err := naseps.Protect(esm, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 	if err != nil {
 		return nil, err
@@ -1114,10 +1114,10 @@ func sendESM(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTra
 		return nil, err
 	}
 
-	return &SendENBNASResponse{}, nil
+	return &SendENBUES1APResponse{}, nil
 }
 
-func esmBearerID(ue *store.UEEPSContext, req *SendENBNASRequest) uint8 {
+func esmBearerID(ue *store.UEEPSContext, req *SendENBUES1APRequest) uint8 {
 	if req.EPSBearerIdentity != nil {
 		return *req.EPSBearerIdentity
 	}
@@ -1125,7 +1125,7 @@ func esmBearerID(ue *store.UEEPSContext, req *SendENBNASRequest) uint8 {
 	return ue.EPSBearerID
 }
 
-func esmPTI(req *SendENBNASRequest) uint8 {
+func esmPTI(req *SendENBUES1APRequest) uint8 {
 	if req.PTI != nil {
 		return *req.PTI
 	}
@@ -1133,7 +1133,7 @@ func esmPTI(req *SendENBNASRequest) uint8 {
 	return 0
 }
 
-func handleENBErrorIndication(ctx context.Context, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBErrorIndication(ctx context.Context, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	encoded, err := s1ap.BuildErrorIndication(sourceMMEID(ue, req), sourceENBID(ue, req), causeRadioNetworkUnspecified)
 	if err != nil {
 		return nil, err
@@ -1145,10 +1145,10 @@ func handleENBErrorIndication(ctx context.Context, ue *store.UEEPSContext, t *tr
 
 	resp := waitDownlinkTolerant(ctx, t, ue, "UEContextReleaseCommand", "ErrorIndication")
 
-	return &SendENBNASResponse{S1AP: resp}, nil
+	return &SendENBUES1APResponse{S1AP: resp}, nil
 }
 
-func handleENBInitialContextSetupFailure(ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBInitialContextSetupFailure(ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	encoded, err := s1ap.BuildInitialContextSetupFailure(sourceMMEID(ue, req), sourceENBID(ue, req), causeRadioNetworkUnspecified)
 	if err != nil {
 		return nil, err
@@ -1158,10 +1158,10 @@ func handleENBInitialContextSetupFailure(ue *store.UEEPSContext, t *transport.S1
 		return nil, err
 	}
 
-	return &SendENBNASResponse{}, nil
+	return &SendENBUES1APResponse{}, nil
 }
 
-func handleENBModifyResponse(ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBModifyResponse(ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	encoded, err := s1ap.BuildERABModifyResponse(ue.MMEUES1APID, ue.ENBUES1APID, []uint8{esmBearerID(ue, req)})
 	if err != nil {
 		return nil, err
@@ -1171,10 +1171,10 @@ func handleENBModifyResponse(ue *store.UEEPSContext, t *transport.S1APTransport,
 		return nil, err
 	}
 
-	return &SendENBNASResponse{}, nil
+	return &SendENBUES1APResponse{}, nil
 }
 
-func handleENBTrackingAreaUpdate(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBTrackingAreaUpdate(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	if !ue.SecurityActive {
 		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
 	}
@@ -1214,7 +1214,7 @@ func handleENBTrackingAreaUpdate(ctx context.Context, enb *store.ENBContext, ue 
 
 	dl := waitDownlinkTolerant(ctx, t, ue, "DownlinkNASTransport")
 	if dl == nil {
-		return &SendENBNASResponse{}, nil
+		return &SendENBUES1APResponse{}, nil
 	}
 
 	nasBytes, err := nasPDUBytes(dl)
@@ -1229,7 +1229,7 @@ func handleENBTrackingAreaUpdate(ctx context.Context, enb *store.ENBContext, ue 
 
 	if sht == naseps.SHTPlain {
 		nas, derr := naseps.Decode(nasBytes)
-		return &SendENBNASResponse{S1AP: dl, NAS: annotateSecurityHeaderType(nas, nasBytes)}, derr
+		return &SendENBUES1APResponse{S1AP: dl, NAS: annotateSecurityHeaderType(nas, nasBytes)}, derr
 	}
 
 	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
@@ -1269,10 +1269,10 @@ func handleENBTrackingAreaUpdate(ctx context.Context, enb *store.ENBContext, ue 
 		}
 	}
 
-	return &SendENBNASResponse{S1AP: dl, NAS: nas}, nil
+	return &SendENBUES1APResponse{S1AP: dl, NAS: nas}, nil
 }
 
-func handleENBReleaseRequest(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBReleaseRequest(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	mmeID, enbID := forgeIDs(ue, req)
 
 	cause := s1ap.CauseRadioNetworkUserInactivity
@@ -1291,16 +1291,16 @@ func handleENBReleaseRequest(ctx context.Context, enb *store.ENBContext, ue *sto
 
 	if req.MMEUES1APIDOverride != nil || req.ENBUES1APIDOverride != nil {
 		resp, _ := t.WaitForMessage(ctx, "ErrorIndication", "UEContextReleaseCommand")
-		return &SendENBNASResponse{S1AP: resp}, nil
+		return &SendENBUES1APResponse{S1AP: resp}, nil
 	}
 
 	dl, err := waitDownlink(ctx, t, ue, "UEContextReleaseCommand", "ErrorIndication")
 	if err != nil {
-		return &SendENBNASResponse{}, nil
+		return &SendENBUES1APResponse{}, nil
 	}
 
 	if dl.MessageType != "UEContextReleaseCommand" {
-		return &SendENBNASResponse{S1AP: dl}, nil
+		return &SendENBUES1APResponse{S1AP: dl}, nil
 	}
 
 	comp, err := s1ap.BuildUEContextReleaseComplete(ue.MMEUES1APID, ue.ENBUES1APID)
@@ -1312,10 +1312,10 @@ func handleENBReleaseRequest(ctx context.Context, enb *store.ENBContext, ue *sto
 		return nil, err
 	}
 
-	return &SendENBNASResponse{S1AP: dl}, nil
+	return &SendENBUES1APResponse{S1AP: dl}, nil
 }
 
-func handleENBServiceRequest(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBServiceRequest(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	if !ue.SecurityActive {
 		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
 	}
@@ -1358,11 +1358,11 @@ func handleENBServiceRequest(ctx context.Context, enb *store.ENBContext, ue *sto
 
 	dl := waitDownlinkTolerant(ctx, t, ue, "InitialContextSetupRequest", "DownlinkNASTransport")
 	if dl == nil {
-		return &SendENBNASResponse{}, nil
+		return &SendENBUES1APResponse{}, nil
 	}
 
 	learnMMEID(ue, dl)
-	resp := &SendENBNASResponse{S1AP: dl}
+	resp := &SendENBUES1APResponse{S1AP: dl}
 
 	switch dl.MessageType {
 	case "InitialContextSetupRequest":
@@ -1389,7 +1389,7 @@ func handleENBServiceRequest(ctx context.Context, enb *store.ENBContext, ue *sto
 	return resp, nil
 }
 
-func handleENBDetach(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBDetach(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	if !ue.SecurityActive {
 		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
 	}
@@ -1425,7 +1425,7 @@ func handleENBDetach(ctx context.Context, enb *store.ENBContext, ue *store.UEEPS
 	}
 
 	if req.SwitchOff {
-		return &SendENBNASResponse{S1AP: waitDownlinkTolerant(ctx, t, ue, "UEContextReleaseCommand")}, nil
+		return &SendENBUES1APResponse{S1AP: waitDownlinkTolerant(ctx, t, ue, "UEContextReleaseCommand")}, nil
 	}
 
 	dl, err := waitDownlink(ctx, t, ue, "DownlinkNASTransport")
@@ -1433,7 +1433,7 @@ func handleENBDetach(ctx context.Context, enb *store.ENBContext, ue *store.UEEPS
 		return nil, err
 	}
 
-	resp := &SendENBNASResponse{S1AP: dl}
+	resp := &SendENBUES1APResponse{S1AP: dl}
 
 	if dl.NASPDU != nil {
 		nasBytes, berr := nasPDUBytes(dl)
@@ -1456,7 +1456,7 @@ func handleENBDetach(ctx context.Context, enb *store.ENBContext, ue *store.UEEPS
 	return resp, nil
 }
 
-func handleENBInjectNAS(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBInjectNAS(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	var nasPDU []byte
 
 	switch {
@@ -1501,10 +1501,10 @@ func handleENBInjectNAS(ctx context.Context, enb *store.ENBContext, ue *store.UE
 
 	resp, err := t.WaitForMessage(ctx, "DownlinkNASTransport", "ErrorIndication", "UEContextReleaseCommand")
 	if err != nil {
-		return &SendENBNASResponse{}, nil
+		return &SendENBUES1APResponse{}, nil
 	}
 
-	return &SendENBNASResponse{S1AP: resp}, nil
+	return &SendENBUES1APResponse{S1AP: resp}, nil
 }
 
 func waitDownlinkTolerant(ctx context.Context, t *transport.S1APTransport, ue *store.UEEPSContext, types ...string) *s1ap.S1APResponse {

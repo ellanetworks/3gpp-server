@@ -36,7 +36,7 @@ func NewHandler(s *store.Store) *Handler {
 var defaultNGSetupWait = []string{"NGSetupResponse", "NGSetupFailure", "ErrorIndication"}
 
 func (h *Handler) CreateGNB(w http.ResponseWriter, r *http.Request) {
-	var req CreateGnBRequest
+	var req CreateGNBRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
 		return
@@ -47,7 +47,7 @@ func (h *Handler) CreateGNB(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	localAddr := req.GnBN2Address
+	localAddr := req.GNBN2Address
 	if localAddr == "" {
 		localAddr = "0.0.0.0"
 	}
@@ -63,12 +63,12 @@ func (h *Handler) CreateGNB(w http.ResponseWriter, r *http.Request) {
 		slices = append(slices, store.SliceConfig{SST: s.SST, SD: s.SD})
 	}
 
-	gnb := h.Store.CreateGNB(req.MCC, req.MNC, req.TAC, req.GnbID, req.Name, req.SST, req.SD, slices)
+	gnb := h.Store.CreateGNB(req.MCC, req.MNC, req.TAC, req.GNBID, req.Name, req.SST, req.SD, slices)
 	gnb.N3Addr = localAddr
 	h.Transports[gnb.ID] = t
 
 	if req.EnableGTPU {
-		n3 := req.GnBN3Address
+		n3 := req.GNBN3Address
 		if n3 == "" {
 			n3 = localAddr
 		}
@@ -85,7 +85,7 @@ func (h *Handler) CreateGNB(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.SkipNGSetup {
-		writeJSON(w, http.StatusCreated, CreateGnBResponse{GnBID: gnb.ID})
+		writeJSON(w, http.StatusCreated, CreateGNBResponse{GNBID: gnb.ID})
 		return
 	}
 
@@ -119,7 +119,7 @@ func (h *Handler) CreateGNB(w http.ResponseWriter, r *http.Request) {
 				MCC:    req.MCC,
 				MNC:    req.MNC,
 				TAC:    req.TAC,
-				GnbID:  req.GnbID,
+				GnbID:  req.GNBID,
 				Name:   req.Name,
 				SST:    req.SST,
 				SD:     req.SD,
@@ -162,8 +162,8 @@ func (h *Handler) CreateGNB(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, CreateGnBResponse{
-		GnBID:           gnb.ID,
+	writeJSON(w, http.StatusCreated, CreateGNBResponse{
+		GNBID:           gnb.ID,
 		NGSetupResponse: ngapResp,
 	})
 }
@@ -177,12 +177,12 @@ func (h *Handler) GetGNB(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, GnBStateResponse{
+	writeJSON(w, http.StatusOK, GNBStateResponse{
 		ID:    gnb.ID,
 		MCC:   gnb.MCC,
 		MNC:   gnb.MNC,
 		TAC:   gnb.TAC,
-		GnbID: gnb.GNBID,
+		GNBID: gnb.GNBID,
 		Name:  gnb.Name,
 		SST:   gnb.SST,
 		SD:    gnb.SD,

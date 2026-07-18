@@ -17,7 +17,7 @@ func Test4GUplinkForgedAPID(t *testing.T) {
 	ueID := mustCreateENBUE(t, enbID)
 	fullAttach(t, enbID, ueID)
 
-	status, body := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas",
+	status, body := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap",
 		fmt.Sprintf(`{"message_type":"tracking_area_update","mme_ue_s1ap_id_override":%d,"timeout_ms":2000}`, forgedMMEID))
 	if status != 200 {
 		t.Fatalf("tracking_area_update with a forged MME UE S1AP ID: HTTP %d\n  body: %s", status, body)

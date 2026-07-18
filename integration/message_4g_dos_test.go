@@ -86,7 +86,7 @@ func Test4GOversizedPDU(t *testing.T) {
 
 	// ~8 KB stays within the S1AP OCTET STRING encoder's 16 K bound.
 	body := fmt.Sprintf(`{"message_type":"attach_request","raw_nas_pdu":%q,"timeout_ms":800}`, strings.Repeat("cd", 8000))
-	if status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas", body); status != 200 {
+	if status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap", body); status != 200 {
 		t.Fatalf("oversized NAS: server failed to handle it (HTTP %d): %s", status, resp)
 	}
 

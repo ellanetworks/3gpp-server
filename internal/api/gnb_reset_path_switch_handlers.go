@@ -14,7 +14,7 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/transport"
 )
 
-func handleGnBPathSwitchRequest(ctx context.Context, gnb *store.GNBContext, t *transport.NGAPTransport, req *SendGnBNGAPRequest) (*SendNGAPResponse, error) {
+func handleGNBPathSwitchRequest(ctx context.Context, gnb *store.GNBContext, t *transport.NGAPTransport, req *SendGNBNGAPRequest) (*SendGNBUENGAPResponse, error) {
 	if req.AMFUENGAPID == nil || req.RANUENGAPID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "amf_ue_ngap_id and ran_ue_ngap_id are required")
 	}
@@ -76,7 +76,7 @@ func handleGnBPathSwitchRequest(ctx context.Context, gnb *store.GNBContext, t *t
 	}
 
 	if len(req.WaitFor) == 0 {
-		return &SendNGAPResponse{}, nil
+		return &SendGNBUENGAPResponse{}, nil
 	}
 
 	ngapResp, err := t.WaitForMessage(ctx, req.WaitFor...)
@@ -84,7 +84,7 @@ func handleGnBPathSwitchRequest(ctx context.Context, gnb *store.GNBContext, t *t
 		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for %v: %v", req.WaitFor, err)
 	}
 
-	return &SendNGAPResponse{NGAP: ngapResp}, nil
+	return &SendGNBUENGAPResponse{NGAP: ngapResp}, nil
 }
 
 func pathSwitchSecurityCapabilities(in *UESecurityCapabilitiesInput) (ngap.UESecurityCapabilities, error) {
@@ -133,7 +133,7 @@ func pathSwitchSecurityCapabilities(in *UESecurityCapabilitiesInput) (ngap.UESec
 	return caps, nil
 }
 
-func handleGnBRawNGAP(ctx context.Context, t *transport.NGAPTransport, req *SendGnBNGAPRequest) (*SendNGAPResponse, error) {
+func handleGNBRawNGAP(ctx context.Context, t *transport.NGAPTransport, req *SendGNBNGAPRequest) (*SendGNBUENGAPResponse, error) {
 	pdu, err := hex.DecodeString(*req.RawNGAPPDU)
 	if err != nil {
 		return nil, httpErrorf(http.StatusBadRequest, "decode raw_ngap_pdu: %v", err)
@@ -144,7 +144,7 @@ func handleGnBRawNGAP(ctx context.Context, t *transport.NGAPTransport, req *Send
 	}
 
 	if len(req.WaitFor) == 0 {
-		return &SendNGAPResponse{}, nil
+		return &SendGNBUENGAPResponse{}, nil
 	}
 
 	ngapResp, err := t.WaitForMessage(ctx, req.WaitFor...)
@@ -152,10 +152,10 @@ func handleGnBRawNGAP(ctx context.Context, t *transport.NGAPTransport, req *Send
 		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for %v: %v", req.WaitFor, err)
 	}
 
-	return &SendNGAPResponse{NGAP: ngapResp}, nil
+	return &SendGNBUENGAPResponse{NGAP: ngapResp}, nil
 }
 
-func handleGnBNGReset(ctx context.Context, gnb *store.GNBContext, t *transport.NGAPTransport, req *SendGnBNGAPRequest) (*SendNGAPResponse, error) {
+func handleGNBNGReset(ctx context.Context, gnb *store.GNBContext, t *transport.NGAPTransport, req *SendGNBNGAPRequest) (*SendGNBUENGAPResponse, error) {
 	var connections []ngap.NGResetConnection
 
 	for _, ueID := range req.ResetUEIDs {
@@ -183,5 +183,5 @@ func handleGnBNGReset(ctx context.Context, gnb *store.GNBContext, t *transport.N
 		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for NGResetAcknowledge: %v", err)
 	}
 
-	return &SendNGAPResponse{NGAP: ngapResp}, nil
+	return &SendGNBUENGAPResponse{NGAP: ngapResp}, nil
 }

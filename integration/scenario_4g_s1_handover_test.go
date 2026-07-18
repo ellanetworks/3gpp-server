@@ -131,7 +131,7 @@ func runS1HandoverFlow(t *testing.T, sourceENB, targetENB, ueID string) {
 
 	const statusContainer = "0a1b2c3d"
 
-	status, body = doRequest(t, "POST", "/enb/"+sourceENB+"/ue/"+ueID+"/nas",
+	status, body = doRequest(t, "POST", "/enb/"+sourceENB+"/ue/"+ueID+"/s1ap",
 		fmt.Sprintf(`{"message_type":"enb_status_transfer","status_transfer_container":%q}`, statusContainer))
 	if status != 200 {
 		t.Fatalf("enb_status_transfer: HTTP %d\n  body: %s", status, body)

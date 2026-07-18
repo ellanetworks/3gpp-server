@@ -23,7 +23,7 @@ type CreateENBUEResponse struct {
 	ENBUES1APID uint32 `json:"enb_ue_s1ap_id"`
 }
 
-type SendENBNASRequest struct {
+type SendENBUES1APRequest struct {
 	MessageType string `json:"message_type"`
 
 	PDNType     uint8 `json:"pdn_type,omitempty"`
@@ -126,7 +126,7 @@ type MigrateENBUEResponse struct {
 	ENBUES1APID uint32 `json:"enb_ue_s1ap_id"`
 }
 
-type SendENBNASResponse struct {
+type SendENBUES1APResponse struct {
 	S1AP        *s1ap.S1APResponse  `json:"s1ap,omitempty"`
 	NAS         *naseps.NASResponse `json:"nas,omitempty"`
 	MACVerified *bool               `json:"mac_verified,omitempty"`

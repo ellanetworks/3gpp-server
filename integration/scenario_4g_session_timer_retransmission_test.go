@@ -67,7 +67,7 @@ func Test4GT3486_ModifyBearerRetransmitted(t *testing.T) {
 	// Unasserted: stops T3486 so the bearer commits the modification.
 	accept := fmt.Sprintf(`{"message_type":"modify_eps_bearer_context_accept","eps_bearer_identity":%s,"pti":%s}`,
 		jsonGet(first, "nas.eps_bearer_identity"), jsonGet(first, "nas.bearer_pti"))
-	doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas", accept)
+	doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap", accept)
 }
 
 // TS 24.301 §6.4.1.6 a): on the first expiry of T3485 the MME "shall resend the ACTIVATE

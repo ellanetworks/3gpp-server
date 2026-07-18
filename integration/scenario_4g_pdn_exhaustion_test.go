@@ -86,7 +86,7 @@ func Test4GPDNConnectivityPoolExhausted(t *testing.T) {
 	var leases []lease
 	t.Cleanup(func() {
 		for _, l := range leases {
-			doRequest(t, "POST", "/enb/"+enbID+"/ue/"+l.ueID+"/nas",
+			doRequest(t, "POST", "/enb/"+enbID+"/ue/"+l.ueID+"/s1ap",
 				fmt.Sprintf(`{"message_type":"pdn_disconnect","linked_ebi":%s,"pti":9,"timeout_ms":2000}`, l.ebi))
 		}
 	})

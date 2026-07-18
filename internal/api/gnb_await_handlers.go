@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"net/http"
 
-	nasCodec "github.com/ellanetworks/3gpp-server/internal/nas"
+	"github.com/ellanetworks/3gpp-server/internal/nas"
 	"github.com/ellanetworks/3gpp-server/internal/ngap"
 	"github.com/ellanetworks/3gpp-server/internal/store"
 )
@@ -35,7 +35,7 @@ func ueNGAPMatcher(ranID, amfID int64) func(*ngap.NGAPResponse) bool {
 	}
 }
 
-func (h *Handler) AwaitUEMessage(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) AwaitGNBUEMessage(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 	ueID := r.PathValue("ue_id")
 
@@ -71,11 +71,11 @@ func (h *Handler) AwaitUEMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp, NAS: decodeNASFromNGAP(ue, ngapResp)})
+	writeJSON(w, http.StatusOK, SendGNBUENGAPResponse{NGAP: ngapResp, NAS: decodeNASFromNGAP(ue, ngapResp)})
 }
 
-func decodeNASFromNGAP(ue *store.UEContext, ngapResp *ngap.NGAPResponse) *nasCodec.NASResponse {
-	var nasResp *nasCodec.NASResponse
+func decodeNASFromNGAP(ue *store.UEContext, ngapResp *ngap.NGAPResponse) *nas.NASResponse {
+	var nasResp *nas.NASResponse
 
 	if ngapResp.NasPDU != nil {
 		if nasPDUBytes, err := hex.DecodeString(*ngapResp.NasPDU); err == nil {
@@ -86,7 +86,7 @@ func decodeNASFromNGAP(ue *store.UEContext, ngapResp *ngap.NGAPResponse) *nasCod
 	return nasResp
 }
 
-func (h *Handler) AwaitGnBMessage(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) AwaitGNBMessage(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 
 	if _, err := h.Store.GetGNB(gnbID); err != nil {
@@ -114,5 +114,5 @@ func (h *Handler) AwaitGnBMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, SendNGAPResponse{NGAP: ngapResp})
+	writeJSON(w, http.StatusOK, SendGNBUENGAPResponse{NGAP: ngapResp})
 }

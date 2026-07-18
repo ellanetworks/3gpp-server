@@ -47,7 +47,7 @@ paths:
 
   /gnb:
     post:
-      operationId: createGnB
+      operationId: createGNB
       summary: Create gNB
       description: |
         Dials SCTP to the AMF, sends an NGSetupRequest, and returns the
@@ -61,14 +61,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateGnBRequest"
+              $ref: "#/components/schemas/CreateGNBRequest"
       responses:
         "201":
           description: gNB created and NG Setup completed.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CreateGnBResponse"
+                $ref: "#/components/schemas/CreateGNBResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "502":
@@ -78,7 +78,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/gnb_id"
     get:
-      operationId: getGnB
+      operationId: getGNB
       summary: Get gNB state
       responses:
         "200":
@@ -86,11 +86,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/GnBStateResponse"
+                $ref: "#/components/schemas/GNBStateResponse"
         "404":
           $ref: "#/components/responses/NotFound"
     delete:
-      operationId: deleteGnB
+      operationId: deleteGNB
       summary: Delete gNB
       description: Closes the SCTP connection and removes the gNB.
       responses:
@@ -178,7 +178,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-  /enb/{enb_id}/ue/{ue_id}/nas:
+  /enb/{enb_id}/ue/{ue_id}/s1ap:
     parameters:
       - $ref: "#/components/parameters/enb_id"
       - $ref: "#/components/parameters/ue_id"
@@ -270,14 +270,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SendENBNASRequest"
+              $ref: "#/components/schemas/SendENBUES1APRequest"
       responses:
         "200":
           description: MME reply (S1AP and/or decoded NAS).
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SendENBNASResponse"
+                $ref: "#/components/schemas/SendENBUES1APResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -447,7 +447,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SendENBNASResponse"
+                $ref: "#/components/schemas/SendENBUES1APResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -491,7 +491,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SendENBNASResponse"
+                $ref: "#/components/schemas/SendENBUES1APResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -533,7 +533,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SendENBNASResponse"
+                $ref: "#/components/schemas/SendENBUES1APResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -669,14 +669,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateUERequest"
+              $ref: "#/components/schemas/CreateGNBUERequest"
       responses:
         "201":
           description: UE created.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CreateUEResponse"
+                $ref: "#/components/schemas/CreateGNBUEResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -696,7 +696,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UEStateResponse"
+                $ref: "#/components/schemas/GNBUEStateResponse"
         "404":
           $ref: "#/components/responses/NotFound"
     patch:
@@ -710,7 +710,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/PatchUERequest"
+              $ref: "#/components/schemas/PatchGNBUERequest"
       responses:
         "204":
           description: UE patched.
@@ -731,7 +731,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/gnb_id"
     post:
-      operationId: sendGnBNGAP
+      operationId: sendGNBNGAP
       summary: Send a gNB-level (non-UE-associated) NGAP message
       description: |
         Sends a non-UE-associated NGAP message on the gNB's existing N2
@@ -841,7 +841,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/gnb_id"
     post:
-      operationId: awaitGnBMessage
+      operationId: awaitGNBMessage
       summary: Await an unsolicited downlink NGAP message
       description: |
         Blocks until one of the given NGAP message types arrives on the gNB's
@@ -1101,14 +1101,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SendNGAPRequest"
+              $ref: "#/components/schemas/SendGNBUENGAPRequest"
       responses:
         "200":
           description: NGAP message sent and response received.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SendNGAPResponse"
+                $ref: "#/components/schemas/SendGNBUENGAPResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -1179,7 +1179,7 @@ components:
           type: string
       required: [error]
 
-    CreateGnBRequest:
+    CreateGNBRequest:
       type: object
       required: [amf_address]
       properties:
@@ -1259,7 +1259,7 @@ components:
         sd:
           type: string
 
-    CreateGnBResponse:
+    CreateGNBResponse:
       type: object
       properties:
         gnb_id:
@@ -1267,7 +1267,7 @@ components:
         ng_setup_response:
           $ref: "#/components/schemas/NGAPResponse"
 
-    GnBStateResponse:
+    GNBStateResponse:
       type: object
       properties:
         id:
@@ -1486,7 +1486,7 @@ components:
               ue_ip:
                 type: string
 
-    SendENBNASRequest:
+    SendENBUES1APRequest:
       type: object
       required: [message_type]
       properties:
@@ -1657,7 +1657,7 @@ components:
           type: integer
           description: On handover_notify, override the E-UTRAN cell identity of the UE's new location (default 1).
 
-    SendENBNASResponse:
+    SendENBUES1APResponse:
       type: object
       properties:
         s1ap:
@@ -1671,7 +1671,7 @@ components:
             Whether a protected downlink's NAS-MAC verified under the
             independently-derived keys (set for the Security Mode Command).
 
-    CreateUERequest:
+    CreateGNBUERequest:
       type: object
       required: [supi, k, opc]
       properties:
@@ -1727,7 +1727,7 @@ components:
             only. Defaults to NEA0/1/2 + NIA0/1/2. Overridable per message via
             the send-NGAP ue_security_capability field.
 
-    CreateUEResponse:
+    CreateGNBUEResponse:
       type: object
       properties:
         ue_id:
@@ -1740,7 +1740,7 @@ components:
         ran_ue_ngap_id:
           type: integer
 
-    UEStateResponse:
+    GNBUEStateResponse:
       type: object
       properties:
         id:
@@ -1779,7 +1779,7 @@ components:
         imeisv:
           type: string
 
-    PatchUERequest:
+    PatchGNBUERequest:
       type: object
       description: Any field present is overwritten in the UE context.
       properties:
@@ -1802,7 +1802,7 @@ components:
         imeisv:
           type: string
 
-    SendNGAPRequest:
+    SendGNBUENGAPRequest:
       type: object
       required: [message_type]
       properties:
@@ -1979,7 +1979,7 @@ components:
           type: string
           description: EPS bearer context status (hex, 2 bytes).
 
-    SendNGAPResponse:
+    SendGNBUENGAPResponse:
       type: object
       properties:
         ngap:

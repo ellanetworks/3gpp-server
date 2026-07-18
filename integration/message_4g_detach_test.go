@@ -77,7 +77,7 @@ func Test4GDetach_Fuzz(t *testing.T) {
 
 			fullAttach(t, enbID, ueID)
 
-			status, body := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas", tt.body)
+			status, body := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap", tt.body)
 			if status != tt.wantHTTP {
 				t.Fatalf("HTTP %d, want %d\n  body: %s", status, tt.wantHTTP, body)
 			}

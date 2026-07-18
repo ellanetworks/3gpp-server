@@ -47,7 +47,7 @@ func Test4GPreS1SetupGating(t *testing.T) {
 
 	ueID := mustCreateENBUE(t, enbID)
 
-	status, resp = doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas",
+	status, resp = doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap",
 		`{"message_type":"attach_request","timeout_ms":1500}`)
 
 	// TS 36.413 §8.7.1 leaves a drop and an Error Indication both compliant.

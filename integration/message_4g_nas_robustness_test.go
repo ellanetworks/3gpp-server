@@ -34,7 +34,7 @@ func attachUEConcurrent(enbID, imsi string) error {
 	}
 
 	for _, s := range steps {
-		status, body, err := post("/enb/"+enbID+"/ue/"+ueID+"/nas", fmt.Sprintf(`{"message_type":%q}`, s.msg))
+		status, body, err := post("/enb/"+enbID+"/ue/"+ueID+"/s1ap", fmt.Sprintf(`{"message_type":%q}`, s.msg))
 		if err != nil {
 			return err
 		}
@@ -119,7 +119,7 @@ func Test4GMalformedNAS(t *testing.T) {
 
 			body := fmt.Sprintf(`{"message_type":"attach_request","raw_nas_pdu":%q,"timeout_ms":%d}`, g.pdu, timeout)
 
-			status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas", body)
+			status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap", body)
 			if status != 200 {
 				t.Fatalf("server failed to handle raw NAS (HTTP %d): %s", status, resp)
 			}

@@ -13,7 +13,7 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/transport"
 )
 
-func handleGnBHandoverRequired(gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) (*SendNGAPResponse, error) {
+func handleGNBHandoverRequired(gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendGNBUENGAPRequest) (*SendGNBUENGAPResponse, error) {
 	if req.TargetGnbID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "target_gnb_id is required for handover_required")
 	}
@@ -58,10 +58,10 @@ func handleGnBHandoverRequired(gnb *store.GNBContext, ue *store.UEContext, t *tr
 		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
 	}
 
-	return &SendNGAPResponse{}, nil
+	return &SendGNBUENGAPResponse{}, nil
 }
 
-func handleGnBRANStatusTransfer(ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) (*SendNGAPResponse, error) {
+func handleGNBRANStatusTransfer(ue *store.UEContext, t *transport.NGAPTransport, req *SendGNBUENGAPRequest) (*SendGNBUENGAPResponse, error) {
 	drbs := make([]ngap.DRBStatusTransferItem, 0, len(req.StatusTransferDRBs))
 	for _, d := range req.StatusTransferDRBs {
 		drbs = append(drbs, ngap.DRBStatusTransferItem{
@@ -86,10 +86,10 @@ func handleGnBRANStatusTransfer(ue *store.UEContext, t *transport.NGAPTransport,
 		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
 	}
 
-	return &SendNGAPResponse{}, nil
+	return &SendGNBUENGAPResponse{}, nil
 }
 
-func handleGnBHandoverCancel(ctx context.Context, ue *store.UEContext, t *transport.NGAPTransport, req *SendNGAPRequest) (*SendNGAPResponse, error) {
+func handleGNBHandoverCancel(ctx context.Context, ue *store.UEContext, t *transport.NGAPTransport, req *SendGNBUENGAPRequest) (*SendGNBUENGAPResponse, error) {
 	amfUeNgapID := ue.AMFUENGAPID
 	if req.AMFUENGAPIDOverride != nil {
 		amfUeNgapID = *req.AMFUENGAPIDOverride
@@ -119,10 +119,10 @@ func handleGnBHandoverCancel(ctx context.Context, ue *store.UEContext, t *transp
 		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for HandoverCancelAcknowledge: %v", err)
 	}
 
-	return &SendNGAPResponse{NGAP: ngapResp}, nil
+	return &SendGNBUENGAPResponse{NGAP: ngapResp}, nil
 }
 
-func handleGnBHandoverRequestAcknowledge(t *transport.NGAPTransport, req *SendGnBNGAPRequest) (*SendNGAPResponse, error) {
+func handleGNBHandoverRequestAcknowledge(t *transport.NGAPTransport, req *SendGNBNGAPRequest) (*SendGNBUENGAPResponse, error) {
 	if req.AMFUENGAPID == nil || req.RANUENGAPID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "amf_ue_ngap_id and ran_ue_ngap_id are required")
 	}
@@ -172,10 +172,10 @@ func handleGnBHandoverRequestAcknowledge(t *transport.NGAPTransport, req *SendGn
 		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
 	}
 
-	return &SendNGAPResponse{}, nil
+	return &SendGNBUENGAPResponse{}, nil
 }
 
-func handleGnBHandoverNotify(gnb *store.GNBContext, t *transport.NGAPTransport, req *SendGnBNGAPRequest) (*SendNGAPResponse, error) {
+func handleGNBHandoverNotify(gnb *store.GNBContext, t *transport.NGAPTransport, req *SendGNBNGAPRequest) (*SendGNBUENGAPResponse, error) {
 	if req.AMFUENGAPID == nil || req.RANUENGAPID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "amf_ue_ngap_id and ran_ue_ngap_id are required")
 	}
@@ -196,10 +196,10 @@ func handleGnBHandoverNotify(gnb *store.GNBContext, t *transport.NGAPTransport, 
 		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
 	}
 
-	return &SendNGAPResponse{}, nil
+	return &SendGNBUENGAPResponse{}, nil
 }
 
-func handleGnBHandoverFailure(t *transport.NGAPTransport, req *SendGnBNGAPRequest) (*SendNGAPResponse, error) {
+func handleGNBHandoverFailure(t *transport.NGAPTransport, req *SendGNBNGAPRequest) (*SendGNBUENGAPResponse, error) {
 	if req.AMFUENGAPID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "amf_ue_ngap_id is required for handover_failure")
 	}
@@ -218,5 +218,5 @@ func handleGnBHandoverFailure(t *transport.NGAPTransport, req *SendGnBNGAPReques
 		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
 	}
 
-	return &SendNGAPResponse{}, nil
+	return &SendGNBUENGAPResponse{}, nil
 }

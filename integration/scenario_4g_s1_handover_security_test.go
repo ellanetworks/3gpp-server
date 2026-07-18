@@ -22,7 +22,7 @@ func Test4GS1HandoverCrossENBHijack(t *testing.T) {
 	// The attacker needs only its own association up; the UE is the API vehicle.
 	attackerUE := mustCreateENBUE(t, attackerENB)
 
-	status, body := doRequest(t, "POST", "/enb/"+attackerENB+"/ue/"+attackerUE+"/nas",
+	status, body := doRequest(t, "POST", "/enb/"+attackerENB+"/ue/"+attackerUE+"/s1ap",
 		fmt.Sprintf(`{"message_type":"handover_required","target_enb_id":%q,"mme_ue_s1ap_id_override":%s,"enb_ue_s1ap_id_override":%s}`,
 			victimENB, vMME, vENB))
 	if status != 200 {

@@ -90,7 +90,7 @@ func Test4GDataNetworkChangeReactivatesBearer(t *testing.T) {
 	// The accept is mandatory for the MME to complete the deactivation (TS 24.301 §6.4.4.3).
 	accept := fmt.Sprintf(`{"message_type":"deactivate_eps_bearer_context_accept","eps_bearer_identity":%s,"pti":%s}`,
 		jsonGet(body2, "nas.eps_bearer_identity"), jsonGet(body2, "nas.bearer_pti"))
-	if s, ab := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas", accept); s != 200 {
+	if s, ab := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap", accept); s != 200 {
 		t.Fatalf("deactivate accept: HTTP %d\n  body: %s", s, ab)
 	}
 

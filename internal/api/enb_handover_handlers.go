@@ -39,7 +39,7 @@ func (h *Handler) SendENBS1AP(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	var (
-		resp *SendENBNASResponse
+		resp *SendENBUES1APResponse
 		herr error
 	)
 
@@ -71,7 +71,7 @@ func (h *Handler) SendENBS1AP(w http.ResponseWriter, r *http.Request) {
 
 // Reset is non-UE-associated: it resets the whole S1 interface, or the UE
 // associations named in reset_ue_ids (TS 36.413 §8.7.1).
-func handleENBReset(ctx context.Context, enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBNASResponse, error) {
+func handleENBReset(ctx context.Context, enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBUES1APResponse, error) {
 	var connections []s1ap.ResetConnection
 
 	for _, ueID := range req.ResetUEIDs {
@@ -99,10 +99,10 @@ func handleENBReset(ctx context.Context, enb *store.ENBContext, t *transport.S1A
 		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for ResetAcknowledge: %v", err)
 	}
 
-	return &SendENBNASResponse{S1AP: resp}, nil
+	return &SendENBUES1APResponse{S1AP: resp}, nil
 }
 
-func handleENBRawS1AP(ctx context.Context, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBNASResponse, error) {
+func handleENBRawS1AP(ctx context.Context, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBUES1APResponse, error) {
 	pdu, err := hex.DecodeString(*req.RawS1APPDU)
 	if err != nil {
 		return nil, httpErrorf(http.StatusBadRequest, "decode raw_s1ap_pdu: %v", err)
@@ -113,7 +113,7 @@ func handleENBRawS1AP(ctx context.Context, t *transport.S1APTransport, req *Send
 	}
 
 	if len(req.WaitFor) == 0 {
-		return &SendENBNASResponse{}, nil
+		return &SendENBUES1APResponse{}, nil
 	}
 
 	resp, err := t.WaitForMessage(ctx, req.WaitFor...)
@@ -121,10 +121,10 @@ func handleENBRawS1AP(ctx context.Context, t *transport.S1APTransport, req *Send
 		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for %v: %v", req.WaitFor, err)
 	}
 
-	return &SendENBNASResponse{S1AP: resp}, nil
+	return &SendENBUES1APResponse{S1AP: resp}, nil
 }
 
-func handleENBPathSwitchRequest(ctx context.Context, enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBNASResponse, error) {
+func handleENBPathSwitchRequest(ctx context.Context, enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBUES1APResponse, error) {
 	if req.MMEUES1APID == nil || req.ENBUES1APID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "mme_ue_s1ap_id and enb_ue_s1ap_id are required")
 	}
@@ -165,7 +165,7 @@ func handleENBPathSwitchRequest(ctx context.Context, enb *store.ENBContext, t *t
 	}
 
 	if len(req.WaitFor) == 0 {
-		return &SendENBNASResponse{}, nil
+		return &SendENBUES1APResponse{}, nil
 	}
 
 	resp, err := t.WaitForMessage(ctx, req.WaitFor...)
@@ -173,10 +173,10 @@ func handleENBPathSwitchRequest(ctx context.Context, enb *store.ENBContext, t *t
 		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for %v: %v", req.WaitFor, err)
 	}
 
-	return &SendENBNASResponse{S1AP: resp}, nil
+	return &SendENBUES1APResponse{S1AP: resp}, nil
 }
 
-func handleENBHandoverRequestAcknowledge(enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBNASResponse, error) {
+func handleENBHandoverRequestAcknowledge(enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBUES1APResponse, error) {
 	if req.MMEUES1APID == nil || req.ENBUES1APID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "mme_ue_s1ap_id and enb_ue_s1ap_id are required")
 	}
@@ -219,10 +219,10 @@ func handleENBHandoverRequestAcknowledge(enb *store.ENBContext, t *transport.S1A
 		return nil, err
 	}
 
-	return &SendENBNASResponse{}, nil
+	return &SendENBUES1APResponse{}, nil
 }
 
-func handleENBHandoverNotify(enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBNASResponse, error) {
+func handleENBHandoverNotify(enb *store.ENBContext, t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBUES1APResponse, error) {
 	if req.MMEUES1APID == nil || req.ENBUES1APID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "mme_ue_s1ap_id and enb_ue_s1ap_id are required")
 	}
@@ -248,10 +248,10 @@ func handleENBHandoverNotify(enb *store.ENBContext, t *transport.S1APTransport, 
 		return nil, err
 	}
 
-	return &SendENBNASResponse{}, nil
+	return &SendENBUES1APResponse{}, nil
 }
 
-func handleENBHandoverFailure(t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBNASResponse, error) {
+func handleENBHandoverFailure(t *transport.S1APTransport, req *SendENBS1APRequest) (*SendENBUES1APResponse, error) {
 	if req.MMEUES1APID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "mme_ue_s1ap_id is required for handover_failure")
 	}
@@ -270,10 +270,10 @@ func handleENBHandoverFailure(t *transport.S1APTransport, req *SendENBS1APReques
 		return nil, err
 	}
 
-	return &SendENBNASResponse{}, nil
+	return &SendENBUES1APResponse{}, nil
 }
 
-func handleENBHandoverRequired(st *store.Store, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBHandoverRequired(st *store.Store, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	if req.TargetENBID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "target_enb_id is required for handover_required")
 	}
@@ -300,10 +300,10 @@ func handleENBHandoverRequired(st *store.Store, ue *store.UEEPSContext, t *trans
 		return nil, err
 	}
 
-	return &SendENBNASResponse{}, nil
+	return &SendENBUES1APResponse{}, nil
 }
 
-func handleENBHandoverCancel(ctx context.Context, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBHandoverCancel(ctx context.Context, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	cause := s1ap.CauseRadioNetworkHandoverCancelled
 	if req.HandoverCancelCause != nil {
 		cause = *req.HandoverCancelCause
@@ -323,10 +323,10 @@ func handleENBHandoverCancel(ctx context.Context, ue *store.UEEPSContext, t *tra
 		return nil, err
 	}
 
-	return &SendENBNASResponse{S1AP: resp}, nil
+	return &SendENBUES1APResponse{S1AP: resp}, nil
 }
 
-func handleENBEnbStatusTransfer(ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBNASRequest) (*SendENBNASResponse, error) {
+func handleENBEnbStatusTransfer(ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	var container []byte
 
 	if req.StatusTransferContainer != nil {
@@ -347,10 +347,10 @@ func handleENBEnbStatusTransfer(ue *store.UEEPSContext, t *transport.S1APTranspo
 		return nil, err
 	}
 
-	return &SendENBNASResponse{}, nil
+	return &SendENBUES1APResponse{}, nil
 }
 
-func handoverRequiredCause(req *SendENBNASRequest) int {
+func handoverRequiredCause(req *SendENBUES1APRequest) int {
 	if req != nil && req.HandoverRequiredCause != nil {
 		return *req.HandoverRequiredCause
 	}
@@ -358,7 +358,7 @@ func handoverRequiredCause(req *SendENBNASRequest) int {
 	return s1ap.CauseRadioNetworkHandoverDesirableForRadioReason
 }
 
-func sourceMMEID(ue *store.UEEPSContext, req *SendENBNASRequest) uint32 {
+func sourceMMEID(ue *store.UEEPSContext, req *SendENBUES1APRequest) uint32 {
 	if req.MMEUES1APIDOverride != nil {
 		return *req.MMEUES1APIDOverride
 	}
@@ -366,7 +366,7 @@ func sourceMMEID(ue *store.UEEPSContext, req *SendENBNASRequest) uint32 {
 	return ue.MMEUES1APID
 }
 
-func sourceENBID(ue *store.UEEPSContext, req *SendENBNASRequest) uint32 {
+func sourceENBID(ue *store.UEEPSContext, req *SendENBUES1APRequest) uint32 {
 	if req.ENBUES1APIDOverride != nil {
 		return *req.ENBUES1APIDOverride
 	}

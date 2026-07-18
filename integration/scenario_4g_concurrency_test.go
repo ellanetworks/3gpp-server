@@ -34,7 +34,7 @@ func attachENBUEConcurrent(enbID, imsi string) (string, error) {
 	}
 
 	for _, s := range steps {
-		status, body, err := post("/enb/"+enbID+"/ue/"+ueID+"/nas", fmt.Sprintf(`{"message_type":%q}`, s.msg))
+		status, body, err := post("/enb/"+enbID+"/ue/"+ueID+"/s1ap", fmt.Sprintf(`{"message_type":%q}`, s.msg))
 		if err != nil {
 			return "", err
 		}
@@ -54,7 +54,7 @@ func attachENBUEConcurrent(enbID, imsi string) (string, error) {
 }
 
 func detachENBUEConcurrent(enbID, ueID string) error {
-	status, body, err := post("/enb/"+enbID+"/ue/"+ueID+"/nas", `{"message_type":"detach_request"}`)
+	status, body, err := post("/enb/"+enbID+"/ue/"+ueID+"/s1ap", `{"message_type":"detach_request"}`)
 	if err != nil {
 		return err
 	}
@@ -71,7 +71,7 @@ func detachENBUEConcurrent(enbID, ueID string) error {
 }
 
 func connectPDNENBUEConcurrent(enbID, ueID string) (string, error) {
-	status, body, err := post("/enb/"+enbID+"/ue/"+ueID+"/nas",
+	status, body, err := post("/enb/"+enbID+"/ue/"+ueID+"/s1ap",
 		`{"message_type":"pdn_connectivity","apn":"internet46","timeout_ms":4000}`)
 	if err != nil {
 		return "", err

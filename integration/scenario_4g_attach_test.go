@@ -37,7 +37,7 @@ func mustCreateENBUE(t *testing.T, enbID string) string {
 func nasStep(t *testing.T, enbID, ueID, messageType string) []byte {
 	t.Helper()
 
-	status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas",
+	status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap",
 		fmt.Sprintf(`{"message_type":%q}`, messageType))
 	if status != 200 {
 		t.Fatalf("%s: HTTP %d: %s", messageType, status, resp)

@@ -17,7 +17,7 @@ func Test4GS1HandoverCancel(t *testing.T) {
 	ueID := mustCreateENBUE(t, sourceENB)
 	fullAttach(t, sourceENB, ueID)
 
-	status, body := doRequest(t, "POST", "/enb/"+sourceENB+"/ue/"+ueID+"/nas",
+	status, body := doRequest(t, "POST", "/enb/"+sourceENB+"/ue/"+ueID+"/s1ap",
 		fmt.Sprintf(`{"message_type":"handover_required","target_enb_id":%q}`, targetENB))
 	if status != 200 {
 		t.Fatalf("handover_required: HTTP %d\n  body: %s", status, body)

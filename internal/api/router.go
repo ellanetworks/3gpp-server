@@ -23,7 +23,7 @@ func NewRouter(h *Handler) *http.ServeMux {
 	mux.HandleFunc("PATCH /enb/{enb_id}/ue/{ue_id}", h.PatchENBUE)
 	mux.HandleFunc("DELETE /enb/{enb_id}/ue/{ue_id}", h.DeleteENBUE)
 	mux.HandleFunc("GET /enb/{enb_id}/ue/{ue_id}/tunnel", h.GetENBTunnel)
-	mux.HandleFunc("POST /enb/{enb_id}/ue/{ue_id}/nas", h.SendENBNAS)
+	mux.HandleFunc("POST /enb/{enb_id}/ue/{ue_id}/s1ap", h.SendENBUES1AP)
 	mux.HandleFunc("POST /enb/{enb_id}/ue/{ue_id}/migrate", h.MigrateENBUE)
 
 	mux.HandleFunc("POST /enb/{enb_id}/s1ap", h.SendENBS1AP)
@@ -36,23 +36,23 @@ func NewRouter(h *Handler) *http.ServeMux {
 	mux.HandleFunc("POST /enb/{enb_id}/gtpu/echo", h.SendENBGTPUEcho)
 	mux.HandleFunc("POST /enb/{enb_id}/gtpu/error-indication/await", h.AwaitENBErrorIndication)
 
-	mux.HandleFunc("POST /gnb/{gnb_id}/ngap", h.SendGnBNGAP)
-	mux.HandleFunc("POST /gnb/{gnb_id}/await", h.AwaitGnBMessage)
+	mux.HandleFunc("POST /gnb/{gnb_id}/ngap", h.SendGNBNGAP)
+	mux.HandleFunc("POST /gnb/{gnb_id}/await", h.AwaitGNBMessage)
 
-	mux.HandleFunc("POST /gnb/{gnb_id}/ue", h.CreateUE)
-	mux.HandleFunc("GET /gnb/{gnb_id}/ue/{ue_id}", h.GetUE)
-	mux.HandleFunc("PATCH /gnb/{gnb_id}/ue/{ue_id}", h.PatchUE)
-	mux.HandleFunc("DELETE /gnb/{gnb_id}/ue/{ue_id}", h.DeleteUE)
+	mux.HandleFunc("POST /gnb/{gnb_id}/ue", h.CreateGNBUE)
+	mux.HandleFunc("GET /gnb/{gnb_id}/ue/{ue_id}", h.GetGNBUE)
+	mux.HandleFunc("PATCH /gnb/{gnb_id}/ue/{ue_id}", h.PatchGNBUE)
+	mux.HandleFunc("DELETE /gnb/{gnb_id}/ue/{ue_id}", h.DeleteGNBUE)
 
-	mux.HandleFunc("POST /gnb/{gnb_id}/ue/{ue_id}/migrate", h.MigrateUE)
-	mux.HandleFunc("POST /gnb/{gnb_id}/ue/{ue_id}/ngap", h.SendNGAP)
-	mux.HandleFunc("POST /gnb/{gnb_id}/ue/{ue_id}/await", h.AwaitUEMessage)
+	mux.HandleFunc("POST /gnb/{gnb_id}/ue/{ue_id}/migrate", h.MigrateGNBUE)
+	mux.HandleFunc("POST /gnb/{gnb_id}/ue/{ue_id}/ngap", h.SendGNBUENGAP)
+	mux.HandleFunc("POST /gnb/{gnb_id}/ue/{ue_id}/await", h.AwaitGNBUEMessage)
 
-	mux.HandleFunc("POST /gnb/{gnb_id}/gtpu/echo", h.SendGTPUEcho)
-	mux.HandleFunc("POST /gnb/{gnb_id}/gtpu/error-indication/await", h.AwaitErrorIndication)
-	mux.HandleFunc("GET /gnb/{gnb_id}/ue/{ue_id}/tunnel", h.GetTunnel)
-	mux.HandleFunc("POST /gnb/{gnb_id}/ue/{ue_id}/uplink", h.SendUplink)
-	mux.HandleFunc("POST /gnb/{gnb_id}/ue/{ue_id}/downlink/await", h.AwaitDownlink)
+	mux.HandleFunc("POST /gnb/{gnb_id}/gtpu/echo", h.SendGNBGTPUEcho)
+	mux.HandleFunc("POST /gnb/{gnb_id}/gtpu/error-indication/await", h.AwaitGNBErrorIndication)
+	mux.HandleFunc("GET /gnb/{gnb_id}/ue/{ue_id}/tunnel", h.GetGNBTunnel)
+	mux.HandleFunc("POST /gnb/{gnb_id}/ue/{ue_id}/uplink", h.SendGNBUplink)
+	mux.HandleFunc("POST /gnb/{gnb_id}/ue/{ue_id}/downlink/await", h.AwaitGNBDownlink)
 
 	return mux
 }

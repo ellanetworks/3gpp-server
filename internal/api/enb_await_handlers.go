@@ -41,7 +41,7 @@ func (h *Handler) AwaitENBMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, SendENBNASResponse{S1AP: resp})
+	writeJSON(w, http.StatusOK, SendENBUES1APResponse{S1AP: resp})
 }
 
 func (h *Handler) AwaitENBUEMessage(w http.ResponseWriter, r *http.Request) {
@@ -77,7 +77,7 @@ func (h *Handler) AwaitENBUEMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, SendENBNASResponse{S1AP: resp, NAS: decodeENBDownlinkNAS(ue, resp)})
+	writeJSON(w, http.StatusOK, SendENBUES1APResponse{S1AP: resp, NAS: decodeENBDownlinkNAS(ue, resp)})
 }
 
 // b[5] is the sequence number, which is the DL NAS COUNT until the first overflow.

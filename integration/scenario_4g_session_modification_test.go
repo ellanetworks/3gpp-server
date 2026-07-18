@@ -79,7 +79,7 @@ func Test4GSessionAMBRModification(t *testing.T) {
 	// The accept is mandatory for the MME to commit the modification and stop T3486 (TS 24.301 §6.4.3.3).
 	accept := fmt.Sprintf(`{"message_type":"modify_eps_bearer_context_accept","eps_bearer_identity":%s,"pti":%s}`,
 		jsonGet(body2, "nas.eps_bearer_identity"), jsonGet(body2, "nas.bearer_pti"))
-	if s, ab := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas", accept); s != 200 {
+	if s, ab := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap", accept); s != 200 {
 		t.Fatalf("modify accept: HTTP %d\n  body: %s", s, ab)
 	}
 

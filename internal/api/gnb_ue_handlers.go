@@ -11,7 +11,7 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/store"
 )
 
-func (h *Handler) CreateUE(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) CreateGNBUE(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 
 	gnb, err := h.Store.GetGNB(gnbID)
@@ -20,7 +20,7 @@ func (h *Handler) CreateUE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req CreateUERequest
+	var req CreateGNBUERequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
 		return
@@ -68,7 +68,7 @@ func (h *Handler) CreateUE(w http.ResponseWriter, r *http.Request) {
 
 	gnb.CreateUE(ue)
 
-	writeJSON(w, http.StatusCreated, CreateUEResponse{
+	writeJSON(w, http.StatusCreated, CreateGNBUEResponse{
 		UEID:        ue.ID,
 		SUPI:        ue.Supi,
 		SUCI:        ue.SuciString,
@@ -76,7 +76,7 @@ func (h *Handler) CreateUE(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) GetUE(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetGNBUE(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 	ueID := r.PathValue("ue_id")
 
@@ -92,7 +92,7 @@ func (h *Handler) GetUE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, UEStateResponse{
+	writeJSON(w, http.StatusOK, GNBUEStateResponse{
 		ID:               ue.ID,
 		SUPI:             ue.Supi,
 		SUCI:             ue.SuciString,
@@ -113,7 +113,7 @@ func (h *Handler) GetUE(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) PatchUE(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) PatchGNBUE(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 	ueID := r.PathValue("ue_id")
 
@@ -129,7 +129,7 @@ func (h *Handler) PatchUE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req PatchUERequest
+	var req PatchGNBUERequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
 		return
@@ -166,7 +166,7 @@ func (h *Handler) PatchUE(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *Handler) DeleteUE(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DeleteGNBUE(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 	ueID := r.PathValue("ue_id")
 
@@ -184,7 +184,7 @@ func (h *Handler) DeleteUE(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *Handler) MigrateUE(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) MigrateGNBUE(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 	ueID := r.PathValue("ue_id")
 
@@ -200,7 +200,7 @@ func (h *Handler) MigrateUE(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req MigrateUERequest
+	var req MigrateGNBUERequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
 		return
@@ -214,9 +214,9 @@ func (h *Handler) MigrateUE(w http.ResponseWriter, r *http.Request) {
 
 	src.MigrateUE(target, ue, req.RANUENGAPID, req.AMFUENGAPID)
 
-	writeJSON(w, http.StatusOK, MigrateUEResponse{
+	writeJSON(w, http.StatusOK, MigrateGNBUEResponse{
 		UEID:        ue.ID,
-		GnBID:       req.TargetGnbID,
+		GNBID:       req.TargetGnbID,
 		RANUENGAPID: ue.RANUENGAPID,
 		AMFUENGAPID: ue.AMFUENGAPID,
 	})

@@ -16,7 +16,7 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/store"
 )
 
-type UplinkRequest struct {
+type GNBUplinkRequest struct {
 	PDUSessionID int64 `json:"pdu_session_id,omitempty"`
 
 	TEID *uint32 `json:"teid,omitempty"`
@@ -37,12 +37,12 @@ type UplinkRequest struct {
 	Src *string `json:"src,omitempty"`
 }
 
-type AwaitDownlinkRequest struct {
+type GNBAwaitDownlinkRequest struct {
 	PDUSessionID int64 `json:"pdu_session_id,omitempty"`
 	TimeoutMs    int   `json:"timeout_ms,omitempty"`
 }
 
-func (h *Handler) gtpuSession(w http.ResponseWriter, r *http.Request, pduSessionID int64) (*gtpu.Endpoint, *store.PDUSessionInfo, bool) {
+func (h *Handler) gnbGTPU(w http.ResponseWriter, r *http.Request, pduSessionID int64) (*gtpu.Endpoint, *store.PDUSessionInfo, bool) {
 	gnbID := r.PathValue("gnb_id")
 	ueID := r.PathValue("ue_id")
 
@@ -80,14 +80,14 @@ func (h *Handler) gtpuSession(w http.ResponseWriter, r *http.Request, pduSession
 	return gt, info, true
 }
 
-func (h *Handler) SendUplink(w http.ResponseWriter, r *http.Request) {
-	var req UplinkRequest
+func (h *Handler) SendGNBUplink(w http.ResponseWriter, r *http.Request) {
+	var req GNBUplinkRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
 		return
 	}
 
-	gt, info, ok := h.gtpuSession(w, r, req.PDUSessionID)
+	gt, info, ok := h.gnbGTPU(w, r, req.PDUSessionID)
 	if !ok {
 		return
 	}
@@ -166,14 +166,14 @@ func (h *Handler) SendUplink(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"sent_bytes": len(inner)})
 }
 
-func (h *Handler) AwaitDownlink(w http.ResponseWriter, r *http.Request) {
-	var req AwaitDownlinkRequest
+func (h *Handler) AwaitGNBDownlink(w http.ResponseWriter, r *http.Request) {
+	var req GNBAwaitDownlinkRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
 		return
 	}
 
-	gt, info, ok := h.gtpuSession(w, r, req.PDUSessionID)
+	gt, info, ok := h.gnbGTPU(w, r, req.PDUSessionID)
 	if !ok {
 		return
 	}
@@ -199,7 +199,7 @@ func (h *Handler) AwaitDownlink(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-type GnBTunnelResponse struct {
+type GNBTunnelResponse struct {
 	PDUSessionID uint8  `json:"pdu_session_id"`
 	N3GnbIP      string `json:"n3_gnb_ip"`
 	DLTeid       uint32 `json:"dl_teid"`
@@ -209,7 +209,7 @@ type GnBTunnelResponse struct {
 	UEIP         string `json:"ue_ip,omitempty"`
 }
 
-func (h *Handler) GetTunnel(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetGNBTunnel(w http.ResponseWriter, r *http.Request) {
 	pduSessionID := int64(0)
 	if v := r.URL.Query().Get("pdu_session_id"); v != "" {
 		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
@@ -217,12 +217,12 @@ func (h *Handler) GetTunnel(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_, info, ok := h.gtpuSession(w, r, pduSessionID)
+	_, info, ok := h.gnbGTPU(w, r, pduSessionID)
 	if !ok {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, GnBTunnelResponse{
+	writeJSON(w, http.StatusOK, GNBTunnelResponse{
 		PDUSessionID: info.PDUSessionID,
 		N3GnbIP:      info.N3GnbIP,
 		DLTeid:       info.DLTeid,
@@ -233,7 +233,7 @@ func (h *Handler) GetTunnel(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (h *Handler) SendGTPUEcho(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) SendGNBGTPUEcho(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 
 	var req struct {
@@ -275,7 +275,7 @@ func (h *Handler) SendGTPUEcho(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-func (h *Handler) AwaitErrorIndication(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) AwaitGNBErrorIndication(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 
 	var req struct {
