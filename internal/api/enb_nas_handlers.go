@@ -264,9 +264,13 @@ func handleENBIdentityResponse(ctx context.Context, enb *store.ENBContext, ue *s
 		return nil, err
 	}
 
-	dl, err := waitDownlink(ctx, t, ue, "DownlinkNASTransport")
+	dl, err := waitDownlink(ctx, t, ue, "DownlinkNASTransport", "ErrorIndication")
 	if err != nil {
 		return nil, err
+	}
+
+	if dl.NASPDU == nil {
+		return &SendENBUES1APResponse{S1AP: dl}, nil
 	}
 
 	plain, err := nasPDUBytes(dl)
@@ -313,9 +317,13 @@ func handleENBAuthenticationFailure(ctx context.Context, enb *store.ENBContext, 
 		return nil, err
 	}
 
-	dl, err := waitDownlink(ctx, t, ue, "DownlinkNASTransport")
+	dl, err := waitDownlink(ctx, t, ue, "DownlinkNASTransport", "ErrorIndication")
 	if err != nil {
 		return nil, err
+	}
+
+	if dl.NASPDU == nil {
+		return &SendENBUES1APResponse{S1AP: dl}, nil
 	}
 
 	plain, err := nasPDUBytes(dl)
@@ -366,9 +374,13 @@ func handleENBSecurityModeComplete(ctx context.Context, enb *store.ENBContext, u
 		return &SendENBUES1APResponse{S1AP: waitDownlinkTolerant(ctx, t, ue, "InitialContextSetupRequest")}, nil
 	}
 
-	dl, err := waitDownlink(ctx, t, ue, "InitialContextSetupRequest")
+	dl, err := waitDownlink(ctx, t, ue, "InitialContextSetupRequest", "ErrorIndication")
 	if err != nil {
 		return nil, err
+	}
+
+	if dl.NASPDU == nil {
+		return &SendENBUES1APResponse{S1AP: dl}, nil
 	}
 
 	nasBytes, err := nasPDUBytes(dl)
@@ -444,7 +456,7 @@ func handleENBSecurityModeReject(ctx context.Context, enb *store.ENBContext, ue 
 		return nil, err
 	}
 
-	dl, err := waitDownlink(ctx, t, ue, "UEContextReleaseCommand")
+	dl, err := waitDownlink(ctx, t, ue, "UEContextReleaseCommand", "ErrorIndication")
 	if err != nil {
 		return nil, err
 	}
