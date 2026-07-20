@@ -6,13 +6,14 @@ package api
 import "github.com/ellanetworks/3gpp-server/internal/s1ap"
 
 type CreateENBRequest struct {
-	MMEAddress   string `json:"mme_address"`
-	ENBS1Address string `json:"enb_s1_address"`
-	MCC          string `json:"mcc"`
-	MNC          string `json:"mnc"`
-	TAC          string `json:"tac"`
-	ENBID        uint32 `json:"enb_id"`
-	Name         string `json:"name"`
+	MMEAddress     string `json:"mme_address"`
+	ENBS1Address   string `json:"enb_s1_address"`
+	MCC            string `json:"mcc"`
+	MNC            string `json:"mnc"`
+	TAC            string `json:"tac"`
+	ENBID          string `json:"enb_id"`
+	ENBIDBitLength int    `json:"enb_id_bit_length,omitempty"`
+	Name           string `json:"name"`
 
 	RawS1APPDU *string  `json:"raw_s1ap_pdu,omitempty"`
 	WaitFor    []string `json:"wait_for,omitempty"`
@@ -30,10 +31,11 @@ type CreateENBResponse struct {
 }
 
 type ENBStateResponse struct {
-	ID    string `json:"id"`
-	MCC   string `json:"mcc"`
-	MNC   string `json:"mnc"`
-	TAC   string `json:"tac"`
-	ENBID uint32 `json:"enb_id"`
-	Name  string `json:"name"`
+	ID             string `json:"id"`
+	MCC            string `json:"mcc"`
+	MNC            string `json:"mnc"`
+	TAC            string `json:"tac"`
+	ENBID          string `json:"enb_id"`
+	ENBIDBitLength int    `json:"enb_id_bit_length,omitempty"`
+	Name           string `json:"name"`
 }

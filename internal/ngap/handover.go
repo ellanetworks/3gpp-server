@@ -24,7 +24,7 @@ type HandoverAdmittedSession struct {
 type HandoverRequiredParams struct {
 	AMFUENGAPID       int64
 	RANUENGAPID       int64
-	TargetGnbID       string
+	TargetGNBID       string
 	MCC               string
 	MNC               string
 	TAC               string
@@ -80,7 +80,7 @@ func BuildHandoverRequired(p HandoverRequiredParams) ([]byte, error) {
 		return nil, fmt.Errorf("target TAC: %w", err)
 	}
 
-	gnbIDBits := ngapConvert.HexToBitString(p.TargetGnbID, 24)
+	gnbIDBits := ngapConvert.HexToBitString(p.TargetGNBID, 24)
 	add(ngapType.ProtocolIEIDTargetID, ngapType.CriticalityPresentReject,
 		ngapType.HandoverRequiredIEsPresentTargetID).TargetID = &ngapType.TargetID{
 		Present: ngapType.TargetIDPresentTargetRANNodeID,
@@ -429,7 +429,7 @@ type HandoverNotifyParams struct {
 	MCC         string
 	MNC         string
 	TAC         string
-	GnbID       string
+	GNBID       string
 }
 
 func BuildHandoverNotify(p HandoverNotifyParams) ([]byte, error) {
@@ -470,7 +470,7 @@ func BuildHandoverNotify(p HandoverNotifyParams) ([]byte, error) {
 		return nil, fmt.Errorf("TAC: %w", err)
 	}
 
-	nrCellID, err := nrCellIdentity(p.GnbID)
+	nrCellID, err := nrCellIdentity(p.GNBID)
 	if err != nil {
 		return nil, fmt.Errorf("NRCellIdentity: %w", err)
 	}

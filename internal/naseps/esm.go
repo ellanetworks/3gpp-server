@@ -296,6 +296,10 @@ func decodeDefaultBearer(container []byte, resp *NASResponse) error {
 	resp.PDNAddress = hex.EncodeToString(m.PDNAddress)
 	resp.APN = hex.EncodeToString(m.AccessPointName)
 
+	if len(m.EPSQoS) > 0 {
+		resp.EPSQoS = &EPSQoSJSON{QCI: int(m.EPSQoS[0]), RawHex: hex.EncodeToString(m.EPSQoS)}
+	}
+
 	if m.ESMCause != nil {
 		c := int(*m.ESMCause)
 		resp.BearerESMCause = &c

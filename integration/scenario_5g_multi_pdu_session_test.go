@@ -27,7 +27,7 @@ func establishNumberedPDUSession(t *testing.T, gnbID, ueID string, sessionID int
 }
 
 func Test5GMultiPDUSessionEstablish(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 	doRegistrationFlow(t, gnbID, ueID)
 
@@ -57,7 +57,7 @@ func Test5GMultiPDUSessionEstablish(t *testing.T) {
 }
 
 func Test5GMultiPDUSessionReleaseOne(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 	doRegistrationFlow(t, gnbID, ueID)
 

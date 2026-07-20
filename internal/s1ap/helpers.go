@@ -11,6 +11,33 @@ import (
 	"github.com/ellanetworks/core/s1ap"
 )
 
+// ENBIDValue parses a hex eNB-ID and maps its bit length to the eNB-ID CHOICE
+// variant (TS 36.413 §9.2.1.37): 20 macro, 28 home, 18 short-macro, 21 long-macro.
+// A zero bit length defaults to the 20-bit macro form.
+func ENBIDValue(hexID string, bitLength int) (uint32, ENBIDKind, error) {
+	var kind ENBIDKind
+
+	switch bitLength {
+	case 0, 20:
+		kind = ENBIDMacro
+	case 28:
+		kind = ENBIDHome
+	case 18:
+		kind = ENBIDShortMacro
+	case 21:
+		kind = ENBIDLongMacro
+	default:
+		return 0, 0, fmt.Errorf("enb_id_bit_length %d invalid; must be 18, 20, 21, or 28 (TS 36.413 §9.2.1.37)", bitLength)
+	}
+
+	v, err := strconv.ParseUint(hexID, 16, 32)
+	if err != nil {
+		return 0, 0, fmt.Errorf("enb_id must be a hex string: %v", err)
+	}
+
+	return uint32(v), kind, nil
+}
+
 func parseTAC(s string) (uint16, error) {
 	v, err := strconv.ParseUint(s, 16, 16)
 	if err != nil {

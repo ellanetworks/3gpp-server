@@ -14,6 +14,7 @@ type CreateGNBRequest struct {
 	MNC          string `json:"mnc"`
 	TAC          string `json:"tac"`
 	GNBID        string `json:"gnb_id"`
+	GNBIDBitLen  int    `json:"gnb_id_bit_length,omitempty"`
 	Name         string `json:"name"`
 	SST          int32  `json:"sst"`
 	SD           string `json:"sd,omitempty"`
@@ -61,19 +62,6 @@ type SendGNBNGAPRequest struct {
 	Cause             *int64  `json:"cause,omitempty"`
 }
 
-type MigrateGNBUERequest struct {
-	TargetGnbID string `json:"target_gnb_id"`
-	RANUENGAPID *int64 `json:"ran_ue_ngap_id,omitempty"`
-	AMFUENGAPID *int64 `json:"amf_ue_ngap_id,omitempty"`
-}
-
-type MigrateGNBUEResponse struct {
-	UEID        string `json:"ue_id"`
-	GNBID       string `json:"gnb_id"`
-	RANUENGAPID int64  `json:"ran_ue_ngap_id"`
-	AMFUENGAPID int64  `json:"amf_ue_ngap_id"`
-}
-
 type HandoverPDUSession struct {
 	ID          int64   `json:"id"`
 	DLTeid      uint32  `json:"dl_teid,omitempty"`
@@ -94,14 +82,15 @@ type AwaitRequest struct {
 }
 
 type GNBStateResponse struct {
-	ID    string `json:"id"`
-	MCC   string `json:"mcc"`
-	MNC   string `json:"mnc"`
-	TAC   string `json:"tac"`
-	GNBID string `json:"gnb_id"`
-	Name  string `json:"name"`
-	SST   int32  `json:"sst"`
-	SD    string `json:"sd,omitempty"`
+	ID          string `json:"id"`
+	MCC         string `json:"mcc"`
+	MNC         string `json:"mnc"`
+	TAC         string `json:"tac"`
+	GNBID       string `json:"gnb_id"`
+	GNBIDBitLen int    `json:"gnb_id_bit_length,omitempty"`
+	Name        string `json:"name"`
+	SST         int32  `json:"sst"`
+	SD          string `json:"sd,omitempty"`
 }
 
 type CreateGNBUERequest struct {
@@ -132,33 +121,24 @@ type CreateGNBUEResponse struct {
 }
 
 type GNBUEStateResponse struct {
-	ID               string `json:"id"`
-	SUPI             string `json:"supi"`
-	SUCI             string `json:"suci"`
-	MCC              string `json:"mcc"`
-	MNC              string `json:"mnc"`
-	RANUENGAPID      int64  `json:"ran_ue_ngap_id"`
-	AMFUENGAPID      int64  `json:"amf_ue_ngap_id"`
-	K                string `json:"k"`
-	OPc              string `json:"opc"`
-	Amf              string `json:"amf"`
-	Sqn              string `json:"sqn"`
-	DNN              string `json:"dnn,omitempty"`
-	SST              int32  `json:"sst,omitempty"`
-	SD               string `json:"sd,omitempty"`
-	ProtectionScheme string `json:"protection_scheme"`
-	RoutingIndicator string `json:"routing_indicator"`
-	IMEISV           string `json:"imeisv,omitempty"`
+	UEID                string         `json:"ue_id"`
+	SUPI                string         `json:"supi"`
+	SUCI                string         `json:"suci"`
+	IMEISV              string         `json:"imeisv,omitempty"`
+	UEIP                string         `json:"ue_ip"`
+	SecurityActive      bool           `json:"security_active"`
+	RANUENGAPID         int64          `json:"ran_ue_ngap_id"`
+	AMFUENGAPID         int64          `json:"amf_ue_ngap_id"`
+	DefaultPDUSessionID uint8          `json:"default_pdu_session_id"`
+	Sessions            []GNBUESession `json:"sessions"`
+	DNN                 string         `json:"dnn,omitempty"`
+	SST                 int32          `json:"sst,omitempty"`
+	SD                  string         `json:"sd,omitempty"`
+	ProtectionScheme    string         `json:"protection_scheme"`
+	RoutingIndicator    string         `json:"routing_indicator"`
 }
 
-type PatchGNBUERequest struct {
-	K           *string `json:"k,omitempty"`
-	OPc         *string `json:"opc,omitempty"`
-	Amf         *string `json:"amf,omitempty"`
-	Sqn         *string `json:"sqn,omitempty"`
-	AMFUENGAPID *int64  `json:"amf_ue_ngap_id,omitempty"`
-	DNN         *string `json:"dnn,omitempty"`
-	SST         *int32  `json:"sst,omitempty"`
-	SD          *string `json:"sd,omitempty"`
-	IMEISV      *string `json:"imeisv,omitempty"`
+type GNBUESession struct {
+	PDUSessionID uint8  `json:"pdu_session_id"`
+	UEIP         string `json:"ue_ip"`
 }

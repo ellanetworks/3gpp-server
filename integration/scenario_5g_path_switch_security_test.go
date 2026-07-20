@@ -35,8 +35,8 @@ func ngapField(body []byte, key string) any {
 }
 
 func Test5GPathSwitchRequestSuccess(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "0000c0", "ps-src")
-	targetGNB := createGnBWithID(t, "0000c1", "ps-tgt")
+	sourceGNB := createGNBWithID(t, "0000c0", "ps-src")
+	targetGNB := createGNBWithID(t, "0000c1", "ps-tgt")
 
 	ueID := establishRegisteredUEWithSUPI(t, sourceGNB, "imsi-001010000000001")
 	amf, _ := ueNGAPIDs(t, sourceGNB, ueID)
@@ -66,8 +66,8 @@ func Test5GPathSwitchRequestSuccess(t *testing.T) {
 }
 
 func Test5GPathSwitchRequestDuplicatePDUSessionIDsFailure(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "0000c2", "ps-dup-src")
-	targetGNB := createGnBWithID(t, "0000c3", "ps-dup-tgt")
+	sourceGNB := createGNBWithID(t, "0000c2", "ps-dup-src")
+	targetGNB := createGNBWithID(t, "0000c3", "ps-dup-tgt")
 
 	ueID := establishRegisteredUEWithSUPI(t, sourceGNB, "imsi-001010000000002")
 	amf, _ := ueNGAPIDs(t, sourceGNB, ueID)
@@ -92,8 +92,8 @@ func Test5GPathSwitchRequestDuplicatePDUSessionIDsFailure(t *testing.T) {
 }
 
 func Test5GPathSwitchRequestSecurityCapabilityMismatchAcknowledged(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "0000c4", "ps-sec-src")
-	targetGNB := createGnBWithID(t, "0000c5", "ps-sec-tgt")
+	sourceGNB := createGNBWithID(t, "0000c4", "ps-sec-src")
+	targetGNB := createGNBWithID(t, "0000c5", "ps-sec-tgt")
 
 	ueID := establishRegisteredUEWithSUPI(t, sourceGNB, "imsi-001010000000003")
 	amf, _ := ueNGAPIDs(t, sourceGNB, ueID)

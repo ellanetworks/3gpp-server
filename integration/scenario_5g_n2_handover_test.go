@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-func createGnBWithID(t *testing.T, gnbID, name string) string {
+func createGNBWithID(t *testing.T, gnbID, name string) string {
 	t.Helper()
 
 	body := fmt.Sprintf(`{
@@ -186,8 +186,8 @@ func ngapHasSecurityContext(body []byte) bool {
 func runN2HandoverFlow(t *testing.T, establishBody string) {
 	t.Helper()
 
-	sourceGNB := createGnBWithID(t, "000001", "source-gnb")
-	targetGNB := createGnBWithID(t, "000002", "target-gnb")
+	sourceGNB := createGNBWithID(t, "000001", "source-gnb")
+	targetGNB := createGNBWithID(t, "000002", "target-gnb")
 
 	ueID := mustCreateUE(t, sourceGNB)
 	doRegistrationFlow(t, sourceGNB, ueID)

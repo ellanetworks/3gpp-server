@@ -11,7 +11,7 @@ import (
 )
 
 func Test5GDownlinkNASTransport_Decode(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",

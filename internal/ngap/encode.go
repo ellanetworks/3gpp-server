@@ -90,11 +90,11 @@ func buildNGSetupRequestIE(ie *IE) (*ngapType.NGSetupRequestIEs, error) {
 		g.GlobalGNBID.GNBID.Present = ngapType.GNBIDPresentGNBID
 		g.GlobalGNBID.GNBID.GNBID = new(aper.BitString)
 
-		bitLen := gnbIDData.GnbIDBitLen
+		bitLen := gnbIDData.GNBIDBitLen
 		if bitLen == 0 {
 			bitLen = 24
 		}
-		*g.GlobalGNBID.GNBID.GNBID = ngapConvert.HexToBitString(gnbIDData.GnbID, bitLen)
+		*g.GlobalGNBID.GNBID.GNBID = ngapConvert.HexToBitString(gnbIDData.GNBID, bitLen)
 
 	case ngapType.ProtocolIEIDRANNodeName:
 		if ie.RANNodeName == nil {
@@ -198,14 +198,15 @@ type NGSetupSlice struct {
 }
 
 type NGSetupRequestFromStoreParams struct {
-	MCC    string
-	MNC    string
-	TAC    string
-	GnbID  string
-	Name   string
-	SST    int32
-	SD     string
-	Slices []NGSetupSlice
+	MCC         string
+	MNC         string
+	TAC         string
+	GNBID       string
+	GNBIDBitLen int
+	Name        string
+	SST         int32
+	SD          string
+	Slices      []NGSetupSlice
 }
 
 func BuildNGSetupRequestFromStore(p NGSetupRequestFromStoreParams) (*NGAPMessage, error) {
@@ -248,8 +249,8 @@ func BuildNGSetupRequestFromStore(p NGSetupRequestFromStoreParams) (*NGAPMessage
 					Present: "global_gnb_id",
 					GlobalGNBID: &GlobalGNBIDJSON{
 						PLMNIdentity: plmnHex,
-						GnbID:        p.GnbID,
-						GnbIDBitLen:  24,
+						GNBID:        p.GNBID,
+						GNBIDBitLen:  p.GNBIDBitLen,
 					},
 				},
 			},

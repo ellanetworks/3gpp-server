@@ -13,7 +13,7 @@ import (
 func idleRegisteredUE(t *testing.T) (string, string) {
 	t.Helper()
 
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	doRegistrationFlow(t, gnbID, ueID)
@@ -99,7 +99,7 @@ func Test5GServiceRequest_ThenDeregister(t *testing.T) {
 // An unprotected SERVICE REQUEST (TS 24.501 §4.4.4.2) may draw a 5GMM STATUS or a
 // SERVICE REJECT, so only the denial of service is asserted.
 func Test5GServiceRequest_WithoutRegistration(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
@@ -119,7 +119,7 @@ func Test5GServiceRequest_WithoutRegistration(t *testing.T) {
 func idleRegisteredUENoSession(t *testing.T) (string, string) {
 	t.Helper()
 
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	doRegistrationFlow(t, gnbID, ueID)
@@ -179,7 +179,7 @@ func Test5GServiceRequest_PDUStatusMismatch(t *testing.T) {
 
 // Out-of-state: accept and reject are both conformant, so only a hang fails.
 func Test5GServiceRequest_WhileConnected(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	doRegistrationFlow(t, gnbID, ueID)
@@ -195,7 +195,7 @@ func Test5GServiceRequest_WhileConnected(t *testing.T) {
 }
 
 func Test5GServiceRequest_AfterDeregistration(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	doRegistrationFlow(t, gnbID, ueID)

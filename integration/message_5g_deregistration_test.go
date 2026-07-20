@@ -96,7 +96,7 @@ func Test5GDeregistration_Fuzz(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gnbID := mustCreateGnB(t)
+			gnbID := mustCreateGNB(t)
 			ueID := mustCreateUE(t, gnbID)
 
 			doRegistrationFlow(t, gnbID, ueID)
@@ -136,4 +136,6 @@ func Test5GDeregistration_Fuzz(t *testing.T) {
 			assertNASCause(t, body, "nas.5gmm_cause", tt.wantNASCause5GMM)
 		})
 	}
+
+	assertGNBCoreAlive(t)
 }

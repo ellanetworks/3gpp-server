@@ -201,7 +201,7 @@ func (h *Handler) AwaitGNBDownlink(w http.ResponseWriter, r *http.Request) {
 
 type GNBTunnelResponse struct {
 	PDUSessionID uint8  `json:"pdu_session_id"`
-	N3GnbIP      string `json:"n3_gnb_ip"`
+	N3GNBIP      string `json:"n3_gnb_ip"`
 	DLTeid       uint32 `json:"dl_teid"`
 	QFI          uint8  `json:"qfi"`
 	ULTeid       uint32 `json:"ul_teid,omitempty"`
@@ -224,7 +224,7 @@ func (h *Handler) GetGNBTunnel(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, GNBTunnelResponse{
 		PDUSessionID: info.PDUSessionID,
-		N3GnbIP:      info.N3GnbIP,
+		N3GNBIP:      info.N3GNBIP,
 		DLTeid:       info.DLTeid,
 		QFI:          info.QFI,
 		ULTeid:       info.ULTeid,

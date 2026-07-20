@@ -11,8 +11,8 @@ import (
 )
 
 func Test5GN2HandoverFailureRejection(t *testing.T) {
-	srcGNB := createGnBWithID(t, "000401", "ho-fail-src")
-	targetGNB := createGnBWithID(t, "000402", "ho-fail-tgt")
+	srcGNB := createGNBWithID(t, "000401", "ho-fail-src")
+	targetGNB := createGNBWithID(t, "000402", "ho-fail-tgt")
 
 	ueID := establishRegisteredUE(t, srcGNB)
 
@@ -44,8 +44,8 @@ func Test5GN2HandoverFailureRejection(t *testing.T) {
 }
 
 func Test5GN2HandoverFailureThenReHandover(t *testing.T) {
-	srcGNB := createGnBWithID(t, "000403", "ho-refail-src")
-	targetGNB := createGnBWithID(t, "000404", "ho-refail-tgt")
+	srcGNB := createGNBWithID(t, "000403", "ho-refail-src")
+	targetGNB := createGNBWithID(t, "000404", "ho-refail-tgt")
 
 	ueID := establishRegisteredUE(t, srcGNB)
 
@@ -100,7 +100,7 @@ func Test5GN2HandoverFailureThenReHandover(t *testing.T) {
 }
 
 func Test5GN2HandoverFailureUnknownAmfUeNgapID(t *testing.T) {
-	targetGNB := createGnBWithID(t, "000405", "ho-fail-tgt")
+	targetGNB := createGNBWithID(t, "000405", "ho-fail-tgt")
 
 	status, body := doRequest(t, "POST", "/gnb/"+targetGNB+"/ngap",
 		fmt.Sprintf(`{"message_type":"handover_failure","amf_ue_ngap_id":%d}`, unknownAmfUeNgapID))
@@ -112,8 +112,8 @@ func Test5GN2HandoverFailureUnknownAmfUeNgapID(t *testing.T) {
 }
 
 func Test5GN2HandoverFailureCrossAssociationHijack(t *testing.T) {
-	victimGNB := createGnBWithID(t, "000406", "victim-gnb")
-	attackerGNB := createGnBWithID(t, "000407", "attacker-gnb")
+	victimGNB := createGNBWithID(t, "000406", "victim-gnb")
+	attackerGNB := createGNBWithID(t, "000407", "attacker-gnb")
 
 	victimUE := registerUEWithSUPI(t, victimGNB, "imsi-001010000000001")
 	victimAmf, _ := ueNGAPIDs(t, victimGNB, victimUE)

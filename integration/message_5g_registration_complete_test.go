@@ -64,7 +64,7 @@ func Test5GRegistrationComplete_Fuzz(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gnbID := mustCreateGnB(t)
+			gnbID := mustCreateGNB(t)
 			ueID := mustCreateUE(t, gnbID)
 
 			for _, step := range []string{
@@ -94,6 +94,8 @@ func Test5GRegistrationComplete_Fuzz(t *testing.T) {
 			}
 		})
 	}
+
+	assertGNBCoreAlive(t)
 }
 
 func Test5GRegistrationComplete_NGAPIDFuzz(t *testing.T) {
@@ -137,7 +139,7 @@ func Test5GRegistrationComplete_NGAPIDFuzz(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gnbID := mustCreateGnB(t)
+			gnbID := mustCreateGNB(t)
 			ueID := mustCreateUE(t, gnbID)
 
 			for _, step := range []string{

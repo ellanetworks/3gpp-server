@@ -103,7 +103,7 @@ func mustNGReset(t *testing.T, gnbID string, ueIDs ...string) []byte {
 }
 
 func Test5GNGReset_All(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	doRegistrationFlow(t, gnbID, ueID)
@@ -131,7 +131,7 @@ func Test5GNGReset_All(t *testing.T) {
 }
 
 func Test5GNGReset_Partial(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 
 	ueA := mustCreateUE(t, gnbID)
 	doRegistrationFlow(t, gnbID, ueA)

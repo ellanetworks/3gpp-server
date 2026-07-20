@@ -6,8 +6,8 @@ package store
 import "testing"
 
 func TestGNBContextMigrateUE(t *testing.T) {
-	src := NewGNBContext("g1", "001", "01", "000001", "000001", "src", 1, "", nil)
-	target := NewGNBContext("g2", "001", "01", "000001", "000002", "target", 1, "", nil)
+	src := NewGNBContext("g1", "001", "01", "000001", "000001", 24, "src", 1, "", nil)
+	target := NewGNBContext("g2", "001", "01", "000001", "000002", 24, "target", 1, "", nil)
 
 	ue := &UEContext{ID: "ue1", RANUENGAPID: 42, PDUSessions: map[uint8]*PDUSessionInfo{1: {PDUSessionID: 1}}}
 	src.CreateUE(ue)
@@ -38,7 +38,7 @@ func TestGNBContextMigrateUE(t *testing.T) {
 }
 
 func TestGNBContextAllocateRanUeNgapID(t *testing.T) {
-	g := NewGNBContext("g1", "001", "01", "000001", "000001", "gnb", 1, "", nil)
+	g := NewGNBContext("g1", "001", "01", "000001", "000001", 24, "gnb", 1, "", nil)
 
 	for want := int64(1); want <= 3; want++ {
 		if got := g.AllocateRANUENGAPID(); got != want {

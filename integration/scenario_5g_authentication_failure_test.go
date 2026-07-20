@@ -13,7 +13,7 @@ import (
 func authChallengePending(t *testing.T) (string, string) {
 	t.Helper()
 
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",

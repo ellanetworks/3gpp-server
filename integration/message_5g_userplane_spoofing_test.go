@@ -24,7 +24,7 @@ func gnbDrainDownlinks(t *testing.T, gnbID, ueID string) {
 // A forwarded spoof shows up as the data-network reply un-NATing to UE-B's
 // address and reaching UE-B's tunnel.
 func Test5GUserPlaneSourceSpoofing(t *testing.T) {
-	gnbID := createGTPUGnB(t, "00ec09", "gtpu-spoof", n3IPv4)
+	gnbID := createGTPUGNB(t, "00ec09", "gtpu-spoof", n3IPv4)
 
 	ueA := establishRegisteredUEWithSUPI(t, gnbID, testSUPI(1))
 	ueB := establishRegisteredUEWithSUPI(t, gnbID, testSUPI(2))

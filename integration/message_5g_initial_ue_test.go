@@ -12,7 +12,7 @@ import (
 )
 
 func Test5GInitialUEMessage_Valid(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 
 	tests := []struct {
 		name            string
@@ -142,7 +142,7 @@ func Test5GInitialUEMessage_Valid(t *testing.T) {
 }
 
 func Test5GInitialUEMessage_Fuzz(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 
 	tests := []struct {
 		name            string
@@ -546,4 +546,6 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 			}
 		})
 	}
+
+	assertGNBCoreAlive(t)
 }

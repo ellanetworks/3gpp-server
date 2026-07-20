@@ -20,7 +20,7 @@ func ngap5GStep(t *testing.T, gnbID, ueID, messageType string) []byte {
 }
 
 func Test5GInitialContextSetupFailure(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	if got := jsonGet(ngap5GStep(t, gnbID, ueID, "registration_request"), "nas.message_type"); got != nasAuthenticationRequest {

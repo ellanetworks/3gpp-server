@@ -24,9 +24,9 @@ func New() *Store {
 	}
 }
 
-func (s *Store) CreateGNB(mcc, mnc, tac, gnbID, name string, sst int32, sd string, slices []SliceConfig) *GNBContext {
+func (s *Store) CreateGNB(mcc, mnc, tac, gnbID string, gnbIDBitLen int, name string, sst int32, sd string, slices []SliceConfig) *GNBContext {
 	id := strconv.FormatInt(s.nextID.Add(1), 10)
-	gnb := NewGNBContext(id, mcc, mnc, tac, gnbID, name, sst, sd, slices)
+	gnb := NewGNBContext(id, mcc, mnc, tac, gnbID, gnbIDBitLen, name, sst, sd, slices)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -59,9 +59,9 @@ func (s *Store) DeleteGNB(id string) error {
 	return nil
 }
 
-func (s *Store) CreateENB(mcc, mnc, tac string, enbID uint32, name string) *ENBContext {
+func (s *Store) CreateENB(mcc, mnc, tac, enbID string, enbIDBitLength int, name string) *ENBContext {
 	id := strconv.FormatInt(s.nextID.Add(1), 10)
-	enb := NewENBContext(id, mcc, mnc, tac, enbID, name)
+	enb := NewENBContext(id, mcc, mnc, tac, enbID, enbIDBitLength, name)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()

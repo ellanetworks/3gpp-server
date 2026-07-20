@@ -61,7 +61,7 @@ func Test5GSubscriptionChange_SliceRemovedReleasesPDUSession(t *testing.T) {
 		t.Fatalf("ella core token: %v", err)
 	}
 
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUEWithSUPI(t, gnbID, subscriptionChangeSUPI)
 	doRegistrationFlow(t, gnbID, ueID)
 

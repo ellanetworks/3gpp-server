@@ -11,7 +11,7 @@ import (
 )
 
 func Test5GPDUSessionModification_Rejected(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := establishRegisteredUE(t, gnbID)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
@@ -39,7 +39,7 @@ func Test5GPDUSessionModification_Rejected(t *testing.T) {
 }
 
 func Test5GPDUSessionModification_NoActiveSession(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 	doRegistrationFlow(t, gnbID, ueID)
 
@@ -64,7 +64,7 @@ func Test5GPDUSessionModification_NoActiveSession(t *testing.T) {
 func Test5GPDUSessionModification_ExistingPduSessionRequestType(t *testing.T) {
 	const requestTypeExistingPduSession = 2
 
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := establishRegisteredUE(t, gnbID)
 
 	body := fmt.Sprintf(`{"message_type":"pdu_session_modification_request","request_type":%d}`, requestTypeExistingPduSession)
@@ -83,7 +83,7 @@ func Test5GPDUSessionModification_ExistingPduSessionRequestType(t *testing.T) {
 func Test5GPDUSessionModification_EmergencyRequestType(t *testing.T) {
 	const requestTypeInitialEmergency = 3
 
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := establishRegisteredUE(t, gnbID)
 
 	body := fmt.Sprintf(`{"message_type":"pdu_session_modification_request","request_type":%d}`, requestTypeInitialEmergency)

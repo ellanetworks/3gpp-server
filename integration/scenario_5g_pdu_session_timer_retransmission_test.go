@@ -87,7 +87,7 @@ func Test5GT3591_ModificationCommandRetransmitted(t *testing.T) {
 	// Unasserted: baselines the AMBR so the later change differs across reruns.
 	mustEllaUpdatePolicy(t, token, "200 Mbps")
 
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUEWithDNN(t, gnbID, modTimerDNN)
 
 	doRegistrationFlow(t, gnbID, ueID)

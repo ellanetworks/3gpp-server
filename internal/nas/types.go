@@ -29,9 +29,10 @@ type NASResponse struct {
 	NgKSI        *int   `json:"ng_ksi,omitempty"`
 	EAPMessage   string `json:"eap_message,omitempty"`
 
-	SelectedCipheringAlgorithm *int `json:"selected_ciphering_algorithm,omitempty"`
-	SelectedIntegrityAlgorithm *int `json:"selected_integrity_algorithm,omitempty"`
-	IMEISVRequested            bool `json:"imeisv_requested,omitempty"`
+	SelectedCipheringAlgorithm     *int   `json:"selected_ciphering_algorithm,omitempty"`
+	SelectedIntegrityAlgorithm     *int   `json:"selected_integrity_algorithm,omitempty"`
+	ReplayedUESecurityCapabilities string `json:"replayed_ue_security_capabilities,omitempty"`
+	IMEISVRequested                bool   `json:"imeisv_requested,omitempty"`
 
 	GUTI    *GUTI5GJSON `json:"guti,omitempty"`
 	TAIList string      `json:"tai_list,omitempty"`

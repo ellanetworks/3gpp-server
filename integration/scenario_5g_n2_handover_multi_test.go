@@ -31,8 +31,8 @@ func establishPDUSession(t *testing.T, gnbID, ueID string, sessionID int) {
 }
 
 func Test5GN2HandoverMultiplePDUSessions(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "000011", "ho-multi-src")
-	targetGNB := createGnBWithID(t, "000012", "ho-multi-tgt")
+	sourceGNB := createGNBWithID(t, "000011", "ho-multi-src")
+	targetGNB := createGNBWithID(t, "000012", "ho-multi-tgt")
 
 	ueID := establishRegisteredUE(t, sourceGNB)
 	establishPDUSession(t, sourceGNB, ueID, 2)
@@ -64,8 +64,8 @@ func Test5GN2HandoverMultiplePDUSessions(t *testing.T) {
 }
 
 func Test5GN2HandoverPartialAdmission(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "000013", "ho-part-src")
-	targetGNB := createGnBWithID(t, "000014", "ho-part-tgt")
+	sourceGNB := createGNBWithID(t, "000013", "ho-part-src")
+	targetGNB := createGNBWithID(t, "000014", "ho-part-tgt")
 
 	ueID := establishRegisteredUE(t, sourceGNB)
 	establishPDUSession(t, sourceGNB, ueID, 2)
@@ -101,8 +101,8 @@ func Test5GN2HandoverPartialAdmission(t *testing.T) {
 }
 
 func Test5GN2HandoverMobilityRegistrationUpdate(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "000015", "ho-mru-src")
-	targetGNB := createGnBWithID(t, "000016", "ho-mru-tgt")
+	sourceGNB := createGNBWithID(t, "000015", "ho-mru-src")
+	targetGNB := createGNBWithID(t, "000016", "ho-mru-tgt")
 
 	ueID := establishRegisteredUE(t, sourceGNB)
 

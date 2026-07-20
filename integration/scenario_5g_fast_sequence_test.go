@@ -10,7 +10,7 @@ import (
 )
 
 func Test5GFastRegisterDeregisterChurn(t *testing.T) {
-	gnb := createGnBWithID(t, "00c004", "fast-churn")
+	gnb := createGNBWithID(t, "00c004", "fast-churn")
 
 	const cycles = 10
 

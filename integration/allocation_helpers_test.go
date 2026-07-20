@@ -14,7 +14,7 @@ import (
 const (
 	allocatedSubscriberBase = subscriptionChangeIndex + 100
 	allocatedENBIDBase      = 1000
-	allocatedGnBIDBase      = 0x0a0000
+	allocatedGNBIDBase      = 0x0a0000
 )
 
 var (
@@ -51,6 +51,6 @@ func claimENBID() int {
 	return allocatedENBIDBase + int(enbIDCounter.Add(1)) - 1
 }
 
-func claimGnBID() string {
-	return fmt.Sprintf("%06x", allocatedGnBIDBase+int(gnbIDCounter.Add(1))-1)
+func claimGNBID() string {
+	return fmt.Sprintf("%06x", allocatedGNBIDBase+int(gnbIDCounter.Add(1))-1)
 }

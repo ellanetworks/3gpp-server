@@ -110,11 +110,11 @@ func Test4GS1SetupHappyVariations(t *testing.T) {
 		body       string
 		wantReject bool
 	}{
-		{name: "baseline", body: `"mcc":"001","mnc":"01","tac":"0001","enb_id":1,"name":"enb-baseline"`},
-		{name: "different eNB ID", body: `"mcc":"001","mnc":"01","tac":"0001","enb_id":1048575,"name":"enb-max-macro"`},
-		{name: "unserved TAC", body: `"mcc":"001","mnc":"01","tac":"abcd","enb_id":2,"name":"enb-tac"`, wantReject: true},
-		{name: "no name (optional omitted)", body: `"mcc":"001","mnc":"01","tac":"0001","enb_id":3`},
-		{name: "long name", body: `"mcc":"001","mnc":"01","tac":"0001","enb_id":4,"name":"this-is-a-very-long-enb-name-used-for-testing-the-printable-string-bound"`},
+		{name: "baseline", body: `"mcc":"001","mnc":"01","tac":"0001","enb_id":"1","name":"enb-baseline"`},
+		{name: "different eNB ID", body: `"mcc":"001","mnc":"01","tac":"0001","enb_id":"fffff","name":"enb-max-macro"`},
+		{name: "unserved TAC", body: `"mcc":"001","mnc":"01","tac":"abcd","enb_id":"2","name":"enb-tac"`, wantReject: true},
+		{name: "no name (optional omitted)", body: `"mcc":"001","mnc":"01","tac":"0001","enb_id":"3"`},
+		{name: "long name", body: `"mcc":"001","mnc":"01","tac":"0001","enb_id":"4","name":"this-is-a-very-long-enb-name-used-for-testing-the-printable-string-bound"`},
 	}
 
 	for _, tt := range tests {
@@ -152,7 +152,7 @@ func Test4GS1SetupWrongPLMN(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			body := fmt.Sprintf(`{"mme_address":%q,"enb_s1_address":%q,"mcc":%q,"mnc":%q,"tac":"0001","enb_id":1,"name":"enb-wrong-plmn"}`,
+			body := fmt.Sprintf(`{"mme_address":%q,"enb_s1_address":%q,"mcc":%q,"mnc":%q,"tac":"0001","enb_id":"1","name":"enb-wrong-plmn"}`,
 				mmeAddress, enbS1Address, tt.mcc, tt.mnc)
 
 			status, resp := doRequest(t, "POST", "/enb", body)

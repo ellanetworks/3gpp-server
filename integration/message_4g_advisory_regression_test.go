@@ -55,7 +55,7 @@ func Test4GPathSwitchEmptySecCapNoCrash(t *testing.T) {
 
 	fullAttach(t, enbID, ueID)
 
-	resp := nasBody(t, enbID, ueID, `{"message_type":"path_switch","path_switch_eea":0,"path_switch_eia":0}`)
+	resp := pathSwitchUE(t, enbID, ueID, `,"path_switch_eea":0,"path_switch_eia":0`)
 
 	if got := jsonGet(resp, "s1ap.message_type"); got != "PathSwitchRequestAcknowledge" {
 		t.Fatalf("path switch with zero sec caps: s1ap.message_type = %q, want PathSwitchRequestAcknowledge; body: %s", got, resp)

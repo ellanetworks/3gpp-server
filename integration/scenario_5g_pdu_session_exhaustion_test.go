@@ -14,7 +14,7 @@ import (
 const exhaustDNN = "exhaust"
 
 func Test5GPDUSessionEstablishment_IPPoolExhausted(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 
 	ue1 := newExhaustUE(t, gnbID, testSUPI(1))
 	mustEstablishExhaust(t, gnbID, ue1)

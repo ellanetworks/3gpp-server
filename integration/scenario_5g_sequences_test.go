@@ -66,7 +66,7 @@ func registerThenIdle(t *testing.T, gnbID, ueID string) {
 }
 
 func Test5GRegistration_MobilityUpdate(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	registerThenIdle(t, gnbID, ueID)
@@ -84,7 +84,7 @@ func Test5GRegistration_MobilityUpdate(t *testing.T) {
 // Re-authenticating, rejecting and re-identifying all keep security closed
 // (TS 24.501 §4.4.4.3), so only a Registration Accept is disqualifying.
 func Test5GRegistration_MobilityUpdateBadMAC(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	registerThenIdle(t, gnbID, ueID)
@@ -98,10 +98,12 @@ func Test5GRegistration_MobilityUpdateBadMAC(t *testing.T) {
 	if got := jsonGet(resp, "nas.message_type"); got == nasRegistrationAccept {
 		t.Fatalf("the AMF accepted a mobility registration update whose NAS-MAC failed the integrity check; it must re-authenticate and re-activate security first (TS 24.501 §4.4.4.3)\n  body: %s", resp)
 	}
+
+	assertGNBCoreAlive(t)
 }
 
 func Test5GRegistration_PeriodicUpdate(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	registerThenIdle(t, gnbID, ueID)
@@ -117,7 +119,7 @@ func Test5GRegistration_PeriodicUpdate(t *testing.T) {
 }
 
 func Test5GDeregistration_NonSwitchOff_Accept(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	doRegistrationFlow(t, gnbID, ueID)
@@ -158,7 +160,7 @@ func Test5GNGSetup_UnknownPLMN(t *testing.T) {
 }
 
 func Test5GRegistration_DuringSecurityMode(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",

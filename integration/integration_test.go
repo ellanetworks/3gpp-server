@@ -360,8 +360,8 @@ func jsonGet(data []byte, path string) string {
 	}
 }
 
-// mustCreateGnB returns the gNB's store id, not its NGAP gNB ID.
-func mustCreateGnB(t *testing.T) string {
+// mustCreateGNB returns the gNB's store id, not its NGAP gNB ID.
+func mustCreateGNB(t *testing.T) string {
 	t.Helper()
 	body := fmt.Sprintf(`{
 		"amf_address": "10.3.0.2:38412",
@@ -369,7 +369,7 @@ func mustCreateGnB(t *testing.T) string {
 		"mcc": "001", "mnc": "01",
 		"tac": "000001", "gnb_id": %q,
 		"name": "test-gnb", "sst": 1
-	}`, claimGnBID())
+	}`, claimGNBID())
 	status, resp := doRequest(t, "POST", "/gnb", body)
 	if status != 201 {
 		t.Fatalf("create gnb: HTTP %d: %s", status, resp)

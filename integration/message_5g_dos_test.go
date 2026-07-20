@@ -11,10 +11,10 @@ import (
 	"testing"
 )
 
-func createGnBAssertingNGSetup(t *testing.T, name string) string {
+func createGNBAssertingNGSetup(t *testing.T, name string) string {
 	t.Helper()
 
-	gnbID := claimGnBID()
+	gnbID := claimGNBID()
 
 	body := fmt.Sprintf(`{
 		"amf_address": "10.3.0.2:38412", "gnb_n2_address": "10.3.0.3",
@@ -41,14 +41,14 @@ func Test5GAssociationFlood(t *testing.T) {
 	const n = 50
 
 	for i := 0; i < n; i++ {
-		createGnBAssertingNGSetup(t, "flood-gnb")
+		createGNBAssertingNGSetup(t, "flood-gnb")
 	}
 
-	createGnBAssertingNGSetup(t, "flood-probe")
+	createGNBAssertingNGSetup(t, "flood-probe")
 }
 
 func Test5GOversizedPDU(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 
 	// ab: the NGAP-PDU CHOICE extension bit is set, so the Type of Message IE
 	// does not decode (TS 38.413 §9.3.1.1).

@@ -20,7 +20,7 @@ func Test5GPDUSessionEstablishment_NGAPIDFuzz(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			gnbID := mustCreateGnB(t)
+			gnbID := mustCreateGNB(t)
 			ueID := mustCreateUE(t, gnbID)
 			doRegistrationFlow(t, gnbID, ueID)
 
@@ -36,7 +36,7 @@ func Test5GPDUSessionEstablishment_NGAPIDFuzz(t *testing.T) {
 
 // PDU session identity 16 falls outside the valid 1-15 range (TS 24.501 §7.3.2 c).
 func Test5GPDUSessionEstablishment_ReservedPDUSessionID(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 	doRegistrationFlow(t, gnbID, ueID)
 
@@ -59,7 +59,7 @@ func Test5GPDUSessionEstablishment_ReservedPDUSessionID(t *testing.T) {
 }
 
 func Test5GPDUSessionEstablishment_DuplicateReestablishes(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := establishRegisteredUE(t, gnbID)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
@@ -118,7 +118,7 @@ func Test5GPDUSessionEstablishment_Fuzz(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gnbID := mustCreateGnB(t)
+			gnbID := mustCreateGNB(t)
 			ueID := mustCreateUE(t, gnbID)
 
 			doRegistrationFlow(t, gnbID, ueID)
@@ -218,7 +218,7 @@ func Test5GPDUSessionEstablishment_InnerSMFuzz(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gnbID := mustCreateGnB(t)
+			gnbID := mustCreateGNB(t)
 			ueID := mustCreateUE(t, gnbID)
 
 			doRegistrationFlow(t, gnbID, ueID)
@@ -310,7 +310,7 @@ func Test5GPDUSessionEstablishment_InnerSMRequestIEFuzz(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gnbID := mustCreateGnB(t)
+			gnbID := mustCreateGNB(t)
 			ueID := mustCreateUE(t, gnbID)
 
 			doRegistrationFlow(t, gnbID, ueID)

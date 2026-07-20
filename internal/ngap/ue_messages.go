@@ -211,7 +211,7 @@ type InitialUEMessageFromStateParams struct {
 	MCC         string
 	MNC         string
 	TAC         string
-	GnbID       string
+	GNBID       string
 	GUTI        *FiveGSTMSIFromGUTI
 	Overrides   *InitialUEMessageOverrides
 }
@@ -254,7 +254,7 @@ func BuildInitialUEMessageFromState(p InitialUEMessageFromStateParams) (*NGAPMes
 				NR: &UserLocationInformationNRJSON{
 					NRCGI: NRCGIJSON{
 						PLMNIdentity:   plmnHex,
-						NRCellIdentity: p.GnbID,
+						NRCellIdentity: p.GNBID,
 					},
 					TAI: TAIJSON{
 						PLMNIdentity: plmnHex,
@@ -321,7 +321,7 @@ type UplinkNASTransportParams struct {
 	MCC         string
 	MNC         string
 	TAC         string
-	GnbID       string
+	GNBID       string
 	Overrides   *UplinkNASTransportOverrides
 }
 
@@ -342,7 +342,7 @@ func BuildUplinkNASTransport(p UplinkNASTransportParams) ([]byte, error) {
 
 	plmnID := ngapType.PLMNIdentity{Value: plmnBytes}
 
-	nrCellID, err := nrCellIdentity(p.GnbID)
+	nrCellID, err := nrCellIdentity(p.GNBID)
 	if err != nil {
 		return nil, fmt.Errorf("NRCellIdentity: %w", err)
 	}

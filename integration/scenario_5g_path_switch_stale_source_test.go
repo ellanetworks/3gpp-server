@@ -33,8 +33,8 @@ func assertUEStillSwitchable(t *testing.T, gnbID string, amfID, newRanID int64, 
 }
 
 func Test5GPathSwitchStaleSourceUEContextReleaseRejected(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "000120", "ps-stale-rel-src")
-	targetGNB := createGnBWithID(t, "000121", "ps-stale-rel-tgt")
+	sourceGNB := createGNBWithID(t, "000120", "ps-stale-rel-src")
+	targetGNB := createGNBWithID(t, "000121", "ps-stale-rel-tgt")
 
 	ueID, amfID := movePathToTarget(t, sourceGNB, targetGNB, "imsi-001010000000020", 210)
 
@@ -52,8 +52,8 @@ func Test5GPathSwitchStaleSourceUEContextReleaseRejected(t *testing.T) {
 }
 
 func Test5GPathSwitchStaleSourceUplinkNASRejected(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "000122", "ps-stale-nas-src")
-	targetGNB := createGnBWithID(t, "000123", "ps-stale-nas-tgt")
+	sourceGNB := createGNBWithID(t, "000122", "ps-stale-nas-src")
+	targetGNB := createGNBWithID(t, "000123", "ps-stale-nas-tgt")
 
 	ueID, _ := movePathToTarget(t, sourceGNB, targetGNB, "imsi-001010000000021", 212)
 
@@ -70,8 +70,8 @@ func Test5GPathSwitchStaleSourceUplinkNASRejected(t *testing.T) {
 
 // An NG Reset resets only the resetting association's connections (TS 38.413 §8.7.4).
 func Test5GPathSwitchSourceNGResetPreservesMovedUE(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "000124", "ps-stale-reset-src")
-	targetGNB := createGnBWithID(t, "000125", "ps-stale-reset-tgt")
+	sourceGNB := createGNBWithID(t, "000124", "ps-stale-reset-src")
+	targetGNB := createGNBWithID(t, "000125", "ps-stale-reset-tgt")
 
 	_, amfID := movePathToTarget(t, sourceGNB, targetGNB, "imsi-001010000000022", 213)
 

@@ -30,6 +30,10 @@ type SendENBUES1APRequest struct {
 	AttachType  uint8 `json:"attach_type,omitempty"`
 	ForeignGUTI bool  `json:"foreign_guti,omitempty"`
 
+	UENetworkCapabilityOverride *string `json:"ue_network_capability,omitempty"`
+	MSNetworkCapability         *string `json:"ms_network_capability,omitempty"`
+	DRXParameter                *string `json:"drx_parameter,omitempty"`
+
 	RawNASPDU  *string `json:"raw_nas_pdu,omitempty"`
 	CorruptMAC bool    `json:"corrupt_mac,omitempty"`
 
@@ -44,11 +48,6 @@ type SendENBUES1APRequest struct {
 	MTMSIOverride     *uint32 `json:"mtmsi,omitempty"`
 	NASCountOverride  *uint32 `json:"nas_count,omitempty"`
 	EPSUpdateType     uint8   `json:"eps_update_type,omitempty"`
-
-	PathSwitchERABID *uint8  `json:"path_switch_erab_id,omitempty"`
-	DuplicateERAB    bool    `json:"duplicate_erab,omitempty"`
-	PathSwitchEEA    *uint16 `json:"path_switch_eea,omitempty"`
-	PathSwitchEIA    *uint16 `json:"path_switch_eia,omitempty"`
 
 	APN               string `json:"apn,omitempty"`
 	PTI               *uint8 `json:"pti,omitempty"`
@@ -84,6 +83,10 @@ type SendENBS1APRequest struct {
 	Admitted    []HandoverERAB `json:"admitted_erabs,omitempty"`
 	FailedERABs []uint8        `json:"failed_erabs,omitempty"`
 	ERABs       []HandoverERAB `json:"erabs,omitempty"`
+
+	DuplicateERAB bool    `json:"duplicate_erab,omitempty"`
+	PathSwitchEEA *uint16 `json:"path_switch_eea,omitempty"`
+	PathSwitchEIA *uint16 `json:"path_switch_eia,omitempty"`
 
 	Cause  *int    `json:"cause,omitempty"`
 	CellID *uint32 `json:"cell_id,omitempty"`

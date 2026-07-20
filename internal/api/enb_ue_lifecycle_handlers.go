@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 )
 
 type PatchENBUERequest struct {
@@ -78,54 +77,4 @@ func (h *Handler) DeleteENBUE(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
-}
-
-type ENBTunnelResponse struct {
-	EBI    uint8  `json:"ebi"`
-	APN    string `json:"apn,omitempty"`
-	UEIP   string `json:"ue_ip,omitempty"`
-	ULTeid uint32 `json:"ul_teid,omitempty"`
-	SGWIP  string `json:"sgw_ip,omitempty"`
-	DLTeid uint32 `json:"dl_teid,omitempty"`
-}
-
-func (h *Handler) GetENBTunnel(w http.ResponseWriter, r *http.Request) {
-	enb, err := h.Store.GetENB(r.PathValue("enb_id"))
-	if err != nil {
-		writeError(w, http.StatusNotFound, err.Error())
-		return
-	}
-
-	ue, ok := enb.GetUE(r.PathValue("ue_id"))
-	if !ok {
-		writeError(w, http.StatusNotFound, "ue not found")
-		return
-	}
-
-	ebi := uint8(0)
-
-	if v := r.URL.Query().Get("ebi"); v != "" {
-		n, err := strconv.ParseUint(v, 10, 8)
-		if err != nil {
-			writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid ebi: %v", err))
-			return
-		}
-
-		ebi = uint8(n)
-	}
-
-	ulTeid, dlTeid, sgwIP, ueIP, found := enbBearer(ue, ebi)
-	if !found {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("no user-plane tunnel for bearer %d; complete an attach / pdn_connectivity on a GTP-U-enabled eNB", ebi))
-		return
-	}
-
-	resp := ENBTunnelResponse{EBI: ebi, UEIP: ueIP, ULTeid: ulTeid, SGWIP: sgwIP, DLTeid: dlTeid}
-	if ebi == 0 || ebi == ue.EPSBearerID {
-		resp.EBI = ue.EPSBearerID
-	} else if b, exists := ue.Bearers[ebi]; exists {
-		resp.APN = b.APN
-	}
-
-	writeJSON(w, http.StatusOK, resp)
 }

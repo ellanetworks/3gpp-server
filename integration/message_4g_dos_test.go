@@ -15,7 +15,7 @@ import (
 func createENBID(t *testing.T, enbID int) string {
 	t.Helper()
 
-	body := fmt.Sprintf(`{"mme_address":"10.3.0.2:36412","enb_s1_address":"10.3.0.3","mcc":"001","mnc":"01","tac":"0001","enb_id":%d,"name":"flood-enb"}`, enbID)
+	body := fmt.Sprintf(`{"mme_address":"10.3.0.2:36412","enb_s1_address":"10.3.0.3","mcc":"001","mnc":"01","tac":"0001","enb_id":"%x","name":"flood-enb"}`, enbID)
 
 	status, resp := doRequest(t, "POST", "/enb", body)
 	if status != 201 {

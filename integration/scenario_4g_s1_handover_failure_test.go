@@ -17,7 +17,7 @@ func createUnconnectedENB(t *testing.T, enbID int, name string) string {
 		"mme_address": "10.3.0.2:36412",
 		"enb_s1_address": "10.3.0.3",
 		"mcc": "001", "mnc": "01",
-		"tac": "0001", "enb_id": %d,
+		"tac": "0001", "enb_id": "%x",
 		"name": %q, "skip_s1_setup": true
 	}`, enbID, name)
 

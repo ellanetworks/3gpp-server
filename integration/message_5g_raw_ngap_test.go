@@ -62,12 +62,12 @@ func Test5GRawNGAPMalformedDoesNotCrashCore(t *testing.T) {
 
 	for i, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			gnbID := createGnBWithID(t, fmt.Sprintf("%06x", 0x100+i), "fuzz-src")
+			gnbID := createGNBWithID(t, fmt.Sprintf("%06x", 0x100+i), "fuzz-src")
 
 			body := sendRawNGAPAwaitingErrorIndication(t, gnbID, tc.hex, tc.clause)
 			assertErrorIndicationReported(t, body, tc.clause)
 
-			createGnBWithID(t, fmt.Sprintf("%06x", 0x200+i), "fuzz-probe")
+			createGNBWithID(t, fmt.Sprintf("%06x", 0x200+i), "fuzz-probe")
 		})
 	}
 }

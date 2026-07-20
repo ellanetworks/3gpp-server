@@ -25,7 +25,7 @@ func Test4GScenarioS1Setup(t *testing.T) {
 			"mme_address": "10.3.0.2:36412",
 			"enb_s1_address": "10.3.0.3",
 			"mcc": "001", "mnc": "01",
-			"tac": "0001", "enb_id": %d,
+			"tac": "0001", "enb_id": "%x",
 			"name": "assert-enb"
 		}`, claimENBID()))
 		if status != 201 {
@@ -58,7 +58,7 @@ func Test4GScenarioS1Setup(t *testing.T) {
 			"mcc":    "001",
 			"mnc":    "01",
 			"tac":    "0001",
-			"enb_id": fmt.Sprintf("%d", stateENBID),
+			"enb_id": fmt.Sprintf("%x", stateENBID),
 			"name":   "test-enb",
 		} {
 			if got := jsonGet(body, key); got != want {

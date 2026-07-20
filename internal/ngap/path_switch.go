@@ -34,7 +34,7 @@ type PathSwitchRequestParams struct {
 	MCC               string
 	MNC               string
 	TAC               string
-	GnbID             string
+	GNBID             string
 	SecCaps           UESecurityCapabilities
 	Sessions          []PathSwitchSession
 	Failed            []int64
@@ -79,7 +79,7 @@ func BuildPathSwitchRequest(p PathSwitchRequestParams) ([]byte, error) {
 		return nil, fmt.Errorf("TAC: %w", err)
 	}
 
-	nrCellID, err := nrCellIdentity(p.GnbID)
+	nrCellID, err := nrCellIdentity(p.GNBID)
 	if err != nil {
 		return nil, fmt.Errorf("NRCellIdentity: %w", err)
 	}

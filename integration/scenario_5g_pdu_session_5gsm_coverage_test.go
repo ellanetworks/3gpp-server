@@ -11,7 +11,7 @@ import (
 )
 
 func Test5GPDUSessionEstablishment_AcceptMandatoryIEs(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 	doRegistrationFlow(t, gnbID, ueID)
 
@@ -61,7 +61,7 @@ func Test5GPDUSessionEstablishment_AcceptMandatoryIEs(t *testing.T) {
 }
 
 func Test5GPDUSessionEstablishment_AlwaysOnIndication(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 	doRegistrationFlow(t, gnbID, ueID)
 
@@ -84,7 +84,7 @@ func Test5GPDUSessionEstablishment_AlwaysOnIndication(t *testing.T) {
 // must not answer "not allowed". Case a) still permits "required", which is the
 // SMF's own determination.
 func Test5GPDUSessionEstablishment_AlwaysOnIndicationNotRequested(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 	doRegistrationFlow(t, gnbID, ueID)
 
@@ -104,7 +104,7 @@ func Test5GPDUSessionEstablishment_AlwaysOnIndicationNotRequested(t *testing.T) 
 }
 
 func Test5GPDUSessionModificationCommandReject_PTIMismatch(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := establishRegisteredUE(t, gnbID)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
@@ -125,7 +125,7 @@ func Test5GPDUSessionModificationCommandReject_PTIMismatch(t *testing.T) {
 // TS 24.501 §7.4 leaves the reaction to an unsolicited 5GSM STATUS to the
 // implementation, so only the session surviving is asserted.
 func Test5GStatus5GSM_FromUE_SessionRemainsUsable(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := establishRegisteredUE(t, gnbID)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",

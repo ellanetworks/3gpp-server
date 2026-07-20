@@ -10,14 +10,14 @@ import (
 	"testing"
 )
 
-// tgtGNB is the target's store ID (URL paths); tgtGnbHex is its NGAP gNB ID.
-func handoverHop(t *testing.T, srcGNB, ueID, tgtGNB, tgtGnbHex string) int64 {
+// tgtGNB is the target's store ID (URL paths); tgtGNBHex is its NGAP gNB ID.
+func handoverHop(t *testing.T, srcGNB, ueID, tgtGNB, tgtGNBHex string) int64 {
 	t.Helper()
 
 	const tgtRan = 100
 
 	status, body := doRequest(t, "POST", "/gnb/"+srcGNB+"/ue/"+ueID+"/ngap",
-		fmt.Sprintf(`{"message_type":"handover_required","target_gnb_id":"%s"}`, tgtGnbHex))
+		fmt.Sprintf(`{"message_type":"handover_required","target_gnb_id":"%s"}`, tgtGNBHex))
 	if status != 200 {
 		t.Fatalf("handover_required %s->%s: HTTP %d\n  body: %s", srcGNB, tgtGNB, status, body)
 	}
@@ -69,8 +69,8 @@ func assertMobilityRegistrationAccepted(t *testing.T, gnbID, ueID string) {
 
 func Test5GN2HandoverPingPong(t *testing.T) {
 	const hexA, hexB = "0000c0", "0000c1"
-	gnbA := createGnBWithID(t, hexA, "ho-pp-a")
-	gnbB := createGnBWithID(t, hexB, "ho-pp-b")
+	gnbA := createGNBWithID(t, hexA, "ho-pp-a")
+	gnbB := createGNBWithID(t, hexB, "ho-pp-b")
 
 	ueID := establishRegisteredUE(t, gnbA)
 
@@ -82,9 +82,9 @@ func Test5GN2HandoverPingPong(t *testing.T) {
 
 func Test5GN2HandoverMultiHop(t *testing.T) {
 	const hexA, hexB, hexC = "0000c2", "0000c3", "0000c4"
-	gnbA := createGnBWithID(t, hexA, "ho-mh-a")
-	gnbB := createGnBWithID(t, hexB, "ho-mh-b")
-	gnbC := createGnBWithID(t, hexC, "ho-mh-c")
+	gnbA := createGNBWithID(t, hexA, "ho-mh-a")
+	gnbB := createGNBWithID(t, hexB, "ho-mh-b")
+	gnbC := createGNBWithID(t, hexC, "ho-mh-c")
 
 	ueID := establishRegisteredUE(t, gnbA)
 
@@ -95,9 +95,9 @@ func Test5GN2HandoverMultiHop(t *testing.T) {
 }
 
 func Test5GN2HandoverConcurrentUEs(t *testing.T) {
-	srcGNB := createGnBWithID(t, "0002f0", "ho-cc-src")
+	srcGNB := createGNBWithID(t, "0002f0", "ho-cc-src")
 	tgtHex := "0002f1"
-	targetGNB := createGnBWithID(t, tgtHex, "ho-cc-tgt")
+	targetGNB := createGNBWithID(t, tgtHex, "ho-cc-tgt")
 
 	// Dedicated subscribers: a mid-flow abort must not dirty the shared ones.
 	ue1 := establishRegisteredUEWithSUPI(t, srcGNB, "imsi-001010000000005")
@@ -139,9 +139,9 @@ func Test5GN2HandoverConcurrentUEs(t *testing.T) {
 }
 
 func Test5GN2HandoverThenIdleThenServiceRequest(t *testing.T) {
-	gnbA := createGnBWithID(t, "000210", "ho-cyc-a")
+	gnbA := createGNBWithID(t, "000210", "ho-cyc-a")
 	hexB := "000211"
-	gnbB := createGnBWithID(t, hexB, "ho-cyc-b")
+	gnbB := createGNBWithID(t, hexB, "ho-cyc-b")
 
 	ueID := establishRegisteredUE(t, gnbA)
 	handoverHop(t, gnbA, ueID, gnbB, hexB)

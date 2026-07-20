@@ -11,7 +11,7 @@ import (
 )
 
 // Only one gNB can bind a given N3 address:port at a time.
-func createGTPUGnB(t *testing.T, gnbID, name string, n3 n3Transport) string {
+func createGTPUGNB(t *testing.T, gnbID, name string, n3 n3Transport) string {
 	t.Helper()
 
 	body := fmt.Sprintf(`{
@@ -36,7 +36,7 @@ func createGTPUGnB(t *testing.T, gnbID, name string, n3 n3Transport) string {
 }
 
 func Test5GGTPU_ICMPRoundTrip(t *testing.T) {
-	gnbID := createGTPUGnB(t, "00ec03", "gtpu-rt", n3IPv4)
+	gnbID := createGTPUGNB(t, "00ec03", "gtpu-rt", n3IPv4)
 	ueID := establishRegisteredUEWithSUPI(t, gnbID, "imsi-001010000000001")
 
 	status, body := doRequest(t, "GET", "/gnb/"+gnbID+"/ue/"+ueID+"/tunnel", "")
@@ -88,7 +88,7 @@ func Test5GGTPU_Echo(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.n3.name, func(t *testing.T) {
-			gnbID := createGTPUGnB(t, tc.gnbID, "gtpu-echo-"+tc.n3.name, tc.n3)
+			gnbID := createGTPUGNB(t, tc.gnbID, "gtpu-echo-"+tc.n3.name, tc.n3)
 
 			status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/gtpu/echo",
 				fmt.Sprintf(`{"upf_ip":%q,"timeout_ms":5000}`, tc.n3.upfN3))
@@ -120,7 +120,7 @@ func gtpuAwaitDownlink(t *testing.T, gnbID, ueID, dst string, id, seq int) ([]by
 }
 
 func Test5GGTPU_ReleaseStopsForwarding(t *testing.T) {
-	gnbID := createGTPUGnB(t, "00ec05", "gtpu-rel", n3IPv4)
+	gnbID := createGTPUGNB(t, "00ec05", "gtpu-rel", n3IPv4)
 	ueID := establishRegisteredUEWithSUPI(t, gnbID, "imsi-001010000000002")
 
 	const icmpID, icmpSeq = 0x1234, 11
@@ -146,7 +146,7 @@ func Test5GGTPU_ReleaseStopsForwarding(t *testing.T) {
 }
 
 func Test5GGTPU_UDPRoundTrip(t *testing.T) {
-	gnbID := createGTPUGnB(t, "00ec06", "gtpu-udp", n3IPv4)
+	gnbID := createGTPUGNB(t, "00ec06", "gtpu-udp", n3IPv4)
 	ueID := establishRegisteredUEWithSUPI(t, gnbID, "imsi-001010000000003")
 
 	const payloadHex = "abad1dea"
@@ -178,7 +178,7 @@ func Test5GGTPU_UDPRoundTrip(t *testing.T) {
 }
 
 func Test5GGTPU_WrongTEID_Dropped(t *testing.T) {
-	gnbID := createGTPUGnB(t, "00ec07", "gtpu-badteid", n3IPv4)
+	gnbID := createGTPUGNB(t, "00ec07", "gtpu-badteid", n3IPv4)
 	ueID := establishRegisteredUEWithSUPI(t, gnbID, "imsi-001010000000004")
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/uplink",
@@ -194,7 +194,7 @@ func Test5GGTPU_WrongTEID_Dropped(t *testing.T) {
 }
 
 func Test5GGTPU_WrongTEID_ErrorIndication(t *testing.T) {
-	gnbID := createGTPUGnB(t, "00ec08", "gtpu-errind", n3IPv4)
+	gnbID := createGTPUGNB(t, "00ec08", "gtpu-errind", n3IPv4)
 	ueID := establishRegisteredUEWithSUPI(t, gnbID, "imsi-001010000000005")
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/uplink",

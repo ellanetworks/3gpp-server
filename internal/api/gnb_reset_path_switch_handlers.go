@@ -61,7 +61,7 @@ func handleGNBPathSwitchRequest(ctx context.Context, gnb *store.GNBContext, t *t
 		MCC:               gnb.MCC,
 		MNC:               gnb.MNC,
 		TAC:               gnb.TAC,
-		GnbID:             gnb.GNBID,
+		GNBID:             gnb.GNBID,
 		SecCaps:           secCaps,
 		Sessions:          sessions,
 		Failed:            req.FailedPDUSessions,

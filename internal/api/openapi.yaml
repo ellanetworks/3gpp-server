@@ -243,8 +243,6 @@ paths:
         - `error_indication` — ERROR INDICATION for the UE's connection (§8.7.2).
         - `release_request` — UE CONTEXT RELEASE REQUEST; the MME's Release Command
           is acknowledged with Release Complete.
-        - `path_switch` — Target-eNB PATH SWITCH REQUEST after an X2 handover
-          (§9.1.5.8), expecting a fresh {NH, NCC} in the acknowledge.
 
         ## Source-eNB side of S1 handover (TS 36.413 §8.4)
 
@@ -1206,6 +1204,9 @@ components:
           type: string
           description: gNB ID (hex).
           example: "000001"
+        gnb_id_bit_length:
+          type: integer
+          description: gNB-ID bit length, 22–32 (TS 38.413 §9.3.1.6). Defaults to 24.
         name:
           type: string
         sst:
@@ -1280,6 +1281,8 @@ components:
           type: string
         gnb_id:
           type: string
+        gnb_id_bit_length:
+          type: integer
         name:
           type: string
         sst:
@@ -1311,9 +1314,15 @@ components:
           description: Tracking Area Code (2-octet hex).
           example: "0001"
         enb_id:
+          type: string
+          description: eNB ID (hex).
+          example: "00001"
+        enb_id_bit_length:
           type: integer
-          description: Macro eNB ID (20-bit).
-          example: 1
+          description: >
+            eNB-ID CHOICE variant by bit length (TS 36.413 §9.2.1.37):
+            20 macro (default), 28 home, 18 short-macro, 21 long-macro.
+          example: 20
         name:
           type: string
         enable_gtpu:
@@ -1365,8 +1374,11 @@ components:
         tac:
           type: string
         enb_id:
+          type: string
+          description: eNB ID (hex).
+        enb_id_bit_length:
           type: integer
-          description: Macro eNB ID.
+          description: eNB-ID CHOICE variant by bit length (TS 36.413 §9.2.1.37).
         name:
           type: string
 
@@ -1492,13 +1504,22 @@ components:
       properties:
         message_type:
           type: string
-          enum: [attach_request, authentication_response, authentication_failure, identity_response, security_mode_complete, security_mode_reject, attach_complete, detach_request, release_request, service_request, ue_capability_info, tracking_area_update, path_switch, pdn_connectivity, pdn_disconnect, bearer_resource_allocation_request, bearer_resource_modification_request, esm_information_response, modify_response, modify_eps_bearer_context_accept, deactivate_eps_bearer_context_accept, status_esm, reset, inject_nas, handover_required, handover_cancel, enb_status_transfer, initial_context_setup_failure, error_indication]
+          enum: [attach_request, authentication_response, authentication_failure, identity_response, security_mode_complete, security_mode_reject, attach_complete, detach_request, release_request, service_request, ue_capability_info, tracking_area_update, pdn_connectivity, pdn_disconnect, bearer_resource_allocation_request, bearer_resource_modification_request, esm_information_response, modify_response, modify_eps_bearer_context_accept, deactivate_eps_bearer_context_accept, status_esm, reset, inject_nas, handover_required, handover_cancel, enb_status_transfer, initial_context_setup_failure, error_indication]
         pdn_type:
           type: integer
           description: "Requested PDN type for attach: 1=IPv4, 2=IPv6, 3=IPv4v6 (default 1)."
         attach_type:
           type: integer
           description: "EPS attach type: 1=EPS, 2=combined EPS/IMSI, 6=emergency (default 1)."
+        ue_network_capability:
+          type: string
+          description: "attach_request override — UE network capability (hex, TS 24.301 §9.9.3.34); overrides the stored value."
+        ms_network_capability:
+          type: string
+          description: "attach_request override — MS network capability (hex, TS 24.008 §10.5.5.12)."
+        drx_parameter:
+          type: string
+          description: "attach_request override — DRX parameter (hex, 2 octets, TS 24.301 §9.9.3.8)."
         foreign_guti:
           type: boolean
           description: >
@@ -1548,18 +1569,6 @@ components:
         eps_update_type:
           type: integer
           description: On tracking_area_update, the EPS update type (0=TA, 1/2=combined, 3=periodic).
-        path_switch_erab_id:
-          type: integer
-          description: On path_switch, override the to-be-switched E-RAB ID (e.g. an unestablished one to force a failure).
-        duplicate_erab:
-          type: boolean
-          description: On path_switch, list the E-RAB ID twice (abnormal; MME rejects with multiple-E-RAB-ID-instances).
-        path_switch_eea:
-          type: integer
-          description: On path_switch, override the reported EPS encryption-algorithm bitmap; a mismatch with the stored value makes the MME replay its caps in the Ack.
-        path_switch_eia:
-          type: integer
-          description: On path_switch, override the reported EPS integrity-algorithm bitmap (see path_switch_eea).
         apn:
           type: string
           description: On pdn_connectivity, the access point name of the additional PDN connection (TS 24.301 §6.5.1).
@@ -1636,6 +1645,15 @@ components:
               id: { type: integer, description: "E-RAB ID." }
               dl_teid: { type: integer, description: "Target eNB downlink TEID (default synthesized)." }
               dl_ip: { type: string, description: "Target eNB S1-U address (default the eNB's own)." }
+        duplicate_erab:
+          type: boolean
+          description: On path_switch_request, list the E-RAB ID twice (abnormal; MME rejects with multiple-E-RAB-ID-instances).
+        path_switch_eea:
+          type: integer
+          description: On path_switch_request, override the reported EPS encryption-algorithm bitmap; a mismatch with the stored value makes the MME replay its caps in the Ack.
+        path_switch_eia:
+          type: integer
+          description: On path_switch_request, override the reported EPS integrity-algorithm bitmap (see path_switch_eea).
         admitted_erabs:
           type: array
           description: On handover_request_acknowledge, the E-RABs the target admits with their downlink S1-U endpoints.
@@ -1743,29 +1761,37 @@ components:
     GNBUEStateResponse:
       type: object
       properties:
-        id:
+        ue_id:
           type: string
         supi:
           type: string
         suci:
           type: string
-        mcc:
+        imeisv:
           type: string
-        mnc:
+        ue_ip:
           type: string
+          description: Assigned in the PDU Session Establishment Accept; empty before a session is established.
+        security_active:
+          type: boolean
         ran_ue_ngap_id:
           type: integer
         amf_ue_ngap_id:
           type: integer
           description: Set by the AMF after the first NGAP exchange.
-        k:
-          type: string
-        opc:
-          type: string
-        amf:
-          type: string
-        sqn:
-          type: string
+        default_pdu_session_id:
+          type: integer
+          description: PDU session identity of the default session.
+        sessions:
+          type: array
+          description: Active PDU sessions (TS 23.501 §5.6).
+          items:
+            type: object
+            properties:
+              pdu_session_id:
+                type: integer
+              ue_ip:
+                type: string
         dnn:
           type: string
         sst:
@@ -1775,8 +1801,6 @@ components:
         protection_scheme:
           type: string
         routing_indicator:
-          type: string
-        imeisv:
           type: string
 
     PatchGNBUERequest:

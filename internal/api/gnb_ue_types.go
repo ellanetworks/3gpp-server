@@ -66,7 +66,7 @@ type SendGNBUENGAPRequest struct {
 
 	FiveGMMCause *uint8 `json:"5gmm_cause,omitempty"`
 
-	TargetGnbID *string `json:"target_gnb_id,omitempty"`
+	TargetGNBID *string `json:"target_gnb_id,omitempty"`
 
 	PDUSessionIDs []int64 `json:"pdu_session_ids,omitempty"`
 
@@ -103,4 +103,17 @@ type SendGNBUENGAPResponse struct {
 	NGAP        *ngap.NGAPResponse `json:"ngap,omitempty"`
 	NAS         *nas.NASResponse   `json:"nas,omitempty"`
 	MACVerified *bool              `json:"mac_verified,omitempty"`
+}
+
+type MigrateGNBUERequest struct {
+	TargetGNBID string `json:"target_gnb_id"`
+	RANUENGAPID *int64 `json:"ran_ue_ngap_id,omitempty"`
+	AMFUENGAPID *int64 `json:"amf_ue_ngap_id,omitempty"`
+}
+
+type MigrateGNBUEResponse struct {
+	UEID        string `json:"ue_id"`
+	GNBID       string `json:"gnb_id"`
+	RANUENGAPID int64  `json:"ran_ue_ngap_id"`
+	AMFUENGAPID int64  `json:"amf_ue_ngap_id"`
 }

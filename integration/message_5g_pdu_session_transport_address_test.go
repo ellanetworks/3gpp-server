@@ -34,7 +34,7 @@ func ngapPDUSessionSetupItems(body []byte) []pduSessionSetupItem {
 // TS 38.414 §5.3 makes the 32-, 128- and 160-bit forms all conformant, so no
 // particular address family is demanded.
 func Test5GPDUSessionResourceSetup_TransportLayerAddress(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	doRegistrationFlow(t, gnbID, ueID)

@@ -88,7 +88,7 @@ func assertConcealedRegistration(t *testing.T, gnbID, ueID string) {
 }
 
 func Test5GRegistrationSUCIProfileA(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	pubKey := deriveX25519PubHex(t, profileAPrivKey)
 
 	ueID := mustCreateUEProfile(t, gnbID, "imsi-001010000000024", "1", fmt.Sprintf("%d", profileAKeyID), pubKey)
@@ -96,7 +96,7 @@ func Test5GRegistrationSUCIProfileA(t *testing.T) {
 }
 
 func Test5GRegistrationSUCIProfileB(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	pubKey := deriveP256CompressedPubHex(t, profileBPrivKey)
 
 	ueID := mustCreateUEProfile(t, gnbID, "imsi-001010000000025", "2", fmt.Sprintf("%d", profileBKeyID), pubKey)

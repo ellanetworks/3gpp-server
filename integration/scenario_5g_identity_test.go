@@ -10,7 +10,7 @@ import "testing"
 func identityRequestPending(t *testing.T) (string, string) {
 	t.Helper()
 
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	// A syntactically valid 5G-GUTI (type 0xf2) whose 5G-TMSI the AMF never allocated.

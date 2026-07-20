@@ -9,12 +9,13 @@ import (
 )
 
 type ENBContext struct {
-	ID    string
-	MCC   string
-	MNC   string
-	TAC   string
-	ENBID uint32
-	Name  string
+	ID             string
+	MCC            string
+	MNC            string
+	TAC            string
+	ENBID          string
+	ENBIDBitLength int
+	Name           string
 
 	N3Addr string
 
@@ -23,15 +24,16 @@ type ENBContext struct {
 	nextENBUEID atomic.Uint32
 }
 
-func NewENBContext(id, mcc, mnc, tac string, enbID uint32, name string) *ENBContext {
+func NewENBContext(id, mcc, mnc, tac, enbID string, enbIDBitLength int, name string) *ENBContext {
 	return &ENBContext{
-		ID:    id,
-		MCC:   mcc,
-		MNC:   mnc,
-		TAC:   tac,
-		ENBID: enbID,
-		Name:  name,
-		ues:   make(map[string]*UEEPSContext),
+		ID:             id,
+		MCC:            mcc,
+		MNC:            mnc,
+		TAC:            tac,
+		ENBID:          enbID,
+		ENBIDBitLength: enbIDBitLength,
+		Name:           name,
+		ues:            make(map[string]*UEEPSContext),
 	}
 }
 

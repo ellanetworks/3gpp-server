@@ -11,7 +11,7 @@ import (
 )
 
 func Test5GPDUSessionEstablishment_UnknownDNN(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUEWithDNN(t, gnbID, "unconfigured")
 	doRegistrationFlow(t, gnbID, ueID)
 

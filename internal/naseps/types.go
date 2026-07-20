@@ -22,12 +22,13 @@ type NASResponse struct {
 	EPSAttachResult *int `json:"eps_attach_result,omitempty"`
 	EPSUpdateResult *int `json:"eps_update_result,omitempty"`
 
-	EPSBearerIdentity *int   `json:"eps_bearer_identity,omitempty"`
-	BearerPTI         *int   `json:"bearer_pti,omitempty"`
-	PDNAddress        string `json:"pdn_address,omitempty"`
-	APN               string `json:"apn,omitempty"`
-	APNAMBR           string `json:"apn_ambr,omitempty"`
-	BearerESMCause    *int   `json:"bearer_esm_cause,omitempty"`
+	EPSBearerIdentity *int        `json:"eps_bearer_identity,omitempty"`
+	BearerPTI         *int        `json:"bearer_pti,omitempty"`
+	EPSQoS            *EPSQoSJSON `json:"eps_qos,omitempty"`
+	PDNAddress        string      `json:"pdn_address,omitempty"`
+	APN               string      `json:"apn,omitempty"`
+	APNAMBR           string      `json:"apn_ambr,omitempty"`
+	BearerESMCause    *int        `json:"bearer_esm_cause,omitempty"`
 
 	EMMCause *int `json:"emm_cause,omitempty"`
 	ESMCause *int `json:"esm_cause,omitempty"`
@@ -35,6 +36,13 @@ type NASResponse struct {
 	IdentityType *int `json:"identity_type,omitempty"`
 
 	RawHex string `json:"raw_hex"`
+}
+
+// EPSQoSJSON surfaces the EPS quality of service IE (TS 24.301 §9.9.4.3): the QCI
+// is octet 1 of the value, mandatory; the raw bytes carry any optional bit rates.
+type EPSQoSJSON struct {
+	QCI    int    `json:"qci"`
+	RawHex string `json:"raw_hex,omitempty"`
 }
 
 type GUTIJSON struct {

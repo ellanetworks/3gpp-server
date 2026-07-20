@@ -5,6 +5,7 @@ package naseps
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/ellanetworks/core/nas/common"
@@ -91,6 +92,15 @@ type AttachRequestParams struct {
 	NASKeySetIdentifier uint8
 	UENetworkCapability []byte
 	ESMContainer        []byte
+	Overrides           *AttachRequestOverrides
+}
+
+// AttachRequestOverrides carries the optional ATTACH REQUEST IEs the EPS codec
+// can express (TS 24.301 §8.2.4), each as a hex string; nil leaves the IE absent.
+type AttachRequestOverrides struct {
+	UENetworkCapability *string
+	MSNetworkCapability *string
+	DRXParameter        *string
 }
 
 // BuildAttachRequest builds a plain ATTACH REQUEST (TS 24.301 §8.2.4).
@@ -125,7 +135,36 @@ func BuildAttachRequest(p AttachRequestParams) ([]byte, error) {
 		ESMMessageContainer: p.ESMContainer,
 	}
 
+	if o := p.Overrides; o != nil {
+		if err := applyHexOverride(o.UENetworkCapability, &m.UENetworkCapability); err != nil {
+			return nil, fmt.Errorf("ue_network_capability: %w", err)
+		}
+
+		if err := applyHexOverride(o.MSNetworkCapability, &m.MSNetworkCapability); err != nil {
+			return nil, fmt.Errorf("ms_network_capability: %w", err)
+		}
+
+		if err := applyHexOverride(o.DRXParameter, &m.DRXParameter); err != nil {
+			return nil, fmt.Errorf("drx_parameter: %w", err)
+		}
+	}
+
 	return m.Marshal()
+}
+
+func applyHexOverride(hexStr *string, dst *[]byte) error {
+	if hexStr == nil {
+		return nil
+	}
+
+	b, err := hex.DecodeString(*hexStr)
+	if err != nil {
+		return err
+	}
+
+	*dst = b
+
+	return nil
 }
 
 // BuildIdentityResponse builds a plain IDENTITY RESPONSE carrying the IMSI as a mobile identity (TS 24.301 §8.2.19, TS 24.008 §10.5.1.4).

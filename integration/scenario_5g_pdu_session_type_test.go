@@ -68,7 +68,7 @@ func Test5GPDUSessionTypeNegotiation(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			gnbID := mustCreateGnB(t)
+			gnbID := mustCreateGNB(t)
 			ueID := mustCreateUETypeDNN(t, gnbID, tc.dnn, tc.reqType)
 			doRegistrationFlow(t, gnbID, ueID)
 

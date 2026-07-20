@@ -25,7 +25,7 @@ func Test5GUEContextReleaseRequest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gnbID := mustCreateGnB(t)
+			gnbID := mustCreateGNB(t)
 			ueID := mustCreateUE(t, gnbID)
 
 			doRegistrationFlow(t, gnbID, ueID)
@@ -48,7 +48,7 @@ func Test5GUEContextReleaseRequest(t *testing.T) {
 }
 
 func Test5GUEContextReleaseRequest_AfterPDUSession(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	doRegistrationFlow(t, gnbID, ueID)
@@ -71,7 +71,7 @@ func Test5GUEContextReleaseRequest_AfterPDUSession(t *testing.T) {
 }
 
 func Test5GUEContextReleaseRequest_ThenReregister(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	doRegistrationFlow(t, gnbID, ueID)
@@ -125,7 +125,7 @@ func Test5GUEContextReleaseRequest_NGAPIDFuzz(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gnbID := mustCreateGnB(t)
+			gnbID := mustCreateGNB(t)
 			ueID := mustCreateUE(t, gnbID)
 
 			doRegistrationFlow(t, gnbID, ueID)
@@ -147,7 +147,7 @@ func Test5GUEContextReleaseRequest_NGAPIDFuzz(t *testing.T) {
 }
 
 func Test5GUEContextReleaseRequest_BeforeRegistration(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
@@ -162,7 +162,7 @@ func Test5GUEContextReleaseRequest_BeforeRegistration(t *testing.T) {
 }
 
 func Test5GUEContextReleaseRequest_DoubleRelease(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	doRegistrationFlow(t, gnbID, ueID)
@@ -189,7 +189,7 @@ func Test5GUEContextReleaseRequest_DoubleRelease(t *testing.T) {
 // The Cause IE is informational, so an out-of-range value leaves the AMF free to
 // process the request or to reject the encoding.
 func Test5GUEContextReleaseRequest_OutOfRangeCause(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	doRegistrationFlow(t, gnbID, ueID)
@@ -208,7 +208,7 @@ func Test5GUEContextReleaseRequest_OutOfRangeCause(t *testing.T) {
 }
 
 func Test5GUEContextReleaseRequest_CommandCarriesCause(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	doRegistrationFlow(t, gnbID, ueID)

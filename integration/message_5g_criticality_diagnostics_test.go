@@ -14,7 +14,7 @@ import (
 const ngapTransferSyntaxErrorPDU = "002e4004deadbeef"
 
 func Test5GCriticalityDiagnostics(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 
 	status, resp := doRequest(t, "POST", "/gnb/"+gnbID+"/ngap",
 		`{"raw_ngap_pdu":"`+ngapTransferSyntaxErrorPDU+`","wait_for":["ErrorIndication"],"timeout_ms":3000}`)
@@ -24,7 +24,7 @@ func Test5GCriticalityDiagnostics(t *testing.T) {
 
 	assertTransferSyntaxErrorIndication(t, resp)
 
-	mustCreateGnB(t)
+	mustCreateGNB(t)
 }
 
 func assertTransferSyntaxErrorIndication(t *testing.T, body []byte) {

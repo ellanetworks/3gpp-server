@@ -15,10 +15,11 @@ type HandoverRequiredParams struct {
 	ENBUES1APID uint32
 	Cause       int
 
-	TargetMCC   string
-	TargetMNC   string
-	TargetTAC   string
-	TargetENBID uint32
+	TargetMCC       string
+	TargetMNC       string
+	TargetTAC       string
+	TargetENBID     uint32
+	TargetENBIDKind ENBIDKind
 }
 
 func BuildHandoverRequired(p HandoverRequiredParams) ([]byte, error) {
@@ -41,7 +42,7 @@ func BuildHandoverRequired(p HandoverRequiredParams) ([]byte, error) {
 			TargeteNBID: s1ap.TargeteNBID{
 				GlobalENBID: s1ap.GlobalENBID{
 					PLMNIdentity: plmn,
-					ENBID:        s1ap.ENBID{Kind: s1ap.ENBIDMacro, Value: p.TargetENBID},
+					ENBID:        s1ap.ENBID{Kind: p.TargetENBIDKind, Value: p.TargetENBID},
 				},
 				SelectedTAI: s1ap.TAI{PLMNIdentity: plmn, TAC: s1ap.TAC(tac)},
 			},

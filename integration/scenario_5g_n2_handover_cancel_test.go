@@ -11,8 +11,8 @@ import (
 )
 
 func Test5GN2HandoverCancelDuringPreparation(t *testing.T) {
-	srcGNB := createGnBWithID(t, "000301", "ho-cancel-src")
-	targetGNB := createGnBWithID(t, "000302", "ho-cancel-tgt")
+	srcGNB := createGNBWithID(t, "000301", "ho-cancel-src")
+	targetGNB := createGNBWithID(t, "000302", "ho-cancel-tgt")
 
 	ueID := establishRegisteredUE(t, srcGNB)
 
@@ -42,8 +42,8 @@ func Test5GN2HandoverCancelDuringPreparation(t *testing.T) {
 }
 
 func Test5GN2HandoverCancelAfterCommand(t *testing.T) {
-	srcGNB := createGnBWithID(t, "000303", "ho-cancel-src")
-	targetGNB := createGnBWithID(t, "000304", "ho-cancel-tgt")
+	srcGNB := createGNBWithID(t, "000303", "ho-cancel-src")
+	targetGNB := createGNBWithID(t, "000304", "ho-cancel-tgt")
 
 	ueID := establishRegisteredUE(t, srcGNB)
 
@@ -80,8 +80,8 @@ func Test5GN2HandoverCancelAfterCommand(t *testing.T) {
 }
 
 func Test5GN2HandoverCancelThenReHandover(t *testing.T) {
-	srcGNB := createGnBWithID(t, "00030a", "ho-recancel-src")
-	targetGNB := createGnBWithID(t, "00030b", "ho-recancel-tgt")
+	srcGNB := createGNBWithID(t, "00030a", "ho-recancel-src")
+	targetGNB := createGNBWithID(t, "00030b", "ho-recancel-tgt")
 
 	ueID := establishRegisteredUE(t, srcGNB)
 
@@ -136,7 +136,7 @@ func Test5GN2HandoverCancelThenReHandover(t *testing.T) {
 // TS 38.413 §8.4.5 defines Handover Cancel only for an ongoing or prepared
 // handover, so with none underway only the UE staying usable is asserted.
 func Test5GN2HandoverCancelNoHandoverInProgress(t *testing.T) {
-	gnb := createGnBWithID(t, "00030c", "ho-nocancel")
+	gnb := createGNBWithID(t, "00030c", "ho-nocancel")
 
 	ueID := registerUEWithSUPI(t, gnb, "imsi-001010000000001")
 
@@ -146,7 +146,7 @@ func Test5GN2HandoverCancelNoHandoverInProgress(t *testing.T) {
 }
 
 func Test5GN2HandoverCancelUnknownRanUeNgapID(t *testing.T) {
-	srcGNB := createGnBWithID(t, "000305", "ho-cancel-src")
+	srcGNB := createGNBWithID(t, "000305", "ho-cancel-src")
 
 	ueID := establishRegisteredUE(t, srcGNB)
 
@@ -162,8 +162,8 @@ func Test5GN2HandoverCancelUnknownRanUeNgapID(t *testing.T) {
 }
 
 func Test5GN2HandoverCancelInconsistentAmfUeNgapID(t *testing.T) {
-	srcGNB := createGnBWithID(t, "000306", "ho-cancel-src")
-	targetGNB := createGnBWithID(t, "000307", "ho-cancel-tgt")
+	srcGNB := createGNBWithID(t, "000306", "ho-cancel-src")
+	targetGNB := createGNBWithID(t, "000307", "ho-cancel-tgt")
 
 	ueID := establishRegisteredUE(t, srcGNB)
 

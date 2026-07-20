@@ -156,6 +156,10 @@ func decodeSecurityModeCommand(m *gonas.Message, resp *NASResponse) {
 	ksi := int(m.SecurityModeCommand.GetNasKeySetIdentifiler())
 	resp.NgKSI = &ksi
 
+	if rc := m.ReplayedUESecurityCapabilities; rc.GetLen() > 0 {
+		resp.ReplayedUESecurityCapabilities = hex.EncodeToString(rc.Buffer)
+	}
+
 	if m.IMEISVRequest != nil {
 		resp.IMEISVRequested = true
 	}

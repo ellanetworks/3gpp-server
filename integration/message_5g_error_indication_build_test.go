@@ -12,7 +12,7 @@ import (
 // TS 38.413 §8.7.5 leaves the receiver's reaction implementation-specific, so
 // only an Error Indication in return is failed.
 func Test5GErrorIndicationAccepted(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 	doRegistrationFlow(t, gnbID, ueID)
 

@@ -18,7 +18,7 @@ const (
 )
 
 func Test5GPDUSessionReleaseComplete_PTIMismatch(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := establishRegisteredUE(t, gnbID)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
@@ -37,7 +37,7 @@ func Test5GPDUSessionReleaseComplete_PTIMismatch(t *testing.T) {
 }
 
 func Test5GPDUSessionEstablishment_UnassignedPTI(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 	doRegistrationFlow(t, gnbID, ueID)
 
@@ -63,7 +63,7 @@ func Test5GPDUSessionEstablishment_UnassignedPTI(t *testing.T) {
 }
 
 func Test5GPDUSessionEstablishment_ReservedPTI(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 	doRegistrationFlow(t, gnbID, ueID)
 
@@ -73,10 +73,12 @@ func Test5GPDUSessionEstablishment_ReservedPTI(t *testing.T) {
 	if status != 504 {
 		t.Errorf("reserved-PTI Establishment Request must be ignored (TS 24.501 §7.3.1 d), but the network responded: HTTP %d\n  body: %s", status, body)
 	}
+
+	assertGNBCoreAlive(t)
 }
 
 func Test5GPDUSessionModificationRequest_UnassignedPTI(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := establishRegisteredUE(t, gnbID)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
@@ -97,7 +99,7 @@ func Test5GPDUSessionModificationRequest_UnassignedPTI(t *testing.T) {
 }
 
 func Test5GPDUSessionReleaseRequest_UnassignedPTI(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := establishRegisteredUE(t, gnbID)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
@@ -118,7 +120,7 @@ func Test5GPDUSessionReleaseRequest_UnassignedPTI(t *testing.T) {
 }
 
 func Test5GPDUSessionModificationRequest_ReservedPTI(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := establishRegisteredUE(t, gnbID)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
@@ -127,10 +129,12 @@ func Test5GPDUSessionModificationRequest_ReservedPTI(t *testing.T) {
 	if status != 504 {
 		t.Errorf("reserved-PTI Modification Request must be ignored (TS 24.501 §7.3.1 d), but the network responded: HTTP %d\n  body: %s", status, body)
 	}
+
+	assertGNBCoreAlive(t)
 }
 
 func Test5GPDUSessionModificationComplete_PTIMismatch(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := establishRegisteredUE(t, gnbID)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",

@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func createGnBWithoutNGSetup(t *testing.T, gnbID, name string) string {
+func createGNBWithoutNGSetup(t *testing.T, gnbID, name string) string {
 	t.Helper()
 
 	body := fmt.Sprintf(`{
@@ -57,7 +57,7 @@ func assertNotServedBeforeNGSetup(t *testing.T, context string, status int, body
 
 func Test5GNGAPMessagesBeforeNGSetupRejected(t *testing.T) {
 	t.Run("InitialUEMessage", func(t *testing.T) {
-		gnb := createGnBWithoutNGSetup(t, "0000d0", "no-ngsetup-iue")
+		gnb := createGNBWithoutNGSetup(t, "0000d0", "no-ngsetup-iue")
 		ueID := mustCreateUEWithSUPI(t, gnb, "imsi-001010000000004")
 
 		status, body := doRequest(t, "POST", "/gnb/"+gnb+"/ue/"+ueID+"/ngap",
@@ -66,7 +66,7 @@ func Test5GNGAPMessagesBeforeNGSetupRejected(t *testing.T) {
 	})
 
 	t.Run("PathSwitchRequest", func(t *testing.T) {
-		gnb := createGnBWithoutNGSetup(t, "0000d1", "no-ngsetup-psr")
+		gnb := createGNBWithoutNGSetup(t, "0000d1", "no-ngsetup-psr")
 
 		status, body := doRequest(t, "POST", "/gnb/"+gnb+"/ngap", `{
 			"message_type": "path_switch_request",
@@ -80,9 +80,11 @@ func Test5GNGAPMessagesBeforeNGSetupRejected(t *testing.T) {
 	})
 
 	t.Run("NGReset", func(t *testing.T) {
-		gnb := createGnBWithoutNGSetup(t, "0000d2", "no-ngsetup-reset")
+		gnb := createGNBWithoutNGSetup(t, "0000d2", "no-ngsetup-reset")
 
 		status, body := doRequest(t, "POST", "/gnb/"+gnb+"/ngap", `{"message_type":"ng_reset"}`)
 		assertNotServedBeforeNGSetup(t, "NG Reset before NG Setup", status, body)
 	})
+
+	assertGNBCoreAlive(t)
 }

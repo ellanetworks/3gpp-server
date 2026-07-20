@@ -89,7 +89,7 @@ func handleGNBRegistrationRequest(ctx context.Context, gnb *store.GNBContext, ue
 			MCC:         gnb.MCC,
 			MNC:         gnb.MNC,
 			TAC:         gnb.TAC,
-			GnbID:       gnb.GNBID,
+			GNBID:       gnb.GNBID,
 			Overrides:   initialUEOverrides(req),
 		})
 		if err != nil {
@@ -142,7 +142,7 @@ func handleGNBRegistrationRequest(ctx context.Context, gnb *store.GNBContext, ue
 		MCC:         gnb.MCC,
 		MNC:         gnb.MNC,
 		TAC:         gnb.TAC,
-		GnbID:       gnb.GNBID,
+		GNBID:       gnb.GNBID,
 		Overrides:   initialUEOverrides(req),
 	})
 	if err != nil {
@@ -311,7 +311,7 @@ func handleGNBDeregistrationRequest(ctx context.Context, gnb *store.GNBContext, 
 		MCC:         gnb.MCC,
 		MNC:         gnb.MNC,
 		TAC:         gnb.TAC,
-		GnbID:       gnb.GNBID,
+		GNBID:       gnb.GNBID,
 		Overrides:   uplinkOverrides(req),
 	})
 	if err != nil {
@@ -602,7 +602,7 @@ func handleGNBServiceRequest(ctx context.Context, gnb *store.GNBContext, ue *sto
 		MCC:         gnb.MCC,
 		MNC:         gnb.MNC,
 		TAC:         gnb.TAC,
-		GnbID:       gnb.GNBID,
+		GNBID:       gnb.GNBID,
 		GUTI:        fiveGSTMSIFromGUTI(ue.Guti),
 		Overrides:   overrides,
 	})
@@ -682,7 +682,7 @@ func handleGNBInjectNAS(ctx context.Context, gnb *store.GNBContext, ue *store.UE
 		MCC:         gnb.MCC,
 		MNC:         gnb.MNC,
 		TAC:         gnb.TAC,
-		GnbID:       gnb.GNBID,
+		GNBID:       gnb.GNBID,
 		Overrides:   uplinkOverrides(req),
 	})
 	if err != nil {

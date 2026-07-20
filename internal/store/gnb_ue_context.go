@@ -8,14 +8,14 @@ import (
 	"fmt"
 
 	"github.com/ellanetworks/3gpp-server/internal/crypto"
-	nasCodec "github.com/ellanetworks/3gpp-server/internal/nas"
+	"github.com/ellanetworks/3gpp-server/internal/nas"
 	"github.com/free5gc/nas/nasMessage"
 	"github.com/free5gc/nas/nasType"
 )
 
 type PDUSessionInfo struct {
 	PDUSessionID uint8
-	N3GnbIP      string
+	N3GNBIP      string
 	DLTeid       uint32
 	QFI          uint8
 
@@ -167,7 +167,7 @@ func NewUEContext(id string, ranUeNgapID int64, mncLength int, opts *CreateUEOpt
 
 	suciStr := crypto.BuildSuciString(mcc, mnc, routingInd, protScheme, pubKeyID, suciBuffer)
 
-	capBuf := nasCodec.DefaultUESecurityCapability
+	capBuf := nas.DefaultUESecurityCapability
 	if opts.UESecurityCapability != "" {
 		if capBuf, err = hex.DecodeString(opts.UESecurityCapability); err != nil {
 			return nil, fmt.Errorf("decode ue_security_capability: %w", err)

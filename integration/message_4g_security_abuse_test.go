@@ -32,7 +32,7 @@ func Test4GPreS1SetupGating(t *testing.T) {
 	body := fmt.Sprintf(`{
 		"mme_address": "10.3.0.2:36412",
 		"enb_s1_address": "10.3.0.3",
-		"mcc": "001", "mnc": "01", "tac": "0001", "enb_id": %d,
+		"mcc": "001", "mnc": "01", "tac": "0001", "enb_id": "%x",
 		"name": "no-s1setup-enb",
 		"skip_s1_setup": true
 	}`, claimENBID())

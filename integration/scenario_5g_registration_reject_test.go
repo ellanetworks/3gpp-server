@@ -26,7 +26,7 @@ func createUEWithBody(t *testing.T, gnbID, body string) string {
 // TS 24.501 §5.5.1.2.5 leaves the 5GMM cause to the network, so only the
 // rejection itself is asserted.
 func Test5GRegistrationReject_UnknownUE(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := createUEWithBody(t, gnbID, `{
 		"supi": "imsi-001019999999999",
 		"k": "00112233445566778899aabbccddeeff",
@@ -49,7 +49,7 @@ func Test5GRegistrationReject_UnknownUE(t *testing.T) {
 }
 
 func Test5GRegistrationReject_InvalidHomeNetworkKey(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := createUEWithBody(t, gnbID, `{
 		"supi": "imsi-001010000000001",
 		"k": "00112233445566778899aabbccddeeff",

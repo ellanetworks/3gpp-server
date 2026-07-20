@@ -21,7 +21,7 @@ import (
 func captureTunnel(gnb *store.GNBContext, ue *store.UEContext, pduSessionID int64, dlTeid uint32, ngapResp *ngap.NGAPResponse, nasResp *nas.NASResponse) {
 	info := &store.PDUSessionInfo{
 		PDUSessionID: uint8(pduSessionID),
-		N3GnbIP:      gnb.N3Addr,
+		N3GNBIP:      gnb.N3Addr,
 		DLTeid:       dlTeid,
 		QFI:          1,
 	}
@@ -119,7 +119,7 @@ func handleGNBPDUSessionEstablishmentRequest(ctx context.Context, gnb *store.GNB
 		MCC:         gnb.MCC,
 		MNC:         gnb.MNC,
 		TAC:         gnb.TAC,
-		GnbID:       gnb.GNBID,
+		GNBID:       gnb.GNBID,
 		Overrides:   uplinkOverrides(req),
 	})
 	if err != nil {
@@ -294,7 +294,7 @@ func handleGNBPDUSessionReleaseComplete(gnb *store.GNBContext, ue *store.UEConte
 		MCC:         gnb.MCC,
 		MNC:         gnb.MNC,
 		TAC:         gnb.TAC,
-		GnbID:       gnb.GNBID,
+		GNBID:       gnb.GNBID,
 		Overrides:   uplinkOverrides(req),
 	})
 	if err != nil {
@@ -346,7 +346,7 @@ func handleGNBPDUSessionModificationComplete(gnb *store.GNBContext, ue *store.UE
 		MCC:         gnb.MCC,
 		MNC:         gnb.MNC,
 		TAC:         gnb.TAC,
-		GnbID:       gnb.GNBID,
+		GNBID:       gnb.GNBID,
 		Overrides:   uplinkOverrides(req),
 	})
 	if err != nil {
@@ -388,7 +388,7 @@ func sendInner5GSM(gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAP
 		MCC:         gnb.MCC,
 		MNC:         gnb.MNC,
 		TAC:         gnb.TAC,
-		GnbID:       gnb.GNBID,
+		GNBID:       gnb.GNBID,
 		Overrides:   uplinkOverrides(req),
 	})
 	if err != nil {

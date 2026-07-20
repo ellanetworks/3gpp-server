@@ -212,7 +212,7 @@ func sendUplinkAndWait(ctx context.Context, gnb *store.GNBContext, ue *store.UEC
 		MCC:         gnb.MCC,
 		MNC:         gnb.MNC,
 		TAC:         gnb.TAC,
-		GnbID:       gnb.GNBID,
+		GNBID:       gnb.GNBID,
 		Overrides:   uplinkOverrides(req),
 	})
 	if err != nil {

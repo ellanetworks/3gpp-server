@@ -14,7 +14,7 @@ import (
 func establishedPDUSession(t *testing.T) (string, string) {
 	t.Helper()
 
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	doRegistrationFlow(t, gnbID, ueID)

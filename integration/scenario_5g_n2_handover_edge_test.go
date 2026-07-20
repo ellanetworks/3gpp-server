@@ -47,8 +47,8 @@ func expectHandoverPreparationFailure(t *testing.T, gnbID, context string) {
 }
 
 func Test5GN2HandoverRequiredUnknownAmfUeNgapID(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "000003", "ho-edge-src")
-	createGnBWithID(t, "000004", "ho-edge-tgt")
+	sourceGNB := createGNBWithID(t, "000003", "ho-edge-src")
+	createGNBWithID(t, "000004", "ho-edge-tgt")
 
 	ueID := establishRegisteredUE(t, sourceGNB)
 
@@ -62,8 +62,8 @@ func Test5GN2HandoverRequiredUnknownAmfUeNgapID(t *testing.T) {
 }
 
 func Test5GN2HandoverRequiredInconsistentRanUeNgapID(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "000009", "ho-edge-src")
-	createGnBWithID(t, "00000a", "ho-edge-tgt")
+	sourceGNB := createGNBWithID(t, "000009", "ho-edge-src")
+	createGNBWithID(t, "00000a", "ho-edge-tgt")
 
 	ueID := establishRegisteredUE(t, sourceGNB)
 
@@ -77,8 +77,8 @@ func Test5GN2HandoverRequiredInconsistentRanUeNgapID(t *testing.T) {
 }
 
 func Test5GN2HandoverRequiredUnregisteredUE(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "00000b", "ho-edge-src")
-	createGnBWithID(t, "00000c", "ho-edge-tgt")
+	sourceGNB := createGNBWithID(t, "00000b", "ho-edge-src")
+	createGNBWithID(t, "00000c", "ho-edge-tgt")
 
 	ueID := mustCreateUE(t, sourceGNB)
 
@@ -92,7 +92,7 @@ func Test5GN2HandoverRequiredUnregisteredUE(t *testing.T) {
 }
 
 func Test5GN2HandoverRequiredUnknownTarget(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "00000d", "ho-edge-src")
+	sourceGNB := createGNBWithID(t, "00000d", "ho-edge-src")
 
 	ueID := establishRegisteredUE(t, sourceGNB)
 
@@ -106,8 +106,8 @@ func Test5GN2HandoverRequiredUnknownTarget(t *testing.T) {
 }
 
 func Test5GN2HandoverRequiredUnknownPDUSession(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "00000e", "ho-edge-src")
-	createGnBWithID(t, "00000f", "ho-edge-tgt")
+	sourceGNB := createGNBWithID(t, "00000e", "ho-edge-src")
+	createGNBWithID(t, "00000f", "ho-edge-tgt")
 
 	ueID := establishRegisteredUE(t, sourceGNB)
 
@@ -121,8 +121,8 @@ func Test5GN2HandoverRequiredUnknownPDUSession(t *testing.T) {
 }
 
 func Test5GN2HandoverRequestAcknowledgeUnknownAmfUeNgapID(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "000005", "ho-edge-src")
-	targetGNB := createGnBWithID(t, "000006", "ho-edge-tgt")
+	sourceGNB := createGNBWithID(t, "000005", "ho-edge-src")
+	targetGNB := createGNBWithID(t, "000006", "ho-edge-tgt")
 
 	ueID := establishRegisteredUE(t, sourceGNB)
 
@@ -146,8 +146,8 @@ func Test5GN2HandoverRequestAcknowledgeUnknownAmfUeNgapID(t *testing.T) {
 }
 
 func Test5GN2HandoverNotifyUnknownAmfUeNgapID(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "000007", "ho-edge-src")
-	targetGNB := createGnBWithID(t, "000008", "ho-edge-tgt")
+	sourceGNB := createGNBWithID(t, "000007", "ho-edge-src")
+	targetGNB := createGNBWithID(t, "000008", "ho-edge-tgt")
 
 	ueID := establishRegisteredUE(t, sourceGNB)
 

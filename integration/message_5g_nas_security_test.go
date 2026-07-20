@@ -21,8 +21,8 @@ func Test5GBadMACSecurityModeComplete(t *testing.T) {
 		}
 	}
 
-	freshGnB := mustCreateGnB(t)
-	doRegistrationFlow(t, freshGnB, mustCreateUE(t, freshGnB))
+	freshGNB := mustCreateGNB(t)
+	doRegistrationFlow(t, freshGNB, mustCreateUE(t, freshGNB))
 }
 
 // TS 24.501 §4.4.4.3 mandates SERVICE REJECT #9 only while the UE has no
@@ -75,7 +75,7 @@ func Test5GServiceRequestStaleNASCount(t *testing.T) {
 }
 
 func Test5GForgedNGAPIDInjection(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 	doRegistrationFlow(t, gnbID, ueID)
 
@@ -93,7 +93,7 @@ func Test5GForgedNGAPIDInjection(t *testing.T) {
 }
 
 func Test5GNASReplay(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 	doRegistrationFlow(t, gnbID, ueID)
 
@@ -107,6 +107,6 @@ func Test5GNASReplay(t *testing.T) {
 		t.Fatalf("AMF re-processed a replayed NAS message (TS 24.501 §4.4.3.2)\n  body: %s", body)
 	}
 
-	freshGnB := mustCreateGnB(t)
-	doRegistrationFlow(t, freshGnB, mustCreateUE(t, freshGnB))
+	freshGNB := mustCreateGNB(t)
+	doRegistrationFlow(t, freshGNB, mustCreateUE(t, freshGNB))
 }

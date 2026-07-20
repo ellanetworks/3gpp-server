@@ -48,7 +48,7 @@ func ngapReleasedPDUSessionIDs(body []byte) []int64 {
 }
 
 func Test5GPathSwitchRequestUnknownUEFails(t *testing.T) {
-	gnb := createGnBWithID(t, "0000e0", "ps-unknown")
+	gnb := createGNBWithID(t, "0000e0", "ps-unknown")
 
 	status, body := sendPathSwitch(t, gnb,
 		`"amf_ue_ngap_id":987654,"ran_ue_ngap_id":300,"pdu_sessions":[{"id":1,"dl_teid":2,"dl_ip":"10.3.0.3"}]`)
@@ -56,8 +56,8 @@ func Test5GPathSwitchRequestUnknownUEFails(t *testing.T) {
 }
 
 func Test5GPathSwitchRequestNoSwitchableSessionFails(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "0000e1", "ps-none-src")
-	targetGNB := createGnBWithID(t, "0000e2", "ps-none-tgt")
+	sourceGNB := createGNBWithID(t, "0000e1", "ps-none-src")
+	targetGNB := createGNBWithID(t, "0000e2", "ps-none-tgt")
 
 	ueID := establishRegisteredUEWithSUPI(t, sourceGNB, "imsi-001010000000001")
 	amf, _ := ueNGAPIDs(t, sourceGNB, ueID)
@@ -70,8 +70,8 @@ func Test5GPathSwitchRequestNoSwitchableSessionFails(t *testing.T) {
 }
 
 func Test5GPathSwitchRequestFailureReportsReleasedSessions(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "0000e3", "ps-rel-src")
-	targetGNB := createGnBWithID(t, "0000e4", "ps-rel-tgt")
+	sourceGNB := createGNBWithID(t, "0000e3", "ps-rel-src")
+	targetGNB := createGNBWithID(t, "0000e4", "ps-rel-tgt")
 
 	ueID := establishRegisteredUEWithSUPI(t, sourceGNB, "imsi-001010000000002")
 	amf, _ := ueNGAPIDs(t, sourceGNB, ueID)
@@ -88,8 +88,8 @@ func Test5GPathSwitchRequestFailureReportsReleasedSessions(t *testing.T) {
 }
 
 func Test5GPathSwitchRequestMultipleSessions(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "0000e5", "ps-multi-src")
-	targetGNB := createGnBWithID(t, "0000e6", "ps-multi-tgt")
+	sourceGNB := createGNBWithID(t, "0000e5", "ps-multi-src")
+	targetGNB := createGNBWithID(t, "0000e6", "ps-multi-tgt")
 
 	ueID := establishRegisteredUEWithSUPI(t, sourceGNB, "imsi-001010000000003")
 	establishPDUSession(t, sourceGNB, ueID, 2)
@@ -104,8 +104,8 @@ func Test5GPathSwitchRequestMultipleSessions(t *testing.T) {
 
 // One switchable session is enough for an acknowledge (TS 38.413 §8.4.4.3).
 func Test5GPathSwitchRequestPartialSuccess(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "0000e7", "ps-part-src")
-	targetGNB := createGnBWithID(t, "0000e8", "ps-part-tgt")
+	sourceGNB := createGNBWithID(t, "0000e7", "ps-part-src")
+	targetGNB := createGNBWithID(t, "0000e8", "ps-part-tgt")
 
 	ueID := establishRegisteredUEWithSUPI(t, sourceGNB, "imsi-001010000000004")
 	amf, _ := ueNGAPIDs(t, sourceGNB, ueID)
@@ -118,8 +118,8 @@ func Test5GPathSwitchRequestPartialSuccess(t *testing.T) {
 }
 
 func Test5GPathSwitchRequestFailedToSetupList(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "0000e9", "ps-fail-src")
-	targetGNB := createGnBWithID(t, "0000ea", "ps-fail-tgt")
+	sourceGNB := createGNBWithID(t, "0000e9", "ps-fail-src")
+	targetGNB := createGNBWithID(t, "0000ea", "ps-fail-tgt")
 
 	ueID := establishRegisteredUEWithSUPI(t, sourceGNB, "imsi-001010000000005")
 	establishPDUSession(t, sourceGNB, ueID, 2)
@@ -134,8 +134,8 @@ func Test5GPathSwitchRequestFailedToSetupList(t *testing.T) {
 
 // PDU Session ID 16 is outside the valid 1..15 range (TS 24.007 §11.2.3.1b).
 func Test5GPathSwitchRequestInvalidPDUSessionIDFails(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "0000eb", "ps-badid-src")
-	targetGNB := createGnBWithID(t, "0000ec", "ps-badid-tgt")
+	sourceGNB := createGNBWithID(t, "0000eb", "ps-badid-src")
+	targetGNB := createGNBWithID(t, "0000ec", "ps-badid-tgt")
 
 	ueID := establishRegisteredUEWithSUPI(t, sourceGNB, "imsi-001010000000006")
 	amf, _ := ueNGAPIDs(t, sourceGNB, ueID)
@@ -156,8 +156,8 @@ const (
 )
 
 func Test5GPathSwitchRequestAcknowledgeCarriesMandatoryIEs(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "0000f0", "ps-ackies-src")
-	targetGNB := createGnBWithID(t, "0000f1", "ps-ackies-tgt")
+	sourceGNB := createGNBWithID(t, "0000f0", "ps-ackies-src")
+	targetGNB := createGNBWithID(t, "0000f1", "ps-ackies-tgt")
 
 	ueID := establishRegisteredUEWithSUPI(t, sourceGNB, "imsi-001010000000008")
 	amf, _ := ueNGAPIDs(t, sourceGNB, ueID)
@@ -188,9 +188,9 @@ func pathSwitchNCC(t *testing.T, body []byte) int64 {
 }
 
 func Test5GPathSwitchRequestNCCIncrements(t *testing.T) {
-	gnbA := createGnBWithID(t, "000126", "ps-ncc-a")
-	gnbB := createGnBWithID(t, "000127", "ps-ncc-b")
-	gnbC := createGnBWithID(t, "000128", "ps-ncc-c")
+	gnbA := createGNBWithID(t, "000126", "ps-ncc-a")
+	gnbB := createGNBWithID(t, "000127", "ps-ncc-b")
+	gnbC := createGNBWithID(t, "000128", "ps-ncc-c")
 
 	ueID := establishRegisteredUEWithSUPI(t, gnbA, "imsi-001010000000023")
 	amf, _ := ueNGAPIDs(t, gnbA, ueID)
@@ -227,8 +227,8 @@ func Test5GPathSwitchRequestMissingMandatoryIE(t *testing.T) {
 
 	for i, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			sourceGNB := createGnBWithID(t, fmt.Sprintf("0000%02x", 0xf2+i*2), "ps-omit-src")
-			targetGNB := createGnBWithID(t, fmt.Sprintf("0000%02x", 0xf3+i*2), "ps-omit-tgt")
+			sourceGNB := createGNBWithID(t, fmt.Sprintf("0000%02x", 0xf2+i*2), "ps-omit-src")
+			targetGNB := createGNBWithID(t, fmt.Sprintf("0000%02x", 0xf3+i*2), "ps-omit-tgt")
 
 			ueID := establishRegisteredUEWithSUPI(t, sourceGNB, fmt.Sprintf("imsi-00101000000001%d", i))
 			amf, _ := ueNGAPIDs(t, sourceGNB, ueID)
@@ -241,8 +241,8 @@ func Test5GPathSwitchRequestMissingMandatoryIE(t *testing.T) {
 }
 
 func Test5GPathSwitchRequestMalformedTransferFails(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "0000ed", "ps-badxfer-src")
-	targetGNB := createGnBWithID(t, "0000ee", "ps-badxfer-tgt")
+	sourceGNB := createGNBWithID(t, "0000ed", "ps-badxfer-src")
+	targetGNB := createGNBWithID(t, "0000ee", "ps-badxfer-tgt")
 
 	ueID := establishRegisteredUEWithSUPI(t, sourceGNB, "imsi-001010000000007")
 	amf, _ := ueNGAPIDs(t, sourceGNB, ueID)

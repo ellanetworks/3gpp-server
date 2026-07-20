@@ -14,7 +14,7 @@ func Test4GPathSwitchSecurityCapabilityMatch(t *testing.T) {
 
 	fullAttach(t, enbID, ueID)
 
-	resp := nasStep(t, enbID, ueID, "path_switch")
+	resp := pathSwitchUE(t, enbID, ueID, "")
 
 	if got := jsonGet(resp, "s1ap.message_type"); got != "PathSwitchRequestAcknowledge" {
 		t.Fatalf("path switch: s1ap.message_type = %q, want PathSwitchRequestAcknowledge; body: %s", got, resp)
@@ -28,7 +28,7 @@ func Test4GPathSwitchSecurityCapabilityMismatch(t *testing.T) {
 	fullAttach(t, enbID, ueID)
 
 	// Report 0x8000 (EEA1/EIA1 only), which mismatches the stored caps.
-	resp := nasBody(t, enbID, ueID, `{"message_type":"path_switch","path_switch_eea":32768,"path_switch_eia":32768}`)
+	resp := pathSwitchUE(t, enbID, ueID, `,"path_switch_eea":32768,"path_switch_eia":32768`)
 
 	if got := jsonGet(resp, "s1ap.message_type"); got != "PathSwitchRequestAcknowledge" {
 		t.Fatalf("path switch: s1ap.message_type = %q, want PathSwitchRequestAcknowledge; body: %s", got, resp)

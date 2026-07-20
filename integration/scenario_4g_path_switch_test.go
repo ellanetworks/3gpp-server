@@ -6,9 +6,33 @@
 package integration_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
+
+func sendENBPathSwitchReq(t *testing.T, enbID, mme, enb, erabsJSON, extra string) []byte {
+	t.Helper()
+
+	body := fmt.Sprintf(
+		`{"message_type":"path_switch_request","mme_ue_s1ap_id":%s,"enb_ue_s1ap_id":%s,"erabs":%s%s,"wait_for":["PathSwitchRequestAcknowledge","PathSwitchRequestFailure","ErrorIndication"],"timeout_ms":4000}`,
+		mme, enb, erabsJSON, extra)
+
+	_, resp := doRequest(t, "POST", "/enb/"+enbID+"/s1ap", body)
+
+	return resp
+}
+
+// pathSwitchUE drives a PATH SWITCH REQUEST for an attached UE, sourcing its S1AP
+// IDs and default E-RAB from the eNB UE state; extra appends request fields.
+func pathSwitchUE(t *testing.T, enbID, ueID, extra string) []byte {
+	t.Helper()
+
+	mme, enb := enbUES1APIDs(t, enbID, ueID)
+	ebi := jsonGet(getENBUE(t, enbID, ueID), "default_ebi")
+
+	return sendENBPathSwitchReq(t, enbID, mme, enb, `[{"id":`+ebi+`}]`, extra)
+}
 
 // NCC seeds at 1 at Initial Context Setup and advances by one per path switch, so the first switch returns 2 (TS 33.401 §7.2.8.4).
 func Test4GPathSwitch(t *testing.T) {
@@ -17,7 +41,7 @@ func Test4GPathSwitch(t *testing.T) {
 
 	fullAttach(t, enbID, ueID)
 
-	resp := nasStep(t, enbID, ueID, "path_switch")
+	resp := pathSwitchUE(t, enbID, ueID, "")
 
 	if got := jsonGet(resp, "s1ap.message_type"); got != "PathSwitchRequestAcknowledge" {
 		t.Fatalf("path switch: s1ap.message_type = %q, want PathSwitchRequestAcknowledge; body: %s", got, resp)
@@ -43,12 +67,12 @@ func Test4GPathSwitchNCCIncrements(t *testing.T) {
 
 	fullAttach(t, enbID, ueID)
 
-	first := jsonGet(nasStep(t, enbID, ueID, "path_switch"), "s1ap.security_context.next_hop_chaining_count")
+	first := jsonGet(pathSwitchUE(t, enbID, ueID, ""), "s1ap.security_context.next_hop_chaining_count")
 	if first != "2" {
 		t.Fatalf("first path switch NCC = %q, want 2; body unavailable", first)
 	}
 
-	second := jsonGet(nasStep(t, enbID, ueID, "path_switch"), "s1ap.security_context.next_hop_chaining_count")
+	second := jsonGet(pathSwitchUE(t, enbID, ueID, ""), "s1ap.security_context.next_hop_chaining_count")
 	if second != "3" {
 		t.Fatalf("second path switch NCC = %q, want 3 (NCC must advance per switch, TS 33.401 §7.2.8.4.3)", second)
 	}
@@ -60,7 +84,10 @@ func Test4GPathSwitchUnknownUE(t *testing.T) {
 
 	fullAttach(t, enbID, ueID)
 
-	resp := nasBody(t, enbID, ueID, `{"message_type":"path_switch","mme_ue_s1ap_id_override":2147483646,"timeout_ms":4000}`)
+	_, enb := enbUES1APIDs(t, enbID, ueID)
+	ebi := jsonGet(getENBUE(t, enbID, ueID), "default_ebi")
+
+	resp := sendENBPathSwitchReq(t, enbID, "2147483646", enb, `[{"id":`+ebi+`}]`, "")
 
 	if got := jsonGet(resp, "s1ap.message_type"); got != "PathSwitchRequestFailure" {
 		t.Fatalf("unknown-UE path switch: s1ap.message_type = %q, want PathSwitchRequestFailure; body: %s", got, resp)
@@ -77,7 +104,7 @@ func Test4GPathSwitchDuplicateERAB(t *testing.T) {
 
 	fullAttach(t, enbID, ueID)
 
-	resp := nasBody(t, enbID, ueID, `{"message_type":"path_switch","duplicate_erab":true,"timeout_ms":4000}`)
+	resp := pathSwitchUE(t, enbID, ueID, `,"duplicate_erab":true`)
 
 	if got := jsonGet(resp, "s1ap.message_type"); got != "PathSwitchRequestFailure" {
 		t.Fatalf("duplicate-E-RAB path switch: s1ap.message_type = %q, want PathSwitchRequestFailure; body: %s", got, resp)
@@ -95,7 +122,9 @@ func Test4GPathSwitchUnknownERAB(t *testing.T) {
 
 	fullAttach(t, enbID, ueID)
 
-	resp := nasBody(t, enbID, ueID, `{"message_type":"path_switch","path_switch_erab_id":7,"timeout_ms":4000}`)
+	mme, enb := enbUES1APIDs(t, enbID, ueID)
+
+	resp := sendENBPathSwitchReq(t, enbID, mme, enb, `[{"id":7}]`, "")
 
 	if got := jsonGet(resp, "s1ap.message_type"); got != "PathSwitchRequestFailure" {
 		t.Fatalf("unknown-E-RAB path switch: s1ap.message_type = %q, want PathSwitchRequestFailure; body: %s", got, resp)

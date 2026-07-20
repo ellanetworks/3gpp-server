@@ -93,4 +93,6 @@ func Test4GDetach_Fuzz(t *testing.T) {
 			}
 		})
 	}
+
+	assertENBCoreAlive(t)
 }

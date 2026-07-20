@@ -13,7 +13,7 @@ import (
 // A replayed mobility Registration Request carrying a stale NAS COUNT fails the
 // integrity check (TS 24.501 §4.4.3.5), so the AMF must not accept it.
 func Test5GRegistration_MobilityReplay(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	registerThenIdle(t, gnbID, ueID)
@@ -35,4 +35,6 @@ func Test5GRegistration_MobilityReplay(t *testing.T) {
 	if got := jsonGet(resp, "nas.message_type"); got == nasRegistrationAccept {
 		t.Fatalf("the AMF accepted a replayed mobility Registration Request with a stale NAS COUNT (TS 24.501 §4.4.3.5)\n  body: %s", resp)
 	}
+
+	assertGNBCoreAlive(t)
 }

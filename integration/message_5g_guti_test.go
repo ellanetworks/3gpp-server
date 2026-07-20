@@ -48,7 +48,7 @@ func registerToAccept(t *testing.T, gnbID string) string {
 }
 
 func Test5GGUTIReallocation(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 
 	const n = 4
 

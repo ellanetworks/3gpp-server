@@ -11,7 +11,7 @@ import (
 )
 
 func Test5GConcurrentRegistration(t *testing.T) {
-	gnb := createGnBWithID(t, "00c001", "conc-reg")
+	gnb := createGNBWithID(t, "00c001", "conc-reg")
 
 	const n = 8
 
@@ -53,7 +53,7 @@ func Test5GConcurrentRegistration(t *testing.T) {
 }
 
 func Test5GConcurrentPDUSessionEstablishment(t *testing.T) {
-	gnb := createGnBWithID(t, "00c002", "conc-pdu")
+	gnb := createGNBWithID(t, "00c002", "conc-pdu")
 
 	const n = 6
 
@@ -98,7 +98,7 @@ func Test5GConcurrentPDUSessionEstablishment(t *testing.T) {
 }
 
 func Test5GConcurrentDeregistration(t *testing.T) {
-	gnb := createGnBWithID(t, "00c003", "conc-dereg")
+	gnb := createGNBWithID(t, "00c003", "conc-dereg")
 
 	const n = 6
 

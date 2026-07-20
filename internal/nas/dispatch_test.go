@@ -42,4 +42,8 @@ func TestDecodeSurfacesIEsOfAnUnprotectedSecurityModeCommand(t *testing.T) {
 	if resp.NgKSI == nil || *resp.NgKSI != 0 {
 		t.Errorf("ngKSI = %v, want 0 (TS 24.501 §9.11.3.32)", resp.NgKSI)
 	}
+
+	if resp.ReplayedUESecurityCapabilities != "e0e0" {
+		t.Errorf("replayed_ue_security_capabilities = %q, want e0e0 (TS 24.501 §9.11.3.54)", resp.ReplayedUESecurityCapabilities)
+	}
 }

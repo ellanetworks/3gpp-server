@@ -6,6 +6,8 @@ package api
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/ellanetworks/3gpp-server/internal/ngap"
@@ -14,7 +16,7 @@ import (
 )
 
 func handleGNBHandoverRequired(gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendGNBUENGAPRequest) (*SendGNBUENGAPResponse, error) {
-	if req.TargetGnbID == nil {
+	if req.TargetGNBID == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "target_gnb_id is required for handover_required")
 	}
 
@@ -43,7 +45,7 @@ func handleGNBHandoverRequired(gnb *store.GNBContext, ue *store.UEContext, t *tr
 	encoded, err := ngap.BuildHandoverRequired(ngap.HandoverRequiredParams{
 		AMFUENGAPID:       amfUeNgapID,
 		RANUENGAPID:       ranUeNgapID,
-		TargetGnbID:       *req.TargetGnbID,
+		TargetGNBID:       *req.TargetGNBID,
 		MCC:               gnb.MCC,
 		MNC:               gnb.MNC,
 		TAC:               gnb.TAC,
@@ -186,7 +188,7 @@ func handleGNBHandoverNotify(gnb *store.GNBContext, t *transport.NGAPTransport, 
 		MCC:         gnb.MCC,
 		MNC:         gnb.MNC,
 		TAC:         gnb.TAC,
-		GnbID:       gnb.GNBID,
+		GNBID:       gnb.GNBID,
 	})
 	if err != nil {
 		return nil, httpErrorf(http.StatusInternalServerError, "build HandoverNotify: %v", err)
@@ -219,4 +221,42 @@ func handleGNBHandoverFailure(t *transport.NGAPTransport, req *SendGNBNGAPReques
 	}
 
 	return &SendGNBUENGAPResponse{}, nil
+}
+
+func (h *Handler) MigrateGNBUE(w http.ResponseWriter, r *http.Request) {
+	gnbID := r.PathValue("gnb_id")
+	ueID := r.PathValue("ue_id")
+
+	src, err := h.Store.GetGNB(gnbID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("gnb not found: %v", err))
+		return
+	}
+
+	ue, ok := src.GetUE(ueID)
+	if !ok {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("ue %s not found", ueID))
+		return
+	}
+
+	var req MigrateGNBUERequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
+		return
+	}
+
+	target, err := h.Store.GetGNB(req.TargetGNBID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("target gnb not found: %v", err))
+		return
+	}
+
+	src.MigrateUE(target, ue, req.RANUENGAPID, req.AMFUENGAPID)
+
+	writeJSON(w, http.StatusOK, MigrateGNBUEResponse{
+		UEID:        ue.ID,
+		GNBID:       req.TargetGNBID,
+		RANUENGAPID: ue.RANUENGAPID,
+		AMFUENGAPID: ue.AMFUENGAPID,
+	})
 }

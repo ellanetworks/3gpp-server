@@ -86,8 +86,8 @@ func containsInt64(ids []int64, want int64) bool {
 }
 
 func Test5GN2HandoverAcknowledgeCrossAssociationHijack(t *testing.T) {
-	victimGNB := createGnBWithID(t, "0000a0", "victim-gnb")
-	attackerGNB := createGnBWithID(t, "0000a1", "attacker-gnb")
+	victimGNB := createGNBWithID(t, "0000a0", "victim-gnb")
+	attackerGNB := createGNBWithID(t, "0000a1", "attacker-gnb")
 
 	victimUE := registerUEWithSUPI(t, victimGNB, "imsi-001010000000001")
 	victimAmf, _ := ueNGAPIDs(t, victimGNB, victimUE)
@@ -103,8 +103,8 @@ func Test5GN2HandoverAcknowledgeCrossAssociationHijack(t *testing.T) {
 }
 
 func Test5GN2HandoverNotifyCrossAssociationHijack(t *testing.T) {
-	victimGNB := createGnBWithID(t, "0000a2", "victim-gnb")
-	attackerGNB := createGnBWithID(t, "0000a3", "attacker-gnb")
+	victimGNB := createGNBWithID(t, "0000a2", "victim-gnb")
+	attackerGNB := createGNBWithID(t, "0000a3", "attacker-gnb")
 
 	victimUE := registerUEWithSUPI(t, victimGNB, "imsi-001010000000001")
 	victimAmf, _ := ueNGAPIDs(t, victimGNB, victimUE)
@@ -120,8 +120,8 @@ func Test5GN2HandoverNotifyCrossAssociationHijack(t *testing.T) {
 }
 
 func Test5GN2HandoverRequiredCrossAssociationHijack(t *testing.T) {
-	victimGNB := createGnBWithID(t, "0000a4", "victim-gnb")
-	attackerGNB := createGnBWithID(t, "0000a5", "attacker-gnb")
+	victimGNB := createGNBWithID(t, "0000a4", "victim-gnb")
+	attackerGNB := createGNBWithID(t, "0000a5", "attacker-gnb")
 
 	victimUE := registerUEWithSUPI(t, victimGNB, "imsi-001010000000001")
 	victimAmf, _ := ueNGAPIDs(t, victimGNB, victimUE)
@@ -140,7 +140,7 @@ func Test5GN2HandoverRequiredCrossAssociationHijack(t *testing.T) {
 
 // TS 38.413 §8.4.3.3 is Void, so no response is defined; only the UE staying usable is asserted.
 func Test5GN2HandoverNotifyPrematureNoHandover(t *testing.T) {
-	gnb := createGnBWithID(t, "0000a7", "ho-premature")
+	gnb := createGNBWithID(t, "0000a7", "ho-premature")
 
 	ueID := registerUEWithSUPI(t, gnb, "imsi-001010000000001")
 	amf, ran := ueNGAPIDs(t, gnb, ueID)
@@ -155,8 +155,8 @@ func Test5GN2HandoverNotifyPrematureNoHandover(t *testing.T) {
 }
 
 func Test5GN2HandoverAcknowledgeNonRequestedSession(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "0000a8", "ho-extra-src")
-	targetGNB := createGnBWithID(t, "0000a9", "ho-extra-tgt")
+	sourceGNB := createGNBWithID(t, "0000a8", "ho-extra-src")
+	targetGNB := createGNBWithID(t, "0000a9", "ho-extra-tgt")
 
 	ueID := establishRegisteredUE(t, sourceGNB)
 
@@ -187,8 +187,8 @@ func Test5GN2HandoverAcknowledgeNonRequestedSession(t *testing.T) {
 }
 
 func Test5GN2HandoverAcknowledgeDuplicateSessions(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "0000aa", "ho-dup-src")
-	targetGNB := createGnBWithID(t, "0000ab", "ho-dup-tgt")
+	sourceGNB := createGNBWithID(t, "0000aa", "ho-dup-src")
+	targetGNB := createGNBWithID(t, "0000ab", "ho-dup-tgt")
 
 	ueID := establishRegisteredUE(t, sourceGNB)
 
@@ -220,8 +220,8 @@ func Test5GN2HandoverAcknowledgeDuplicateSessions(t *testing.T) {
 
 // The trailing legitimate handover catches a procedure-state leak across the flood.
 func Test5GN2HandoverRequiredUnknownTargetFlood(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "0000ac", "ho-flood-src")
-	targetGNB := createGnBWithID(t, "0000ad", "ho-flood-tgt")
+	sourceGNB := createGNBWithID(t, "0000ac", "ho-flood-src")
+	targetGNB := createGNBWithID(t, "0000ad", "ho-flood-tgt")
 
 	ueID := establishRegisteredUE(t, sourceGNB)
 
@@ -248,7 +248,7 @@ func Test5GN2HandoverRequiredUnknownTargetFlood(t *testing.T) {
 
 // TS 38.413 defines no behaviour for a handover to the serving gNB, so only liveness is asserted.
 func Test5GN2HandoverToSelf(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "0000ae", "ho-self")
+	sourceGNB := createGNBWithID(t, "0000ae", "ho-self")
 
 	ueID := establishRegisteredUE(t, sourceGNB)
 
@@ -259,12 +259,12 @@ func Test5GN2HandoverToSelf(t *testing.T) {
 	}
 
 	// Liveness probe: an unasserted association that must still succeed.
-	createGnBWithID(t, "0000af", "ho-self-probe")
+	createGNBWithID(t, "0000af", "ho-self-probe")
 }
 
 func Test5GN2HandoverRequiredDuplicateInProgress(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "0000b0", "ho-rep-src")
-	targetGNB := createGnBWithID(t, "0000b1", "ho-rep-tgt")
+	sourceGNB := createGNBWithID(t, "0000b0", "ho-rep-src")
+	targetGNB := createGNBWithID(t, "0000b1", "ho-rep-tgt")
 
 	ueID := establishRegisteredUE(t, sourceGNB)
 
@@ -322,9 +322,9 @@ func Test5GN2HandoverAcknowledgeMalformedTransfer(t *testing.T) {
 
 	for i, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			srcGNB := createGnBWithID(t, fmt.Sprintf("0002a%d", i), "ho-mal-src")
+			srcGNB := createGNBWithID(t, fmt.Sprintf("0002a%d", i), "ho-mal-src")
 			tgtHex := fmt.Sprintf("0002b%d", i)
-			targetGNB := createGnBWithID(t, tgtHex, "ho-mal-tgt")
+			targetGNB := createGNBWithID(t, tgtHex, "ho-mal-tgt")
 
 			ueID := establishRegisteredUEWithSUPI(t, srcGNB, tc.supi)
 
@@ -352,8 +352,8 @@ func Test5GN2HandoverAcknowledgeMalformedTransfer(t *testing.T) {
 }
 
 func Test5GUEContextReleaseRequestCrossAssociationHijack(t *testing.T) {
-	victimGNB := createGnBWithID(t, "0002c0", "victim-gnb")
-	attackerGNB := createGnBWithID(t, "0002c1", "attacker-gnb")
+	victimGNB := createGNBWithID(t, "0002c0", "victim-gnb")
+	attackerGNB := createGNBWithID(t, "0002c1", "attacker-gnb")
 
 	victimUE := registerUEWithSUPI(t, victimGNB, "imsi-001010000000001")
 	victimAmf, victimRan := ueNGAPIDs(t, victimGNB, victimUE)
@@ -374,8 +374,8 @@ func Test5GUEContextReleaseRequestCrossAssociationHijack(t *testing.T) {
 }
 
 func Test5GUECapabilityInfoCrossAssociationHijack(t *testing.T) {
-	victimGNB := mustCreateGnB(t)
-	attackerGNB := mustCreateGnB(t)
+	victimGNB := mustCreateGNB(t)
+	attackerGNB := mustCreateGNB(t)
 
 	victimUE := mustCreateUE(t, victimGNB)
 	doRegistrationFlow(t, victimGNB, victimUE)
@@ -400,8 +400,8 @@ func Test5GUECapabilityInfoCrossAssociationHijack(t *testing.T) {
 func runInvalidPDUSessionHandover(t *testing.T, srcHex, tgtHex string, sessionID int) {
 	t.Helper()
 
-	srcGNB := createGnBWithID(t, srcHex, "ho-badid-src")
-	createGnBWithID(t, tgtHex, "ho-badid-tgt")
+	srcGNB := createGNBWithID(t, srcHex, "ho-badid-src")
+	createGNBWithID(t, tgtHex, "ho-badid-tgt")
 
 	ueID := establishRegisteredUE(t, srcGNB)
 
@@ -421,9 +421,9 @@ func Test5GN2HandoverRequiredInvalidPDUSessionID(t *testing.T) {
 }
 
 func Test5GN2HandoverRequiredManyPDUSessions(t *testing.T) {
-	srcGNB := createGnBWithID(t, "0002e0", "ho-many-src")
+	srcGNB := createGNBWithID(t, "0002e0", "ho-many-src")
 	tgtHex := "0002e1"
-	targetGNB := createGnBWithID(t, tgtHex, "ho-many-tgt")
+	targetGNB := createGNBWithID(t, tgtHex, "ho-many-tgt")
 
 	ueID := establishRegisteredUE(t, srcGNB)
 

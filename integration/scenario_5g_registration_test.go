@@ -10,7 +10,7 @@ import (
 )
 
 func Test5GScenarioRegistration(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 
 	var ueID string
 	supi := claimSubscriber(t)

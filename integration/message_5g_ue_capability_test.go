@@ -25,7 +25,7 @@ func ngapIEHasUERadioCapability(body []byte, want string) bool {
 }
 
 func Test5GUERadioCapabilityReplay(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 	doRegistrationFlow(t, gnbID, ueID)
 

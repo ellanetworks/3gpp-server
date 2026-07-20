@@ -78,7 +78,7 @@ func Test5GAuthenticationResponse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gnbID := mustCreateGnB(t)
+			gnbID := mustCreateGNB(t)
 			ueID := mustCreateUE(t, gnbID)
 
 			status, _ := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
@@ -111,10 +111,12 @@ func Test5GAuthenticationResponse(t *testing.T) {
 			assertNASCause(t, body, "nas.5gmm_cause", tt.wantNASCause5GMM)
 		})
 	}
+
+	assertGNBCoreAlive(t)
 }
 
 func Test5GAuthenticationResponse_WithoutChallenge(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
@@ -130,7 +132,7 @@ func Test5GAuthenticationResponse_WithoutChallenge(t *testing.T) {
 // TS 24.501 §7.5.1: a status answering a syntactically incorrect mandatory IE
 // carries #96; the alternative treatment is open, so no message type is pinned.
 func Test5GAuthenticationResponse_TruncatedRESStar(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 
 	if status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",

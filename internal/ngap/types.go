@@ -94,8 +94,8 @@ type GlobalRANNodeIDJSON struct {
 
 type GlobalGNBIDJSON struct {
 	PLMNIdentity string `json:"plmn_identity"`
-	GnbID        string `json:"gnb_id"`
-	GnbIDBitLen  int    `json:"gnb_id_bit_length,omitempty"`
+	GNBID        string `json:"gnb_id"`
+	GNBIDBitLen  int    `json:"gnb_id_bit_length,omitempty"`
 }
 
 type SupportedTAListJSON struct {

@@ -60,7 +60,7 @@ func (h *Handler) CreateENB(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	enb := h.Store.CreateENB(req.MCC, req.MNC, req.TAC, req.ENBID, req.Name)
+	enb := h.Store.CreateENB(req.MCC, req.MNC, req.TAC, req.ENBID, req.ENBIDBitLength, req.Name)
 	enb.N3Addr = localAddr
 	h.S1APTransports[enb.ID] = t
 
@@ -133,12 +133,18 @@ func encodeS1SetupAttempt(req *CreateENBRequest) ([]byte, error) {
 		return b, nil
 	}
 
+	enbID, enbIDKind, err := s1ap.ENBIDValue(req.ENBID, req.ENBIDBitLength)
+	if err != nil {
+		return nil, err
+	}
+
 	encoded, err := s1ap.BuildS1SetupRequest(&s1ap.S1SetupRequestParams{
-		MCC:     req.MCC,
-		MNC:     req.MNC,
-		ENBID:   req.ENBID,
-		ENBName: req.Name,
-		TAC:     req.TAC,
+		MCC:       req.MCC,
+		MNC:       req.MNC,
+		ENBID:     enbID,
+		ENBIDKind: enbIDKind,
+		ENBName:   req.Name,
+		TAC:       req.TAC,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("s1ap encode: %v", err)
@@ -155,12 +161,13 @@ func (h *Handler) GetENB(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, ENBStateResponse{
-		ID:    enb.ID,
-		MCC:   enb.MCC,
-		MNC:   enb.MNC,
-		TAC:   enb.TAC,
-		ENBID: enb.ENBID,
-		Name:  enb.Name,
+		ID:             enb.ID,
+		MCC:            enb.MCC,
+		MNC:            enb.MNC,
+		TAC:            enb.TAC,
+		ENBID:          enb.ENBID,
+		ENBIDBitLength: enb.ENBIDBitLength,
+		Name:           enb.Name,
 	})
 }
 
