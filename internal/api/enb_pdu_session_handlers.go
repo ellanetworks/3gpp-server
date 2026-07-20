@@ -77,7 +77,7 @@ func handleENBPdnConnectivity(ctx context.Context, enb *store.ENBContext, ue *st
 		return nil, err
 	}
 
-	annotateSecurityHeaderType(nas, nasBytes)
+	annotateENBSecurityHeaderType(nas, nasBytes)
 
 	if dl.MessageType != "ERABSetupRequest" || nas.MessageType != "activate_default_eps_bearer_context_request" {
 		return &SendENBUES1APResponse{S1AP: dl, NAS: nas}, nil
@@ -196,7 +196,7 @@ func handleENBPdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *stor
 		return nil, err
 	}
 
-	annotateSecurityHeaderType(nas, nasBytes)
+	annotateENBSecurityHeaderType(nas, nasBytes)
 
 	// Withholding the accept leaves timer T3495 running so its retransmission is observable (TS 24.301 §6.4.4.5 a).
 	if req.WithholdAccept {

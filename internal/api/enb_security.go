@@ -16,7 +16,7 @@ func epsDLSequenceNumber(nasBytes []byte) uint8 {
 	return nasBytes[snOffset]
 }
 
-func annotateSecurityHeaderType(nas *naseps.NASResponse, downlink []byte) *naseps.NASResponse {
+func annotateENBSecurityHeaderType(nas *naseps.NASResponse, downlink []byte) *naseps.NASResponse {
 	if nas == nil {
 		return nil
 	}

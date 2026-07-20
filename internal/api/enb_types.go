@@ -32,6 +32,30 @@ type CreateENBResponse struct {
 	S1SetupResponse *s1ap.S1APResponse `json:"s1_setup_response"`
 }
 
+type SendENBS1APRequest struct {
+	MessageType string `json:"message_type"`
+
+	RawS1APPDU *string  `json:"raw_s1ap_pdu,omitempty"`
+	WaitFor    []string `json:"wait_for,omitempty"`
+	TimeoutMs  int      `json:"timeout_ms,omitempty"`
+
+	ResetUEIDs []string `json:"reset_ue_ids,omitempty"`
+
+	MMEUES1APID *uint32 `json:"mme_ue_s1ap_id,omitempty"`
+	ENBUES1APID *uint32 `json:"enb_ue_s1ap_id,omitempty"`
+
+	Admitted    []HandoverERAB `json:"admitted_erabs,omitempty"`
+	FailedERABs []uint8        `json:"failed_erabs,omitempty"`
+	ERABs       []HandoverERAB `json:"erabs,omitempty"`
+
+	DuplicateERAB bool    `json:"duplicate_erab,omitempty"`
+	PathSwitchEEA *uint16 `json:"path_switch_eea,omitempty"`
+	PathSwitchEIA *uint16 `json:"path_switch_eia,omitempty"`
+
+	Cause  *int    `json:"cause,omitempty"`
+	CellID *uint32 `json:"cell_id,omitempty"`
+}
+
 type ENBStateResponse struct {
 	ID             string `json:"id"`
 	MCC            string `json:"mcc"`

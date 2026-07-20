@@ -127,7 +127,7 @@ func handleENBAttachRequest(ctx context.Context, enb *store.ENBContext, ue *stor
 		return nil, err
 	}
 
-	annotateSecurityHeaderType(nas, plain)
+	annotateENBSecurityHeaderType(nas, plain)
 
 	ue.RAND, _ = hex.DecodeString(nas.RAND)
 	ue.AUTN, _ = hex.DecodeString(nas.AUTN)
@@ -167,7 +167,7 @@ func handleENBAttachRequestRaw(ctx context.Context, enb *store.ENBContext, ue *s
 	if dl.NASPDU != nil {
 		if plain, perr := nasPDUBytes(dl); perr == nil {
 			nas, _ = naseps.Decode(plain)
-			annotateSecurityHeaderType(nas, plain)
+			annotateENBSecurityHeaderType(nas, plain)
 		}
 	}
 
@@ -219,7 +219,7 @@ func handleENBAuthenticationResponse(ctx context.Context, enb *store.ENBContext,
 			return nil, derr
 		}
 
-		return &SendENBUES1APResponse{S1AP: dl, NAS: annotateSecurityHeaderType(nas, nasBytes)}, nil
+		return &SendENBUES1APResponse{S1AP: dl, NAS: annotateENBSecurityHeaderType(nas, nasBytes)}, nil
 	}
 
 	// The Security Mode Command is not ciphered, so the algorithms it selects are readable before their keys exist.
@@ -251,7 +251,7 @@ func handleENBAuthenticationResponse(ctx context.Context, enb *store.ENBContext,
 	_, verr := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 	verified := verr == nil
 
-	return &SendENBUES1APResponse{S1AP: dl, NAS: annotateSecurityHeaderType(smc, nasBytes), MACVerified: &verified}, nil
+	return &SendENBUES1APResponse{S1AP: dl, NAS: annotateENBSecurityHeaderType(smc, nasBytes), MACVerified: &verified}, nil
 }
 
 func handleENBIdentityResponse(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
@@ -279,7 +279,7 @@ func handleENBIdentityResponse(ctx context.Context, enb *store.ENBContext, ue *s
 		return nil, err
 	}
 
-	annotateSecurityHeaderType(nas, plain)
+	annotateENBSecurityHeaderType(nas, plain)
 
 	if nas.MessageType == "authentication_request" {
 		ue.RAND, _ = hex.DecodeString(nas.RAND)
@@ -328,7 +328,7 @@ func handleENBAuthenticationFailure(ctx context.Context, enb *store.ENBContext, 
 		return nil, err
 	}
 
-	annotateSecurityHeaderType(nas, plain)
+	annotateENBSecurityHeaderType(nas, plain)
 
 	if nas.MessageType == "authentication_request" {
 		ue.RAND, _ = hex.DecodeString(nas.RAND)
@@ -386,7 +386,7 @@ func handleENBSecurityModeComplete(ctx context.Context, enb *store.ENBContext, u
 		return nil, err
 	}
 
-	annotateSecurityHeaderType(nas, nasBytes)
+	annotateENBSecurityHeaderType(nas, nasBytes)
 
 	if nas.EPSBearerIdentity != nil {
 		ue.EPSBearerID = uint8(*nas.EPSBearerIdentity)
@@ -495,7 +495,7 @@ func handleENBAttachComplete(ctx context.Context, enb *store.ENBContext, ue *sto
 			if plain, perr := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt); perr == nil {
 				resp.S1AP = dl
 				resp.NAS, _ = naseps.Decode(plain)
-				resp.NAS = annotateSecurityHeaderType(resp.NAS, nasBytes)
+				resp.NAS = annotateENBSecurityHeaderType(resp.NAS, nasBytes)
 			}
 		}
 	}
@@ -503,7 +503,7 @@ func handleENBAttachComplete(ctx context.Context, enb *store.ENBContext, ue *sto
 	return resp, nil
 }
 
-func handleENBUeCapabilityInfo(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
+func handleENBUECapabilityInfo(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	cap := []byte{0x01, 0x02, 0x03, 0x04, 0x05}
 	if req.UERadioCapability != "" {
 		b, err := hex.DecodeString(req.UERadioCapability)
@@ -616,7 +616,7 @@ func handleENBTrackingAreaUpdate(ctx context.Context, enb *store.ENBContext, ue 
 
 	if sht == naseps.SHTPlain {
 		nas, derr := naseps.Decode(nasBytes)
-		return &SendENBUES1APResponse{S1AP: dl, NAS: annotateSecurityHeaderType(nas, nasBytes)}, derr
+		return &SendENBUES1APResponse{S1AP: dl, NAS: annotateENBSecurityHeaderType(nas, nasBytes)}, derr
 	}
 
 	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
@@ -629,7 +629,7 @@ func handleENBTrackingAreaUpdate(ctx context.Context, enb *store.ENBContext, ue 
 		return nil, err
 	}
 
-	annotateSecurityHeaderType(nas, nasBytes)
+	annotateENBSecurityHeaderType(nas, nasBytes)
 
 	if nas.GUTI != nil {
 		ue.GUTIMCC = nas.GUTI.MCC
@@ -768,7 +768,7 @@ func handleENBServiceRequest(ctx context.Context, enb *store.ENBContext, ue *sto
 		if dl.NASPDU != nil {
 			if plain, berr := nasPDUBytes(dl); berr == nil {
 				resp.NAS, _ = naseps.Decode(plain)
-				resp.NAS = annotateSecurityHeaderType(resp.NAS, plain)
+				resp.NAS = annotateENBSecurityHeaderType(resp.NAS, plain)
 			}
 		}
 	}
@@ -837,7 +837,7 @@ func handleENBDetach(ctx context.Context, enb *store.ENBContext, ue *store.UEEPS
 			return nil, err
 		}
 
-		resp.NAS = annotateSecurityHeaderType(resp.NAS, nasBytes)
+		resp.NAS = annotateENBSecurityHeaderType(resp.NAS, nasBytes)
 	}
 
 	return resp, nil

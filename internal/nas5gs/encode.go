@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Ella Networks Inc.
 // SPDX-License-Identifier: BUSL-1.1
 
-package nas
+package nas5gs
 
 import (
 	"bytes"
@@ -14,7 +14,7 @@ import (
 	"github.com/free5gc/nas/nasType"
 )
 
-type RegistrationRequestOpts struct {
+type RegistrationRequestParams struct {
 	RegistrationType uint8
 	Suci             nasType.MobileIdentity5GS
 	Guti             *nasType.GUTI5G
@@ -56,7 +56,7 @@ type RegistrationRequestOverrides struct {
 // NEA0/1/2 and NIA0/1/2; bit 7 = algorithm 0, bit 6 = 1, bit 5 = 2 (TS 24.501 §9.11.3.54).
 var DefaultUESecurityCapability = []byte{0xE0, 0xE0}
 
-func BuildRegistrationRequest(opts *RegistrationRequestOpts) ([]byte, error) {
+func BuildRegistrationRequest(opts RegistrationRequestParams) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
 	m.GmmHeader.SetMessageType(nas.MsgTypeRegistrationRequest)
@@ -506,7 +506,7 @@ func buildIMEISV(imeisv string) (*nasType.IMEISV, error) {
 	return pei, nil
 }
 
-type ServiceRequestOpts struct {
+type ServiceRequestParams struct {
 	ServiceType uint8
 	NgKsi       uint8
 	Guti        *nasType.GUTI5G
@@ -516,7 +516,7 @@ type ServiceRequestOpts struct {
 }
 
 // BuildServiceRequest builds a plain SERVICE REQUEST (TS 24.501 §8.2.16); a nil Guti zeroes the 5G-S-TMSI so an unknown UE can still emit one.
-func BuildServiceRequest(opts *ServiceRequestOpts) ([]byte, error) {
+func BuildServiceRequest(opts ServiceRequestParams) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
 	m.GmmHeader.SetMessageType(nas.MsgTypeServiceRequest)
@@ -573,7 +573,7 @@ func pduSessionBitmap(status *[16]bool) uint16 {
 	return flags
 }
 
-type DeregistrationRequestOpts struct {
+type DeregistrationRequestParams struct {
 	Guti      *nasType.GUTI5G
 	Suci      *nasType.MobileIdentity5GS
 	NgKsi     uint8
@@ -581,7 +581,7 @@ type DeregistrationRequestOpts struct {
 }
 
 // BuildDeregistrationRequest builds a UE-originating DEREGISTRATION REQUEST (TS 24.501 §8.2.12).
-func BuildDeregistrationRequest(opts *DeregistrationRequestOpts) ([]byte, error) {
+func BuildDeregistrationRequest(opts DeregistrationRequestParams) ([]byte, error) {
 	m := nas.NewMessage()
 	m.GmmMessage = nas.NewGmmMessage()
 	m.GmmHeader.SetMessageType(nas.MsgTypeDeregistrationRequestUEOriginatingDeregistration)

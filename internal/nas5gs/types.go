@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Ella Networks Inc.
 // SPDX-License-Identifier: BUSL-1.1
 
-package nas
+package nas5gs
 
 type SNSSAIJSON struct {
 	SST int32  `json:"sst"`

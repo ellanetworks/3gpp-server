@@ -171,7 +171,7 @@ func handleENBHandoverCancel(ctx context.Context, ue *store.UEEPSContext, t *tra
 	return &SendENBUES1APResponse{S1AP: resp}, nil
 }
 
-func handleENBEnbStatusTransfer(ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
+func handleENBENBStatusTransfer(ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	var container []byte
 
 	if req.StatusTransferContainer != nil {

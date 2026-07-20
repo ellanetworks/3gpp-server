@@ -90,7 +90,7 @@ func buildNGSetupRequestIE(ie *IE) (*ngapType.NGSetupRequestIEs, error) {
 		g.GlobalGNBID.GNBID.Present = ngapType.GNBIDPresentGNBID
 		g.GlobalGNBID.GNBID.GNBID = new(aper.BitString)
 
-		bitLen := gnbIDData.GNBIDBitLen
+		bitLen := gnbIDData.GNBIDBitLength
 		if bitLen == 0 {
 			bitLen = 24
 		}
@@ -197,12 +197,12 @@ type NGSetupSlice struct {
 	SD  string
 }
 
-type NGSetupRequestFromStoreParams struct {
+type NGSetupRequestParams struct {
 	MCC              string
 	MNC              string
 	TAC              string
 	GNBID            string
-	GNBIDBitLen      int
+	GNBIDBitLength   int
 	Name             string
 	SST              int32
 	SD               string
@@ -210,7 +210,7 @@ type NGSetupRequestFromStoreParams struct {
 	DefaultPagingDRX *int
 }
 
-func BuildNGSetupRequestFromStore(p NGSetupRequestFromStoreParams) (*NGAPMessage, error) {
+func BuildNGSetupRequest(p NGSetupRequestParams) (*NGAPMessage, error) {
 	plmnID, err := encodePLMN(p.MCC, p.MNC)
 	if err != nil {
 		return nil, fmt.Errorf("PLMN: %w", err)
@@ -256,9 +256,9 @@ func BuildNGSetupRequestFromStore(p NGSetupRequestFromStoreParams) (*NGAPMessage
 				GlobalRANNodeID: &GlobalRANNodeIDJSON{
 					Present: "global_gnb_id",
 					GlobalGNBID: &GlobalGNBIDJSON{
-						PLMNIdentity: plmnHex,
-						GNBID:        p.GNBID,
-						GNBIDBitLen:  p.GNBIDBitLen,
+						PLMNIdentity:   plmnHex,
+						GNBID:          p.GNBID,
+						GNBIDBitLength: p.GNBIDBitLength,
 					},
 				},
 			},

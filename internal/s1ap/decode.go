@@ -91,7 +91,7 @@ func Decode(data []byte) (*S1APResponse, error) {
 
 			setUnknownIEs(resp, sr)
 
-			mapS1SetupResponse(sr, resp)
+			decodeS1SetupResponse(sr, resp)
 		case s1ap.ProcPathSwitchRequest:
 			resp.MessageType = "PathSwitchRequestAcknowledge"
 			if err := decodePathSwitchRequestAcknowledge(m.Value, resp); err != nil {
@@ -128,7 +128,7 @@ func Decode(data []byte) (*S1APResponse, error) {
 
 			setUnknownIEs(resp, sf)
 
-			mapS1SetupFailure(sf, resp)
+			decodeS1SetupFailure(sf, resp)
 
 			if sf.CriticalityDiagnostics != nil {
 				resp.CriticalityDiagnostics = decodeCriticalityDiagnostics(sf.CriticalityDiagnostics)
@@ -543,7 +543,7 @@ func setUnknownIEs(resp *S1APResponse, m unknownIECarrier) {
 	}
 }
 
-func mapS1SetupResponse(sr *s1ap.S1SetupResponse, resp *S1APResponse) {
+func decodeS1SetupResponse(sr *s1ap.S1SetupResponse, resp *S1APResponse) {
 	if sr.MMEName != "" {
 		name := sr.MMEName
 		resp.MMEName = &name
@@ -571,7 +571,7 @@ func mapS1SetupResponse(sr *s1ap.S1SetupResponse, resp *S1APResponse) {
 	}
 }
 
-func mapS1SetupFailure(sf *s1ap.S1SetupFailure, resp *S1APResponse) {
+func decodeS1SetupFailure(sf *s1ap.S1SetupFailure, resp *S1APResponse) {
 	resp.Cause = &CauseJSON{Group: causeGroupName(sf.Cause.Group), Value: sf.Cause.Value}
 
 	if sf.TimeToWait != nil {

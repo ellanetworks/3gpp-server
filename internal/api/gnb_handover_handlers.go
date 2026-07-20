@@ -206,7 +206,7 @@ func handleGNBHandoverFailure(t *transport.NGAPTransport, req *SendGNBNGAPReques
 		return nil, httpErrorf(http.StatusBadRequest, "amf_ue_ngap_id is required for handover_failure")
 	}
 
-	cause := ngap.CauseRadioNetworkHoFailureInTarget
+	cause := ngap.CauseRadioNetworkHOFailureInTarget
 	if req.Cause != nil {
 		cause = *req.Cause
 	}

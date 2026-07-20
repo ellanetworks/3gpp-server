@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"github.com/ellanetworks/3gpp-server/internal/crypto"
-	"github.com/ellanetworks/3gpp-server/internal/nas"
+	"github.com/ellanetworks/3gpp-server/internal/nas5gs"
 	"github.com/ellanetworks/3gpp-server/internal/store"
 	gonas "github.com/free5gc/nas"
 )
@@ -31,7 +31,7 @@ func encodeGNBUplinkNAS(ue *store.UEContext, plain []byte, sht uint8, req *SendG
 		count = *req.NASCountOverride
 	}
 
-	protected, err := nas.Protect(plain, sht, count, ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
+	protected, err := nas5gs.Protect(plain, sht, count, ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 	if err != nil {
 		return nil, err
 	}
@@ -49,14 +49,14 @@ func encodeGNBUplinkNAS(ue *store.UEContext, plain []byte, sht uint8, req *SendG
 // decodeGNBDownlinkNAS unwraps a downlink 5GS NAS PDU: it advances the DL NAS COUNT, establishes
 // the security context from a Security Mode Command, verifies the NAS-MAC, and decodes the plain
 // message. It reports whether the downlink was successfully integrity checked (TS 24.501 §4.4.4.2).
-func decodeGNBDownlinkNAS(ue *store.UEContext, message []byte) (*nas.NASResponse, *bool) {
-	sht, err := nas.SecurityHeader(message)
+func decodeGNBDownlinkNAS(ue *store.UEContext, message []byte) (*nas5gs.NASResponse, *bool) {
+	sht, err := nas5gs.SecurityHeader(message)
 	if err != nil {
 		return nil, nil
 	}
 
 	if sht == gonas.SecurityHeaderTypePlainNas {
-		resp, _ := nas.Decode(message)
+		resp, _ := nas5gs.Decode(message)
 		return resp, nil
 	}
 
@@ -69,36 +69,36 @@ func decodeGNBDownlinkNAS(ue *store.UEContext, message []byte) (*nas.NASResponse
 	newContext := sht == gonas.SecurityHeaderTypeIntegrityProtectedWithNew5gNasSecurityContext ||
 		sht == gonas.SecurityHeaderTypeIntegrityProtectedAndCipheredWithNew5gNasSecurityContext
 	if newContext {
-		if inner, perr := nas.PeekProtectedPayload(message); perr == nil {
-			if smc, derr := nas.Decode(inner); derr == nil {
+		if inner, perr := nas5gs.PeekProtectedPayload(message); perr == nil {
+			if smc, derr := nas5gs.Decode(inner); derr == nil {
 				establishGNBSecurityContext(ue, smc)
 			}
 		}
 	}
 
 	if !ue.SecurityActive {
-		inner, perr := nas.PeekProtectedPayload(message)
+		inner, perr := nas5gs.PeekProtectedPayload(message)
 		if perr != nil {
 			return nil, nil
 		}
 
-		resp, _ := nas.Decode(inner)
+		resp, _ := nas5gs.Decode(inner)
 
 		return annotateGNBSecurityHeaderType(resp, sht, message), nil
 	}
 
-	plain, verr := nas.Unprotect(message, count, ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
+	plain, verr := nas5gs.Unprotect(message, count, ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 	if plain == nil {
 		return nil, nil
 	}
 
 	verified := verr == nil
-	resp, _ := nas.Decode(plain)
+	resp, _ := nas5gs.Decode(plain)
 
 	return annotateGNBSecurityHeaderType(resp, sht, message), &verified
 }
 
-func establishGNBSecurityContext(ue *store.UEContext, smc *nas.NASResponse) {
+func establishGNBSecurityContext(ue *store.UEContext, smc *nas5gs.NASResponse) {
 	if smc == nil || smc.SelectedCipheringAlgorithm == nil || smc.SelectedIntegrityAlgorithm == nil {
 		return
 	}
@@ -117,12 +117,12 @@ func establishGNBSecurityContext(ue *store.UEContext, smc *nas.NASResponse) {
 	ue.SecurityActive = true
 }
 
-func annotateGNBSecurityHeaderType(resp *nas.NASResponse, sht uint8, message []byte) *nas.NASResponse {
+func annotateGNBSecurityHeaderType(resp *nas5gs.NASResponse, sht uint8, message []byte) *nas5gs.NASResponse {
 	if resp == nil {
 		return nil
 	}
 
-	resp.SecurityHeaderType = nas.SecurityHeaderTypeString(sht)
+	resp.SecurityHeaderType = nas5gs.SecurityHeaderTypeString(sht)
 	resp.RawHex = hex.EncodeToString(message)
 
 	return resp

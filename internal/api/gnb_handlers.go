@@ -63,7 +63,7 @@ func (h *Handler) CreateGNB(w http.ResponseWriter, r *http.Request) {
 		slices = append(slices, store.SliceConfig{SST: s.SST, SD: s.SD})
 	}
 
-	gnb := h.Store.CreateGNB(req.MCC, req.MNC, req.TAC, req.GNBID, req.GNBIDBitLen, req.Name, req.SST, req.SD, slices)
+	gnb := h.Store.CreateGNB(req.MCC, req.MNC, req.TAC, req.GNBID, req.GNBIDBitLength, req.Name, req.SST, req.SD, slices)
 	gnb.N3Addr = localAddr
 	h.Transports[gnb.ID] = t
 
@@ -115,12 +115,12 @@ func (h *Handler) CreateGNB(w http.ResponseWriter, r *http.Request) {
 				sliceArgs = append(sliceArgs, ngap.NGSetupSlice{SST: s.SST, SD: s.SD})
 			}
 			var berr error
-			msg, berr = ngap.BuildNGSetupRequestFromStore(ngap.NGSetupRequestFromStoreParams{
+			msg, berr = ngap.BuildNGSetupRequest(ngap.NGSetupRequestParams{
 				MCC:              req.MCC,
 				MNC:              req.MNC,
 				TAC:              req.TAC,
 				GNBID:            req.GNBID,
-				GNBIDBitLen:      req.GNBIDBitLen,
+				GNBIDBitLength:   req.GNBIDBitLength,
 				Name:             req.Name,
 				SST:              req.SST,
 				SD:               req.SD,
@@ -180,15 +180,15 @@ func (h *Handler) GetGNB(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, GNBStateResponse{
-		ID:          gnb.ID,
-		MCC:         gnb.MCC,
-		MNC:         gnb.MNC,
-		TAC:         gnb.TAC,
-		GNBID:       gnb.GNBID,
-		GNBIDBitLen: gnb.GNBIDBitLen,
-		Name:        gnb.Name,
-		SST:         gnb.SST,
-		SD:          gnb.SD,
+		ID:             gnb.ID,
+		MCC:            gnb.MCC,
+		MNC:            gnb.MNC,
+		TAC:            gnb.TAC,
+		GNBID:          gnb.GNBID,
+		GNBIDBitLength: gnb.GNBIDBitLength,
+		Name:           gnb.Name,
+		SST:            gnb.SST,
+		SD:             gnb.SD,
 	})
 }
 

@@ -74,7 +74,7 @@ func BuildPathSwitchRequest(p PathSwitchRequestParams) ([]byte, error) {
 		return nil, fmt.Errorf("PLMN: %w", err)
 	}
 
-	tacBytes, err := tacInBytes(p.TAC)
+	tacBytes, err := parseTAC(p.TAC)
 	if err != nil {
 		return nil, fmt.Errorf("TAC: %w", err)
 	}

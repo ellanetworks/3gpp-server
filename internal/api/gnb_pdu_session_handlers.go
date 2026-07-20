@@ -10,7 +10,7 @@ import (
 	"net/netip"
 
 	"github.com/ellanetworks/3gpp-server/internal/gtpu"
-	"github.com/ellanetworks/3gpp-server/internal/nas"
+	"github.com/ellanetworks/3gpp-server/internal/nas5gs"
 	"github.com/ellanetworks/3gpp-server/internal/ngap"
 	"github.com/ellanetworks/3gpp-server/internal/store"
 	"github.com/ellanetworks/3gpp-server/internal/transport"
@@ -18,7 +18,7 @@ import (
 	"github.com/free5gc/nas/nasMessage"
 )
 
-func captureTunnel(gnb *store.GNBContext, ue *store.UEContext, pduSessionID int64, dlTeid uint32, ngapResp *ngap.NGAPResponse, nasResp *nas.NASResponse) {
+func captureTunnel(gnb *store.GNBContext, ue *store.UEContext, pduSessionID int64, dlTeid uint32, ngapResp *ngap.NGAPResponse, nasResp *nas5gs.NASResponse) {
 	info := &store.PDUSessionInfo{
 		PDUSessionID: uint8(pduSessionID),
 		N3GNBIP:      gnb.N3Addr,
@@ -84,7 +84,7 @@ func handleGNBPDUSessionEstablishmentRequest(ctx context.Context, gnb *store.GNB
 			return nil, httpErrorf(http.StatusBadRequest, "decode inner_sm_payload: %v", err)
 		}
 	} else {
-		pduReq, err = nas.BuildPDUSessionEstablishmentRequest(&nas.PDUSessionEstablishmentRequestOpts{
+		pduReq, err = nas5gs.BuildPDUSessionEstablishmentRequest(nas5gs.PDUSessionEstablishmentRequestParams{
 			PDUSessionID:   pduSessionID,
 			PDUSessionType: pduSessionType,
 			PTI:            ptiFor(req),
@@ -95,7 +95,7 @@ func handleGNBPDUSessionEstablishmentRequest(ctx context.Context, gnb *store.GNB
 		}
 	}
 
-	ulNas, err := nas.BuildULNASTransport(&nas.ULNASTransportOpts{
+	ulNas, err := nas5gs.BuildULNASTransport(nas5gs.ULNASTransportParams{
 		PduSessionID:     pduSessionID,
 		PayloadContainer: pduReq,
 		DNN:              ue.DNN,
@@ -136,7 +136,7 @@ func handleGNBPDUSessionEstablishmentRequest(ctx context.Context, gnb *store.GNB
 		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for PDU establishment response: %v", err)
 	}
 
-	var nasResp *nas.NASResponse
+	var nasResp *nas5gs.NASResponse
 
 	var macVerified *bool
 
@@ -173,8 +173,8 @@ func handleGNBPDUSessionEstablishmentRequest(ctx context.Context, gnb *store.GNB
 }
 
 func ptiFor(req *SendGNBUENGAPRequest) uint8 {
-	if req != nil && req.PTIOverride != nil {
-		return *req.PTIOverride
+	if req != nil && req.PTI != nil {
+		return *req.PTI
 	}
 
 	return 0x01
@@ -201,7 +201,7 @@ func handleGNBPDUSessionReleaseRequest(ctx context.Context, gnb *store.GNBContex
 
 		inner = raw
 	} else {
-		relReq, err := nas.BuildPDUSessionReleaseRequest(pduSessionID, ptiFor(req))
+		relReq, err := nas5gs.BuildPDUSessionReleaseRequest(pduSessionID, ptiFor(req))
 		if err != nil {
 			return nil, httpErrorf(http.StatusInternalServerError, "build PDUSessionReleaseRequest: %v", err)
 		}
@@ -209,7 +209,7 @@ func handleGNBPDUSessionReleaseRequest(ctx context.Context, gnb *store.GNBContex
 		inner = relReq
 	}
 
-	ulNas, err := nas.BuildULNASTransportExisting(pduSessionID, req.RequestTypeOverride, inner)
+	ulNas, err := nas5gs.BuildULNASTransportExisting(pduSessionID, req.RequestTypeOverride, inner)
 	if err != nil {
 		return nil, httpErrorf(http.StatusInternalServerError, "build ULNASTransport: %v", err)
 	}
@@ -235,7 +235,7 @@ func handleGNBPDUSessionModificationRequest(ctx context.Context, gnb *store.GNBC
 
 		inner = raw
 	} else {
-		modReq, err := nas.BuildPDUSessionModificationRequest(pduSessionID, ptiFor(req))
+		modReq, err := nas5gs.BuildPDUSessionModificationRequest(pduSessionID, ptiFor(req))
 		if err != nil {
 			return nil, httpErrorf(http.StatusInternalServerError, "build PDUSessionModificationRequest: %v", err)
 		}
@@ -243,7 +243,7 @@ func handleGNBPDUSessionModificationRequest(ctx context.Context, gnb *store.GNBC
 		inner = modReq
 	}
 
-	ulNas, err := nas.BuildULNASTransportExisting(pduSessionID, req.RequestTypeOverride, inner)
+	ulNas, err := nas5gs.BuildULNASTransportExisting(pduSessionID, req.RequestTypeOverride, inner)
 	if err != nil {
 		return nil, httpErrorf(http.StatusInternalServerError, "build ULNASTransport: %v", err)
 	}
@@ -269,7 +269,7 @@ func handleGNBPDUSessionReleaseComplete(gnb *store.GNBContext, ue *store.UEConte
 
 		inner = raw
 	} else {
-		cmp, err := nas.BuildPDUSessionReleaseComplete(pduSessionID, ptiFor(req))
+		cmp, err := nas5gs.BuildPDUSessionReleaseComplete(pduSessionID, ptiFor(req))
 		if err != nil {
 			return nil, httpErrorf(http.StatusInternalServerError, "build PDUSessionReleaseComplete: %v", err)
 		}
@@ -277,7 +277,7 @@ func handleGNBPDUSessionReleaseComplete(gnb *store.GNBContext, ue *store.UEConte
 		inner = cmp
 	}
 
-	ulNas, err := nas.BuildULNASTransportExisting(pduSessionID, req.RequestTypeOverride, inner)
+	ulNas, err := nas5gs.BuildULNASTransportExisting(pduSessionID, req.RequestTypeOverride, inner)
 	if err != nil {
 		return nil, httpErrorf(http.StatusInternalServerError, "build ULNASTransport: %v", err)
 	}
@@ -321,7 +321,7 @@ func handleGNBPDUSessionModificationComplete(gnb *store.GNBContext, ue *store.UE
 
 		inner = raw
 	} else {
-		cmp, err := nas.BuildPDUSessionModificationComplete(pduSessionID, ptiFor(req))
+		cmp, err := nas5gs.BuildPDUSessionModificationComplete(pduSessionID, ptiFor(req))
 		if err != nil {
 			return nil, httpErrorf(http.StatusInternalServerError, "build PDUSessionModificationComplete: %v", err)
 		}
@@ -329,7 +329,7 @@ func handleGNBPDUSessionModificationComplete(gnb *store.GNBContext, ue *store.UE
 		inner = cmp
 	}
 
-	ulNas, err := nas.BuildULNASTransportExisting(pduSessionID, req.RequestTypeOverride, inner)
+	ulNas, err := nas5gs.BuildULNASTransportExisting(pduSessionID, req.RequestTypeOverride, inner)
 	if err != nil {
 		return nil, httpErrorf(http.StatusInternalServerError, "build ULNASTransport: %v", err)
 	}
@@ -371,7 +371,7 @@ func cause5GSMFor(req *SendGNBUENGAPRequest) uint8 {
 func sendInner5GSM(gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendGNBUENGAPRequest, inner []byte) (*SendGNBUENGAPResponse, error) {
 	pduSessionID := pduSessionIDForRelease(ue)
 
-	ulNas, err := nas.BuildULNASTransportExisting(pduSessionID, req.RequestTypeOverride, inner)
+	ulNas, err := nas5gs.BuildULNASTransportExisting(pduSessionID, req.RequestTypeOverride, inner)
 	if err != nil {
 		return nil, httpErrorf(http.StatusInternalServerError, "build ULNASTransport: %v", err)
 	}
@@ -415,7 +415,7 @@ func handleGNBPDUSessionModificationCommandReject(gnb *store.GNBContext, ue *sto
 
 		inner = raw
 	} else {
-		rej, err := nas.BuildPDUSessionModificationCommandReject(pduSessionID, ptiFor(req), cause5GSMFor(req))
+		rej, err := nas5gs.BuildPDUSessionModificationCommandReject(pduSessionID, ptiFor(req), cause5GSMFor(req))
 		if err != nil {
 			return nil, httpErrorf(http.StatusInternalServerError, "build PDUSessionModificationCommandReject: %v", err)
 		}
@@ -439,7 +439,7 @@ func handleGNBStatus5GSM(gnb *store.GNBContext, ue *store.UEContext, t *transpor
 
 		inner = raw
 	} else {
-		st, err := nas.BuildPDUSessionStatus5GSM(pduSessionID, ptiFor(req), cause5GSMFor(req))
+		st, err := nas5gs.BuildPDUSessionStatus5GSM(pduSessionID, ptiFor(req), cause5GSMFor(req))
 		if err != nil {
 			return nil, httpErrorf(http.StatusInternalServerError, "build Status5GSM: %v", err)
 		}

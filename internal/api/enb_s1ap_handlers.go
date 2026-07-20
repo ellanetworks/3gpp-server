@@ -68,13 +68,13 @@ func (h *Handler) SendENBUES1AP(w http.ResponseWriter, r *http.Request) {
 	case "tracking_area_update":
 		resp, herr = handleENBTrackingAreaUpdate(ctx, enb, ue, t, &req)
 	case "ue_capability_info":
-		resp, herr = handleENBUeCapabilityInfo(ctx, enb, ue, t, &req)
+		resp, herr = handleENBUECapabilityInfo(ctx, enb, ue, t, &req)
 	case "handover_required":
 		resp, herr = handleENBHandoverRequired(h.Store, ue, t, &req)
 	case "handover_cancel":
 		resp, herr = handleENBHandoverCancel(ctx, ue, t, &req)
 	case "enb_status_transfer":
-		resp, herr = handleENBEnbStatusTransfer(ue, t, &req)
+		resp, herr = handleENBENBStatusTransfer(ue, t, &req)
 	case "error_indication":
 		resp, herr = handleENBErrorIndication(ctx, ue, t, &req)
 	case "initial_context_setup_failure":

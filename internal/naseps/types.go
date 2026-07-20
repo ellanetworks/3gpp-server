@@ -3,6 +3,14 @@
 
 package naseps
 
+// EPS update types (TS 24.301 §9.9.3.14).
+const (
+	EPSUpdateTypeTA               uint8 = 0
+	EPSUpdateTypeCombinedTALA     uint8 = 1
+	EPSUpdateTypeCombinedTALAImsi uint8 = 2
+	EPSUpdateTypePeriodic         uint8 = 3
+)
+
 type NASResponse struct {
 	MessageType        string `json:"message_type"`
 	SecurityHeaderType string `json:"security_header_type,omitempty"`

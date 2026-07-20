@@ -12,14 +12,6 @@ import (
 	"github.com/ellanetworks/core/nas/eps"
 )
 
-// EPS update types (TS 24.301 §9.9.3.14).
-const (
-	EPSUpdateTypeTA               uint8 = 0
-	EPSUpdateTypeCombinedTALA     uint8 = 1
-	EPSUpdateTypeCombinedTALAImsi uint8 = 2
-	EPSUpdateTypePeriodic         uint8 = 3
-)
-
 func encodeGUTIIdentity(guti GUTIParams) ([]byte, error) {
 	plmn, err := common.EncodePLMN(guti.MCC, guti.MNC)
 	if err != nil {

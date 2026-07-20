@@ -9,15 +9,15 @@ import (
 )
 
 type GNBContext struct {
-	ID          string
-	MCC         string
-	MNC         string
-	SST         int32
-	SD          string
-	TAC         string
-	GNBID       string
-	GNBIDBitLen int
-	Name        string
+	ID             string
+	MCC            string
+	MNC            string
+	SST            int32
+	SD             string
+	TAC            string
+	GNBID          string
+	GNBIDBitLength int
+	Name           string
 
 	N3Addr string
 
@@ -33,19 +33,19 @@ type SliceConfig struct {
 	SD  string
 }
 
-func NewGNBContext(id, mcc, mnc, tac, gnbID string, gnbIDBitLen int, name string, sst int32, sd string, slices []SliceConfig) *GNBContext {
+func NewGNBContext(id, mcc, mnc, tac, gnbID string, gnbIDBitLength int, name string, sst int32, sd string, slices []SliceConfig) *GNBContext {
 	return &GNBContext{
-		ID:          id,
-		MCC:         mcc,
-		MNC:         mnc,
-		SST:         sst,
-		SD:          sd,
-		TAC:         tac,
-		GNBID:       gnbID,
-		GNBIDBitLen: gnbIDBitLen,
-		Name:        name,
-		Slices:      slices,
-		ues:         make(map[string]*UEContext),
+		ID:             id,
+		MCC:            mcc,
+		MNC:            mnc,
+		SST:            sst,
+		SD:             sd,
+		TAC:            tac,
+		GNBID:          gnbID,
+		GNBIDBitLength: gnbIDBitLength,
+		Name:           name,
+		Slices:         slices,
+		ues:            make(map[string]*UEContext),
 	}
 }
 
