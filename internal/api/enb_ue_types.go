@@ -30,9 +30,34 @@ type SendENBUES1APRequest struct {
 	AttachType  uint8 `json:"attach_type,omitempty"`
 	ForeignGUTI bool  `json:"foreign_guti,omitempty"`
 
-	UENetworkCapabilityOverride *string `json:"ue_network_capability,omitempty"`
-	MSNetworkCapability         *string `json:"ms_network_capability,omitempty"`
-	DRXParameter                *string `json:"drx_parameter,omitempty"`
+	UENetworkCapabilityOverride     *string `json:"ue_network_capability,omitempty"`
+	OldPTMSISignature               *string `json:"old_ptmsi_signature,omitempty"`
+	AdditionalGUTI                  *string `json:"additional_guti,omitempty"`
+	LastVisitedRegisteredTAI        *string `json:"last_visited_registered_tai,omitempty"`
+	DRXParameter                    *string `json:"drx_parameter,omitempty"`
+	MSNetworkCapability             *string `json:"ms_network_capability,omitempty"`
+	OldLocationAreaID               *string `json:"old_location_area_identification,omitempty"`
+	TMSIStatus                      *uint8  `json:"tmsi_status,omitempty"`
+	MobileStationClassmark2         *string `json:"mobile_station_classmark_2,omitempty"`
+	MobileStationClassmark3         *string `json:"mobile_station_classmark_3,omitempty"`
+	SupportedCodecs                 *string `json:"supported_codecs,omitempty"`
+	AdditionalUpdateType            *uint8  `json:"additional_update_type,omitempty"`
+	VoiceDomainPreference           *string `json:"voice_domain_preference,omitempty"`
+	DeviceProperties                *uint8  `json:"device_properties,omitempty"`
+	OldGUTIType                     *uint8  `json:"old_guti_type,omitempty"`
+	MSNetworkFeatureSupport         *uint8  `json:"ms_network_feature_support,omitempty"`
+	TMSIBasedNRIContainer           *string `json:"tmsi_based_nri_container,omitempty"`
+	T3324Value                      *string `json:"t3324_value,omitempty"`
+	T3412ExtendedValue              *string `json:"t3412_extended_value,omitempty"`
+	ExtendedDRXParameters           *string `json:"extended_drx_parameters,omitempty"`
+	UEAdditionalSecurityCapability  *string `json:"ue_additional_security_capability,omitempty"`
+	UEStatus                        *string `json:"ue_status,omitempty"`
+	AdditionalInformationRequested  *string `json:"additional_information_requested,omitempty"`
+	N1UENetworkCapability           *string `json:"n1_ue_network_capability,omitempty"`
+	UERadioCapabilityIDAvailability *string `json:"ue_radio_capability_id_availability,omitempty"`
+	RequestedWUSAssistance          *string `json:"requested_wus_assistance_information,omitempty"`
+	DRXParameterNBS1Mode            *string `json:"drx_parameter_nb_s1_mode,omitempty"`
+	RequestedIMSIOffset             *string `json:"requested_imsi_offset,omitempty"`
 
 	RawNASPDU  *string `json:"raw_nas_pdu,omitempty"`
 	CorruptMAC bool    `json:"corrupt_mac,omitempty"`

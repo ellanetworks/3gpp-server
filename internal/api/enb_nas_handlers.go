@@ -33,14 +33,35 @@ const (
 )
 
 func attachOverrides(req *SendENBUES1APRequest) *naseps.AttachRequestOverrides {
-	if req.UENetworkCapabilityOverride == nil && req.MSNetworkCapability == nil && req.DRXParameter == nil {
-		return nil
-	}
-
 	return &naseps.AttachRequestOverrides{
-		UENetworkCapability: req.UENetworkCapabilityOverride,
-		MSNetworkCapability: req.MSNetworkCapability,
-		DRXParameter:        req.DRXParameter,
+		UENetworkCapability:             req.UENetworkCapabilityOverride,
+		OldPTMSISignature:               req.OldPTMSISignature,
+		AdditionalGUTI:                  req.AdditionalGUTI,
+		LastVisitedRegisteredTAI:        req.LastVisitedRegisteredTAI,
+		DRXParameter:                    req.DRXParameter,
+		MSNetworkCapability:             req.MSNetworkCapability,
+		OldLocationAreaID:               req.OldLocationAreaID,
+		TMSIStatus:                      req.TMSIStatus,
+		MobileStationClassmark2:         req.MobileStationClassmark2,
+		MobileStationClassmark3:         req.MobileStationClassmark3,
+		SupportedCodecs:                 req.SupportedCodecs,
+		AdditionalUpdateType:            req.AdditionalUpdateType,
+		VoiceDomainPreference:           req.VoiceDomainPreference,
+		DeviceProperties:                req.DeviceProperties,
+		OldGUTIType:                     req.OldGUTIType,
+		MSNetworkFeatureSupport:         req.MSNetworkFeatureSupport,
+		TMSIBasedNRIContainer:           req.TMSIBasedNRIContainer,
+		T3324Value:                      req.T3324Value,
+		T3412ExtendedValue:              req.T3412ExtendedValue,
+		ExtendedDRXParameters:           req.ExtendedDRXParameters,
+		UEAdditionalSecurityCapability:  req.UEAdditionalSecurityCapability,
+		UEStatus:                        req.UEStatus,
+		AdditionalInformationRequested:  req.AdditionalInformationRequested,
+		N1UENetworkCapability:           req.N1UENetworkCapability,
+		UERadioCapabilityIDAvailability: req.UERadioCapabilityIDAvailability,
+		RequestedWUSAssistance:          req.RequestedWUSAssistance,
+		DRXParameterNBS1Mode:            req.DRXParameterNBS1Mode,
+		RequestedIMSIOffset:             req.RequestedIMSIOffset,
 	}
 }
 

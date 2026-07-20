@@ -15,13 +15,14 @@ const (
 )
 
 type S1SetupRequestParams struct {
-	MCC          string
-	MNC          string
-	ENBID        uint32
-	ENBIDKind    ENBIDKind
-	ENBName      string
-	TAC          string
-	SupportedTAs []SupportedTAParams
+	MCC              string
+	MNC              string
+	ENBID            uint32
+	ENBIDKind        ENBIDKind
+	ENBName          string
+	TAC              string
+	SupportedTAs     []SupportedTAParams
+	DefaultPagingDRX *int
 }
 
 type SupportedTAParams struct {

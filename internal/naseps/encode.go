@@ -96,11 +96,37 @@ type AttachRequestParams struct {
 }
 
 // AttachRequestOverrides carries the optional ATTACH REQUEST IEs the EPS codec
-// can express (TS 24.301 §8.2.4), each as a hex string; nil leaves the IE absent.
+// can express (TS 24.301 §8.2.4). Full-octet IEs are hex strings; the type-1
+// half-octet IEs are a nibble value. A nil field leaves the IE absent.
 type AttachRequestOverrides struct {
-	UENetworkCapability *string
-	MSNetworkCapability *string
-	DRXParameter        *string
+	UENetworkCapability             *string
+	OldPTMSISignature               *string
+	AdditionalGUTI                  *string
+	LastVisitedRegisteredTAI        *string
+	DRXParameter                    *string
+	MSNetworkCapability             *string
+	OldLocationAreaID               *string
+	TMSIStatus                      *uint8
+	MobileStationClassmark2         *string
+	MobileStationClassmark3         *string
+	SupportedCodecs                 *string
+	AdditionalUpdateType            *uint8
+	VoiceDomainPreference           *string
+	DeviceProperties                *uint8
+	OldGUTIType                     *uint8
+	MSNetworkFeatureSupport         *uint8
+	TMSIBasedNRIContainer           *string
+	T3324Value                      *string
+	T3412ExtendedValue              *string
+	ExtendedDRXParameters           *string
+	UEAdditionalSecurityCapability  *string
+	UEStatus                        *string
+	AdditionalInformationRequested  *string
+	N1UENetworkCapability           *string
+	UERadioCapabilityIDAvailability *string
+	RequestedWUSAssistance          *string
+	DRXParameterNBS1Mode            *string
+	RequestedIMSIOffset             *string
 }
 
 // BuildAttachRequest builds a plain ATTACH REQUEST (TS 24.301 §8.2.4).
@@ -136,17 +162,46 @@ func BuildAttachRequest(p AttachRequestParams) ([]byte, error) {
 	}
 
 	if o := p.Overrides; o != nil {
-		if err := applyHexOverride(o.UENetworkCapability, &m.UENetworkCapability); err != nil {
-			return nil, fmt.Errorf("ue_network_capability: %w", err)
+		hexIEs := []struct {
+			name string
+			src  *string
+			dst  *[]byte
+		}{
+			{"ue_network_capability", o.UENetworkCapability, &m.UENetworkCapability},
+			{"old_ptmsi_signature", o.OldPTMSISignature, &m.OldPTMSISignature},
+			{"additional_guti", o.AdditionalGUTI, &m.AdditionalGUTI},
+			{"last_visited_registered_tai", o.LastVisitedRegisteredTAI, &m.LastVisitedRegisteredTAI},
+			{"drx_parameter", o.DRXParameter, &m.DRXParameter},
+			{"ms_network_capability", o.MSNetworkCapability, &m.MSNetworkCapability},
+			{"old_location_area_identification", o.OldLocationAreaID, &m.OldLocationAreaID},
+			{"mobile_station_classmark_2", o.MobileStationClassmark2, &m.MobileStationClassmark2},
+			{"mobile_station_classmark_3", o.MobileStationClassmark3, &m.MobileStationClassmark3},
+			{"supported_codecs", o.SupportedCodecs, &m.SupportedCodecs},
+			{"voice_domain_preference", o.VoiceDomainPreference, &m.VoiceDomainPreference},
+			{"tmsi_based_nri_container", o.TMSIBasedNRIContainer, &m.TMSIBasedNRIContainer},
+			{"t3324_value", o.T3324Value, &m.T3324Value},
+			{"t3412_extended_value", o.T3412ExtendedValue, &m.T3412ExtendedValue},
+			{"extended_drx_parameters", o.ExtendedDRXParameters, &m.ExtendedDRXParameters},
+			{"ue_additional_security_capability", o.UEAdditionalSecurityCapability, &m.UEAdditionalSecurityCapability},
+			{"ue_status", o.UEStatus, &m.UEStatus},
+			{"additional_information_requested", o.AdditionalInformationRequested, &m.AdditionalInformationRequested},
+			{"n1_ue_network_capability", o.N1UENetworkCapability, &m.N1UENetworkCapability},
+			{"ue_radio_capability_id_availability", o.UERadioCapabilityIDAvailability, &m.UERadioCapabilityIDAvailability},
+			{"requested_wus_assistance_information", o.RequestedWUSAssistance, &m.RequestedWUSAssistance},
+			{"drx_parameter_nb_s1_mode", o.DRXParameterNBS1Mode, &m.DRXParameterNBS1Mode},
+			{"requested_imsi_offset", o.RequestedIMSIOffset, &m.RequestedIMSIOffset},
+		}
+		for _, ie := range hexIEs {
+			if err := applyHexOverride(ie.src, ie.dst); err != nil {
+				return nil, fmt.Errorf("%s: %w", ie.name, err)
+			}
 		}
 
-		if err := applyHexOverride(o.MSNetworkCapability, &m.MSNetworkCapability); err != nil {
-			return nil, fmt.Errorf("ms_network_capability: %w", err)
-		}
-
-		if err := applyHexOverride(o.DRXParameter, &m.DRXParameter); err != nil {
-			return nil, fmt.Errorf("drx_parameter: %w", err)
-		}
+		applyTV1Override(o.TMSIStatus, &m.TMSIStatus)
+		applyTV1Override(o.AdditionalUpdateType, &m.AdditionalUpdateType)
+		applyTV1Override(o.DeviceProperties, &m.DeviceProperties)
+		applyTV1Override(o.OldGUTIType, &m.OldGUTIType)
+		applyTV1Override(o.MSNetworkFeatureSupport, &m.MSNetworkFeatureSupport)
 	}
 
 	return m.Marshal()
@@ -165,6 +220,12 @@ func applyHexOverride(hexStr *string, dst *[]byte) error {
 	*dst = b
 
 	return nil
+}
+
+func applyTV1Override(src *uint8, dst **uint8) {
+	if src != nil {
+		*dst = src
+	}
 }
 
 // BuildIdentityResponse builds a plain IDENTITY RESPONSE carrying the IMSI as a mobile identity (TS 24.301 §8.2.19, TS 24.008 §10.5.1.4).

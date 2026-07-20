@@ -139,12 +139,13 @@ func encodeS1SetupAttempt(req *CreateENBRequest) ([]byte, error) {
 	}
 
 	encoded, err := s1ap.BuildS1SetupRequest(&s1ap.S1SetupRequestParams{
-		MCC:       req.MCC,
-		MNC:       req.MNC,
-		ENBID:     enbID,
-		ENBIDKind: enbIDKind,
-		ENBName:   req.Name,
-		TAC:       req.TAC,
+		MCC:              req.MCC,
+		MNC:              req.MNC,
+		ENBID:            enbID,
+		ENBIDKind:        enbIDKind,
+		ENBName:          req.Name,
+		TAC:              req.TAC,
+		DefaultPagingDRX: req.DefaultPagingDRX,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("s1ap encode: %v", err)

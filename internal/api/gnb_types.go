@@ -19,6 +19,8 @@ type CreateGNBRequest struct {
 	SST          int32  `json:"sst"`
 	SD           string `json:"sd,omitempty"`
 
+	DefaultPagingDRX *int `json:"default_paging_drx,omitempty"`
+
 	Slices []SliceInput `json:"slices,omitempty"`
 
 	NGSetupIEs  []ngap.IE `json:"ng_setup_ies,omitempty"`

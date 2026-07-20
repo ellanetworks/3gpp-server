@@ -198,15 +198,16 @@ type NGSetupSlice struct {
 }
 
 type NGSetupRequestFromStoreParams struct {
-	MCC         string
-	MNC         string
-	TAC         string
-	GNBID       string
-	GNBIDBitLen int
-	Name        string
-	SST         int32
-	SD          string
-	Slices      []NGSetupSlice
+	MCC              string
+	MNC              string
+	TAC              string
+	GNBID            string
+	GNBIDBitLen      int
+	Name             string
+	SST              int32
+	SD               string
+	Slices           []NGSetupSlice
+	DefaultPagingDRX *int
 }
 
 func BuildNGSetupRequestFromStore(p NGSetupRequestFromStoreParams) (*NGAPMessage, error) {
@@ -235,6 +236,13 @@ func BuildNGSetupRequestFromStore(p NGSetupRequestFromStoreParams) (*NGAPMessage
 	}
 
 	pagingDRX := int64(ngapType.PagingDRXPresentV128)
+	if p.DefaultPagingDRX != nil {
+		if *p.DefaultPagingDRX < 0 || *p.DefaultPagingDRX > int(ngapType.PagingDRXPresentV256) {
+			return nil, fmt.Errorf("default_paging_drx must be 0..3 (v32, v64, v128, v256)")
+		}
+		pagingDRX = int64(*p.DefaultPagingDRX)
+	}
+
 	nodeName := p.Name
 
 	return &NGAPMessage{

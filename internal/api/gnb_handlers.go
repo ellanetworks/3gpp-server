@@ -116,15 +116,16 @@ func (h *Handler) CreateGNB(w http.ResponseWriter, r *http.Request) {
 			}
 			var berr error
 			msg, berr = ngap.BuildNGSetupRequestFromStore(ngap.NGSetupRequestFromStoreParams{
-				MCC:         req.MCC,
-				MNC:         req.MNC,
-				TAC:         req.TAC,
-				GNBID:       req.GNBID,
-				GNBIDBitLen: req.GNBIDBitLen,
-				Name:        req.Name,
-				SST:         req.SST,
-				SD:          req.SD,
-				Slices:      sliceArgs,
+				MCC:              req.MCC,
+				MNC:              req.MNC,
+				TAC:              req.TAC,
+				GNBID:            req.GNBID,
+				GNBIDBitLen:      req.GNBIDBitLen,
+				Name:             req.Name,
+				SST:              req.SST,
+				SD:               req.SD,
+				Slices:           sliceArgs,
+				DefaultPagingDRX: req.DefaultPagingDRX,
 			})
 			if berr != nil {
 				h.teardownGNB(gnb.ID, t)

@@ -15,6 +15,8 @@ type CreateENBRequest struct {
 	ENBIDBitLength int    `json:"enb_id_bit_length,omitempty"`
 	Name           string `json:"name"`
 
+	DefaultPagingDRX *int `json:"default_paging_drx,omitempty"`
+
 	RawS1APPDU *string  `json:"raw_s1ap_pdu,omitempty"`
 	WaitFor    []string `json:"wait_for,omitempty"`
 	TimeoutMs  int      `json:"timeout_ms,omitempty"`
