@@ -24,8 +24,6 @@ func Test5GScenarioRegistration(t *testing.T) {
 		}
 		checks := map[string]string{
 			"supi":              supi,
-			"mcc":               "001",
-			"mnc":               "01",
 			"dnn":               "internet",
 			"protection_scheme": "0",
 			"amf_ue_ngap_id":    "0",

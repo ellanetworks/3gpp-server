@@ -502,12 +502,15 @@ func handleENBAttachComplete(ctx context.Context, enb *store.ENBContext, ue *sto
 
 	resp := &SendENBUES1APResponse{}
 
-	if dl := waitDownlinkTolerant(wctx, t, ue, "DownlinkNASTransport"); dl != nil && dl.NASPDU != nil {
-		if nasBytes, berr := nasPDUBytes(dl); berr == nil {
-			if plain, perr := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt); perr == nil {
-				resp.S1AP = dl
-				resp.NAS, _ = naseps.Decode(plain)
-				resp.NAS = annotateENBSecurityHeaderType(resp.NAS, nasBytes)
+	if dl := waitDownlinkTolerant(wctx, t, ue, "DownlinkNASTransport", "ErrorIndication"); dl != nil {
+		resp.S1AP = dl
+
+		if dl.NASPDU != nil {
+			if nasBytes, berr := nasPDUBytes(dl); berr == nil {
+				if plain, perr := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt); perr == nil {
+					resp.NAS, _ = naseps.Decode(plain)
+					resp.NAS = annotateENBSecurityHeaderType(resp.NAS, nasBytes)
+				}
 			}
 		}
 	}
@@ -778,9 +781,15 @@ func handleENBServiceRequest(ctx context.Context, enb *store.ENBContext, ue *sto
 		}
 	case "DownlinkNASTransport":
 		if dl.NASPDU != nil {
-			if plain, berr := nasPDUBytes(dl); berr == nil {
+			if nasBytes, berr := nasPDUBytes(dl); berr == nil {
+				plain := nasBytes
+				if sht, serr := naseps.SecurityHeader(nasBytes); serr == nil && sht != naseps.SHTPlain {
+					if dec, uerr := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt); uerr == nil {
+						plain = dec
+					}
+				}
 				resp.NAS, _ = naseps.Decode(plain)
-				resp.NAS = annotateENBSecurityHeaderType(resp.NAS, plain)
+				resp.NAS = annotateENBSecurityHeaderType(resp.NAS, nasBytes)
 			}
 		}
 	}
