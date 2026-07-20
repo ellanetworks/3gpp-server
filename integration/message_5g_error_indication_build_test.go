@@ -9,13 +9,10 @@ import (
 	"testing"
 )
 
-// Test5GErrorIndicationAccepted checks the AMF accepts a UE-associated ERROR
-// INDICATION from the gNB. TS 38.413 §8.7.5 defines only the reporting procedure
-// and message content; the receiver's reaction is implementation-specific (Ella
-// Core releases the UE), so the only spec-grounded assertion is that the AMF does
-// not answer a valid Error Indication with an Error Indication of its own.
+// TS 38.413 §8.7.5 leaves the receiver's reaction implementation-specific, so
+// only an Error Indication in return is failed.
 func Test5GErrorIndicationAccepted(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 	ueID := mustCreateUE(t, gnbID)
 	doRegistrationFlow(t, gnbID, ueID)
 

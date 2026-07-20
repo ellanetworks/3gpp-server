@@ -15,10 +15,9 @@ import (
 	"github.com/ellanetworks/core/nas/eps"
 )
 
-// sessionModIMSI is a dedicated subscriber for the session-AMBR modification test.
 const sessionModIMSI = "001010000000103"
 
-// setPolicyAMBR sets the default policy's session-AMBR via the Ella Core admin API.
+// The default policy seeds at 5QI 9, ARP 1, session-AMBR 200 Mbps.
 func setPolicyAMBR(t *testing.T, token, ul, dl string) {
 	t.Helper()
 
@@ -33,14 +32,9 @@ func setPolicyAMBR(t *testing.T, token, ul, dl string) {
 		t.Fatalf("set policy AMBR: %v", err)
 	}
 
-	resp.Body.Close()
+	_ = resp.Body.Close()
 }
 
-// Test4GSessionAMBRModification: changing the session-AMBR of an attached UE's
-// policy must reconfigure the bearer in place — the MME sends a Modify EPS Bearer
-// Context Request carrying the new APN-AMBR (TS 24.301 §6.4.3), without
-// re-establishing the bearer. The emulated eNB observes it on its UE-associated
-// await.
 func Test4GSessionAMBRModification(t *testing.T) {
 	token, err := provisionEllaCore()
 	if err != nil {
@@ -51,10 +45,9 @@ func Test4GSessionAMBRModification(t *testing.T) {
 		t.Fatalf("create subscriber: %v", err)
 	}
 	t.Cleanup(func() { deleteSubscriber(t, token, sessionModIMSI) })
-	// Restore the default policy's session-AMBR so the env is left as found.
 	t.Cleanup(func() { setPolicyAMBR(t, token, "200 Mbps", "200 Mbps") })
 
-	enbID := createGTPUENB(t, 1, "sess-mod-enb")
+	enbID := createGTPUENB(t, claimENBID(), "sess-mod-enb", n3IPv4)
 
 	body := fmt.Sprintf(`{"imsi":%q,"k":%q,"opc":%q,"amf":"8000","sqn":"000000000020"}`, sessionModIMSI, testK, testOPc)
 	status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue", body)
@@ -65,7 +58,6 @@ func Test4GSessionAMBRModification(t *testing.T) {
 	ueID := jsonGet(resp, "ue_id")
 	fullAttach(t, enbID, ueID)
 
-	// Trigger: a distinct session-AMBR (the policy seeds at 200 Mbps).
 	const newAMBR = "50 Mbps"
 	setPolicyAMBR(t, token, newAMBR, newAMBR)
 
@@ -79,21 +71,18 @@ func Test4GSessionAMBRModification(t *testing.T) {
 		t.Fatalf("MME-initiated NAS = %q, want modify_eps_bearer_context_request (TS 24.301 §6.4.3)\n  body: %s", got, body2)
 	}
 
-	// The carried APN-AMBR must encode the new 50 Mbps rate (TS 24.301 §9.9.4.2).
 	wantAMBR := hex.EncodeToString(eps.APNAMBRFromBitsPerSecond(50_000_000, 50_000_000).Marshal())
 	if got := jsonGet(body2, "nas.apn_ambr"); got != wantAMBR {
 		t.Fatalf("Modify EPS Bearer Context Request apn_ambr = %q, want %q (50 Mbps, TS 24.301 §9.9.4.2)\n  body: %s", got, wantAMBR, body2)
 	}
 
-	// The UE accepts the modification (mandatory, TS 24.301 §6.4.3.3); the MME
-	// commits it and stops T3486.
+	// The accept is mandatory for the MME to commit the modification and stop T3486 (TS 24.301 §6.4.3.3).
 	accept := fmt.Sprintf(`{"message_type":"modify_eps_bearer_context_accept","eps_bearer_identity":%s,"pti":%s}`,
 		jsonGet(body2, "nas.eps_bearer_identity"), jsonGet(body2, "nas.bearer_pti"))
-	if s, ab := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas", accept); s != 200 {
+	if s, ab := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap", accept); s != 200 {
 		t.Fatalf("modify accept: HTTP %d\n  body: %s", s, ab)
 	}
 
-	// The UE remains connected after the modification round-trip.
 	if got := jsonGet(nasStep(t, enbID, ueID, "release_request"), "s1ap.message_type"); got != "UEContextReleaseCommand" {
 		t.Errorf("UE not usable after bearer modification; release_request did not yield a UEContextReleaseCommand")
 	}

@@ -19,13 +19,12 @@ const (
 	enbS1Address = "10.3.0.3"
 )
 
-// createENBRaw opens an S1-MME association and sends rawHex verbatim as the first
-// PDU, then returns the HTTP status and body. Registers cleanup of the eNB.
+// timeout_ms is capped low to keep the adversarial sweep within the suite
+// timeout; the MME shares a host with the tester, so a reply arrives in
+// milliseconds or not at all.
 func createENBRaw(t *testing.T, rawHex string) (int, []byte) {
 	t.Helper()
 
-	// A malformed PDU is usually dropped without reply, so cap the wait low to
-	// keep the adversarial sweep within the suite timeout.
 	body := fmt.Sprintf(`{
 		"mme_address": %q,
 		"enb_s1_address": %q,
@@ -41,13 +40,11 @@ func createENBRaw(t *testing.T, rawHex string) (int, []byte) {
 	return status, resp
 }
 
-// validS1SetupPDU returns a well-formed S1 Setup Request as hex, used as the seed
-// for byte-level corruption.
 func validS1SetupPDU(t *testing.T) []byte {
 	t.Helper()
 
 	b, err := s1ap.BuildS1SetupRequest(&s1ap.S1SetupRequestParams{
-		MCC: "001", MNC: "01", ENBID: 7, ENBName: "fuzz-seed", TAC: 1,
+		MCC: "001", MNC: "01", ENBID: 7, ENBName: "fuzz-seed", TAC: "0001",
 	})
 	if err != nil {
 		t.Fatalf("build seed S1 Setup: %v", err)
@@ -56,10 +53,6 @@ func validS1SetupPDU(t *testing.T) []byte {
 	return b
 }
 
-// sendS1SetupPDU builds an S1 Setup Request from p, sends it on a fresh
-// association, and returns the response body. The wait is long enough for a
-// definite MME reply (these PDUs are well-formed, so the MME must answer).
-// Registers cleanup of the eNB.
 func sendS1SetupPDU(t *testing.T, p *s1ap.S1SetupRequestParams) []byte {
 	t.Helper()
 
@@ -83,52 +76,45 @@ func sendS1SetupPDU(t *testing.T, p *s1ap.S1SetupRequestParams) []byte {
 	return resp
 }
 
-// assertS1SetupAccepted checks the MME returned an S1 Setup Response carrying its
-// mandatory Served GUMMEIs IE (TS 36.413 §9.1.8.5).
 func assertS1SetupAccepted(t *testing.T, resp []byte) {
 	t.Helper()
 
-	if got := jsonGet(resp, "response.message_type"); got != "S1SetupResponse" {
+	if got := jsonGet(resp, "s1_setup_response.message_type"); got != "S1SetupResponse" {
 		t.Fatalf("message_type = %q, want S1SetupResponse; body: %s", got, resp)
 	}
 
-	if g := jsonGet(resp, "response.s1_setup_response.served_gummeis"); g == "" || g == "null" || g == "[]" {
+	if g := jsonGet(resp, "s1_setup_response.served_gummeis"); g == "" || g == "null" || g == "[]" {
 		t.Fatalf("S1 Setup Response missing mandatory Served GUMMEIs (TS 36.413 §9.1.8.5); body: %s", resp)
 	}
 }
 
-// assertS1SetupRejected checks the MME returned an S1 Setup Failure carrying its
-// mandatory Cause IE (TS 36.413 §9.1.8.6). The specific cause is left unchecked:
-// §8.7.3.4 gives "Unknown PLMN" only as an example ("e.g.").
+// TS 36.413 §8.7.3.4 names Unknown PLMN only as an example, so the cause value
+// itself is unchecked.
 func assertS1SetupRejected(t *testing.T, resp []byte) {
 	t.Helper()
 
-	if got := jsonGet(resp, "response.message_type"); got != "S1SetupFailure" {
+	if got := jsonGet(resp, "s1_setup_response.message_type"); got != "S1SetupFailure" {
 		t.Fatalf("message_type = %q, want S1SetupFailure; body: %s", got, resp)
 	}
 
-	if c := jsonGet(resp, "response.s1_setup_failure.cause.group"); c == "" {
+	if c := jsonGet(resp, "s1_setup_response.cause.group"); c == "" {
 		t.Fatalf("S1 Setup Failure missing mandatory Cause (TS 36.413 §9.1.8.6); body: %s", resp)
 	}
 }
 
-// TestS1SetupHappyVariations checks the MME accepts a range of valid eNB
-// configurations with an S1 Setup Response. An eNB broadcasting a served PLMN
-// but a TAC this MME does not serve is rejected with an S1 Setup Failure: the
-// integration operator serves only TAC 000001, and the MME declines an eNB with
-// no served TAI just as its AMF declines such a gNB on NG Setup (TS 36.413
-// §8.7.3.3).
+// The integration operator serves only TAC 000001, so a served PLMN on any other
+// TAC yields no served TAI and draws a Failure (TS 36.413 §8.7.3.3).
 func Test4GS1SetupHappyVariations(t *testing.T) {
 	tests := []struct {
 		name       string
 		body       string
 		wantReject bool
 	}{
-		{name: "baseline", body: `"mcc":"001","mnc":"01","tac":"0001","enb_id":1,"name":"enb-baseline"`},
-		{name: "different eNB ID", body: `"mcc":"001","mnc":"01","tac":"0001","enb_id":1048575,"name":"enb-max-macro"`},
-		{name: "unserved TAC", body: `"mcc":"001","mnc":"01","tac":"abcd","enb_id":2,"name":"enb-tac"`, wantReject: true},
-		{name: "no name (optional omitted)", body: `"mcc":"001","mnc":"01","tac":"0001","enb_id":3`},
-		{name: "long name", body: `"mcc":"001","mnc":"01","tac":"0001","enb_id":4,"name":"this-is-a-very-long-enb-name-used-for-testing-the-printable-string-bound"`},
+		{name: "baseline", body: `"mcc":"001","mnc":"01","tac":"0001","enb_id":"1","name":"enb-baseline"`},
+		{name: "different eNB ID", body: `"mcc":"001","mnc":"01","tac":"0001","enb_id":"fffff","name":"enb-max-macro"`},
+		{name: "unserved TAC", body: `"mcc":"001","mnc":"01","tac":"abcd","enb_id":"2","name":"enb-tac"`, wantReject: true},
+		{name: "no name (optional omitted)", body: `"mcc":"001","mnc":"01","tac":"0001","enb_id":"3"`},
+		{name: "long name", body: `"mcc":"001","mnc":"01","tac":"0001","enb_id":"4","name":"this-is-a-very-long-enb-name-used-for-testing-the-printable-string-bound"`},
 	}
 
 	for _, tt := range tests {
@@ -154,11 +140,6 @@ func Test4GS1SetupHappyVariations(t *testing.T) {
 	}
 }
 
-// TestS1SetupWrongPLMN checks the MME refuses an eNB none of whose PLMNs it
-// serves. TS 36.413 §8.7.3.4 mandates this: "none of the PLMNs provided by the
-// eNB is identified by the MME, then the MME shall reject the eNB S1 Setup
-// Request procedure with the appropriate cause value, e.g. 'Unknown PLMN'." The
-// cause is exemplary ("e.g."), so only the S1 Setup Failure outcome is asserted.
 func Test4GS1SetupWrongPLMN(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -171,7 +152,7 @@ func Test4GS1SetupWrongPLMN(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			body := fmt.Sprintf(`{"mme_address":%q,"enb_s1_address":%q,"mcc":%q,"mnc":%q,"tac":"0001","enb_id":1,"name":"enb-wrong-plmn"}`,
+			body := fmt.Sprintf(`{"mme_address":%q,"enb_s1_address":%q,"mcc":%q,"mnc":%q,"tac":"0001","enb_id":"1","name":"enb-wrong-plmn"}`,
 				mmeAddress, enbS1Address, tt.mcc, tt.mnc)
 
 			status, resp := doRequest(t, "POST", "/enb", body)
@@ -188,12 +169,6 @@ func Test4GS1SetupWrongPLMN(t *testing.T) {
 	}
 }
 
-// TestS1SetupMalformed throws PDUs that cannot be a valid S1 Setup at the MME
-// and verifies it never mistakes one for a Response. These inputs are either
-// incomplete (truncated) or not S1AP at all, so the only correct outcomes are a
-// silent drop (null response), an Error Indication, or a Failure. Ambiguous
-// corruptions that might still decode to a valid Setup are exercised by
-// TestS1SetupResilience instead.
 func Test4GS1SetupMalformed(t *testing.T) {
 	seed := validS1SetupPDU(t)
 
@@ -215,17 +190,20 @@ func Test4GS1SetupMalformed(t *testing.T) {
 				t.Fatalf("server failed to handle raw send (HTTP %d): %s", status, resp)
 			}
 
-			if got := jsonGet(resp, "response.message_type"); got == "S1SetupResponse" {
+			got := jsonGet(resp, "s1_setup_response.message_type")
+			if got == "S1SetupResponse" {
 				t.Fatalf("MME accepted malformed PDU as S1 Setup; body: %s", resp)
+			}
+
+			// The cause value is unchecked: TS 36.413 §10.2 asks only for "an appropriate cause value".
+			if got != "ErrorIndication" {
+				t.Errorf("s1_setup_response.message_type = %q, want ErrorIndication — a PDU the ASN.1 decoder cannot decode is a Transfer Syntax Error (TS 36.413 §10.2); body: %s", got, resp)
 			}
 		})
 	}
 }
 
-// TestS1SetupResilience drives a barrage of corrupted and oversized PDUs — any
-// MME outcome is acceptable, including accepting a flip that happens to stay
-// valid — then confirms a fresh eNB still completes S1 Setup, proving the MME
-// stayed on its feet.
+// A flip may leave the PDU valid, so no outcome of the barrage itself is asserted.
 func Test4GS1SetupResilience(t *testing.T) {
 	seed := validS1SetupPDU(t)
 
@@ -236,8 +214,6 @@ func Test4GS1SetupResilience(t *testing.T) {
 		bytesRepeat(0x41, 4096),
 	}
 
-	// Sample byte positions across the seed rather than every byte, keeping the
-	// barrage bounded while still hitting the envelope, IE headers, and payload.
 	for n := 0; n < len(seed); n += max(1, len(seed)/12) {
 		barrage = append(barrage, flipByte(seed, n))
 	}
@@ -254,10 +230,7 @@ func Test4GS1SetupResilience(t *testing.T) {
 	}
 }
 
-// TestS1SetupPLMNFlex exercises the precise boundary of TS 36.413 §8.7.3.4,
-// which rejects only when *none* of the eNB's broadcast PLMNs is served. An eNB
-// broadcasting several PLMNs of which one is served (S1-flex / RAN sharing) must
-// be accepted; one broadcasting only unserved PLMNs must be rejected.
+// TS 36.413 §8.7.3.4 rejects only when none of the broadcast PLMNs is served.
 func Test4GS1SetupPLMNFlex(t *testing.T) {
 	served := s1ap.PLMNParams{MCC: "001", MNC: "01"}
 	foreignA := s1ap.PLMNParams{MCC: "310", MNC: "410"}
@@ -267,7 +240,7 @@ func Test4GS1SetupPLMNFlex(t *testing.T) {
 		resp := sendS1SetupPDU(t, &s1ap.S1SetupRequestParams{
 			MCC: "001", MNC: "01", ENBID: 0x100, ENBName: "enb-flex-match",
 			SupportedTAs: []s1ap.SupportedTAParams{{
-				TAC:            1,
+				TAC:            "0001",
 				BroadcastPLMNs: []s1ap.PLMNParams{foreignA, served, foreignB},
 			}},
 		})
@@ -278,7 +251,7 @@ func Test4GS1SetupPLMNFlex(t *testing.T) {
 		resp := sendS1SetupPDU(t, &s1ap.S1SetupRequestParams{
 			MCC: "310", MNC: "410", ENBID: 0x101, ENBName: "enb-flex-none",
 			SupportedTAs: []s1ap.SupportedTAParams{{
-				TAC:            1,
+				TAC:            "0001",
 				BroadcastPLMNs: []s1ap.PLMNParams{foreignA, foreignB},
 			}},
 		})
@@ -286,9 +259,6 @@ func Test4GS1SetupPLMNFlex(t *testing.T) {
 	})
 }
 
-// TestS1SetupENBIDVariants checks the MME accepts every Global eNB ID encoding
-// (TS 36.413 §9.2.1.37): macro (20-bit), home (28-bit), short-macro (18-bit),
-// and long-macro (21-bit), each at its maximum value.
 func Test4GS1SetupENBIDVariants(t *testing.T) {
 	tests := []struct {
 		name string
@@ -305,22 +275,19 @@ func Test4GS1SetupENBIDVariants(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			resp := sendS1SetupPDU(t, &s1ap.S1SetupRequestParams{
 				MCC: "001", MNC: "01", ENBID: tt.id, ENBIDKind: tt.kind,
-				ENBName: "enb-" + strings.ReplaceAll(tt.name, " ", "-"), TAC: 1,
+				ENBName: "enb-" + strings.ReplaceAll(tt.name, " ", "-"), TAC: "0001",
 			})
 			assertS1SetupAccepted(t, resp)
 		})
 	}
 }
 
-// TestS1SetupSupportedTAs checks the MME accepts an eNB advertising several
-// supported TAs and a maximum-length eNB Name (TS 36.413 §9.1.8.4; the eNB Name
-// is a PrintableString of SIZE(1..150)).
 func Test4GS1SetupSupportedTAs(t *testing.T) {
 	t.Run("multiple TAs", func(t *testing.T) {
 		resp := sendS1SetupPDU(t, &s1ap.S1SetupRequestParams{
 			MCC: "001", MNC: "01", ENBID: 0x200, ENBName: "enb-multi-ta",
 			SupportedTAs: []s1ap.SupportedTAParams{
-				{TAC: 1}, {TAC: 2}, {TAC: 0xABCD},
+				{TAC: "0001"}, {TAC: "0002"}, {TAC: "abcd"},
 			},
 		})
 		assertS1SetupAccepted(t, resp)
@@ -328,7 +295,7 @@ func Test4GS1SetupSupportedTAs(t *testing.T) {
 
 	t.Run("max-length eNB name", func(t *testing.T) {
 		resp := sendS1SetupPDU(t, &s1ap.S1SetupRequestParams{
-			MCC: "001", MNC: "01", ENBID: 0x201, TAC: 1,
+			MCC: "001", MNC: "01", ENBID: 0x201, TAC: "0001",
 			ENBName: strings.Repeat("e", 150),
 		})
 		assertS1SetupAccepted(t, resp)

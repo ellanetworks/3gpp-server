@@ -3,13 +3,6 @@
 
 //go:build integration
 
-// PDU session type negotiation (TS 24.501 §6.4.1.3, §9.11.4.2). The SMF resolves
-// the requested PDU session type against the data network's pools: an IPv4v6
-// request is accepted with a downgrade cause (#50/#51) when only one stack is
-// available, a single-stack request that can't be served is rejected with the
-// "only allowed" cause, and an unsupported type is rejected with #28. A failing
-// test means Ella Core's negotiation deviates from the spec.
-
 package integration_test
 
 import (
@@ -23,7 +16,7 @@ func Test5GPDUSessionTypeNegotiation(t *testing.T) {
 		dnn         string
 		reqType     int
 		accept      bool
-		wantSelType int // selected PDU session type in the Accept
+		wantSelType int
 		wantCause   int // 0 means the cause IE must be absent
 	}{
 		{
@@ -75,7 +68,7 @@ func Test5GPDUSessionTypeNegotiation(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			gnbID := mustCreateGnB(t)
+			gnbID := mustCreateGNB(t)
 			ueID := mustCreateUETypeDNN(t, gnbID, tc.dnn, tc.reqType)
 			doRegistrationFlow(t, gnbID, ueID)
 
@@ -110,14 +103,14 @@ func assertTypeAccept(t *testing.T, body []byte, wantSelType, wantCause int) {
 	}
 
 	if wantCause == 0 {
-		if got := jsonGet(body, "nas.cause_5gsm"); got != "" {
-			t.Errorf("nas.cause_5gsm = %q, want absent (full requested type granted)\n  body: %s", got, body)
+		if got := jsonGet(body, "nas.5gsm_cause"); got != "" {
+			t.Errorf("nas.5gsm_cause = %q, want absent (full requested type granted)\n  body: %s", got, body)
 		}
 
 		return
 	}
 
-	assertNASCause(t, body, "nas.cause_5gsm", wantCause)
+	assertNASCause(t, body, "nas.5gsm_cause", wantCause)
 }
 
 func assertTypeReject(t *testing.T, body []byte, wantCause int) {
@@ -131,11 +124,9 @@ func assertTypeReject(t *testing.T, body []byte, wantCause int) {
 		t.Fatalf("nas.inner_nas_message_type = %q, want pdu_session_establishment_reject\n  body: %s", got, body)
 	}
 
-	assertNASCause(t, body, "nas.cause_5gsm", wantCause)
+	assertNASCause(t, body, "nas.5gsm_cause", wantCause)
 }
 
-// mustCreateUETypeDNN creates a UE that requests the given DNN and PDU session
-// type, so a single establishment drives a specific negotiation outcome.
 func mustCreateUETypeDNN(t *testing.T, gnbID, dnn string, pduType int) string {
 	t.Helper()
 

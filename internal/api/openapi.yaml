@@ -47,7 +47,7 @@ paths:
 
   /gnb:
     post:
-      operationId: createGnB
+      operationId: createGNB
       summary: Create gNB
       description: |
         Dials SCTP to the AMF, sends an NGSetupRequest, and returns the
@@ -61,14 +61,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateGnBRequest"
+              $ref: "#/components/schemas/CreateGNBRequest"
       responses:
         "201":
           description: gNB created and NG Setup completed.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CreateGnBResponse"
+                $ref: "#/components/schemas/CreateGNBResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "502":
@@ -78,7 +78,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/gnb_id"
     get:
-      operationId: getGnB
+      operationId: getGNB
       summary: Get gNB state
       responses:
         "200":
@@ -86,11 +86,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/GnBStateResponse"
+                $ref: "#/components/schemas/GNBStateResponse"
         "404":
           $ref: "#/components/responses/NotFound"
     delete:
-      operationId: deleteGnB
+      operationId: deleteGNB
       summary: Delete gNB
       description: Closes the SCTP connection and removes the gNB.
       responses:
@@ -178,7 +178,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
 
-  /enb/{enb_id}/ue/{ue_id}/nas:
+  /enb/{enb_id}/ue/{ue_id}/s1ap:
     parameters:
       - $ref: "#/components/parameters/enb_id"
       - $ref: "#/components/parameters/ue_id"
@@ -187,30 +187,95 @@ paths:
       summary: Drive one EPS NAS procedure step or a source-eNB S1AP message
       description: |
         Sends one uplink message from the emulated UE over S1AP and returns the
-        MME's reply decoded as JSON. message_type selects the message: the EPS NAS
-        procedures (attach_request, authentication_response, identity_response,
-        security_mode_complete/reject, attach_complete, service_request,
-        tracking_area_update, detach_request, release_request, pdn_connectivity,
-        pdn_disconnect, modify_eps_bearer_context_accept,
-        deactivate_eps_bearer_context_accept, status_esm, ue_capability_info,
-        path_switch, reset, inject_nas), and
-        the source-eNB side of S1 handover (handover_required, handover_cancel,
-        enb_status_transfer — TS 36.413 §8.4). EPS-AKA and NAS keys are computed
-        independently, so a returned mac_verified reflects the MME's NAS-MAC
-        checked under those keys.
+        MME's reply decoded as JSON. `message_type` selects the message. EPS-AKA
+        and NAS keys are computed independently, so a returned `mac_verified`
+        reflects the MME's NAS-MAC checked under those keys.
+
+        **Does NOT auto-respond** — the caller controls the entire flow.
+
+        ## EMM procedures (TS 24.301 §5)
+
+        - `attach_request` — ATTACH REQUEST inside an Initial UE Message.
+        - `authentication_response` — Computes EPS-AKA RES from the stored
+          RAND/AUTN and sends AUTHENTICATION RESPONSE.
+        - `authentication_failure` — AUTHENTICATION FAILURE with the EMM `cause`
+          (TS 24.301 §5.4.2.6); #21 synch failure auto-includes the AUTS.
+        - `identity_response` — IDENTITY RESPONSE carrying the requested identity.
+        - `security_mode_complete` — Derives the NAS keys and sends SECURITY MODE
+          COMPLETE (integrity-protected and ciphered).
+        - `security_mode_reject` — SECURITY MODE REJECT with the EMM `cause`,
+          sent unprotected (TS 24.301 §5.4.3.5).
+        - `attach_complete` — INITIAL CONTEXT SETUP RESPONSE followed by ATTACH
+          COMPLETE.
+        - `service_request` — SERVICE REQUEST, moving the UE out of ECM-IDLE.
+        - `tracking_area_update` — TRACKING AREA UPDATE REQUEST.
+        - `detach_request` — UE-originating DETACH REQUEST; with `switch_off` the
+          MME sends no Detach Accept.
+
+        ## ESM procedures (TS 24.301 §6)
+
+        - `pdn_connectivity` — PDN CONNECTIVITY REQUEST for an additional PDN
+          connection to `apn`. With `withhold_accept` the tester never sends the
+          bearer accept, leaving T3485 to retransmit (TS 24.301 §6.4.1.6 a).
+        - `pdn_disconnect` — PDN DISCONNECT REQUEST for the PDN connection whose
+          linked default bearer is `linked_ebi`. With `withhold_accept` the tester
+          never sends the deactivate accept, leaving T3495 to retransmit
+          (TS 24.301 §6.4.4.5 a).
+        - `bearer_resource_allocation_request` — BEARER RESOURCE ALLOCATION REQUEST
+          with the given `pti` (TS 24.301 §8.3.8). Send-only.
+        - `bearer_resource_modification_request` — BEARER RESOURCE MODIFICATION
+          REQUEST with the given `pti` (TS 24.301 §8.3.10). Send-only.
+        - `esm_information_response` — ESM INFORMATION RESPONSE with the given `pti`
+          (TS 24.301 §8.3.14). Send-only.
+        - `modify_eps_bearer_context_accept` — MODIFY EPS BEARER CONTEXT ACCEPT.
+        - `deactivate_eps_bearer_context_accept` — DEACTIVATE EPS BEARER CONTEXT
+          ACCEPT.
+        - `status_esm` — ESM STATUS with the given `esm_cause` (TS 24.301 §6.6.3).
+
+        ## UE-associated S1AP (TS 36.413)
+
+        - `ue_capability_info` — UE CAPABILITY INFO INDICATION (§8.8). Send-only;
+          the MME stores the radio capability.
+        - `initial_context_setup_failure` — INITIAL CONTEXT SETUP FAILURE (§8.3.1.4),
+          making the MME release the UE context. Send-only.
+        - `modify_response` — E-RAB MODIFY RESPONSE confirming a network-initiated
+          E-RAB modification (§8.2.2). Send-only.
+        - `error_indication` — ERROR INDICATION for the UE's connection (§8.7.2).
+        - `release_request` — UE CONTEXT RELEASE REQUEST; the MME's Release Command
+          is acknowledged with Release Complete.
+
+        ## Source-eNB side of S1 handover (TS 36.413 §8.4)
+
+        - `handover_required` — HANDOVER REQUIRED toward the target eNB. Send-only;
+          the Handover Command arrives asynchronously (await it on the eNB).
+        - `handover_cancel` — HANDOVER CANCEL, expecting HANDOVER CANCEL ACKNOWLEDGE.
+        - `enb_status_transfer` — ENB STATUS TRANSFER carrying the PDCP counts.
+          Send-only.
+
+        ## Raw escape hatch
+
+        - `inject_nas` — Sends an Uplink NAS Transport carrying an
+          attacker-controlled NAS PDU: `raw_nas_pdu` (hex, sent verbatim with no
+          building or security encoding) or `replay_last` (this UE's last uplink
+          NAS PDU, to test replay protection). No reply — the MME discarding it —
+          is a valid outcome.
+
+        `mme_ue_s1ap_id_override` / `enb_ue_s1ap_id_override` override the S1AP ID
+        pair on any of the uplink messages above, to probe the MME's UE-association validation
+        (TS 36.413 §10.6).
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SendENBNASRequest"
+              $ref: "#/components/schemas/SendENBUES1APRequest"
       responses:
         "200":
           description: MME reply (S1AP and/or decoded NAS).
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SendENBNASResponse"
+                $ref: "#/components/schemas/SendENBUES1APResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -236,6 +301,67 @@ paths:
       responses:
         "200":
           description: UE state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ENBUEStateResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: patchENBUE
+      summary: Update an eNB UE's stored context
+      description: |
+        Overrides stored UE state before a send, so a step can be driven with
+        altered credentials or identifiers. Only the fields present are changed.
+        There is no slice (sst/sd) counterpart: slicing is 5GS-only (TS 23.501 §5.15).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                imeisv: { type: string }
+                k: { type: string }
+                opc: { type: string }
+                amf: { type: string }
+                sqn: { type: string }
+                mme_ue_s1ap_id: { type: integer, description: "Force the stored MME UE S1AP ID." }
+      responses:
+        "204": { description: "UE updated." }
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    delete:
+      operationId: deleteENBUE
+      summary: Delete an eNB UE
+      description: Removes the UE context from the eNB without signalling the MME.
+      responses:
+        "204": { description: "UE deleted." }
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /enb/{enb_id}/ue/{ue_id}/tunnel:
+    parameters:
+      - $ref: "#/components/parameters/enb_id"
+      - $ref: "#/components/parameters/ue_id"
+    get:
+      operationId: getENBTunnel
+      summary: Get the S1-U GTP-U tunnel state for a UE's EPS bearer
+      description: |
+        Returns the captured tunnel for the selected bearer (the default bearer
+        when `ebi` is absent): the S-GW uplink endpoint (sgw_ip, ul_teid), the
+        eNB downlink TEID (dl_teid), and the UE IP (ue_ip). Populated when the
+        bearer was established on a GTP-U-enabled eNB.
+      parameters:
+        - name: ebi
+          in: query
+          schema: { type: integer }
+          description: "EPS bearer identity. Defaults to the UE's default bearer."
+      responses:
+        "200": { description: "Tunnel state." }
+        "400": { description: "No user-plane tunnel for the bearer." }
         "404":
           $ref: "#/components/responses/NotFound"
 
@@ -284,9 +410,29 @@ paths:
       description: |
         Sends a non-UE-associated S1AP message on the eNB's S1-MME association —
         the target-eNB side of S1 handover, where the eNB acts on a UE it does not
-        yet own and addresses it by the S1AP ID pair the MME assigned. message_type
-        selects the message: handover_request_acknowledge, handover_notify, or
-        handover_failure (TS 36.413 §8.4).
+        yet own and addresses it by the S1AP ID pair the MME assigned.
+
+        ## Supported message types
+
+        - `handover_request_acknowledge` — Target-eNB HANDOVER REQUEST ACKNOWLEDGE
+          (TS 36.413 §8.4.2), admitting the E-RABs in `admitted_erabs` with their
+          downlink S1-U tunnels and rejecting those in `failed_erabs`. Send-only.
+        - `handover_notify` — Target-eNB HANDOVER NOTIFY once the UE has arrived
+          (TS 36.413 §8.4.3). Send-only.
+        - `handover_failure` — Target-eNB HANDOVER FAILURE (TS 36.413 §8.4.2),
+          making the MME abort the handover. Send-only.
+        - `path_switch_request` — PATH SWITCH REQUEST (TS 36.413 §8.6.1) claiming a
+          UE by its `mme_ue_s1ap_id` with a fresh `enb_ue_s1ap_id` and the `erabs`
+          to switch. With `wait_for` the call blocks for the acknowledge, failure or
+          Error Indication.
+
+        ## Raw escape hatch
+
+        `raw_s1ap_pdu` (hex) is the universal primitive: when set, `message_type`
+        is ignored and the bytes are written verbatim onto the S1-MME association
+        with no encoding or validation. With `wait_for` the call blocks for one of
+        those downlink message types and returns it; otherwise it is
+        fire-and-forget.
       requestBody:
         required: true
         content:
@@ -299,7 +445,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SendENBNASResponse"
+                $ref: "#/components/schemas/SendENBUES1APResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -308,6 +454,8 @@ paths:
           $ref: "#/components/responses/InternalError"
         "502":
           $ref: "#/components/responses/BadGateway"
+        "504":
+          $ref: "#/components/responses/GatewayTimeout"
 
   /enb/{enb_id}/await:
     parameters:
@@ -341,7 +489,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SendENBNASResponse"
+                $ref: "#/components/schemas/SendENBUES1APResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -383,7 +531,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SendENBNASResponse"
+                $ref: "#/components/schemas/SendENBUES1APResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -464,10 +612,10 @@ paths:
       - $ref: "#/components/parameters/enb_id"
     post:
       operationId: sendENBGTPUEcho
-      summary: Send a GTP-U Echo Request to the S-GW/UPF (S1-U path management)
+      summary: Send a GTP-U Echo Request to the S-GW (S1-U path management)
       description: |
         Sends a GTP-U Echo Request (TS 29.281 §7.2.1) from the eNB's S1-U endpoint
-        to upf_ip and returns the Echo Response. Requires the eNB to have been
+        to sgw_ip and returns the Echo Response. Requires the eNB to have been
         created with enable_gtpu.
       requestBody:
         required: true
@@ -475,9 +623,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [upf_ip]
+              required: [sgw_ip]
               properties:
-                upf_ip: { type: string, description: "S-GW/UPF S1-U IP to echo." }
+                sgw_ip: { type: string, description: "S-GW S1-U IP to echo." }
                 timeout_ms: { type: integer, description: "How long to wait. Default 5000." }
       responses:
         "200": { description: "Echo Response received." }
@@ -519,14 +667,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/CreateUERequest"
+              $ref: "#/components/schemas/CreateGNBUERequest"
       responses:
         "201":
           description: UE created.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/CreateUEResponse"
+                $ref: "#/components/schemas/CreateGNBUEResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -546,7 +694,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/UEStateResponse"
+                $ref: "#/components/schemas/GNBUEStateResponse"
         "404":
           $ref: "#/components/responses/NotFound"
     patch:
@@ -560,7 +708,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/PatchUERequest"
+              $ref: "#/components/schemas/PatchGNBUERequest"
       responses:
         "204":
           description: UE patched.
@@ -581,7 +729,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/gnb_id"
     post:
-      operationId: sendGnBNGAP
+      operationId: sendGNBNGAP
       summary: Send a gNB-level (non-UE-associated) NGAP message
       description: |
         Sends a non-UE-associated NGAP message on the gNB's existing N2
@@ -691,7 +839,7 @@ paths:
     parameters:
       - $ref: "#/components/parameters/gnb_id"
     post:
-      operationId: awaitGnBMessage
+      operationId: awaitGNBMessage
       summary: Await an unsolicited downlink NGAP message
       description: |
         Blocks until one of the given NGAP message types arrives on the gNB's
@@ -951,14 +1099,14 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/SendNGAPRequest"
+              $ref: "#/components/schemas/SendGNBUENGAPRequest"
       responses:
         "200":
           description: NGAP message sent and response received.
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SendNGAPResponse"
+                $ref: "#/components/schemas/SendGNBUENGAPResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "404":
@@ -1029,7 +1177,7 @@ components:
           type: string
       required: [error]
 
-    CreateGnBRequest:
+    CreateGNBRequest:
       type: object
       required: [amf_address]
       properties:
@@ -1056,6 +1204,9 @@ components:
           type: string
           description: gNB ID (hex).
           example: "000001"
+        gnb_id_bit_length:
+          type: integer
+          description: gNB-ID bit length, 22–32 (TS 38.413 §9.3.1.6). Defaults to 24.
         name:
           type: string
         sst:
@@ -1079,6 +1230,16 @@ components:
             Open the SCTP association without sending an NG Setup Request,
             modelling an NG-RAN node that has not completed NG Setup (TS 38.413
             §8.7.1.1). The response carries no ng_setup_response.
+        raw_ngap_pdu:
+          type: string
+          description: Hex NGAP PDU sent verbatim instead of an NG Setup Request.
+        wait_for:
+          type: array
+          description: NGAP message types to wait for. Default NGSetupResponse/NGSetupFailure/ErrorIndication.
+          items: { type: string }
+        timeout_ms:
+          type: integer
+          description: How long to wait for the response. Default 5000.
         enable_gtpu:
           type: boolean
           description: >
@@ -1099,7 +1260,7 @@ components:
         sd:
           type: string
 
-    CreateGnBResponse:
+    CreateGNBResponse:
       type: object
       properties:
         gnb_id:
@@ -1107,7 +1268,7 @@ components:
         ng_setup_response:
           $ref: "#/components/schemas/NGAPResponse"
 
-    GnBStateResponse:
+    GNBStateResponse:
       type: object
       properties:
         id:
@@ -1120,6 +1281,8 @@ components:
           type: string
         gnb_id:
           type: string
+        gnb_id_bit_length:
+          type: integer
         name:
           type: string
         sst:
@@ -1151,9 +1314,15 @@ components:
           description: Tracking Area Code (2-octet hex).
           example: "0001"
         enb_id:
+          type: string
+          description: eNB ID (hex).
+          example: "00001"
+        enb_id_bit_length:
           type: integer
-          description: Macro eNB ID (20-bit).
-          example: 1
+          description: >
+            eNB-ID CHOICE variant by bit length (TS 36.413 §9.2.1.37):
+            20 macro (default), 28 home, 18 short-macro, 21 long-macro.
+          example: 20
         name:
           type: string
         enable_gtpu:
@@ -1189,7 +1358,7 @@ components:
         enb_id:
           type: string
           description: Store handle used in subsequent /enb/{enb_id} requests.
-        response:
+        s1_setup_response:
           $ref: "#/components/schemas/S1APResponse"
           description: First matching downlink, or null if none arrived in time.
 
@@ -1205,8 +1374,11 @@ components:
         tac:
           type: string
         enb_id:
+          type: string
+          description: eNB ID (hex).
+        enb_id_bit_length:
           type: integer
-          description: Macro eNB ID.
+          description: eNB-ID CHOICE variant by bit length (TS 36.413 §9.2.1.37).
         name:
           type: string
 
@@ -1222,12 +1394,37 @@ components:
         raw_hex:
           type: string
           description: Full S1AP PDU as hex.
-        s1_setup_response:
-          type: object
-          description: Present on an S1SetupResponse; served GUMMEIs and MME capacity.
-        s1_setup_failure:
-          type: object
-          description: Present on an S1SetupFailure; cause and optional time-to-wait.
+        mme_name:
+          type: string
+          description: Present on an S1SetupResponse.
+        served_gummeis:
+          type: array
+          description: Present on an S1SetupResponse.
+          items:
+            type: object
+        relative_mme_capacity:
+          type: integer
+          description: Present on an S1SetupResponse.
+        time_to_wait:
+          type: string
+          description: Present on an S1SetupFailure when the MME signals a back-off.
+        unknown_ies:
+          type: array
+          description: ProtocolIEs the received message carries that its message type does not model, in wire order.
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              criticality:
+                type: string
+                description: >-
+                  reject, ignore, or notify: how a receiver must act on an IE it does not
+                  comprehend (TS 36.413 §10.3.2). A value outside the ENUMERATED range is
+                  rendered Criticality(n).
+              value_hex:
+                type: string
+                description: Raw open-type value bytes as hex.
 
     CreateENBUERequest:
       type: object
@@ -1237,6 +1434,9 @@ components:
           type: string
           description: "15-digit IMSI (an 'imsi-' prefix is accepted)."
           example: "001010000000001"
+        imeisv:
+          type: string
+          description: "16-digit IMEISV, returned in Security Mode Complete when set (TS 24.301 §5.4.3)."
         k:
           type: string
           description: Subscriber key K (hex).
@@ -1263,19 +1463,63 @@ components:
         enb_ue_s1ap_id:
           type: integer
 
-    SendENBNASRequest:
+    ENBUEStateResponse:
+      type: object
+      properties:
+        ue_id:
+          type: string
+        imsi:
+          type: string
+        imeisv:
+          type: string
+        ue_ip:
+          type: string
+          description: Assigned in the Attach Accept; empty before the attach completes.
+        security_active:
+          type: boolean
+        mme_ue_s1ap_id:
+          type: integer
+          description: Set by the MME after the first S1AP exchange.
+        enb_ue_s1ap_id:
+          type: integer
+        default_ebi:
+          type: integer
+          description: EPS bearer identity of the default bearer.
+        bearers:
+          type: array
+          description: PDN connections beyond the default bearer (TS 24.301 §6.5.1).
+          items:
+            type: object
+            properties:
+              ebi:
+                type: integer
+              apn:
+                type: string
+              ue_ip:
+                type: string
+
+    SendENBUES1APRequest:
       type: object
       required: [message_type]
       properties:
         message_type:
           type: string
-          enum: [attach_request, authentication_response, authentication_failure, identity_response, security_mode_complete, security_mode_reject, attach_complete, detach_request, release_request, service_request, ue_capability_info, tracking_area_update, path_switch, pdn_connectivity, pdn_disconnect, modify_response, modify_eps_bearer_context_accept, deactivate_eps_bearer_context_accept, status_esm, reset, inject_nas, handover_required, handover_cancel, enb_status_transfer, initial_context_setup_failure, error_indication]
+          enum: [attach_request, authentication_response, authentication_failure, identity_response, security_mode_complete, security_mode_reject, attach_complete, detach_request, release_request, service_request, ue_capability_info, tracking_area_update, pdn_connectivity, pdn_disconnect, bearer_resource_allocation_request, bearer_resource_modification_request, esm_information_response, modify_response, modify_eps_bearer_context_accept, deactivate_eps_bearer_context_accept, status_esm, reset, inject_nas, handover_required, handover_cancel, enb_status_transfer, initial_context_setup_failure, error_indication]
         pdn_type:
           type: integer
           description: "Requested PDN type for attach: 1=IPv4, 2=IPv6, 3=IPv4v6 (default 1)."
         attach_type:
           type: integer
           description: "EPS attach type: 1=EPS, 2=combined EPS/IMSI, 6=emergency (default 1)."
+        ue_network_capability:
+          type: string
+          description: "attach_request override — UE network capability (hex, TS 24.301 §9.9.3.34); overrides the stored value."
+        ms_network_capability:
+          type: string
+          description: "attach_request override — MS network capability (hex, TS 24.008 §10.5.5.12)."
+        drx_parameter:
+          type: string
+          description: "attach_request override — DRX parameter (hex, 2 octets, TS 24.301 §9.9.3.8)."
         foreign_guti:
           type: boolean
           description: >
@@ -1291,16 +1535,22 @@ components:
           description: >
             On security_mode_complete, flip a NAS-MAC byte so the MME's integrity
             check fails; the MME must discard the message.
-        mme_ue_s1ap_id:
+        mme_ue_s1ap_id_override:
           type: integer
           description: >
-            On inject_nas, the MME-UE-S1AP-ID of the Uplink NAS Transport — set to a
-            forged or another UE's value to test UE-association validation.
-        enb_ue_s1ap_id:
+            Override the MME-UE-S1AP-ID in the S1AP wrapper of every uplink message
+            this UE sends (Uplink NAS Transport, UE Capability Info Indication, UE
+            Context Release Request). Use a stale, unknown or another UE's value to
+            exercise TS 36.413 §10.6.
+        enb_ue_s1ap_id_override:
           type: integer
           description: >
-            On inject_nas, the eNB-UE-S1AP-ID of the Uplink NAS Transport — pair a
-            valid MME-UE-S1AP-ID with an inconsistent eNB-UE-S1AP-ID (TS 36.413 §10.6).
+            Override the eNB-UE-S1AP-ID in the S1AP wrapper of every uplink message
+            this UE sends — on its own it pairs a valid MME-UE-S1AP-ID with an
+            inconsistent eNB-UE-S1AP-ID (TS 36.413 §10.6).
+        rrc_establishment_cause:
+          type: integer
+          description: Override RRC establishment cause in InitialUEMessage (attach_request only).
         replay_last:
           type: boolean
           description: On inject_nas, resend this UE's last uplink NAS PDU (replay test).
@@ -1319,24 +1569,15 @@ components:
         eps_update_type:
           type: integer
           description: On tracking_area_update, the EPS update type (0=TA, 1/2=combined, 3=periodic).
-        path_switch_erab_id:
-          type: integer
-          description: On path_switch, override the to-be-switched E-RAB ID (e.g. an unestablished one to force a failure).
-        duplicate_erab:
-          type: boolean
-          description: On path_switch, list the E-RAB ID twice (abnormal; MME rejects with multiple-E-RAB-ID-instances).
-        path_switch_eea:
-          type: integer
-          description: On path_switch, override the reported EPS encryption-algorithm bitmap; a mismatch with the stored value makes the MME replay its caps in the Ack.
-        path_switch_eia:
-          type: integer
-          description: On path_switch, override the reported EPS integrity-algorithm bitmap (see path_switch_eea).
         apn:
           type: string
           description: On pdn_connectivity, the access point name of the additional PDN connection (TS 24.301 §6.5.1).
         pti:
           type: integer
-          description: On pdn_connectivity/pdn_disconnect, override the procedure transaction identity (0=reserved, for §7.3.1 invalid-PTI tests).
+          description: On pdn_connectivity/pdn_disconnect/bearer_resource_allocation_request/bearer_resource_modification_request/esm_information_response, override the procedure transaction identity (0=unassigned, 255=reserved, for §7.3.1 invalid-PTI tests).
+        withhold_accept:
+          type: boolean
+          description: On pdn_connectivity/pdn_disconnect, suppress the automatic ESM accept so the MME's T3485/T3495 retransmission is observable (TS 24.301 §6.4.1.6, §6.4.4.5).
         request_ebi:
           type: integer
           description: On pdn_connectivity, override the ESM-header EPS bearer identity (normally 0; non-zero for §7.3.2 invalid-EBI tests).
@@ -1349,9 +1590,6 @@ components:
         esm_cause:
           type: integer
           description: On esm_status (or a modify reject), the ESM cause (TS 24.301 §9.9.4.4); #43 makes the MME deactivate the bearer. Defaults to #111.
-        reset_all:
-          type: boolean
-          description: On reset, reset the whole S1 interface (reset-all) rather than only this UE's connection (TS 36.413 §8.7.1).
         res_override:
           type: string
           description: Override the computed RES with these hex bytes (wrong-RES tests).
@@ -1363,6 +1601,9 @@ components:
         target_enb_id:
           type: string
           description: On handover_required, the store ID of the target eNB (its PLMN and eNB-ID form the Target eNB-ID the MME resolves).
+        handover_required_cause:
+          type: integer
+          description: On handover_required, the radio-network Cause the source eNB reports (TS 36.413 §9.2.1.3). Defaults to handover-desirable-for-radio-reasons.
         handover_cancel_cause:
           type: integer
           description: On handover_cancel, override the radio-network Cause (TS 36.413 §9.2.1.3).
@@ -1377,14 +1618,14 @@ components:
       properties:
         message_type:
           type: string
-          enum: [handover_request_acknowledge, handover_notify, handover_failure]
+          enum: [reset, handover_request_acknowledge, handover_notify, handover_failure, path_switch_request]
         raw_s1ap_pdu:
           type: string
           description: When set, hex S1AP PDU written verbatim onto the S1-MME association with no encoding or validation; message_type is ignored. Lets a test send any S1AP PDU, well-formed or not.
         wait_for:
           type: array
           items: { type: string }
-          description: With raw_s1ap_pdu, downlink S1AP message types to block for (empty = fire-and-forget).
+          description: With raw_s1ap_pdu or path_switch_request, downlink S1AP message types to block for (empty = fire-and-forget).
         timeout_ms:
           type: integer
           description: With raw_s1ap_pdu + wait_for, how long to wait. Default 5000.
@@ -1393,7 +1634,26 @@ components:
           description: MME UE S1AP ID the MME assigned to the incoming UE (from the Handover Request).
         enb_ue_s1ap_id:
           type: integer
-          description: eNB UE S1AP ID the target eNB assigns the UE; reused across handover_request_acknowledge and handover_notify.
+          description: eNB UE S1AP ID the target eNB assigns the UE; reused across handover_request_acknowledge and handover_notify. On path_switch_request, a fresh value the relocating eNB claims, staling the source association (TS 36.413 §10.6).
+        erabs:
+          type: array
+          description: On path_switch_request, the E-RABs to switch to this eNB with their downlink S1-U endpoints.
+          items:
+            type: object
+            required: [id]
+            properties:
+              id: { type: integer, description: "E-RAB ID." }
+              dl_teid: { type: integer, description: "Target eNB downlink TEID (default synthesized)." }
+              dl_ip: { type: string, description: "Target eNB S1-U address (default the eNB's own)." }
+        duplicate_erab:
+          type: boolean
+          description: On path_switch_request, list the E-RAB ID twice (abnormal; MME rejects with multiple-E-RAB-ID-instances).
+        path_switch_eea:
+          type: integer
+          description: On path_switch_request, override the reported EPS encryption-algorithm bitmap; a mismatch with the stored value makes the MME replay its caps in the Ack.
+        path_switch_eia:
+          type: integer
+          description: On path_switch_request, override the reported EPS integrity-algorithm bitmap (see path_switch_eea).
         admitted_erabs:
           type: array
           description: On handover_request_acknowledge, the E-RABs the target admits with their downlink S1-U endpoints.
@@ -1415,7 +1675,7 @@ components:
           type: integer
           description: On handover_notify, override the E-UTRAN cell identity of the UE's new location (default 1).
 
-    SendENBNASResponse:
+    SendENBUES1APResponse:
       type: object
       properties:
         s1ap:
@@ -1429,7 +1689,7 @@ components:
             Whether a protected downlink's NAS-MAC verified under the
             independently-derived keys (set for the Security Mode Command).
 
-    CreateUERequest:
+    CreateGNBUERequest:
       type: object
       required: [supi, k, opc]
       properties:
@@ -1478,8 +1738,14 @@ components:
           type: integer
         imeisv:
           type: string
+        ue_security_capability:
+          type: string
+          description: >
+            Advertised NEA/NIA support bitmap (hex), e.g. "2020" for NEA2/NIA2
+            only. Defaults to NEA0/1/2 + NIA0/1/2. Overridable per message via
+            the send-NGAP ue_security_capability field.
 
-    CreateUEResponse:
+    CreateGNBUEResponse:
       type: object
       properties:
         ue_id:
@@ -1492,35 +1758,40 @@ components:
         ran_ue_ngap_id:
           type: integer
 
-    UEStateResponse:
+    GNBUEStateResponse:
       type: object
       properties:
-        id:
+        ue_id:
           type: string
         supi:
           type: string
         suci:
           type: string
-        mcc:
+        imeisv:
           type: string
-        mnc:
+        ue_ip:
           type: string
+          description: Assigned in the PDU Session Establishment Accept; empty before a session is established.
+        security_active:
+          type: boolean
         ran_ue_ngap_id:
           type: integer
         amf_ue_ngap_id:
           type: integer
           description: Set by the AMF after the first NGAP exchange.
-        k:
-          type: string
-        opc:
-          type: string
-        amf:
-          type: string
-        sqn:
-          type: string
-        snn:
-          type: string
-          description: Serving Network Name (derived from MCC/MNC).
+        default_pdu_session_id:
+          type: integer
+          description: PDU session identity of the default session.
+        sessions:
+          type: array
+          description: Active PDU sessions (TS 23.501 §5.6).
+          items:
+            type: object
+            properties:
+              pdu_session_id:
+                type: integer
+              ue_ip:
+                type: string
         dnn:
           type: string
         sst:
@@ -1531,10 +1802,8 @@ components:
           type: string
         routing_indicator:
           type: string
-        imeisv:
-          type: string
 
-    PatchUERequest:
+    PatchGNBUERequest:
       type: object
       description: Any field present is overwritten in the UE context.
       properties:
@@ -1557,14 +1826,14 @@ components:
         imeisv:
           type: string
 
-    SendNGAPRequest:
+    SendGNBUENGAPRequest:
       type: object
       required: [message_type]
       properties:
         message_type:
           type: string
           description: NAS message to send.
-          enum: [registration_request, authentication_response, security_mode_complete, registration_complete, pdu_session_establishment_request, deregistration_request, ue_context_release_request, service_request, identity_response, pdu_session_release_request, pdu_session_release_complete, pdu_session_modification_request, pdu_session_modification_complete, pdu_session_modification_command_reject, status_5gsm, authentication_failure, security_mode_reject, handover_required, handover_cancel, inject_nas, ue_capability_info, error_indication]
+          enum: [registration_request, authentication_response, security_mode_complete, registration_complete, pdu_session_establishment_request, deregistration_request, ue_context_release_request, service_request, identity_response, pdu_session_release_request, pdu_session_release_complete, pdu_session_modification_request, pdu_session_modification_complete, pdu_session_modification_command_reject, status_5gsm, authentication_failure, security_mode_reject, handover_required, handover_cancel, ran_status_transfer, inject_nas, ue_capability_info, error_indication, initial_context_setup_failure]
         raw_nas_pdu:
           type: string
           description: |
@@ -1595,6 +1864,19 @@ components:
         replay_last:
           type: boolean
           description: On inject_nas, resend this UE's last secured uplink NAS PDU verbatim (NAS replay protection test, TS 24.501 §4.4.3.2).
+        status_transfer_drbs:
+          type: array
+          description: |
+            On ran_status_transfer, the DRBs whose PDCP status the source NG-RAN
+            node reports (TS 38.413 §8.4.6.2). Defaults to one DRB with zeroed COUNTs.
+          items:
+            type: object
+            properties:
+              drb_id: { type: integer }
+              ul_pdcp_sn: { type: integer }
+              ul_hfn: { type: integer }
+              dl_pdcp_sn: { type: integer }
+              dl_hfn: { type: integer }
         timeout_ms:
           type: integer
           description: Bounds how long a send waits for a downlink. Default 5000.
@@ -1627,9 +1909,12 @@ components:
         always_on_requested:
           type: boolean
           description: "Add the Always-on PDU session requested IE to a pdu_session_establishment_request (TS 24.501 §8.3.1.7). The network must answer with an Always-on PDU session indication in the Establishment Accept (§6.4.1)."
-        cause_5gsm:
+        5gsm_cause:
           type: integer
           description: "5GSM cause for a UE-originated reject/status message (TS 24.501 §9.11.4.2). Applies to the pdu_session_modification_command_reject / status_5gsm endpoints. Defaults to #111 protocol error, unspecified."
+        handover_required_cause:
+          type: integer
+          description: "Radio-network Cause the source NG-RAN node reports on handover_required (TS 38.413 §9.3.1.2). Defaults to handover-desirable-for-radio-reason."
         handover_cancel_cause:
           type: integer
           description: "Radio-network Cause for handover_cancel (TS 38.413 §9.3.1.2). Defaults to handover-cancelled."
@@ -1718,7 +2003,7 @@ components:
           type: string
           description: EPS bearer context status (hex, 2 bytes).
 
-    SendNGAPResponse:
+    SendGNBUENGAPResponse:
       type: object
       properties:
         ngap:
@@ -1728,6 +2013,9 @@ components:
 
     NGAPResponse:
       type: object
+      description: >-
+        Decoded NGAP message. Each ProtocolIE the message type models is surfaced as
+        its own typed field; IEs it does not model are collected in unknown_ies.
       properties:
         pdu_type:
           type: string
@@ -1738,11 +2026,120 @@ components:
         raw_hex:
           type: string
           description: Full NGAP PDU as hex.
-        ies:
+        amf_ue_ngap_id:
+          type: integer
+        ran_ue_ngap_id:
+          type: integer
+        nas_pdu:
+          type: string
+          description: NAS PDU as hex.
+        cause:
+          type: object
+          description: Cause group and the index of its ASN.1 enumeration (TS 38.413 §9.3.1.2).
+        criticality_diagnostics:
+          type: object
+        time_to_wait:
+          type: string
+        global_ran_node_id:
+          type: object
+        ran_node_name:
+          type: string
+        supported_ta_list:
+          type: object
+        default_paging_drx:
+          type: integer
+        user_location_information:
+          type: object
+        rrc_establishment_cause:
+          type: integer
+        five_g_s_tmsi:
+          type: object
+        ue_context_request:
+          type: integer
+        amf_name:
+          type: string
+        served_guami_list:
           type: array
           items:
             type: object
-            description: Decoded IE with typed fields.
+        relative_amf_capacity:
+          type: integer
+        plmn_support_list:
+          type: array
+          items:
+            type: object
+        ue_retention_information:
+          type: integer
+        amf_set_id_ie:
+          type: string
+        allowed_nssai:
+          type: array
+          items:
+            type: object
+        selected_plmn_identity:
+          type: string
+        old_amf:
+          type: string
+        ran_paging_priority:
+          type: integer
+        mobility_restriction_list:
+          type: object
+        index_to_rfsp:
+          type: integer
+        ue_aggregate_max_bit_rate:
+          type: object
+          description: UE-AMBR downlink and uplink bit rates.
+        ue_radio_capability:
+          type: string
+        pdu_session_setup_items:
+          type: array
+          items:
+            type: object
+        pdu_session_ids:
+          type: array
+          items:
+            type: integer
+        release_pdu_session_ids:
+          type: array
+          items:
+            type: integer
+        next_hop_chaining_count:
+          type: integer
+        next_hop:
+          type: string
+          description: Next Hop key (NH) as hex (TS 33.501 §6.9.2.3.2).
+        ue_security_capabilities:
+          type: object
+        ran_status_transfer:
+          type: object
+        source_to_target_transparent_container:
+          type: string
+        reset_connections:
+          type: array
+          description: UE-associated logical NG-connections echoed in an NG Reset Acknowledge, in wire order.
+          items:
+            type: object
+            properties:
+              amf_ue_ngap_id:
+                type: integer
+              ran_ue_ngap_id:
+                type: integer
+        unknown_ies:
+          type: array
+          description: ProtocolIEs the received message carries that its message type does not model, in wire order.
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              criticality:
+                type: string
+                description: >-
+                  reject, ignore, or notify: how a receiver must act on an IE it does not
+                  comprehend (TS 38.413 §10.3.2).
+              value_hex:
+                type: string
+                description: Raw open-type value bytes as hex; empty when aper discarded them.
 
     NASResponse:
       type: object
@@ -1767,7 +2164,7 @@ components:
         eap_message:
           type: string
           description: EAP message (hex).
-        cause_5gmm:
+        5gmm_cause:
           type: integer
           description: 5GMM cause code (for reject messages).
         identity_type:

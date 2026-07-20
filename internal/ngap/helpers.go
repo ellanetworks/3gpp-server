@@ -11,7 +11,7 @@ import (
 	"github.com/free5gc/ngap/ngapType"
 )
 
-func GetTacInBytes(tacStr string) ([]byte, error) {
+func tacInBytes(tacStr string) ([]byte, error) {
 	resu, err := hex.DecodeString(tacStr)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode tac to bytes: %v", err)
@@ -19,23 +19,7 @@ func GetTacInBytes(tacStr string) ([]byte, error) {
 	return resu, nil
 }
 
-func GetSliceInBytes(sst int32, sd string) ([]byte, []byte, error) {
-	sstBytes := []byte{byte(sst)}
-	if sd != "" {
-		sdBytes, err := hex.DecodeString(sd)
-		if err != nil {
-			return sstBytes, nil, fmt.Errorf("could not decode sd to bytes: %v", err)
-		}
-		return sstBytes, sdBytes, nil
-	}
-	return sstBytes, nil, nil
-}
-
-// encodePLMN encodes an MCC/MNC pair into the 3-octet BCD PLMN identity
-// (TS 23.003 §2.2 / TS 24.008 §10.5.1.3): octet 1 = MCC2|MCC1, octet 2 =
-// MNC3|MCC3, octet 3 = MNC2|MNC1, with a 2-digit MNC taking the 0xF filler in
-// its third digit. It validates lengths and digits so malformed input yields an
-// error, not a panic or a silently-empty mandatory IE.
+// BCD nibbles are swapped within each octet, and a 2-digit MNC takes an 0xF filler (TS 24.008 §10.5.1.3).
 func encodePLMN(mcc, mnc string) ([]byte, error) {
 	if len(mcc) != 3 {
 		return nil, fmt.Errorf("mcc must be 3 digits, got %q", mcc)
@@ -71,7 +55,7 @@ func encodePLMN(mcc, mnc string) ([]byte, error) {
 	return p, nil
 }
 
-func GetNRCellIdentity(gnbID string) (ngapType.NRCellIdentity, error) {
+func nrCellIdentity(gnbID string) (ngapType.NRCellIdentity, error) {
 	nci, err := hex.DecodeString(gnbID)
 	if err != nil {
 		return ngapType.NRCellIdentity{}, fmt.Errorf("could not get NRCellIdentity: %v", err)

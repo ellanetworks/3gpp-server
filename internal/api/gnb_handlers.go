@@ -5,35 +5,38 @@ package api
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/ellanetworks/3gpp-server/internal/gtpu"
 	"github.com/ellanetworks/3gpp-server/internal/ngap"
 	"github.com/ellanetworks/3gpp-server/internal/store"
 	"github.com/ellanetworks/3gpp-server/internal/transport"
+	"github.com/free5gc/ngap/ngapType"
 )
 
 type Handler struct {
 	Store          *store.Store
-	Transports     map[string]*transport.SCTPTransport // gnb store ID -> N2 transport
-	GTPU           map[string]*gtpu.Endpoint           // gnb store ID -> N3 GTP-U endpoint
-	S1APTransports map[string]*transport.S1APTransport // enb store ID -> S1-MME transport
+	Transports     map[string]*transport.NGAPTransport
+	GTPU           map[string]*gtpu.Endpoint
+	S1APTransports map[string]*transport.S1APTransport
 }
 
 func NewHandler(s *store.Store) *Handler {
 	return &Handler{
 		Store:          s,
-		Transports:     make(map[string]*transport.SCTPTransport),
+		Transports:     make(map[string]*transport.NGAPTransport),
 		GTPU:           make(map[string]*gtpu.Endpoint),
 		S1APTransports: make(map[string]*transport.S1APTransport),
 	}
 }
 
-func (h *Handler) CreateGnB(w http.ResponseWriter, r *http.Request) {
-	var req CreateGnBRequest
+var defaultNGSetupWait = []string{"NGSetupResponse", "NGSetupFailure", "ErrorIndication"}
+
+func (h *Handler) CreateGNB(w http.ResponseWriter, r *http.Request) {
+	var req CreateGNBRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
 		return
@@ -44,12 +47,12 @@ func (h *Handler) CreateGnB(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	localAddr := req.GnBN2Address
+	localAddr := req.GNBN2Address
 	if localAddr == "" {
 		localAddr = "0.0.0.0"
 	}
 
-	t, err := transport.Dial(localAddr, req.AMFAddress)
+	t, err := transport.DialNGAP(localAddr, req.AMFAddress)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("sctp dial failed: %v", err))
 		return
@@ -60,121 +63,135 @@ func (h *Handler) CreateGnB(w http.ResponseWriter, r *http.Request) {
 		slices = append(slices, store.SliceConfig{SST: s.SST, SD: s.SD})
 	}
 
-	gnb := h.Store.CreateGnB(req.MCC, req.MNC, req.TAC, req.GnbID, req.Name, req.SST, req.SD, slices)
+	gnb := h.Store.CreateGNB(req.MCC, req.MNC, req.TAC, req.GNBID, req.GNBIDBitLen, req.Name, req.SST, req.SD, slices)
+	gnb.N3Addr = localAddr
 	h.Transports[gnb.ID] = t
 
 	if req.EnableGTPU {
-		n3 := req.GnBN3Address
+		n3 := req.GNBN3Address
 		if n3 == "" {
-			n3 = req.GnBN2Address
+			n3 = localAddr
 		}
 
 		gt, err := gtpu.Listen(n3)
 		if err != nil {
-			_ = t.Close()
-			_ = h.Store.DeleteGnB(gnb.ID)
-			delete(h.Transports, gnb.ID)
+			h.teardownGNB(gnb.ID, t)
 			writeError(w, http.StatusBadGateway, fmt.Sprintf("gtp-u listen on %s failed: %v", n3, err))
 			return
 		}
 
+		gnb.N3Addr = n3
 		h.GTPU[gnb.ID] = gt
 	}
 
-	// Leave the association without an NG-C interface instance: NG Setup is the
-	// first NGAP procedure on an operational TNL association (TS 38.413 §8.7.1.1).
 	if req.SkipNGSetup {
-		writeJSON(w, http.StatusCreated, CreateGnBResponse{GnBID: gnb.ID})
+		writeJSON(w, http.StatusCreated, CreateGNBResponse{GNBID: gnb.ID})
 		return
 	}
 
-	var msg *ngap.NGAPMessage
-	if len(req.NGSetupIEs) > 0 {
-		msg = &ngap.NGAPMessage{
-			ProcedureCode: 21, // NGSetup
-			PDUType:       "initiating_message",
-			Criticality:   "reject",
-			IEs:           req.NGSetupIEs,
+	var encoded []byte
+
+	if req.RawNGAPPDU != nil {
+		decoded, derr := hex.DecodeString(*req.RawNGAPPDU)
+		if derr != nil {
+			h.teardownGNB(gnb.ID, t)
+			writeError(w, http.StatusBadRequest, fmt.Sprintf("raw_ngap_pdu must be hex: %v", derr))
+			return
 		}
+
+		encoded = decoded
 	} else {
-		sliceArgs := make([]struct {
-			SST int32
-			SD  string
-		}, 0, len(req.Slices))
-		for _, s := range req.Slices {
-			sliceArgs = append(sliceArgs, struct {
-				SST int32
-				SD  string
-			}{SST: s.SST, SD: s.SD})
+		var msg *ngap.NGAPMessage
+		if len(req.NGSetupIEs) > 0 {
+			msg = &ngap.NGAPMessage{
+				ProcedureCode: ngapType.ProcedureCodeNGSetup,
+				PDUType:       "initiating_message",
+				Criticality:   "reject",
+				IEs:           req.NGSetupIEs,
+			}
+		} else {
+			sliceArgs := make([]ngap.NGSetupSlice, 0, len(req.Slices))
+			for _, s := range req.Slices {
+				sliceArgs = append(sliceArgs, ngap.NGSetupSlice{SST: s.SST, SD: s.SD})
+			}
+			var berr error
+			msg, berr = ngap.BuildNGSetupRequestFromStore(ngap.NGSetupRequestFromStoreParams{
+				MCC:         req.MCC,
+				MNC:         req.MNC,
+				TAC:         req.TAC,
+				GNBID:       req.GNBID,
+				GNBIDBitLen: req.GNBIDBitLen,
+				Name:        req.Name,
+				SST:         req.SST,
+				SD:          req.SD,
+				Slices:      sliceArgs,
+			})
+			if berr != nil {
+				h.teardownGNB(gnb.ID, t)
+				writeError(w, http.StatusBadRequest, fmt.Sprintf("build ng setup: %v", berr))
+				return
+			}
 		}
-		var berr error
-		msg, berr = ngap.BuildNGSetupRequestFromStore(req.MCC, req.MNC, req.TAC, req.GnbID, req.Name, req.SST, req.SD, sliceArgs)
-		if berr != nil {
-			_ = t.Close()
-			_ = h.Store.DeleteGnB(gnb.ID)
-			delete(h.Transports, gnb.ID)
-			writeError(w, http.StatusBadRequest, fmt.Sprintf("build ng setup: %v", berr))
+
+		var eerr error
+		encoded, eerr = ngap.Encode(msg)
+		if eerr != nil {
+			h.teardownGNB(gnb.ID, t)
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("ngap encode: %v", eerr))
 			return
 		}
 	}
 
-	encoded, err := ngap.Encode(msg)
-	if err != nil {
-		_ = t.Close()
-		_ = h.Store.DeleteGnB(gnb.ID)
-		delete(h.Transports, gnb.ID)
-		writeError(w, http.StatusInternalServerError, fmt.Sprintf("ngap encode: %v", err))
-		return
-	}
-
 	if err := t.Send(encoded, true); err != nil {
-		_ = t.Close()
-		_ = h.Store.DeleteGnB(gnb.ID)
-		delete(h.Transports, gnb.ID)
+		h.teardownGNB(gnb.ID, t)
 		writeError(w, http.StatusBadGateway, fmt.Sprintf("sctp send: %v", err))
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	waitFor := req.WaitFor
+	if len(waitFor) == 0 {
+		waitFor = defaultNGSetupWait
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), waitTimeout(req.TimeoutMs))
 	defer cancel()
 
-	ngapResp, err := t.WaitForMessage(ctx, "NGSetupResponse", "NGSetupFailure", "ErrorIndication")
+	ngapResp, err := t.WaitForMessage(ctx, waitFor...)
 	if err != nil {
-		_ = t.Close()
-		_ = h.Store.DeleteGnB(gnb.ID)
-		delete(h.Transports, gnb.ID)
+		h.teardownGNB(gnb.ID, t)
 		writeError(w, http.StatusGatewayTimeout, fmt.Sprintf("waiting for NGSetupResponse: %v", err))
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, CreateGnBResponse{
-		GnBID:           gnb.ID,
+	writeJSON(w, http.StatusCreated, CreateGNBResponse{
+		GNBID:           gnb.ID,
 		NGSetupResponse: ngapResp,
 	})
 }
 
-func (h *Handler) GetGnB(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetGNB(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 
-	gnb, err := h.Store.GetGnB(gnbID)
+	gnb, err := h.Store.GetGNB(gnbID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, GnBStateResponse{
-		ID:    gnb.ID,
-		MCC:   gnb.MCC,
-		MNC:   gnb.MNC,
-		TAC:   gnb.TAC,
-		GnbID: gnb.GnbID,
-		Name:  gnb.Name,
-		SST:   gnb.SST,
-		SD:    gnb.SD,
+	writeJSON(w, http.StatusOK, GNBStateResponse{
+		ID:          gnb.ID,
+		MCC:         gnb.MCC,
+		MNC:         gnb.MNC,
+		TAC:         gnb.TAC,
+		GNBID:       gnb.GNBID,
+		GNBIDBitLen: gnb.GNBIDBitLen,
+		Name:        gnb.Name,
+		SST:         gnb.SST,
+		SD:          gnb.SD,
 	})
 }
 
-func (h *Handler) DeleteGnB(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DeleteGNB(w http.ResponseWriter, r *http.Request) {
 	gnbID := r.PathValue("gnb_id")
 
 	if t, ok := h.Transports[gnbID]; ok {
@@ -187,10 +204,22 @@ func (h *Handler) DeleteGnB(w http.ResponseWriter, r *http.Request) {
 		delete(h.GTPU, gnbID)
 	}
 
-	if err := h.Store.DeleteGnB(gnbID); err != nil {
+	if err := h.Store.DeleteGNB(gnbID); err != nil {
 		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) teardownGNB(id string, t *transport.NGAPTransport) {
+	_ = t.Close()
+
+	if gt, ok := h.GTPU[id]; ok {
+		_ = gt.Close()
+		delete(h.GTPU, id)
+	}
+
+	_ = h.Store.DeleteGNB(id)
+	delete(h.Transports, id)
 }

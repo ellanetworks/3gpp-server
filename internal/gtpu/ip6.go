@@ -10,7 +10,6 @@ import (
 	"net/netip"
 )
 
-// IPv6 next-header / ICMPv6 type values.
 const (
 	protoICMPv6 = 58
 
@@ -18,9 +17,9 @@ const (
 	icmpv6EchoReply   = 129
 )
 
-// checksum6 computes the upper-layer checksum over the IPv6 pseudo-header
-// (RFC 8200 §8.1) and the upper-layer message. The message's own checksum field
-// must be zero on input.
+const ipv6HopLimit = 64
+
+// upper's own checksum field must be zero on input (RFC 8200 §8.1).
 func checksum6(src, dst netip.Addr, nextHeader uint8, upper []byte) uint16 {
 	pseudo := make([]byte, 40+len(upper))
 
@@ -35,13 +34,12 @@ func checksum6(src, dst netip.Addr, nextHeader uint8, upper []byte) uint16 {
 	return onesComplementSum(pseudo)
 }
 
-// buildIPv6 wraps an upper-layer message in an IPv6 header.
 func buildIPv6(nextHeader uint8, src, dst netip.Addr, upper []byte) []byte {
 	ip := make([]byte, 40+len(upper))
-	ip[0] = 0x60 // version 6
+	ip[0] = 0x60
 	binary.BigEndian.PutUint16(ip[4:6], uint16(len(upper)))
 	ip[6] = nextHeader
-	ip[7] = 64 // hop limit
+	ip[7] = ipv6HopLimit
 
 	s := src.As16()
 	d := dst.As16()
@@ -52,7 +50,6 @@ func buildIPv6(nextHeader uint8, src, dst netip.Addr, upper []byte) []byte {
 	return ip
 }
 
-// buildICMPv6Echo builds an ICMPv6 Echo Request from src to dst.
 func buildICMPv6Echo(src, dst netip.Addr, id, seq uint16, payload []byte) []byte {
 	icmp := make([]byte, 8+len(payload))
 	icmp[0] = icmpv6EchoRequest
@@ -64,8 +61,7 @@ func buildICMPv6Echo(src, dst netip.Addr, id, seq uint16, payload []byte) []byte
 	return buildIPv6(protoICMPv6, src, dst, icmp)
 }
 
-// buildUDPv6 builds a UDP-over-IPv6 datagram. The UDP checksum is mandatory over
-// IPv6 (RFC 8200); a computed zero is transmitted as 0xffff (RFC 768).
+// A zero checksum field means "not computed", illegal over IPv6, so it is sent as 0xffff (RFC 768).
 func buildUDPv6(src, dst netip.Addr, srcPort, dstPort uint16, payload []byte) []byte {
 	udp := make([]byte, 8+len(payload))
 	binary.BigEndian.PutUint16(udp[0:2], srcPort)
@@ -82,9 +78,6 @@ func buildUDPv6(src, dst netip.Addr, srcPort, dstPort uint16, payload []byte) []
 	return buildIPv6(protoUDP, src, dst, udp)
 }
 
-// ParseIPv6 decodes an IPv6 packet for assertion. It reads the upper-layer
-// header directly (no extension-header walk — sufficient for the crafted test
-// traffic). It returns an error for non-IPv6 or truncated input.
 func ParseIPv6(b []byte) (*InnerPacket, error) {
 	if len(b) < 40 || b[0]>>4 != 6 {
 		return nil, fmt.Errorf("not an IPv6 packet")
@@ -119,7 +112,6 @@ func ParseIPv6(b []byte) (*InnerPacket, error) {
 	return p, nil
 }
 
-// ParseInner decodes an inner T-PDU, dispatching on the IP version.
 func ParseInner(b []byte) (*InnerPacket, error) {
 	if len(b) < 1 {
 		return nil, fmt.Errorf("empty packet")

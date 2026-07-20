@@ -11,11 +11,12 @@ import (
 
 func Test5GDeregistration_Fuzz(t *testing.T) {
 	tests := []struct {
-		name            string
-		body            string
-		wantHTTP        int
-		wantNGAPMsgType string
-		wantNASMsgType  string
+		name             string
+		body             string
+		wantHTTP         int
+		wantNGAPMsgType  string
+		wantNASMsgType   string
+		wantNASCause5GMM int
 	}{
 		{
 			name:     "valid deregistration after full registration + PDU session",
@@ -38,55 +39,48 @@ func Test5GDeregistration_Fuzz(t *testing.T) {
 			wantHTTP: 200,
 		},
 		{
-			// TS 24.501 §8.2.12 — DeregistrationRequestUEOriginating
-			// EPD=7E SHT=00 plain, msg type=45, then deregistration-type octet:
-			//   access type=01 (3GPP), re-reg=0, switch-off=1 → 0x09
-			// followed by Mobile identity (5GS).
-			// Empty mobile identity → AMF should respond.
+			// 7E EPD, 00 SHT plain, 45 DeregistrationRequestUEOriginating, 09 = 3GPP
+			// access + switch-off, then an empty 5GS mobile identity (TS 24.501 §8.2.12).
 			name:     "raw NAS: plain deregistration with switch-off bit set",
 			body:     `{"message_type":"deregistration_request","raw_nas_pdu":"7e0045090000"}`,
 			wantHTTP: 200,
 		},
 		{
-			// access type=02 (non-3GPP) — Ella Core only supports 3GPP access
+			// 0a = access type 02, non-3GPP.
 			name:     "raw NAS: plain deregistration with non-3GPP access type",
 			body:     `{"message_type":"deregistration_request","raw_nas_pdu":"7e00450a00"}`,
 			wantHTTP: 200,
 		},
 		{
-			// access type=03 (both 3GPP + non-3GPP)
+			// 0b = access type 03, both 3GPP and non-3GPP.
 			name:     "raw NAS: plain deregistration with both access types",
 			body:     `{"message_type":"deregistration_request","raw_nas_pdu":"7e00450b00"}`,
 			wantHTTP: 200,
 		},
 		{
-			// re-registration-required bit set
 			name:     "raw NAS: plain deregistration with re-registration-required",
 			body:     `{"message_type":"deregistration_request","raw_nas_pdu":"7e0045110000"}`,
 			wantHTTP: 200,
 		},
 		{
-			// truncated — missing mobile identity octet entirely
 			name:     "raw NAS: truncated (missing mobile identity)",
 			body:     `{"message_type":"deregistration_request","raw_nas_pdu":"7e004509"}`,
 			wantHTTP: 200,
 		},
 		{
-			// valid 5GMM header but unknown deregistration message type
-			// (0x46 = DeregistrationAcceptUEOriginating — wrong direction)
-			name:     "raw NAS: deregistration accept type (wrong direction)",
+			// 7e 00 46 = plain Deregistration accept: TS 24.501 §4.4.4.3 discards it
+			// unprotected, before §7.4's unknown-message-type handling — no reply.
+			name:     "raw NAS: deregistration accept type (wrong direction, unprotected)",
 			body:     `{"message_type":"deregistration_request","raw_nas_pdu":"7e0046"}`,
-			wantHTTP: 200,
+			wantHTTP: 504,
 		},
 		{
 			name: "raw NAS: missing security header (single byte EPD)",
-			// Too short to contain a complete message type IE → shall be ignored
-			// (TS 24.501 §7.2.1). Silent drop is the mandated behaviour (504).
+			// TS 24.501 §7.2.1: too short for a message type IE, so it is ignored — no reply.
 			body:     `{"message_type":"deregistration_request","raw_nas_pdu":"7e"}`,
 			wantHTTP: 504,
 		},
 		{
-			// NGAP-level: stale AMF UE NGAP ID — unknown local AP ID (TS 38.413 §10.6)
 			name:            "NGAP override: AMF UE NGAP ID = 0",
 			body:            `{"message_type":"deregistration_request","amf_ue_ngap_id_override":0}`,
 			wantHTTP:        200,
@@ -102,7 +96,7 @@ func Test5GDeregistration_Fuzz(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gnbID := mustCreateGnB(t)
+			gnbID := mustCreateGNB(t)
 			ueID := mustCreateUE(t, gnbID)
 
 			doRegistrationFlow(t, gnbID, ueID)
@@ -138,6 +132,10 @@ func Test5GDeregistration_Fuzz(t *testing.T) {
 					t.Errorf("nas.message_type = %q, want %q\n  body: %s", got, tt.wantNASMsgType, body)
 				}
 			}
+
+			assertNASCause(t, body, "nas.5gmm_cause", tt.wantNASCause5GMM)
 		})
 	}
+
+	assertGNBCoreAlive(t)
 }

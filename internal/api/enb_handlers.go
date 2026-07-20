@@ -17,8 +17,6 @@ import (
 	"github.com/ellanetworks/3gpp-server/internal/transport"
 )
 
-// defaultS1SetupWait lists the downlinks an S1 Setup attempt may elicit: the two
-// outcomes plus an Error Indication a strict MME may return for a bad request.
 var defaultS1SetupWait = []string{"S1SetupResponse", "S1SetupFailure", "ErrorIndication"}
 
 func (h *Handler) CreateENB(w http.ResponseWriter, r *http.Request) {
@@ -35,21 +33,17 @@ func (h *Handler) CreateENB(w http.ResponseWriter, r *http.Request) {
 
 	raw := req.RawS1APPDU != nil
 
-	var tac uint64
 	if req.TAC != "" {
-		parsed, err := strconv.ParseUint(req.TAC, 16, 16)
-		if err != nil {
+		if _, err := strconv.ParseUint(req.TAC, 16, 16); err != nil {
 			writeError(w, http.StatusBadRequest, fmt.Sprintf("tac must be a 2-octet hex string: %v", err))
 			return
 		}
-
-		tac = parsed
 	} else if !raw {
 		writeError(w, http.StatusBadRequest, "tac is required")
 		return
 	}
 
-	encoded, err := encodeS1SetupAttempt(&req, uint16(tac))
+	encoded, err := encodeS1SetupAttempt(&req)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -66,7 +60,7 @@ func (h *Handler) CreateENB(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	enb := h.Store.CreateENB(req.MCC, req.MNC, uint16(tac), req.ENBID, req.Name)
+	enb := h.Store.CreateENB(req.MCC, req.MNC, req.TAC, req.ENBID, req.ENBIDBitLength, req.Name)
 	enb.N3Addr = localAddr
 	h.S1APTransports[enb.ID] = t
 
@@ -87,9 +81,6 @@ func (h *Handler) CreateENB(w http.ResponseWriter, r *http.Request) {
 		h.GTPU[enb.ID] = gt
 	}
 
-	// Open the association without S1 Setup, modelling an eNB that has not
-	// completed it (TS 36.413 §8.7.1), to test that the MME refuses UE-associated
-	// procedures beforehand.
 	if req.SkipS1Setup {
 		writeJSON(w, http.StatusCreated, CreateENBResponse{ENBID: enb.ID})
 		return
@@ -106,12 +97,9 @@ func (h *Handler) CreateENB(w http.ResponseWriter, r *http.Request) {
 		waitFor = defaultS1SetupWait
 	}
 
-	timeout := time.Duration(req.TimeoutMs) * time.Millisecond
-	if timeout == 0 {
-		timeout = 5 * time.Second
-		if raw {
-			timeout = 2 * time.Second
-		}
+	timeout := waitTimeout(req.TimeoutMs)
+	if raw && req.TimeoutMs == 0 {
+		timeout = 2 * time.Second
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), timeout)
@@ -119,8 +107,6 @@ func (h *Handler) CreateENB(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := t.WaitForMessage(ctx, waitFor...)
 	if err != nil {
-		// A silently dropped malformed PDU is a valid, even desirable, MME
-		// behaviour; the association is kept so the caller can probe it further.
 		if raw {
 			writeJSON(w, http.StatusCreated, CreateENBResponse{ENBID: enb.ID})
 			return
@@ -132,12 +118,12 @@ func (h *Handler) CreateENB(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, CreateENBResponse{
-		ENBID:    enb.ID,
-		Response: resp,
+		ENBID:           enb.ID,
+		S1SetupResponse: resp,
 	})
 }
 
-func encodeS1SetupAttempt(req *CreateENBRequest, tac uint16) ([]byte, error) {
+func encodeS1SetupAttempt(req *CreateENBRequest) ([]byte, error) {
 	if req.RawS1APPDU != nil {
 		b, err := hex.DecodeString(*req.RawS1APPDU)
 		if err != nil {
@@ -147,12 +133,18 @@ func encodeS1SetupAttempt(req *CreateENBRequest, tac uint16) ([]byte, error) {
 		return b, nil
 	}
 
+	enbID, enbIDKind, err := s1ap.ENBIDValue(req.ENBID, req.ENBIDBitLength)
+	if err != nil {
+		return nil, err
+	}
+
 	encoded, err := s1ap.BuildS1SetupRequest(&s1ap.S1SetupRequestParams{
-		MCC:     req.MCC,
-		MNC:     req.MNC,
-		ENBID:   req.ENBID,
-		ENBName: req.Name,
-		TAC:     tac,
+		MCC:       req.MCC,
+		MNC:       req.MNC,
+		ENBID:     enbID,
+		ENBIDKind: enbIDKind,
+		ENBName:   req.Name,
+		TAC:       req.TAC,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("s1ap encode: %v", err)
@@ -169,12 +161,13 @@ func (h *Handler) GetENB(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, ENBStateResponse{
-		ID:    enb.ID,
-		MCC:   enb.MCC,
-		MNC:   enb.MNC,
-		TAC:   fmt.Sprintf("%04x", enb.TAC),
-		ENBID: enb.ENBID,
-		Name:  enb.Name,
+		ID:             enb.ID,
+		MCC:            enb.MCC,
+		MNC:            enb.MNC,
+		TAC:            enb.TAC,
+		ENBID:          enb.ENBID,
+		ENBIDBitLength: enb.ENBIDBitLength,
+		Name:           enb.Name,
 	})
 }
 

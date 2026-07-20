@@ -16,8 +16,6 @@ type errorResponse struct {
 	Error string `json:"error"`
 }
 
-// statusError carries the HTTP status a handler error should map to. Errors
-// without one are treated as internal build/encode failures (500).
 type statusError struct {
 	status int
 	err    error
@@ -30,9 +28,6 @@ func httpErrorf(status int, format string, args ...any) error {
 	return &statusError{status: status, err: fmt.Errorf(format, args...)}
 }
 
-// statusForError classifies a handler error: an explicit statusError wins, an
-// SCTP send failure is an upstream gateway error (502), a wait timeout is a
-// gateway timeout (504), and anything else is an internal failure (500).
 func statusForError(err error) int {
 	var se *statusError
 	if errors.As(err, &se) {

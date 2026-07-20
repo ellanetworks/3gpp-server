@@ -20,8 +20,6 @@ func mustAddr(t *testing.T, s string) netip.Addr {
 	return a
 }
 
-// TestBuildICMPv6Echo_RoundTrip builds an ICMPv6 Echo Request, parses it back,
-// and confirms the fields and a valid (zero-folding) checksum.
 func TestBuildICMPv6Echo_RoundTrip(t *testing.T) {
 	src := mustAddr(t, "fd00:45::1")
 	dst := mustAddr(t, "fd00:6::10")
@@ -35,8 +33,6 @@ func TestBuildICMPv6Echo_RoundTrip(t *testing.T) {
 		t.Fatalf("not an IPv6 packet: version nibble %d", pkt[0]>>4)
 	}
 
-	// The ICMPv6 checksum (computed over the pseudo-header with the field
-	// included) must fold to zero.
 	if cs := checksum6(src, dst, protoICMPv6, pkt[40:]); cs != 0 {
 		t.Errorf("ICMPv6 checksum does not validate: folds to %#04x, want 0", cs)
 	}
@@ -60,8 +56,6 @@ func TestBuildICMPv6Echo_RoundTrip(t *testing.T) {
 	}
 }
 
-// TestBuildUDPv6_RoundTrip builds a UDP-over-IPv6 datagram, parses it back, and
-// confirms the mandatory checksum validates and the payload survives.
 func TestBuildUDPv6_RoundTrip(t *testing.T) {
 	src := mustAddr(t, "fd00:45::1")
 	dst := mustAddr(t, "fd00:6::10")
@@ -93,7 +87,6 @@ func TestBuildUDPv6_RoundTrip(t *testing.T) {
 	}
 }
 
-// TestBuildMismatchedFamilies rejects a mixed IPv4/IPv6 address pair.
 func TestBuildMismatchedFamilies(t *testing.T) {
 	v4 := mustAddr(t, "10.45.0.1")
 	v6 := mustAddr(t, "fd00:6::10")
@@ -106,7 +99,6 @@ func TestBuildMismatchedFamilies(t *testing.T) {
 	}
 }
 
-// TestParseInnerDispatch confirms version dispatch for IPv4 and IPv6.
 func TestParseInnerDispatch(t *testing.T) {
 	v4, err := BuildICMPEcho(mustAddr(t, "10.45.0.1"), mustAddr(t, "8.8.8.8"), 1, 1, nil)
 	if err != nil {

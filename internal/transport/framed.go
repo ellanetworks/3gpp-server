@@ -18,19 +18,11 @@ import (
 
 const sctpReadBufferSize = 65535
 
-// ErrSend wraps a failure to write to the SCTP association; ErrTimeout wraps a
-// wait that expired before a matching downlink arrived. Callers classify these
-// to distinguish an upstream transport failure from an internal build error.
 var (
 	ErrSend    = errors.New("sctp send")
 	ErrTimeout = errors.New("timeout waiting for message")
 )
 
-// framed is the SCTP association engine shared by the NGAP and S1AP transports.
-// It buffers decoded downlinks keyed by message type and lets several concurrent
-// waiters on one association each claim the frame for their own UE. T is the
-// per-protocol decoded-response type; decode turns a received SCTP message into
-// one and key returns the type name it is buffered under.
 type framed[T any] struct {
 	conn   *sctp.SCTPConn
 	ppid   uint32
@@ -40,7 +32,7 @@ type framed[T any] struct {
 	closed atomic.Bool
 
 	mu     sync.Mutex
-	cond   *sync.Cond // broadcast when a frame is buffered or a waiter must re-check
+	cond   *sync.Cond
 	frames map[string][]*T
 }
 
@@ -145,19 +137,12 @@ func (t *framed[T]) Send(data []byte, nonUE bool) error {
 	return nil
 }
 
-// WaitForMessage returns the next buffered downlink of one of messageTypes,
-// blocking until one arrives or ctx expires.
 func (t *framed[T]) WaitForMessage(ctx context.Context, messageTypes ...string) (*T, error) {
 	return t.WaitForMessageMatching(ctx, nil, messageTypes...)
 }
 
-// WaitForMessageMatching returns the next buffered downlink of one of
-// messageTypes for which match returns true (a nil match accepts any). It lets
-// several concurrent waiters on one association each claim the frame for their
-// own UE without consuming another UE's downlink.
 func (t *framed[T]) WaitForMessageMatching(ctx context.Context, match func(*T) bool, messageTypes ...string) (*T, error) {
-	// Wake blocked waiters when ctx expires so they observe the deadline; the
-	// receiver only broadcasts on new frames.
+	// The receiver broadcasts only on new frames, so ctx expiry must wake waiters itself.
 	stop := make(chan struct{})
 	defer close(stop)
 

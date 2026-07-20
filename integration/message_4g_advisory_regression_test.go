@@ -10,18 +10,6 @@ import (
 	"testing"
 )
 
-// These tests check the 4G/S1AP control plane against the classes of denial-of-
-// service reported in Ella Core's published 5G advisories. The 4G NAS (nas/eps)
-// and S1AP codecs are separate from the 5G (nas/5gs, ngap) ones, so a fix on the
-// 5G side does not cover them. The MME has no panic recovery, so any unguarded
-// parse crashes the whole core: each test asserts the core survives by attaching
-// a fresh UE afterward.
-
-// TestEPSMalformedAuthNASNoCrash injects Authentication Response and
-// Authentication Failure NAS messages with missing mandatory IEs while the UE is
-// in the authentication procedure — the 4G analogue of GHSA-55q8-2gwx-29pc
-// (panic on NAS auth messages with missing IEs). The MME must discard them
-// without crashing.
 func Test4GMalformedAuthNASNoCrash(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := attachChallenge(t, enbID)
@@ -43,11 +31,6 @@ func Test4GMalformedAuthNASNoCrash(t *testing.T) {
 	fullAttach(t, enbID, fresh)
 }
 
-// TestEPSShortProtectedNASNoCrash injects security-protected NAS messages shorter
-// than a full security header (header, 4-octet MAC, sequence) on a UE with an
-// active context — the 4G analogue of GHSA-m9pm-w3gv-c68f (panic on a short
-// integrity-protected NAS payload). The MME must reject them without an
-// out-of-bounds read.
 func Test4GShortProtectedNASNoCrash(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -65,21 +48,25 @@ func Test4GShortProtectedNASNoCrash(t *testing.T) {
 	fullAttach(t, enbID, fresh)
 }
 
-// TestEPSPathSwitchEmptySecCapNoCrash sends a Path Switch Request whose reported
-// UE security capability bitmaps are zero — the 4G analogue of
-// GHSA-j478-p7vq-3347 (panic on empty NR security capability in PathSwitchRequest).
-// The 4G S1AP encoding uses fixed 16-bit bitmaps (not variable bitstrings), so
-// the MME must handle a zero value without crashing.
+// All bits zero encodes "no algorithm other than EEA0/EIA0" (TS 36.413 §9.2.1.40), a legal report that mismatches the UE's stored caps.
 func Test4GPathSwitchEmptySecCapNoCrash(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
 
 	fullAttach(t, enbID, ueID)
 
-	resp := nasBody(t, enbID, ueID, `{"message_type":"path_switch","path_switch_eea":0,"path_switch_eia":0}`)
+	resp := pathSwitchUE(t, enbID, ueID, `,"path_switch_eea":0,"path_switch_eia":0`)
 
-	if got := jsonGet(resp, "s1ap.message_type"); got != "PathSwitchRequestAcknowledge" && got != "PathSwitchRequestFailure" {
-		t.Fatalf("path switch with zero sec caps: s1ap.message_type = %q, want a defined response; body: %s", got, resp)
+	if got := jsonGet(resp, "s1ap.message_type"); got != "PathSwitchRequestAcknowledge" {
+		t.Fatalf("path switch with zero sec caps: s1ap.message_type = %q, want PathSwitchRequestAcknowledge; body: %s", got, resp)
+	}
+
+	if eea := jsonGet(resp, "s1ap.replayed_ue_security_capabilities.encryption_algorithms"); eea != storedUESecurityCapabilities {
+		t.Errorf("replayed encryption algorithms = %q, want %s (the stored value, TS 33.401 §7.2.4.2.2); body: %s", eea, storedUESecurityCapabilities, resp)
+	}
+
+	if eia := jsonGet(resp, "s1ap.replayed_ue_security_capabilities.integrity_protection_algorithms"); eia != storedUESecurityCapabilities {
+		t.Errorf("replayed integrity algorithms = %q, want %s (the stored value, TS 33.401 §7.2.4.2.2); body: %s", eia, storedUESecurityCapabilities, resp)
 	}
 
 	fresh := mustCreateENBUE(t, enbID)

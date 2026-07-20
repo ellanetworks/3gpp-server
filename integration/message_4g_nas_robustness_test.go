@@ -11,8 +11,7 @@ import (
 	"testing"
 )
 
-// attachUEConcurrent runs a full attach without a *testing.T, so it is safe to
-// call from a goroutine. It returns an error on the first non-compliant step.
+// Errors are returned, not fatalled: this runs on goroutines, where t.Fatal is illegal.
 func attachUEConcurrent(enbID, imsi string) error {
 	createBody := fmt.Sprintf(`{"imsi":%q,"k":%q,"opc":%q,"amf":"8000","sqn":"000000000000"}`, imsi, testK, testOPc)
 
@@ -35,7 +34,7 @@ func attachUEConcurrent(enbID, imsi string) error {
 	}
 
 	for _, s := range steps {
-		status, body, err := post("/enb/"+enbID+"/ue/"+ueID+"/nas", fmt.Sprintf(`{"message_type":%q}`, s.msg))
+		status, body, err := post("/enb/"+enbID+"/ue/"+ueID+"/s1ap", fmt.Sprintf(`{"message_type":%q}`, s.msg))
 		if err != nil {
 			return err
 		}
@@ -54,26 +53,25 @@ func attachUEConcurrent(enbID, imsi string) error {
 	return nil
 }
 
-// TestEPSConcurrentAttach attaches several distinct subscribers at once on one
-// eNB, checking the MME keeps their UE contexts, security contexts, and GUTIs
-// separate and registers them all.
 func Test4GConcurrentAttach(t *testing.T) {
 	enbID := mustCreateENB(t)
 
 	const n = 8
 
+	supis := claimSubscribers(t, n)
+
 	errs := make(chan error, n)
 
 	var wg sync.WaitGroup
 
-	for i := 1; i <= n; i++ {
+	for _, supi := range supis {
 		wg.Add(1)
 
-		go func(i int) {
+		go func(supi string) {
 			defer wg.Done()
 
-			errs <- attachUEConcurrent(enbID, testSUPI(i)[len("imsi-"):])
-		}(i)
+			errs <- attachUEConcurrent(enbID, supi[len("imsi-"):])
+		}(supi)
 	}
 
 	wg.Wait()
@@ -86,33 +84,61 @@ func Test4GConcurrentAttach(t *testing.T) {
 	}
 }
 
-// TestEPSMalformedNAS throws garbage NAS PDUs at the MME inside an Initial UE
-// Message and verifies it never mistakes one for a valid attach, then confirms a
-// clean attach still completes — proof the MME stayed on its feet.
+// TS 24.301 §5.5.1.2.7 b) binds only a PDU whose EMM header identifies an ATTACH REQUEST.
+var malformedNAS = []struct {
+	pdu                 string
+	attachProtocolError bool
+}{
+	{pdu: "00"},
+	{pdu: "ff"},
+	{pdu: "deadbeef"},
+	{pdu: "0741", attachProtocolError: true},
+	{pdu: "0741ffffff", attachProtocolError: true},
+}
+
+func attachRejectCauseAllowed(c string) bool {
+	switch c {
+	case "96", "99", "100", "111":
+		return true
+	}
+
+	return false
+}
+
 func Test4GMalformedNAS(t *testing.T) {
 	enbID := mustCreateENB(t)
 
-	garbage := []string{
-		"00",         // single byte
-		"ff",         // single byte
-		"deadbeef",   // not NAS
-		"0741",       // EMM Attach Request header, then nothing
-		"0741ffffff", // EMM Attach Request header, then garbage
-	}
-
-	for _, g := range garbage {
-		t.Run("garbage "+g, func(t *testing.T) {
+	for _, g := range malformedNAS {
+		t.Run("garbage "+g.pdu, func(t *testing.T) {
 			ueID := mustCreateENBUE(t, enbID)
 
-			body := fmt.Sprintf(`{"message_type":"attach_request","raw_nas_pdu":%q,"timeout_ms":800}`, g)
+			timeout := 800
+			if g.attachProtocolError {
+				timeout = 3000
+			}
 
-			status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas", body)
+			body := fmt.Sprintf(`{"message_type":"attach_request","raw_nas_pdu":%q,"timeout_ms":%d}`, g.pdu, timeout)
+
+			status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap", body)
 			if status != 200 {
 				t.Fatalf("server failed to handle raw NAS (HTTP %d): %s", status, resp)
 			}
 
-			if got := jsonGet(resp, "nas.message_type"); got == "attach_accept" {
+			got := jsonGet(resp, "nas.message_type")
+			if got == "attach_accept" {
 				t.Fatalf("MME accepted malformed NAS as an attach; body: %s", resp)
+			}
+
+			if !g.attachProtocolError {
+				return
+			}
+
+			if got != "attach_reject" {
+				t.Fatalf("nas.message_type = %q, want attach_reject (TS 24.301 §5.5.1.2.7 b)); body: %s", got, resp)
+			}
+
+			if c := jsonGet(resp, "nas.emm_cause"); !attachRejectCauseAllowed(c) {
+				t.Errorf("attach_reject emm_cause = %q, want 96, 99, 100 or 111 (TS 24.301 §5.5.1.2.7 b)); body: %s", c, resp)
 			}
 		})
 	}
@@ -124,9 +150,6 @@ func Test4GMalformedNAS(t *testing.T) {
 	})
 }
 
-// TestEPSBadMACSecurityModeComplete sends a Security Mode Complete with a
-// corrupted NAS-MAC and checks the MME discards it (TS 24.301 §4.4.4) rather than
-// completing the attach, then confirms the MME remains healthy.
 func Test4GBadMACSecurityModeComplete(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)

@@ -15,20 +15,16 @@ import (
 
 const readBufferSize = 65535
 
-// Endpoint is an N3 GTP-U socket. It demultiplexes received G-PDUs by TEID and
-// buffers path-management messages by type, mirroring the SCTP transport's
-// buffer-and-wait pattern so concurrent waiters can each claim their packet.
 type Endpoint struct {
 	conn   *net.UDPConn
 	closed atomic.Bool
 
 	mu      sync.Mutex
 	cond    *sync.Cond
-	gpdus   map[uint32][][]byte // TEID -> received T-PDUs (inner IP packets)
+	gpdus   map[uint32][]*Message
 	control map[uint8][]*Message
 }
 
-// Listen binds a GTP-U endpoint on localIP:2152.
 func Listen(localIP string) (*Endpoint, error) {
 	addr := &net.UDPAddr{IP: net.ParseIP(localIP), Port: Port}
 
@@ -39,7 +35,7 @@ func Listen(localIP string) (*Endpoint, error) {
 
 	e := &Endpoint{
 		conn:    conn,
-		gpdus:   make(map[uint32][][]byte),
+		gpdus:   make(map[uint32][]*Message),
 		control: make(map[uint8][]*Message),
 	}
 	e.cond = sync.NewCond(&e.mu)
@@ -77,7 +73,7 @@ func (e *Endpoint) runReceiver() {
 		e.mu.Lock()
 
 		if msg.Type == MsgGPDU {
-			e.gpdus[msg.TEID] = append(e.gpdus[msg.TEID], msg.Payload)
+			e.gpdus[msg.TEID] = append(e.gpdus[msg.TEID], msg)
 		} else {
 			e.control[msg.Type] = append(e.control[msg.Type], msg)
 		}
@@ -100,28 +96,20 @@ func (e *Endpoint) sendTo(remoteIP string, data []byte) error {
 	return nil
 }
 
-// SendUplink encapsulates an inner IP packet in a G-PDU (with the uplink PDU
-// Session Container / QFI) and sends it to the UPF (remoteIP) on the UPF's
-// uplink TEID.
 func (e *Endpoint) SendUplink(remoteIP string, ulTeid uint32, qfi uint8, innerIP []byte) error {
 	return e.sendTo(remoteIP, EncodeGPDUWithQFI(ulTeid, qfi, innerIP))
 }
 
-// SendUplinkPlain encapsulates an inner IP packet in a plain G-PDU (no PDU
-// Session Container) and sends it to the S-GW/UPF on its uplink TEID — the form
-// an eNB sends uplink user data on S1-U (4G), which has no QFI.
+// S1-U (4G) uplink carries no PDU Session Container, hence no QFI.
 func (e *Endpoint) SendUplinkPlain(remoteIP string, ulTeid uint32, innerIP []byte) error {
 	return e.sendTo(remoteIP, EncodeGPDU(ulTeid, innerIP))
 }
 
-// SendEchoRequest sends a GTP-U Echo Request to remoteIP.
 func (e *Endpoint) SendEchoRequest(remoteIP string, seq uint16) error {
 	return e.sendTo(remoteIP, EncodeEchoRequest(seq))
 }
 
-// WaitForDownlink returns the next downlink T-PDU received on the given DL TEID,
-// blocking until one arrives or ctx expires.
-func (e *Endpoint) WaitForDownlink(ctx context.Context, dlTeid uint32) ([]byte, error) {
+func (e *Endpoint) WaitForDownlink(ctx context.Context, dlTeid uint32) (*Message, error) {
 	stop := make(chan struct{})
 	defer close(stop)
 
@@ -158,8 +146,6 @@ func (e *Endpoint) WaitForDownlink(ctx context.Context, dlTeid uint32) ([]byte, 
 	}
 }
 
-// WaitForControl returns the next buffered path-management message of the given
-// type, blocking until one arrives or ctx expires.
 func (e *Endpoint) WaitForControl(ctx context.Context, msgType uint8) (*Message, error) {
 	stop := make(chan struct{})
 	defer close(stop)
@@ -193,7 +179,6 @@ func (e *Endpoint) WaitForControl(ctx context.Context, msgType uint8) (*Message,
 	}
 }
 
-// LocalIP returns the IP the endpoint is bound to (the gNB's N3 address).
 func (e *Endpoint) LocalIP() string {
 	if a, ok := netip.AddrFromSlice(e.conn.LocalAddr().(*net.UDPAddr).IP); ok {
 		return a.Unmap().String()
@@ -202,7 +187,6 @@ func (e *Endpoint) LocalIP() string {
 	return ""
 }
 
-// Close shuts the endpoint down.
 func (e *Endpoint) Close() error {
 	if e.closed.Swap(true) {
 		return nil

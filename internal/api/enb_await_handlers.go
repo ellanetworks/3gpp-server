@@ -6,19 +6,14 @@ package api
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/ellanetworks/3gpp-server/internal/naseps"
 	"github.com/ellanetworks/3gpp-server/internal/s1ap"
 	"github.com/ellanetworks/3gpp-server/internal/store"
 )
 
-// AwaitENBMessage waits for an unsolicited non-UE-associated S1AP message on the
-// eNB's S1-MME association — e.g. a PAGING the MME broadcasts to reach an
-// ECM-IDLE UE (TS 36.413 §9.1.6), or an MME-initiated Reset.
 func (h *Handler) AwaitENBMessage(w http.ResponseWriter, r *http.Request) {
 	enb, err := h.Store.GetENB(r.PathValue("enb_id"))
 	if err != nil {
@@ -46,13 +41,9 @@ func (h *Handler) AwaitENBMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, SendENBNASResponse{S1AP: resp})
+	writeJSON(w, http.StatusOK, SendENBUES1APResponse{S1AP: resp})
 }
 
-// AwaitENBUEMessage waits for an unsolicited UE-associated downlink S1AP message
-// addressed to a specific UE — e.g. a network-initiated DETACH REQUEST or a
-// Modify EPS Bearer Context Request — letting many UEs share one eNB association
-// without claiming each other's downlink.
 func (h *Handler) AwaitENBUEMessage(w http.ResponseWriter, r *http.Request) {
 	enb, err := h.Store.GetENB(r.PathValue("enb_id"))
 	if err != nil {
@@ -86,14 +77,10 @@ func (h *Handler) AwaitENBUEMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, SendENBNASResponse{S1AP: resp, NAS: decodeENBDownlinkNAS(ue, resp)})
+	writeJSON(w, http.StatusOK, SendENBUES1APResponse{S1AP: resp, NAS: decodeENBDownlinkNAS(ue, resp)})
 }
 
-// decodeENBDownlinkNAS best-effort decodes the EPS NAS message carried in a
-// downlink S1AP PDU (e.g. the Detach Request in a Downlink NAS Transport),
-// returning nil when the PDU carries none or cannot be decoded. A protected
-// message is unprotected under the UE's NAS keys; its DL NAS COUNT is taken from
-// the message sequence number (the overflow counter is 0 below 256 downlinks).
+// b[5] is the sequence number, which is the DL NAS COUNT until the first overflow.
 func decodeENBDownlinkNAS(ue *store.UEEPSContext, resp *s1ap.S1APResponse) *naseps.NASResponse {
 	if resp == nil || resp.NASPDU == nil {
 		return nil
@@ -111,54 +98,24 @@ func decodeENBDownlinkNAS(ue *store.UEEPSContext, resp *s1ap.S1APResponse) *nase
 
 	if sht == naseps.SHTPlain {
 		nas, _ := naseps.Decode(b)
-		return nas
+		return annotateSecurityHeaderType(nas, b)
 	}
 
 	if !ue.SecurityActive || len(b) < 6 {
 		return nil
 	}
 
-	plain, err := naseps.Unprotect(b, uint32(b[5]), ue.EIA, ue.EEA, ue.KnasInt, ue.KnasEnc)
+	plain, err := naseps.Unprotect(b, uint32(b[5]), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
 	if err != nil {
 		return nil
 	}
 
 	nas, _ := naseps.Decode(plain)
 
-	return nas
+	return annotateSecurityHeaderType(nas, b)
 }
 
-// parsedAwaitRequest is an AwaitRequest with its timeout resolved.
-type parsedAwaitRequest struct {
-	MessageTypes []string
-	timeout      time.Duration
-}
-
-func decodeAwaitRequest(w http.ResponseWriter, r *http.Request) (parsedAwaitRequest, bool) {
-	var req AwaitRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid request body: %v", err))
-		return parsedAwaitRequest{}, false
-	}
-
-	if len(req.MessageTypes) == 0 {
-		writeError(w, http.StatusBadRequest, "message_types is required")
-		return parsedAwaitRequest{}, false
-	}
-
-	timeout := 5 * time.Second
-	if req.TimeoutMs > 0 {
-		timeout = time.Duration(req.TimeoutMs) * time.Millisecond
-	}
-
-	return parsedAwaitRequest{MessageTypes: req.MessageTypes, timeout: timeout}, true
-}
-
-// s1apUEMatcher matches a downlink S1AP PDU to a specific UE by its S1AP ID pair,
-// so concurrent waiters on one eNB association don't consume each other's
-// downlink. The eNB UE S1AP ID is ours (always known) and matched exactly. The
-// MME UE S1AP ID is the MME's to assign, so an mmeID of 0 means "not yet known"
-// and is skipped. A PDU carrying neither ID (e.g. a Paging) matches any waiter.
+// An mmeID of 0 means the MME has not assigned one yet, so it cannot match.
 func s1apUEMatcher(mmeID, enbID uint32) func(*s1ap.S1APResponse) bool {
 	return func(resp *s1ap.S1APResponse) bool {
 		if resp.MMEUES1APID == nil && resp.ENBUES1APID == nil {

@@ -3,56 +3,31 @@
 
 //go:build integration
 
-// Scenario tests for 4G/LTE exercise S1AP/NAS-EPS procedures against the MME.
-// S1 Setup is the first procedure on an S1-MME association (TS 36.413 §8.7).
-
 package integration_test
 
 import (
+	"fmt"
 	"testing"
 )
 
-// mustCreateENB creates a standard eNB, completes S1 Setup against the MME, and
-// returns the store handle. Registers cleanup.
 func mustCreateENB(t *testing.T) string {
 	t.Helper()
 
-	body := `{
-		"mme_address": "10.3.0.2:36412",
-		"enb_s1_address": "10.3.0.3",
-		"mcc": "001", "mnc": "01",
-		"tac": "0001", "enb_id": 1,
-		"name": "test-enb"
-	}`
-
-	status, resp := doRequest(t, "POST", "/enb", body)
-	if status != 201 {
-		t.Fatalf("create enb: HTTP %d: %s", status, resp)
-	}
-
-	enbID := jsonGet(resp, "enb_id")
-	if enbID == "" {
-		t.Fatal("create enb: no enb_id in response")
-	}
-
-	t.Cleanup(func() {
-		doRequest(t, "DELETE", "/enb/"+enbID, "")
-	})
-
-	return enbID
+	return createENBWithID(t, claimENBID(), "test-enb")
 }
 
 func Test4GScenarioS1Setup(t *testing.T) {
-	enbID := mustCreateENB(t)
+	stateENBID := claimENBID()
+	enbID := createENBWithID(t, stateENBID, "test-enb")
 
 	t.Run("S1 Setup Response returned", func(t *testing.T) {
-		status, resp := doRequest(t, "POST", "/enb", `{
+		status, resp := doRequest(t, "POST", "/enb", fmt.Sprintf(`{
 			"mme_address": "10.3.0.2:36412",
 			"enb_s1_address": "10.3.0.3",
 			"mcc": "001", "mnc": "01",
-			"tac": "0001", "enb_id": 2,
+			"tac": "0001", "enb_id": "%x",
 			"name": "assert-enb"
-		}`)
+		}`, claimENBID()))
 		if status != 201 {
 			t.Fatalf("create enb: HTTP %d: %s", status, resp)
 		}
@@ -60,15 +35,15 @@ func Test4GScenarioS1Setup(t *testing.T) {
 		id := jsonGet(resp, "enb_id")
 		t.Cleanup(func() { doRequest(t, "DELETE", "/enb/"+id, "") })
 
-		if got := jsonGet(resp, "response.pdu_type"); got != "successful_outcome" {
+		if got := jsonGet(resp, "s1_setup_response.pdu_type"); got != "successful_outcome" {
 			t.Fatalf("pdu_type = %q, want successful_outcome; body: %s", got, resp)
 		}
 
-		if got := jsonGet(resp, "response.message_type"); got != "S1SetupResponse" {
+		if got := jsonGet(resp, "s1_setup_response.message_type"); got != "S1SetupResponse" {
 			t.Fatalf("message_type = %q, want S1SetupResponse; body: %s", got, resp)
 		}
 
-		if gummeis := jsonGet(resp, "response.s1_setup_response.served_gummeis"); gummeis == "" || gummeis == "null" || gummeis == "[]" {
+		if gummeis := jsonGet(resp, "s1_setup_response.served_gummeis"); gummeis == "" || gummeis == "null" || gummeis == "[]" {
 			t.Fatalf("served_gummeis is empty; body: %s", resp)
 		}
 	})
@@ -83,7 +58,7 @@ func Test4GScenarioS1Setup(t *testing.T) {
 			"mcc":    "001",
 			"mnc":    "01",
 			"tac":    "0001",
-			"enb_id": "1",
+			"enb_id": fmt.Sprintf("%x", stateENBID),
 			"name":   "test-enb",
 		} {
 			if got := jsonGet(body, key); got != want {

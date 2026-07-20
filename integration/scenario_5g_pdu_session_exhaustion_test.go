@@ -3,13 +3,6 @@
 
 //go:build integration
 
-// IP-pool exhaustion (TS 24.501 §6.4.1.x): when the PDU session cannot be
-// established because no address can be allocated, the SMF shall reject the PDU
-// SESSION ESTABLISHMENT REQUEST with 5GSM cause #26 "insufficient resources".
-// The condition is transient — once a session releases its address a retry
-// succeeds (§6.2.12). A failing test means Ella Core deviates from the mandated
-// reject, cause, or transience behaviour.
-
 package integration_test
 
 import (
@@ -17,21 +10,18 @@ import (
 	"testing"
 )
 
-// exhaustDNN is provisioned in TestMain with an IPv4 /30 pool, i.e. exactly two
-// allocatable host addresses.
+// exhaustDNN is provisioned in TestMain with an IPv4 /30 pool: two host addresses.
 const exhaustDNN = "exhaust"
 
 func Test5GPDUSessionEstablishment_IPPoolExhausted(t *testing.T) {
-	gnbID := mustCreateGnB(t)
+	gnbID := mustCreateGNB(t)
 
-	// Two registered UEs fill the /30 pool (addresses .1 and .2).
 	ue1 := newExhaustUE(t, gnbID, testSUPI(1))
 	mustEstablishExhaust(t, gnbID, ue1)
 
 	ue2 := newExhaustUE(t, gnbID, testSUPI(2))
 	mustEstablishExhaust(t, gnbID, ue2)
 
-	// A third UE cannot be allocated an address; the SMF must reject with #26.
 	ue3 := newExhaustUE(t, gnbID, testSUPI(3))
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ue3+"/ngap",
@@ -52,25 +42,16 @@ func Test5GPDUSessionEstablishment_IPPoolExhausted(t *testing.T) {
 		t.Errorf("nas.inner_nas_message_type = %q, want pdu_session_establishment_reject\n  body: %s", got, body)
 	}
 
-	assertNASCause(t, body, "nas.cause_5gsm", cause5GSMInsufficientResources)
+	assertNASCause(t, body, "nas.5gsm_cause", cause5GSMInsufficientResources)
 
-	// The Establishment Reject is the complete response (TS 24.501 §6.4.1.x): a
-	// successful UL NAS transport carrying an SMF reject is not a 5GMM protocol
-	// error, so the AMF must not also emit a 5GMM STATUS. Any follow-up NAS
-	// message for this UE is therefore a violation.
+	// The Establishment Reject is the complete response, so any follow-up NAS is a violation.
 	if st, extra := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ue3+"/await",
 		`{"message_types":["DownlinkNASTransport"],"timeout_ms":3000}`); st == 200 {
 		t.Errorf("a PDU Session Establishment Reject must be the complete response (TS 24.501 §6.4.1.x), but a follow-up NAS message arrived — the AMF emits a spurious 5GMM STATUS:\n  %s", extra)
 	}
 
-	// Transience (TS 24.501 §6.2.12): #26 is a temporary condition. Freeing an
-	// address must let a fresh establishment succeed, confirming the shortage was
-	// not permanent and the rejected attempt left the pool consistent.
-	//
-	// A UE-requested release runs as a network-requested release (TS 24.501
-	// §6.4.3.3 → §6.3.3): the SMF frees the address on Release Complete, not on the
-	// bare Release Request, so the UE must finish the handshake before the lease
-	// returns to the pool.
+	// The SMF frees the address only on Release Complete (TS 24.501 §6.4.3.3 → §6.3.3),
+	// so the handshake must finish before the lease returns to the pool.
 	if st, rel := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ue1+"/ngap",
 		`{"message_type":"pdu_session_release_request"}`); st != 200 {
 		t.Fatalf("release on ue1: HTTP %d\n  body: %s", st, rel)
@@ -85,9 +66,7 @@ func Test5GPDUSessionEstablishment_IPPoolExhausted(t *testing.T) {
 	mustEstablishExhaust(t, gnbID, ue4)
 }
 
-// newExhaustUE creates and registers a UE that targets the tiny-pool "exhaust"
-// DNN, and de-registers it on cleanup so its IP leases are released and the
-// shared pool stays clean across runs.
+// The cleanup de-registration returns the UE's IP leases to the shared pool.
 func newExhaustUE(t *testing.T, gnbID, supi string) string {
 	t.Helper()
 
@@ -121,8 +100,6 @@ func newExhaustUE(t *testing.T, gnbID, supi string) string {
 	return ueID
 }
 
-// mustEstablishExhaust establishes a PDU session on the exhaust DNN and requires
-// it to be accepted (the pool still has a free address).
 func mustEstablishExhaust(t *testing.T, gnbID, ueID string) {
 	t.Helper()
 

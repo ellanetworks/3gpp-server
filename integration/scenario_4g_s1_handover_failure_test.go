@@ -3,11 +3,6 @@
 
 //go:build integration
 
-// S1 handover failure paths (TS 36.413 §8.4.1.3, §8.4.2.3): when the target eNB
-// rejects the handover or the target eNB is unknown, the MME must abort the
-// preparation and return a HANDOVER PREPARATION FAILURE to the source eNB. A
-// failure of these tests means Ella Core deviates.
-
 package integration_test
 
 import (
@@ -15,9 +10,6 @@ import (
 	"testing"
 )
 
-// createUnconnectedENB creates an eNB in the tester without opening its S1
-// association, so its Global eNB-ID is known to the tester but not to the MME —
-// a valid handover target identity the MME cannot resolve.
 func createUnconnectedENB(t *testing.T, enbID int, name string) string {
 	t.Helper()
 
@@ -25,7 +17,7 @@ func createUnconnectedENB(t *testing.T, enbID int, name string) string {
 		"mme_address": "10.3.0.2:36412",
 		"enb_s1_address": "10.3.0.3",
 		"mcc": "001", "mnc": "01",
-		"tac": "0001", "enb_id": %d,
+		"tac": "0001", "enb_id": "%x",
 		"name": %q, "skip_s1_setup": true
 	}`, enbID, name)
 
@@ -40,9 +32,6 @@ func createUnconnectedENB(t *testing.T, enbID int, name string) string {
 	return id
 }
 
-// Test4GS1HandoverTargetRejects checks that when the target eNB answers the
-// resource allocation with HANDOVER FAILURE, the MME aborts preparation and
-// returns HANDOVER PREPARATION FAILURE to the source (TS 36.413 §8.4.2.3).
 func Test4GS1HandoverTargetRejects(t *testing.T) {
 	sourceENB := createENBWithID(t, 1, "source-enb")
 	targetENB := createENBWithID(t, 2, "target-enb")
@@ -50,7 +39,7 @@ func Test4GS1HandoverTargetRejects(t *testing.T) {
 	ueID := mustCreateENBUE(t, sourceENB)
 	fullAttach(t, sourceENB, ueID)
 
-	status, body := doRequest(t, "POST", "/enb/"+sourceENB+"/ue/"+ueID+"/nas",
+	status, body := doRequest(t, "POST", "/enb/"+sourceENB+"/ue/"+ueID+"/s1ap",
 		fmt.Sprintf(`{"message_type":"handover_required","target_enb_id":%q}`, targetENB))
 	if status != 200 {
 		t.Fatalf("handover_required: HTTP %d\n  body: %s", status, body)
@@ -62,14 +51,12 @@ func Test4GS1HandoverTargetRejects(t *testing.T) {
 		t.Fatalf("HandoverRequest missing MME UE S1AP ID\n  body: %s", hoReq)
 	}
 
-	// Target eNB → MME: HANDOVER FAILURE.
 	status, body = doRequest(t, "POST", "/enb/"+targetENB+"/s1ap",
 		fmt.Sprintf(`{"message_type":"handover_failure","mme_ue_s1ap_id":%s}`, targetMME))
 	if status != 200 {
 		t.Fatalf("handover_failure: HTTP %d\n  body: %s", status, body)
 	}
 
-	// MME → source eNB: HANDOVER PREPARATION FAILURE.
 	status, fail := awaitENBUES1AP(t, sourceENB, ueID, `["HandoverPreparationFailure"]`)
 	if status != 200 {
 		t.Fatalf("await HandoverPreparationFailure: HTTP %d — the MME must fail the preparation to the source\n  body: %s", status, fail)
@@ -84,9 +71,6 @@ func Test4GS1HandoverTargetRejects(t *testing.T) {
 	}
 }
 
-// Test4GS1HandoverUnknownTarget checks that a HANDOVER REQUIRED naming a target
-// eNB the MME does not serve is rejected with HANDOVER PREPARATION FAILURE
-// (cause unknown-targetID, TS 36.413 §8.4.1.3).
 func Test4GS1HandoverUnknownTarget(t *testing.T) {
 	sourceENB := createENBWithID(t, 1, "source-enb")
 	unknownTarget := createUnconnectedENB(t, 99, "unconnected-enb")
@@ -94,7 +78,7 @@ func Test4GS1HandoverUnknownTarget(t *testing.T) {
 	ueID := mustCreateENBUE(t, sourceENB)
 	fullAttach(t, sourceENB, ueID)
 
-	status, body := doRequest(t, "POST", "/enb/"+sourceENB+"/ue/"+ueID+"/nas",
+	status, body := doRequest(t, "POST", "/enb/"+sourceENB+"/ue/"+ueID+"/s1ap",
 		fmt.Sprintf(`{"message_type":"handover_required","target_enb_id":%q}`, unknownTarget))
 	if status != 200 {
 		t.Fatalf("handover_required: HTTP %d\n  body: %s", status, body)

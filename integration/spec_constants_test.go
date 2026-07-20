@@ -3,11 +3,6 @@
 
 //go:build integration
 
-// Human-readable names for the 3GPP coded values used across the integration
-// tests, so assertions and request bodies read in terms of the spec rather than
-// raw integers. Values are taken from the referenced TS 24.501 / TS 38.413
-// tables.
-
 package integration_test
 
 import (
@@ -25,6 +20,8 @@ const (
 	cause5GMMNon5GAuthenticationUnacceptable = 26
 	cause5GMMngKSIAlreadyInUse               = 71
 	cause5GMMPayloadWasNotForwarded          = 90
+	cause5GMMInvalidMandatoryInformation     = 96
+	cause5GMMMessageTypeNonExistent          = 97
 	cause5GMMProtocolErrorUnspecified        = 111
 )
 
@@ -47,10 +44,7 @@ const (
 	causeRadioNetworkReleaseDueToNgranGeneratedReason = 3
 	causeRadioNetworkUserInactivity                   = 20
 	causeRadioNetworkUnspecified                      = 0
-
-	// causeRadioNetworkOutOfRange is deliberately outside the enumerated
-	// radio-network Cause range, for robustness fuzzing.
-	causeRadioNetworkOutOfRange = 250
+	causeRadioNetworkOutOfRange                       = 250
 )
 
 // NAS service types — TS 24.501 §9.11.3.50, Table 9.11.3.50.1.
@@ -61,13 +55,10 @@ const (
 	serviceTypeEmergencyServices         = 3
 	serviceTypeEmergencyServicesFallback = 4
 	serviceTypeHighPriorityAccess        = 5
-
-	// serviceTypeOutOfRange is an unassigned service-type value, for fuzzing.
-	serviceTypeOutOfRange = 7
+	serviceTypeOutOfRange                = 7
 )
 
-// NGAP message-type names as decoded by the server (internal/ngap/decode.go),
-// used as assertion targets for ngap.message_type.
+// NGAP message-type names as decoded by internal/ngap/decode.go.
 const (
 	ngapDownlinkNASTransport             = "DownlinkNASTransport"
 	ngapErrorIndication                  = "ErrorIndication"
@@ -85,10 +76,10 @@ const (
 	ngapHandoverCancelAcknowledge        = "HandoverCancelAcknowledge"
 	ngapPathSwitchRequestAcknowledge     = "PathSwitchRequestAcknowledge"
 	ngapPathSwitchRequestFailure         = "PathSwitchRequestFailure"
+	ngapDownlinkRANStatusTransfer        = "DownlinkRANStatusTransfer"
 )
 
-// NAS message-type names as decoded by the server (internal/nas/decode.go),
-// used as assertion targets for nas.message_type / nas.inner_nas_message_type.
+// NAS message-type names as decoded by internal/nas/decode.go.
 const (
 	nasAuthenticationRequest         = "authentication_request"
 	nasAuthenticationReject          = "authentication_reject"
@@ -116,11 +107,30 @@ const (
 	pduSessionTypeEthernet     = 5
 )
 
+// Always-on PDU session indication — TS 24.501 §9.11.4.3, Table 9.11.4.3.1.
+const (
+	alwaysOnPDUSessionNotAllowed = 0
+	alwaysOnPDUSessionRequired   = 1
+)
+
 // NGAP Cause, Misc group — TS 38.413 §9.3.1.2.
 const (
 	causePresentMisc           = "misc"
 	causeMiscUnknownPLMNOrSNPN = 4
 )
+
+// NGAP Cause, Protocol group — TS 38.413 §9.3.1.2 (CauseProtocol).
+const (
+	causeProtocolTransferSyntaxError = 0
+)
+
+// NGAP procedure codes — TS 38.413 §9.4.7 (Constant Definitions).
+const (
+	ngapProcedureCodeUplinkNASTransport = 46
+)
+
+// 5GS identity types — TS 24.501 §9.11.3.3, Table 9.11.3.3.1.
+const identityTypeSUCI = "1"
 
 // NAS registration types — TS 24.501 §9.11.3.7, Table 9.11.3.7.1.
 const (
@@ -134,13 +144,9 @@ const (
 const (
 	rrcEstablishmentCauseHighPriorityAccess = 1
 	rrcEstablishmentCauseMoVoiceCall        = 5
-
-	// rrcEstablishmentCauseOutOfRange is outside the enumerated range, for fuzzing.
-	rrcEstablishmentCauseOutOfRange = 99
+	rrcEstablishmentCauseOutOfRange         = 99
 )
 
-// assertNASCause checks that the NAS cause at the given JSON path equals the
-// expected (named) value. A want of 0 means "do not check".
 func assertNASCause(t *testing.T, body []byte, path string, want int) {
 	t.Helper()
 
@@ -153,10 +159,16 @@ func assertNASCause(t *testing.T, body []byte, path string, want int) {
 	}
 }
 
-// ngapCause extracts the NGAP Cause carried in the IE list of the response
-// object at responseKey (e.g. "ng_setup_response"). It returns the Cause group
-// ("misc", "radioNetwork", …) and the integer value within that group, or
-// ("", 0) if no Cause IE is present.
+// TS 24.501 §5.5.1.2.4: the AMF shall assign and include a TAI list as the
+// registration area in the REGISTRATION ACCEPT.
+func assertRegistrationAcceptTAIList(t *testing.T, body []byte) {
+	t.Helper()
+
+	if got := jsonGet(body, "nas.tai_list"); got == "" {
+		t.Errorf("nas.tai_list is absent, want a TAI list registration area (TS 24.501 §5.5.1.2.4)\n  body: %s", body)
+	}
+}
+
 func ngapCause(body []byte, responseKey string) (string, int) {
 	var top map[string]any
 	if err := json.Unmarshal(body, &top); err != nil {
@@ -168,35 +180,19 @@ func ngapCause(body []byte, responseKey string) (string, int) {
 		return "", 0
 	}
 
-	ies, ok := resp["ies"].([]any)
+	cause, ok := resp["cause"].(map[string]any)
 	if !ok {
 		return "", 0
 	}
 
-	for _, ie := range ies {
-		iem, ok := ie.(map[string]any)
-		if !ok {
-			continue
-		}
-
-		cause, ok := iem["cause"].(map[string]any)
-		if !ok {
-			continue
-		}
-
-		present, _ := cause["present"].(string)
-		if v, ok := cause[present].(float64); ok {
-			return present, int(v)
-		}
-
-		return present, 0
+	group, _ := cause["group"].(string)
+	if v, ok := cause["value"].(float64); ok {
+		return group, int(v)
 	}
 
-	return "", 0
+	return group, 0
 }
 
-// assertNGAPCauseMisc checks the response carries an NGAP Misc Cause equal to
-// the expected value. A want of 0 means "do not check".
 func assertNGAPCauseMisc(t *testing.T, body []byte, responseKey string, want int) {
 	t.Helper()
 
@@ -208,5 +204,31 @@ func assertNGAPCauseMisc(t *testing.T, body []byte, responseKey string, want int
 	if group != causePresentMisc || val != want {
 		t.Errorf("%s NGAP cause = (%q, %d), want (%q, %d)\n  body: %s",
 			responseKey, group, val, causePresentMisc, want, body)
+	}
+}
+
+// Sequential allocation packs n values into a span of n-1, so a far wider span is evidence of unpredictable generation.
+func assertUnpredictableTMSIs(t *testing.T, values []uint64, name, cite string) {
+	t.Helper()
+
+	if len(values) < 2 {
+		t.Fatalf("need at least 2 %ss to judge allocation, got %d", name, len(values))
+	}
+
+	min, max := values[0], values[0]
+
+	for _, v := range values[1:] {
+		if v < min {
+			min = v
+		}
+
+		if v > max {
+			max = v
+		}
+	}
+
+	if max-min < 1000 {
+		t.Errorf("%ss span only %d across %d allocations; allocation looks sequential/predictable (%s)",
+			name, max-min, len(values), cite)
 	}
 }

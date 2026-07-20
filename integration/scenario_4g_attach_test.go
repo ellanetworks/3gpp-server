@@ -11,16 +11,15 @@ import (
 )
 
 const (
-	testIMSI = "001010000000001"
-	testK    = "00112233445566778899aabbccddeeff"
-	testOPc  = "63bfa50ee6523365ff14c1f45f88737d"
+	testK   = "00112233445566778899aabbccddeeff"
+	testOPc = "63bfa50ee6523365ff14c1f45f88737d"
 )
 
-// mustCreateENBUE creates a UE on the eNB and returns its store ID.
 func mustCreateENBUE(t *testing.T, enbID string) string {
 	t.Helper()
 
-	body := fmt.Sprintf(`{"imsi":%q,"k":%q,"opc":%q,"amf":"8000","sqn":"000000000000"}`, testIMSI, testK, testOPc)
+	imsi := claimSubscriber(t)[len("imsi-"):]
+	body := fmt.Sprintf(`{"imsi":%q,"k":%q,"opc":%q,"amf":"8000","sqn":"000000000000"}`, imsi, testK, testOPc)
 
 	status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue", body)
 	if status != 201 {
@@ -35,11 +34,10 @@ func mustCreateENBUE(t *testing.T, enbID string) string {
 	return ueID
 }
 
-// nasStep drives one EPS NAS procedure step and returns the response body.
 func nasStep(t *testing.T, enbID, ueID, messageType string) []byte {
 	t.Helper()
 
-	status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/nas",
+	status, resp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap",
 		fmt.Sprintf(`{"message_type":%q}`, messageType))
 	if status != 200 {
 		t.Fatalf("%s: HTTP %d: %s", messageType, status, resp)
@@ -48,12 +46,6 @@ func nasStep(t *testing.T, enbID, ueID, messageType string) []byte {
 	return resp
 }
 
-// TestScenarioAttach drives a full EPS Attach against the live MME and asserts
-// each downlink is spec-compliant: an EPS-AKA challenge, a Security Mode Command
-// that replays the UE capabilities (TS 24.301 §5.4.3.2) and selects a real
-// integrity algorithm (not EIA0, §5.4.3.3 / TS 33.401 §5.1.4.1) with a NAS-MAC
-// that verifies under independently-derived keys, and an Attach Accept carrying a
-// GUTI (§5.5.1.2.4) and a default bearer.
 func Test4GScenarioAttach(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
@@ -82,12 +74,11 @@ func Test4GScenarioAttach(t *testing.T) {
 		}
 
 		// TS 33.401 §5.1.4.1 / TS 24.301 §5.4.3.3: EIA0 is only for emergency/RLOS.
-		if got := jsonGet(resp, "nas.integrity_algorithm"); got == "0" || got == "" {
+		if got := jsonGet(resp, "nas.selected_integrity_algorithm"); got == "0" || got == "" {
 			t.Fatalf("MME selected NAS integrity algorithm %q for a normal attach; want non-EIA0; body: %s", got, resp)
 		}
 
-		// TS 24.301 §5.4.3.2: the MME must replay the UE's security capabilities
-		// verbatim (bidding-down protection). We advertised EEA0/1/2 + EIA0/1/2.
+		// The UE advertised EEA0/1/2 + EIA0/1/2, which the MME must replay verbatim (TS 24.301 §5.4.3.2).
 		if got := jsonGet(resp, "nas.replayed_ue_security_capabilities"); got != "e0e0" {
 			t.Fatalf("replayed UE security capabilities = %q, want e0e0; body: %s", got, resp)
 		}

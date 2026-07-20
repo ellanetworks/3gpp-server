@@ -3,16 +3,6 @@
 
 //go:build integration
 
-// PATH SWITCH REQUEST conformance scenarios (TS 38.413 §8.4.4, TS 33.501
-// §6.7.3.1). A path switch is the NGAP side of an Xn handover: the target
-// NG-RAN node asks the AMF to switch a UE context's downlink user-plane path to
-// itself. NGAP defines no application-layer authorization of the requesting
-// node — N2/N3 security is provided at the transport layer (TS 33.501 §9) — so
-// these tests assert the behaviours the specs do mandate: acknowledge a valid
-// switch (§8.4.4.2), reject duplicate PDU Session IDs (§8.4.4.4), and on a UE
-// security-capability mismatch still acknowledge while returning the AMF's
-// stored capabilities (TS 33.501 §6.7.3.1).
-
 package integration_test
 
 import (
@@ -21,9 +11,6 @@ import (
 	"testing"
 )
 
-// pathSwitchRequest sends a PATH SWITCH REQUEST on gnbID's association and
-// returns the decoded AMF response, blocking for the acknowledge, failure, or an
-// error indication.
 func pathSwitchRequest(t *testing.T, gnbID, body string) []byte {
 	t.Helper()
 
@@ -35,38 +22,21 @@ func pathSwitchRequest(t *testing.T, gnbID, body string) []byte {
 	return resp
 }
 
-// ngapIEByID returns the decoded IE with the given protocol IE id from an NGAP
-// response, or nil if absent.
-func ngapIEByID(body []byte, id int64) map[string]any {
+func ngapField(body []byte, key string) any {
 	var top struct {
-		NGAP struct {
-			IEs []map[string]any `json:"ies"`
-		} `json:"ngap"`
+		NGAP map[string]any `json:"ngap"`
 	}
 
 	if err := json.Unmarshal(body, &top); err != nil {
 		return nil
 	}
 
-	for _, ie := range top.NGAP.IEs {
-		if v, ok := ie["id"].(float64); ok && int64(v) == id {
-			return ie
-		}
-	}
-
-	return nil
+	return top.NGAP[key]
 }
 
-// ngapProtocolIEIDUESecurityCapabilities is the UE Security Capabilities IE id
-// (TS 38.413 §9.3.1.86).
-const ngapProtocolIEIDUESecurityCapabilities = 119
-
-// TestPathSwitchRequestSuccess — §8.4.4.2: a PATH SWITCH REQUEST for an existing
-// UE context is acknowledged, echoing the UE's AMF UE NGAP ID and the new RAN UE
-// NGAP ID assigned by the requesting node.
 func Test5GPathSwitchRequestSuccess(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "0000c0", "ps-src")
-	targetGNB := createGnBWithID(t, "0000c1", "ps-tgt")
+	sourceGNB := createGNBWithID(t, "0000c0", "ps-src")
+	targetGNB := createGNBWithID(t, "0000c1", "ps-tgt")
 
 	ueID := establishRegisteredUEWithSUPI(t, sourceGNB, "imsi-001010000000001")
 	amf, _ := ueNGAPIDs(t, sourceGNB, ueID)
@@ -90,18 +60,14 @@ func Test5GPathSwitchRequestSuccess(t *testing.T) {
 		t.Errorf("acknowledge AMF UE NGAP ID = %d (present=%v), want %d (TS 38.413 §8.4.4.2)\n  body: %s", gotAmf, ok, amf, resp)
 	}
 
-	if got := jsonGet(resp, "ngap.ies"); got == "" {
-		t.Errorf("acknowledge carries no IEs\n  body: %s", resp)
+	if ngapField(resp, "pdu_session_ids") == nil {
+		t.Errorf("acknowledge does not report the switched PDU session (TS 38.413 §9.2.3.9)\n  body: %s", resp)
 	}
 }
 
-// TestPathSwitchRequestDuplicatePDUSessionIDsFailure — §8.4.4.4: a PATH SWITCH
-// REQUEST whose to-be-switched list contains two PDU Session ID IEs set to the
-// same value must be answered with PATH SWITCH REQUEST FAILURE, and the UE's
-// existing context must be left intact.
 func Test5GPathSwitchRequestDuplicatePDUSessionIDsFailure(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "0000c2", "ps-dup-src")
-	targetGNB := createGnBWithID(t, "0000c3", "ps-dup-tgt")
+	sourceGNB := createGNBWithID(t, "0000c2", "ps-dup-src")
+	targetGNB := createGNBWithID(t, "0000c3", "ps-dup-tgt")
 
 	ueID := establishRegisteredUEWithSUPI(t, sourceGNB, "imsi-001010000000002")
 	amf, _ := ueNGAPIDs(t, sourceGNB, ueID)
@@ -122,24 +88,17 @@ func Test5GPathSwitchRequestDuplicatePDUSessionIDsFailure(t *testing.T) {
 		t.Errorf("path switch with duplicate PDU Session IDs: message_type = %q, want PathSwitchRequestFailure (TS 38.413 §8.4.4.4)\n  body: %s", got, resp)
 	}
 
-	// The failed path switch must not have torn down or moved the UE context.
 	assertUEStillConnected(t, sourceGNB, ueID)
 }
 
-// TestPathSwitchRequestSecurityCapabilityMismatchAcknowledged — TS 33.501
-// §6.7.3.1: when the UE 5G security capabilities reported in a PATH SWITCH
-// REQUEST differ from the AMF's locally stored values, the AMF must still
-// acknowledge the switch and return its locally stored capabilities to the
-// NG-RAN node in the PATH SWITCH REQUEST ACKNOWLEDGE.
 func Test5GPathSwitchRequestSecurityCapabilityMismatchAcknowledged(t *testing.T) {
-	sourceGNB := createGnBWithID(t, "0000c4", "ps-sec-src")
-	targetGNB := createGnBWithID(t, "0000c5", "ps-sec-tgt")
+	sourceGNB := createGNBWithID(t, "0000c4", "ps-sec-src")
+	targetGNB := createGNBWithID(t, "0000c5", "ps-sec-tgt")
 
 	ueID := establishRegisteredUEWithSUPI(t, sourceGNB, "imsi-001010000000003")
 	amf, _ := ueNGAPIDs(t, sourceGNB, ueID)
 
-	// Report all-zero algorithms, which cannot match the capabilities the UE
-	// presented at registration, forcing the §6.7.3.1 mismatch path.
+	// All-zero algorithms cannot match what the UE presented at registration.
 	resp := pathSwitchRequest(t, targetGNB, fmt.Sprintf(`{
 		"message_type": "path_switch_request",
 		"amf_ue_ngap_id": %d,
@@ -154,20 +113,14 @@ func Test5GPathSwitchRequestSecurityCapabilityMismatchAcknowledged(t *testing.T)
 		t.Fatalf("path switch with mismatched UE security capabilities: message_type = %q, want PathSwitchRequestAcknowledge (the AMF must not reject; TS 33.501 §6.7.3.1)\n  body: %s", got, resp)
 	}
 
-	ie := ngapIEByID(resp, ngapProtocolIEIDUESecurityCapabilities)
-	if ie == nil {
+	caps, _ := ngapField(resp, "ue_security_capabilities").(map[string]any)
+	if caps == nil {
 		t.Fatalf("acknowledge omits the UE Security Capabilities IE; on a mismatch the AMF must return its locally stored capabilities (TS 33.501 §6.7.3.1)\n  body: %s", resp)
 	}
 
-	caps, _ := ie["ue_security_capabilities"].(map[string]any)
-	if caps == nil {
-		t.Fatalf("UE Security Capabilities IE carries no decoded value\n  body: %s", resp)
-	}
-
-	// The returned capabilities are the AMF's stored values, not the all-zero
-	// ones reported in the request; a UE always supports a non-null integrity
-	// algorithm (TS 33.501 §5.11.2), so stored NR integrity must be non-zero.
+	// A UE always supports a non-null integrity algorithm (TS 33.501 §5.11.2), so
+	// the AMF's stored NR integrity capabilities are non-zero.
 	if nrInt, _ := caps["nr_integrity"].(string); nrInt == "" || nrInt == "0000" {
-		t.Errorf("returned stored NR integrity capabilities = %q, want the AMF's stored non-zero value rather than the reported all-zero one (TS 33.501 §6.7.3.1)\n  body: %s", nrInt, resp)
+		t.Errorf("returned NR integrity capabilities = %q, want the AMF's stored non-zero value (TS 33.501 §6.7.3.1)\n  body: %s", nrInt, resp)
 	}
 }
