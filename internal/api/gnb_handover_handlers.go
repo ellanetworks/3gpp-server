@@ -46,9 +46,9 @@ func handleGNBHandoverRequired(gnb *store.GNBContext, ue *store.UEContext, t *tr
 		AMFUENGAPID:       amfUeNgapID,
 		RANUENGAPID:       ranUeNgapID,
 		TargetGNBID:       *req.TargetGNBID,
-		MCC:               gnb.MCC,
-		MNC:               gnb.MNC,
-		TAC:               gnb.TAC,
+		TargetMCC:         gnb.MCC,
+		TargetMNC:         gnb.MNC,
+		TargetTAC:         gnb.TAC,
 		PDUSessionIDs:     pduSessionIDs,
 		CauseRadioNetwork: cause,
 	})

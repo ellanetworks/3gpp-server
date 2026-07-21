@@ -102,7 +102,7 @@ func (h *Handler) GetGNBUE(w http.ResponseWriter, r *http.Request) {
 	sessions := make([]GNBUESession, 0, len(ids))
 	for _, id := range ids {
 		s := ue.PDUSessions[uint8(id)]
-		sessions = append(sessions, GNBUESession{PDUSessionID: s.PDUSessionID, UEIP: s.UEIP})
+		sessions = append(sessions, GNBUESession{PDUSessionID: s.PDUSessionID, DNN: s.DNN, UEIP: s.UEIP})
 	}
 
 	var ueIP string

@@ -464,8 +464,8 @@ func handleENBAttachComplete(ctx context.Context, enb *store.ENBContext, ue *sto
 
 func handleENBUECapabilityInfo(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	cap := []byte{0x01, 0x02, 0x03, 0x04, 0x05}
-	if req.UERadioCapability != "" {
-		b, err := hex.DecodeString(req.UERadioCapability)
+	if req.UERadioCapability != nil {
+		b, err := hex.DecodeString(*req.UERadioCapability)
 		if err != nil {
 			return nil, httpErrorf(http.StatusBadRequest, "ue_radio_capability must be hex: %v", err)
 		}
@@ -597,7 +597,7 @@ func handleENBReleaseRequest(ctx context.Context, enb *store.ENBContext, ue *sto
 
 	cause := s1ap.CauseRadioNetworkUserInactivity
 	if req.ReleaseCause != nil {
-		cause = *req.ReleaseCause
+		cause = int(*req.ReleaseCause)
 	}
 
 	rr, err := s1ap.BuildUEContextReleaseRequest(mmeID, enbID, cause)

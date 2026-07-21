@@ -42,7 +42,7 @@ type S1APResponse struct {
 
 	MMEName             *string            `json:"mme_name,omitempty"`
 	ServedGUMMEIs       []ServedGUMMEIJSON `json:"served_gummeis,omitempty"`
-	RelativeMMECapacity *int               `json:"relative_mme_capacity,omitempty"`
+	RelativeMMECapacity *int64             `json:"relative_mme_capacity,omitempty"`
 	TimeToWait          *string            `json:"time_to_wait,omitempty"`
 
 	MMEUES1APID                    *int64                      `json:"mme_ue_s1ap_id,omitempty"`
@@ -57,7 +57,7 @@ type S1APResponse struct {
 	ResetConnections               []ResetConnectionJSON       `json:"reset_connections,omitempty"`
 	ReplayedUESecurityCapabilities *UESecurityCapabilitiesJSON `json:"replayed_ue_security_capabilities,omitempty"`
 	UESecurityCapabilities         *UESecurityCapabilitiesJSON `json:"ue_security_capabilities,omitempty"`
-	SourceToTargetContainer        string                      `json:"source_to_target_transparent_container,omitempty"`
+	SourceToTargetContainer        *string                     `json:"source_to_target_transparent_container,omitempty"`
 	Paging                         *PagingJSON                 `json:"paging,omitempty"`
 	ERABModifyItems                []ERABModifyItemJSON        `json:"erab_modify_items,omitempty"`
 	ReleasedERABs                  []int                       `json:"released_erabs,omitempty"`
@@ -69,7 +69,7 @@ type S1APResponse struct {
 type UnknownIEJSON struct {
 	ID          int64  `json:"id"`
 	Criticality string `json:"criticality"`
-	ValueHex    string `json:"value_hex"`
+	ValueHex    string `json:"value_hex,omitempty"`
 }
 
 type PagingJSON struct {

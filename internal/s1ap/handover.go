@@ -11,9 +11,9 @@ import (
 var handoverContainerStub = s1ap.TransparentContainer{0x00}
 
 type HandoverRequiredParams struct {
-	MMEUES1APID uint32
-	ENBUES1APID uint32
-	Cause       int
+	MMEUES1APID       uint32
+	ENBUES1APID       uint32
+	CauseRadioNetwork int
 
 	TargetMCC       string
 	TargetMNC       string
@@ -37,7 +37,7 @@ func BuildHandoverRequired(p HandoverRequiredParams) ([]byte, error) {
 		MMEUES1APID:  s1ap.MMEUES1APID(p.MMEUES1APID),
 		ENBUES1APID:  s1ap.ENBUES1APID(p.ENBUES1APID),
 		HandoverType: s1ap.HandoverTypeIntraLTE,
-		Cause:        s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: p.Cause},
+		Cause:        s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: p.CauseRadioNetwork},
 		TargetID: s1ap.TargetID{
 			TargeteNBID: s1ap.TargeteNBID{
 				GlobalENBID: s1ap.GlobalENBID{

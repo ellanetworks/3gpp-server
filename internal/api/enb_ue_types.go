@@ -20,6 +20,7 @@ type CreateENBUERequest struct {
 
 type CreateENBUEResponse struct {
 	UEID        string `json:"ue_id"`
+	IMSI        string `json:"imsi"`
 	ENBUES1APID uint32 `json:"enb_ue_s1ap_id"`
 }
 
@@ -68,8 +69,8 @@ type SendENBUES1APRequest struct {
 
 	ReplayLast        bool    `json:"replay_last,omitempty"`
 	SwitchOff         bool    `json:"switch_off,omitempty"`
-	ReleaseCause      *int    `json:"release_cause,omitempty"`
-	UERadioCapability string  `json:"ue_radio_capability,omitempty"`
+	ReleaseCause      *int64  `json:"release_cause,omitempty"`
+	UERadioCapability *string `json:"ue_radio_capability,omitempty"`
 	MTMSIOverride     *uint32 `json:"mtmsi,omitempty"`
 	NASCountOverride  *uint32 `json:"nas_count,omitempty"`
 	EPSUpdateType     uint8   `json:"eps_update_type,omitempty"`
@@ -83,11 +84,11 @@ type SendENBUES1APRequest struct {
 	WithholdAccept    bool   `json:"withhold_accept,omitempty"`
 
 	RESOverride *string `json:"res_override,omitempty"`
-	Cause       *int    `json:"cause,omitempty"`
+	Cause       *int64  `json:"cause,omitempty"`
 
 	TargetENBID             *string `json:"target_enb_id,omitempty"`
-	HandoverRequiredCause   *int    `json:"handover_required_cause,omitempty"`
-	HandoverCancelCause     *int    `json:"handover_cancel_cause,omitempty"`
+	HandoverRequiredCause   *int64  `json:"handover_required_cause,omitempty"`
+	HandoverCancelCause     *int64  `json:"handover_cancel_cause,omitempty"`
 	StatusTransferContainer *string `json:"status_transfer_container,omitempty"`
 
 	TimeoutMs int `json:"timeout_ms,omitempty"`

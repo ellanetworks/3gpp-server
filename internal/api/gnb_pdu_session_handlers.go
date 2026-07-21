@@ -21,6 +21,7 @@ import (
 func captureTunnel(gnb *store.GNBContext, ue *store.UEContext, pduSessionID int64, dlTeid uint32, ngapResp *ngap.NGAPResponse, nasResp *nas5gs.NASResponse) {
 	info := &store.PDUSessionInfo{
 		PDUSessionID: uint8(pduSessionID),
+		DNN:          ue.DNN,
 		N3GNBIP:      gnb.N3Addr,
 		DLTeid:       dlTeid,
 		QFI:          1,
@@ -47,6 +48,10 @@ func captureTunnel(gnb *store.GNBContext, ue *store.UEContext, pduSessionID int6
 	}
 
 	ue.PDUSessions[uint8(pduSessionID)] = info
+
+	if ue.PDUSessionID == 0 {
+		ue.PDUSessionID = uint8(pduSessionID)
+	}
 }
 
 func handleGNBPDUSessionEstablishmentRequest(ctx context.Context, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, gt *gtpu.Endpoint, req *SendGNBUENGAPRequest) (*SendGNBUENGAPResponse, error) {

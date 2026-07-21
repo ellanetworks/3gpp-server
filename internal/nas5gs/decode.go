@@ -247,11 +247,11 @@ func decodeDLNASTransport(m *gonas.Message, resp *NASResponse) error {
 
 	switch innerType {
 	case gonas.MsgTypePDUSessionEstablishmentAccept:
-		DecodePDUSessionEstablishmentAccept(resp, inner.GsmMessage)
+		decodePDUSessionEstablishmentAccept(resp, inner.GsmMessage)
 	case gonas.MsgTypePDUSessionEstablishmentReject:
-		DecodePDUSessionEstablishmentReject(resp, inner.GsmMessage)
+		decodePDUSessionEstablishmentReject(resp, inner.GsmMessage)
 	case gonas.MsgTypePDUSessionReleaseCommand:
-		DecodePDUSessionReleaseCommand(resp, inner.GsmMessage, payload)
+		decodePDUSessionReleaseCommand(resp, inner.GsmMessage, payload)
 	case gonas.MsgTypePDUSessionModificationReject:
 		if inner.PDUSessionModificationReject != nil {
 			cause := int(inner.PDUSessionModificationReject.GetCauseValue())

@@ -97,7 +97,7 @@ func handleENBHandoverFailure(t *transport.S1APTransport, req *SendENBS1APReques
 
 	cause := s1ap.CauseRadioNetworkHOFailureInTarget
 	if req.Cause != nil {
-		cause = *req.Cause
+		cause = int(*req.Cause)
 	}
 
 	encoded, err := s1ap.BuildHandoverFailure(*req.MMEUES1APID, cause)
@@ -128,14 +128,14 @@ func handleENBHandoverRequired(st *store.Store, ue *store.UEEPSContext, t *trans
 	}
 
 	encoded, err := s1ap.BuildHandoverRequired(s1ap.HandoverRequiredParams{
-		MMEUES1APID:     sourceMMEID(ue, req),
-		ENBUES1APID:     sourceENBID(ue, req),
-		Cause:           handoverRequiredCause(req),
-		TargetMCC:       target.MCC,
-		TargetMNC:       target.MNC,
-		TargetTAC:       target.TAC,
-		TargetENBID:     targetENBID,
-		TargetENBIDKind: targetENBIDKind,
+		MMEUES1APID:       sourceMMEID(ue, req),
+		ENBUES1APID:       sourceENBID(ue, req),
+		CauseRadioNetwork: handoverRequiredCause(req),
+		TargetMCC:         target.MCC,
+		TargetMNC:         target.MNC,
+		TargetTAC:         target.TAC,
+		TargetENBID:       targetENBID,
+		TargetENBIDKind:   targetENBIDKind,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("build HandoverRequired: %w", err)
@@ -151,7 +151,7 @@ func handleENBHandoverRequired(st *store.Store, ue *store.UEEPSContext, t *trans
 func handleENBHandoverCancel(ctx context.Context, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	cause := s1ap.CauseRadioNetworkHandoverCancelled
 	if req.HandoverCancelCause != nil {
-		cause = *req.HandoverCancelCause
+		cause = int(*req.HandoverCancelCause)
 	}
 
 	encoded, err := s1ap.BuildHandoverCancel(sourceMMEID(ue, req), sourceENBID(ue, req), cause)
@@ -197,7 +197,7 @@ func handleENBENBStatusTransfer(ue *store.UEEPSContext, t *transport.S1APTranspo
 
 func handoverRequiredCause(req *SendENBUES1APRequest) int {
 	if req != nil && req.HandoverRequiredCause != nil {
-		return *req.HandoverRequiredCause
+		return int(*req.HandoverRequiredCause)
 	}
 
 	return s1ap.CauseRadioNetworkHandoverDesirableForRadioReason

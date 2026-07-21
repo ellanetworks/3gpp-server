@@ -1470,6 +1470,8 @@ components:
       properties:
         ue_id:
           type: string
+        imsi:
+          type: string
         enb_ue_s1ap_id:
           type: integer
 
@@ -1875,6 +1877,8 @@ components:
             properties:
               pdu_session_id:
                 type: integer
+              dnn:
+                type: string
               ue_ip:
                 type: string
         dnn:

@@ -389,7 +389,10 @@ func decodeHandoverRequest(value []byte, resp *S1APResponse) error {
 		IntegrityProtectionAlgorithms: secCapHex(m.UESecurityCapabilities.IntegrityProtectionAlgorithms),
 	}
 
-	resp.SourceToTargetContainer = hex.EncodeToString(m.SourceToTarget)
+	if len(m.SourceToTarget) > 0 {
+		c := hex.EncodeToString(m.SourceToTarget)
+		resp.SourceToTargetContainer = &c
+	}
 
 	return nil
 }
@@ -549,7 +552,7 @@ func decodeS1SetupResponse(sr *s1ap.S1SetupResponse, resp *S1APResponse) {
 		resp.MMEName = &name
 	}
 
-	capacity := int(sr.RelativeMMECapacity)
+	capacity := int64(sr.RelativeMMECapacity)
 	resp.RelativeMMECapacity = &capacity
 
 	for _, it := range sr.ServedGUMMEIs {

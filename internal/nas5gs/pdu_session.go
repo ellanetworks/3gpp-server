@@ -302,7 +302,7 @@ func BuildULNASTransportExisting(pduSessionID uint8, requestType *uint8, payload
 	return data.Bytes(), nil
 }
 
-func DecodePDUSessionEstablishmentAccept(nasResp *NASResponse, gsmMsg *gonas.GsmMessage) {
+func decodePDUSessionEstablishmentAccept(nasResp *NASResponse, gsmMsg *gonas.GsmMessage) {
 	if gsmMsg == nil || gsmMsg.PDUSessionEstablishmentAccept == nil {
 		return
 	}
@@ -357,7 +357,7 @@ func DecodePDUSessionEstablishmentAccept(nasResp *NASResponse, gsmMsg *gonas.Gsm
 	}
 }
 
-func DecodePDUSessionReleaseCommand(nasResp *NASResponse, gsmMsg *gonas.GsmMessage, raw []byte) {
+func decodePDUSessionReleaseCommand(nasResp *NASResponse, gsmMsg *gonas.GsmMessage, raw []byte) {
 	if gsmMsg == nil || gsmMsg.PDUSessionReleaseCommand == nil {
 		return
 	}
@@ -429,7 +429,7 @@ func releaseCommandHasAccessType(raw []byte) bool {
 	return false
 }
 
-func DecodePDUSessionEstablishmentReject(nasResp *NASResponse, gsmMsg *gonas.GsmMessage) {
+func decodePDUSessionEstablishmentReject(nasResp *NASResponse, gsmMsg *gonas.GsmMessage) {
 	if gsmMsg == nil || gsmMsg.PDUSessionEstablishmentReject == nil {
 		return
 	}

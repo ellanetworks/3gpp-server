@@ -15,6 +15,7 @@ import (
 
 type PDUSessionInfo struct {
 	PDUSessionID uint8
+	DNN          string
 	N3GNBIP      string
 	DLTeid       uint32
 	QFI          uint8

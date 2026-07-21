@@ -142,5 +142,6 @@ type GNBUEStateResponse struct {
 
 type GNBUESession struct {
 	PDUSessionID uint8  `json:"pdu_session_id"`
+	DNN          string `json:"dnn,omitempty"`
 	UEIP         string `json:"ue_ip"`
 }
