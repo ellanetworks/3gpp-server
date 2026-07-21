@@ -6,7 +6,6 @@ package api
 import (
 	"context"
 	"encoding/hex"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -567,8 +566,6 @@ func handleGNBServiceRequest(ctx context.Context, gnb *store.GNBContext, ue *sto
 		if err != nil {
 			return nil, httpErrorf(http.StatusBadRequest, "decode pdu_session_status: %v", err)
 		}
-
-		fmt.Printf("DBG SR ue.PDUSessionID=%d serviceType=%d status=%v\n", ue.PDUSessionID, serviceType, *status)
 
 		srPDU, err := nas5gs.BuildServiceRequest(nas5gs.ServiceRequestParams{
 			ServiceType:      serviceType,
