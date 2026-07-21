@@ -97,7 +97,7 @@ func handleENBHandoverFailure(t *transport.S1APTransport, req *SendENBS1APReques
 
 	cause := s1ap.CauseRadioNetworkHOFailureInTarget
 	if req.Cause != nil {
-		cause = int(*req.Cause)
+		cause = *req.Cause
 	}
 
 	encoded, err := s1ap.BuildHandoverFailure(*req.MMEUES1APID, cause)
@@ -151,7 +151,7 @@ func handleENBHandoverRequired(st *store.Store, ue *store.UEEPSContext, t *trans
 func handleENBHandoverCancel(ctx context.Context, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	cause := s1ap.CauseRadioNetworkHandoverCancelled
 	if req.HandoverCancelCause != nil {
-		cause = int(*req.HandoverCancelCause)
+		cause = *req.HandoverCancelCause
 	}
 
 	encoded, err := s1ap.BuildHandoverCancel(sourceMMEID(ue, req), sourceENBID(ue, req), cause)
@@ -195,9 +195,9 @@ func handleENBENBStatusTransfer(ue *store.UEEPSContext, t *transport.S1APTranspo
 	return &SendENBUES1APResponse{}, nil
 }
 
-func handoverRequiredCause(req *SendENBUES1APRequest) int {
+func handoverRequiredCause(req *SendENBUES1APRequest) int64 {
 	if req != nil && req.HandoverRequiredCause != nil {
-		return int(*req.HandoverRequiredCause)
+		return *req.HandoverRequiredCause
 	}
 
 	return s1ap.CauseRadioNetworkHandoverDesirableForRadioReason

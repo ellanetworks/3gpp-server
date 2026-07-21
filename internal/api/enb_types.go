@@ -52,7 +52,7 @@ type SendENBS1APRequest struct {
 	PathSwitchEEA *uint16 `json:"path_switch_eea,omitempty"`
 	PathSwitchEIA *uint16 `json:"path_switch_eia,omitempty"`
 
-	Cause  *int    `json:"cause,omitempty"`
+	Cause  *int64  `json:"cause,omitempty"`
 	CellID *uint32 `json:"cell_id,omitempty"`
 }
 

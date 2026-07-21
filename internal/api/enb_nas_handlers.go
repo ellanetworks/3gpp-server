@@ -619,7 +619,7 @@ func handleENBReleaseRequest(ctx context.Context, enb *store.ENBContext, ue *sto
 
 	cause := s1ap.CauseRadioNetworkUserInactivity
 	if req.ReleaseCause != nil {
-		cause = int(*req.ReleaseCause)
+		cause = *req.ReleaseCause
 	}
 
 	rr, err := s1ap.BuildUEContextReleaseRequest(mmeID, enbID, cause)

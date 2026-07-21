@@ -142,10 +142,8 @@ func decodePathSwitchRequestAcknowledge(msg *ngapType.PathSwitchRequestAcknowled
 			}
 		case ngapType.ProtocolIEIDSecurityContext:
 			if sc := ie.Value.SecurityContext; sc != nil {
-				v := sc.NextHopChainingCount.Value
-				resp.NextHopChainingCount = &v
 				nh := hex.EncodeToString(sc.NextHopNH.Value.Bytes)
-				resp.NextHop = &nh
+				resp.SecurityContext = &SecurityContextJSON{NextHopChainingCount: int(sc.NextHopChainingCount.Value), NextHop: nh}
 			}
 		case ngapType.ProtocolIEIDAllowedNSSAI:
 			if ie.Value.AllowedNSSAI != nil {
@@ -486,7 +484,7 @@ func decodePaging(msg *ngapType.Paging, resp *NGAPResponse) {
 	for _, ie := range msg.ProtocolIEs.List {
 		if ie.Id.Value == ngapType.ProtocolIEIDUEPagingIdentity &&
 			ie.Value.UEPagingIdentity != nil && ie.Value.UEPagingIdentity.FiveGSTMSI != nil {
-			resp.FiveGSTMSI = decodeFiveGSTMSI(ie.Value.UEPagingIdentity.FiveGSTMSI)
+			resp.Paging = &PagingJSON{FiveGSTMSI: decodeFiveGSTMSI(ie.Value.UEPagingIdentity.FiveGSTMSI)}
 		} else {
 			resp.UnknownIEs = append(resp.UnknownIEs, unknownIE(ie.Id.Value, ie.Criticality.Value, ie.Value))
 		}
@@ -561,10 +559,8 @@ func decodeHandoverRequest(msg *ngapType.HandoverRequest, resp *NGAPResponse) {
 			}
 		case ngapType.ProtocolIEIDSecurityContext:
 			if sc := ie.Value.SecurityContext; sc != nil {
-				ncc := sc.NextHopChainingCount.Value
 				nh := hex.EncodeToString(sc.NextHopNH.Value.Bytes)
-				resp.NextHopChainingCount = &ncc
-				resp.NextHop = &nh
+				resp.SecurityContext = &SecurityContextJSON{NextHopChainingCount: int(sc.NextHopChainingCount.Value), NextHop: nh}
 			}
 		case ngapType.ProtocolIEIDUESecurityCapabilities:
 			if caps := ie.Value.UESecurityCapabilities; caps != nil {

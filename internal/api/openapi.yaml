@@ -2141,7 +2141,7 @@ components:
           type: object
         rrc_establishment_cause:
           type: integer
-        five_g_s_tmsi:
+        paging:
           type: object
         ue_context_request:
           type: integer
@@ -2192,11 +2192,14 @@ components:
           type: array
           items:
             type: integer
-        next_hop_chaining_count:
-          type: integer
-        next_hop:
-          type: string
-          description: Next Hop key (NH) as hex (TS 33.501 §6.9.2.3.2).
+        security_context:
+          type: object
+          properties:
+            next_hop_chaining_count:
+              type: integer
+            next_hop:
+              type: string
+              description: Next Hop key (NH) as hex (TS 33.501 §6.9.2.3.2).
         ue_security_capabilities:
           type: object
         ran_status_transfer:

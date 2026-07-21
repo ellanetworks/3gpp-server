@@ -23,132 +23,153 @@ func Decode(data []byte) (*S1APResponse, error) {
 	case *s1ap.InitiatingMessage:
 		resp.PDUType = "initiating_message"
 		resp.MessageType = procedureName(m.ProcedureCode)
-
-		switch m.ProcedureCode {
-		case s1ap.ProcDownlinkNASTransport:
-			resp.MessageType = "DownlinkNASTransport"
-			if err := decodeDownlinkNASTransport(m.Value, resp); err != nil {
-				return nil, err
-			}
-		case s1ap.ProcInitialContextSetup:
-			resp.MessageType = "InitialContextSetupRequest"
-			if err := decodeInitialContextSetupRequest(m.Value, resp); err != nil {
-				return nil, err
-			}
-		case s1ap.ProcERABSetup:
-			resp.MessageType = "ERABSetupRequest"
-			if err := decodeERABSetupRequest(m.Value, resp); err != nil {
-				return nil, err
-			}
-		case s1ap.ProcERABRelease:
-			resp.MessageType = "ERABReleaseCommand"
-			if err := decodeERABReleaseCommand(m.Value, resp); err != nil {
-				return nil, err
-			}
-		case s1ap.ProcERABModify:
-			resp.MessageType = "ERABModifyRequest"
-			if err := decodeERABModifyRequest(m.Value, resp); err != nil {
-				return nil, err
-			}
-		case s1ap.ProcUEContextRelease:
-			resp.MessageType = "UEContextReleaseCommand"
-			if err := decodeUEContextReleaseCommand(m.Value, resp); err != nil {
-				return nil, err
-			}
-		case s1ap.ProcErrorIndication:
-			resp.MessageType = "ErrorIndication"
-			if err := decodeErrorIndication(m.Value, resp); err != nil {
-				return nil, err
-			}
-		case s1ap.ProcPaging:
-			resp.MessageType = "Paging"
-			if err := decodePaging(m.Value, resp); err != nil {
-				return nil, err
-			}
-		case s1ap.ProcHandoverResourceAllocation:
-			resp.MessageType = "HandoverRequest"
-			if err := decodeHandoverRequest(m.Value, resp); err != nil {
-				return nil, err
-			}
-		case s1ap.ProcMMEStatusTransfer:
-			resp.MessageType = "MMEStatusTransfer"
-			if err := decodeMMEStatusTransfer(m.Value, resp); err != nil {
-				return nil, err
-			}
+		if err := decodeInitiatingMessage(m, resp); err != nil {
+			return nil, err
 		}
 	case *s1ap.SuccessfulOutcome:
 		resp.PDUType = "successful_outcome"
 		resp.MessageType = procedureName(m.ProcedureCode)
-
-		switch m.ProcedureCode {
-		case s1ap.ProcS1Setup:
-			resp.MessageType = "S1SetupResponse"
-
-			sr, err := s1ap.ParseS1SetupResponse(m.Value)
-			if err != nil {
-				return nil, fmt.Errorf("parse S1SetupResponse: %w", err)
-			}
-
-			setUnknownIEs(resp, sr)
-
-			decodeS1SetupResponse(sr, resp)
-		case s1ap.ProcPathSwitchRequest:
-			resp.MessageType = "PathSwitchRequestAcknowledge"
-			if err := decodePathSwitchRequestAcknowledge(m.Value, resp); err != nil {
-				return nil, err
-			}
-		case s1ap.ProcReset:
-			resp.MessageType = "ResetAcknowledge"
-			if err := decodeResetAcknowledge(m.Value, resp); err != nil {
-				return nil, err
-			}
-		case s1ap.ProcHandoverPreparation:
-			resp.MessageType = "HandoverCommand"
-			if err := decodeHandoverCommand(m.Value, resp); err != nil {
-				return nil, err
-			}
-		case s1ap.ProcHandoverCancel:
-			resp.MessageType = "HandoverCancelAcknowledge"
-			if err := decodeHandoverCancelAcknowledge(m.Value, resp); err != nil {
-				return nil, err
-			}
+		if err := decodeSuccessfulOutcome(m, resp); err != nil {
+			return nil, err
 		}
 	case *s1ap.UnsuccessfulOutcome:
 		resp.PDUType = "unsuccessful_outcome"
 		resp.MessageType = procedureName(m.ProcedureCode)
-
-		switch m.ProcedureCode {
-		case s1ap.ProcS1Setup:
-			resp.MessageType = "S1SetupFailure"
-
-			sf, err := s1ap.ParseS1SetupFailure(m.Value)
-			if err != nil {
-				return nil, fmt.Errorf("parse S1SetupFailure: %w", err)
-			}
-
-			setUnknownIEs(resp, sf)
-
-			decodeS1SetupFailure(sf, resp)
-
-			if sf.CriticalityDiagnostics != nil {
-				resp.CriticalityDiagnostics = decodeCriticalityDiagnostics(sf.CriticalityDiagnostics)
-			}
-		case s1ap.ProcPathSwitchRequest:
-			resp.MessageType = "PathSwitchRequestFailure"
-			if err := decodePathSwitchRequestFailure(m.Value, resp); err != nil {
-				return nil, err
-			}
-		case s1ap.ProcHandoverPreparation:
-			resp.MessageType = "HandoverPreparationFailure"
-			if err := decodeHandoverPreparationFailure(m.Value, resp); err != nil {
-				return nil, err
-			}
+		if err := decodeUnsuccessfulOutcome(m, resp); err != nil {
+			return nil, err
 		}
 	default:
 		return nil, fmt.Errorf("s1ap: unexpected PDU type %T", pdu)
 	}
 
 	return resp, nil
+}
+
+func decodeInitiatingMessage(m *s1ap.InitiatingMessage, resp *S1APResponse) error {
+	switch m.ProcedureCode {
+	case s1ap.ProcDownlinkNASTransport:
+		resp.MessageType = "DownlinkNASTransport"
+		if err := decodeDownlinkNASTransport(m.Value, resp); err != nil {
+			return err
+		}
+	case s1ap.ProcInitialContextSetup:
+		resp.MessageType = "InitialContextSetupRequest"
+		if err := decodeInitialContextSetupRequest(m.Value, resp); err != nil {
+			return err
+		}
+	case s1ap.ProcERABSetup:
+		resp.MessageType = "ERABSetupRequest"
+		if err := decodeERABSetupRequest(m.Value, resp); err != nil {
+			return err
+		}
+	case s1ap.ProcERABRelease:
+		resp.MessageType = "ERABReleaseCommand"
+		if err := decodeERABReleaseCommand(m.Value, resp); err != nil {
+			return err
+		}
+	case s1ap.ProcERABModify:
+		resp.MessageType = "ERABModifyRequest"
+		if err := decodeERABModifyRequest(m.Value, resp); err != nil {
+			return err
+		}
+	case s1ap.ProcUEContextRelease:
+		resp.MessageType = "UEContextReleaseCommand"
+		if err := decodeUEContextReleaseCommand(m.Value, resp); err != nil {
+			return err
+		}
+	case s1ap.ProcErrorIndication:
+		resp.MessageType = "ErrorIndication"
+		if err := decodeErrorIndication(m.Value, resp); err != nil {
+			return err
+		}
+	case s1ap.ProcPaging:
+		resp.MessageType = "Paging"
+		if err := decodePaging(m.Value, resp); err != nil {
+			return err
+		}
+	case s1ap.ProcHandoverResourceAllocation:
+		resp.MessageType = "HandoverRequest"
+		if err := decodeHandoverRequest(m.Value, resp); err != nil {
+			return err
+		}
+	case s1ap.ProcMMEStatusTransfer:
+		resp.MessageType = "MMEStatusTransfer"
+		if err := decodeMMEStatusTransfer(m.Value, resp); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func decodeSuccessfulOutcome(m *s1ap.SuccessfulOutcome, resp *S1APResponse) error {
+	switch m.ProcedureCode {
+	case s1ap.ProcS1Setup:
+		resp.MessageType = "S1SetupResponse"
+
+		sr, err := s1ap.ParseS1SetupResponse(m.Value)
+		if err != nil {
+			return fmt.Errorf("parse S1SetupResponse: %w", err)
+		}
+
+		setUnknownIEs(resp, sr)
+
+		decodeS1SetupResponse(sr, resp)
+	case s1ap.ProcPathSwitchRequest:
+		resp.MessageType = "PathSwitchRequestAcknowledge"
+		if err := decodePathSwitchRequestAcknowledge(m.Value, resp); err != nil {
+			return err
+		}
+	case s1ap.ProcReset:
+		resp.MessageType = "ResetAcknowledge"
+		if err := decodeResetAcknowledge(m.Value, resp); err != nil {
+			return err
+		}
+	case s1ap.ProcHandoverPreparation:
+		resp.MessageType = "HandoverCommand"
+		if err := decodeHandoverCommand(m.Value, resp); err != nil {
+			return err
+		}
+	case s1ap.ProcHandoverCancel:
+		resp.MessageType = "HandoverCancelAcknowledge"
+		if err := decodeHandoverCancelAcknowledge(m.Value, resp); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func decodeUnsuccessfulOutcome(m *s1ap.UnsuccessfulOutcome, resp *S1APResponse) error {
+	switch m.ProcedureCode {
+	case s1ap.ProcS1Setup:
+		resp.MessageType = "S1SetupFailure"
+
+		sf, err := s1ap.ParseS1SetupFailure(m.Value)
+		if err != nil {
+			return fmt.Errorf("parse S1SetupFailure: %w", err)
+		}
+
+		setUnknownIEs(resp, sf)
+
+		decodeS1SetupFailure(sf, resp)
+
+		if sf.CriticalityDiagnostics != nil {
+			resp.CriticalityDiagnostics = decodeCriticalityDiagnostics(sf.CriticalityDiagnostics)
+		}
+	case s1ap.ProcPathSwitchRequest:
+		resp.MessageType = "PathSwitchRequestFailure"
+		if err := decodePathSwitchRequestFailure(m.Value, resp); err != nil {
+			return err
+		}
+	case s1ap.ProcHandoverPreparation:
+		resp.MessageType = "HandoverPreparationFailure"
+		if err := decodeHandoverPreparationFailure(m.Value, resp); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func decodeDownlinkNASTransport(value []byte, resp *S1APResponse) error {

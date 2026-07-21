@@ -32,7 +32,7 @@ func BuildReset(all bool, connections []ResetConnection) ([]byte, error) {
 	}
 
 	m := &s1ap.Reset{
-		Cause:     s1ap.Cause{Group: s1ap.CauseGroupMisc, Value: CauseMiscOMIntervention},
+		Cause:     s1ap.Cause{Group: s1ap.CauseGroupMisc, Value: int(CauseMiscOMIntervention)},
 		ResetType: rt,
 	}
 
