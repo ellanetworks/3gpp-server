@@ -13,7 +13,7 @@ func Test4GServiceRequest(t *testing.T) {
 
 	fullAttach(t, enbID, ueID)
 
-	idle := nasStep(t, enbID, ueID, "release_request")
+	idle := nasStep(t, enbID, ueID, "ue_context_release_request")
 	if got := jsonGet(idle, "s1ap.message_type"); got != "UEContextReleaseCommand" {
 		t.Fatalf("release_request: s1ap.message_type = %q, want UEContextReleaseCommand; body: %s", got, idle)
 	}
@@ -29,7 +29,7 @@ func Test4GServiceRequestBadMAC(t *testing.T) {
 	ueID := mustCreateENBUE(t, enbID)
 
 	fullAttach(t, enbID, ueID)
-	nasStep(t, enbID, ueID, "release_request")
+	nasStep(t, enbID, ueID, "ue_context_release_request")
 
 	sr := nasBody(t, enbID, ueID, `{"message_type":"service_request","corrupt_mac":true,"timeout_ms":3000}`)
 

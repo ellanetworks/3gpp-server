@@ -34,7 +34,7 @@ func Test4GS1HandoverCrossENBHijack(t *testing.T) {
 		t.Errorf("s1ap.message_type = %q, want ErrorIndication for a cross-association handover (TS 36.413 §10.6)\n  body: %s", got, ei)
 	}
 
-	if got := jsonGet(nasStep(t, victimENB, victimUE, "release_request"), "s1ap.message_type"); got != "UEContextReleaseCommand" {
+	if got := jsonGet(nasStep(t, victimENB, victimUE, "ue_context_release_request"), "s1ap.message_type"); got != "UEContextReleaseCommand" {
 		t.Errorf("the victim UE was disturbed by the rogue handover; a normal release did not yield a UEContextReleaseCommand")
 	}
 }

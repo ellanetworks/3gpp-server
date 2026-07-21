@@ -202,7 +202,7 @@ func decodeInitialContextSetupRequest(value []byte, resp *S1APResponse) error {
 	}
 
 	for _, it := range m.ERABToBeSetup {
-		item := ERABSetupItemJSON{ERABID: int(it.ERABID), GTPTEID: uint32(it.GTPTEID)}
+		item := ERABSetupItemJSON{ERABID: int(it.ERABID), ULTeid: uint32(it.GTPTEID)}
 		item.TransportLayerAddress, item.TransportLayerAddressIPv6 = transportLayerIPs(it.TransportLayerAddress)
 
 		resp.ERABSetupItems = append(resp.ERABSetupItems, item)
@@ -306,7 +306,7 @@ func decodeERABSetupRequest(value []byte, resp *S1APResponse) error {
 	setUEIDs(resp, int64(m.MMEUES1APID), int64(m.ENBUES1APID))
 
 	for _, it := range m.ERABToBeSetup {
-		item := ERABSetupItemJSON{ERABID: int(it.ERABID), GTPTEID: uint32(it.GTPTEID)}
+		item := ERABSetupItemJSON{ERABID: int(it.ERABID), ULTeid: uint32(it.GTPTEID)}
 		item.TransportLayerAddress, item.TransportLayerAddressIPv6 = transportLayerIPs(it.TransportLayerAddress)
 		resp.ERABSetupItems = append(resp.ERABSetupItems, item)
 
@@ -390,7 +390,7 @@ func decodeHandoverRequest(value []byte, resp *S1APResponse) error {
 	resp.MMEUES1APID = &mme
 
 	for _, it := range m.ERABToBeSetup {
-		item := ERABSetupItemJSON{ERABID: int(it.ERABID), GTPTEID: uint32(it.GTPTEID)}
+		item := ERABSetupItemJSON{ERABID: int(it.ERABID), ULTeid: uint32(it.GTPTEID)}
 		item.TransportLayerAddress, item.TransportLayerAddressIPv6 = transportLayerIPs(it.TransportLayerAddress)
 		resp.ERABSetupItems = append(resp.ERABSetupItems, item)
 	}

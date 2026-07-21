@@ -57,7 +57,7 @@ func BuildUEContextReleaseRequest(mmeUEID, enbUEID uint32, cause int64) ([]byte,
 	m := &s1ap.UEContextReleaseRequest{
 		MMEUES1APID: s1ap.MMEUES1APID(mmeUEID),
 		ENBUES1APID: s1ap.ENBUES1APID(enbUEID),
-		Cause:       s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: int(cause)},
+		Cause:       radioNetworkCause(cause),
 	}
 
 	return m.Marshal()

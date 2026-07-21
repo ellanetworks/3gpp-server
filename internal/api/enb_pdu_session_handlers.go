@@ -109,7 +109,7 @@ func acceptAdditionalBearer(enb *store.ENBContext, ue *store.UEEPSContext, t *tr
 
 	if len(dl.ERABSetupItems) > 0 {
 		e := dl.ERABSetupItems[0]
-		bearer.ULTeid = e.GTPTEID
+		bearer.ULTeid = e.ULTeid
 		bearer.SGWIP = erabSGWIP(enb, e)
 	}
 

@@ -271,7 +271,7 @@ func Test4GServiceRequest_Fuzz(t *testing.T) {
 
 			fullAttach(t, enbID, ueID)
 
-			idle := nasStep(t, enbID, ueID, "release_request")
+			idle := nasStep(t, enbID, ueID, "ue_context_release_request")
 			if got := jsonGet(idle, "s1ap.message_type"); got != "UEContextReleaseCommand" {
 				t.Fatalf("release_request: s1ap.message_type = %q, want UEContextReleaseCommand; body: %s", got, idle)
 			}

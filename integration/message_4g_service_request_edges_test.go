@@ -13,7 +13,7 @@ func Test4GServiceRequest_StaleMMEIDOverride(t *testing.T) {
 	ueID := mustCreateENBUE(t, enbID)
 
 	fullAttach(t, enbID, ueID)
-	nasStep(t, enbID, ueID, "release_request")
+	nasStep(t, enbID, ueID, "ue_context_release_request")
 
 	resp := nasBody(t, enbID, ueID,
 		`{"message_type":"service_request","mme_ue_s1ap_id_override":99999,"timeout_ms":3000}`)
@@ -28,13 +28,13 @@ func Test4GServiceRequestStaleNASCount(t *testing.T) {
 	ueID := mustCreateENBUE(t, enbID)
 
 	fullAttach(t, enbID, ueID)
-	nasStep(t, enbID, ueID, "release_request")
+	nasStep(t, enbID, ueID, "ue_context_release_request")
 
 	if got := jsonGet(nasStep(t, enbID, ueID, "service_request"), "s1ap.message_type"); got != "InitialContextSetupRequest" {
 		t.Fatalf("first service request did not re-establish: got %q", got)
 	}
 
-	nasStep(t, enbID, ueID, "release_request")
+	nasStep(t, enbID, ueID, "ue_context_release_request")
 
 	// A stale NAS COUNT must not re-establish the UE-associated connection
 	// (TS 24.301 §4.4.3.5). The MME's rejection is ciphered under a downlink

@@ -12,7 +12,7 @@ func Test4GAuthenticationFailure_S1APIDFuzz(t *testing.T) {
 	ueID := attachChallenge(t, enbID)
 
 	status, body := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap",
-		`{"message_type":"authentication_failure","cause":20,"mme_ue_s1ap_id_override":99999}`)
+		`{"message_type":"authentication_failure","emm_cause":20,"mme_ue_s1ap_id_override":99999}`)
 	if status == 504 {
 		t.Fatalf("authentication failure hung (HTTP 504)\n  body: %s", body)
 	}
@@ -73,7 +73,7 @@ func Test4GSecurityModeReject_S1APIDFuzz(t *testing.T) {
 	ueID, _ := attachToSMC(t, enbID, "")
 
 	status, body := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap",
-		`{"message_type":"security_mode_reject","cause":23,"mme_ue_s1ap_id_override":99999}`)
+		`{"message_type":"security_mode_reject","emm_cause":23,"mme_ue_s1ap_id_override":99999}`)
 	if status == 504 {
 		t.Fatalf("security mode reject hung (HTTP 504)\n  body: %s", body)
 	}

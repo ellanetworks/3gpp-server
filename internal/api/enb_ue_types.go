@@ -84,7 +84,7 @@ type SendENBUES1APRequest struct {
 	WithholdAccept    bool   `json:"withhold_accept,omitempty"`
 
 	RESOverride *string `json:"res_override,omitempty"`
-	Cause       *int64  `json:"cause,omitempty"`
+	EMMCause    *int64  `json:"emm_cause,omitempty"`
 
 	TargetENBID             *string `json:"target_enb_id,omitempty"`
 	HandoverRequiredCause   *int64  `json:"handover_required_cause,omitempty"`

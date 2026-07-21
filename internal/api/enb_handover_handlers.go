@@ -41,7 +41,7 @@ func handleENBHandoverRequestAcknowledge(enb *store.ENBContext, t *transport.S1A
 			teid = *req.ENBUES1APID + 0x1000
 		}
 
-		admitted = append(admitted, s1ap.HandoverAdmittedERAB{ERABID: e.ID, DLTeid: teid, DLAddr: ip})
+		admitted = append(admitted, s1ap.HandoverAdmittedERAB{ERABID: e.ID, DLTeid: teid, DLIP: ip})
 	}
 
 	encoded, err := s1ap.BuildHandoverRequestAcknowledge(s1ap.HandoverRequestAcknowledgeParams{

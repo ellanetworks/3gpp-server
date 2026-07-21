@@ -85,7 +85,7 @@ func Test4GQoSModification(t *testing.T) {
 	}
 
 	status, relResp := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap",
-		`{"message_type":"release_request","timeout_ms":5000}`)
+		`{"message_type":"ue_context_release_request","timeout_ms":5000}`)
 	if status != 200 {
 		t.Fatalf("release_request: HTTP %d\n  body: %s", status, relResp)
 	}

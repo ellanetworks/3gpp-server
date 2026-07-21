@@ -70,7 +70,7 @@ func Test4GUserPlaneWrongTEID(t *testing.T) {
 func Test4GUserPlanePostRelease(t *testing.T) {
 	enbID, ueID := gtpuENBAttach(t)
 
-	nasStep(t, enbID, ueID, "release_request")
+	nasStep(t, enbID, ueID, "ue_context_release_request")
 
 	before := scrapeUPFCounters(t)
 	if uplinkRoundTrips(t, enbID, ueID, nil, 0x102, 3) {

@@ -366,8 +366,8 @@ func handleGNBPDUSessionModificationComplete(gnb *store.GNBContext, ue *store.UE
 }
 
 func cause5GSMFor(req *SendGNBUENGAPRequest) uint8 {
-	if req != nil && req.FiveGSMCauseOverride != nil {
-		return *req.FiveGSMCauseOverride
+	if req != nil && req.FiveGSMCause != nil {
+		return *req.FiveGSMCause
 	}
 
 	return nasMessage.Cause5GSMProtocolErrorUnspecified

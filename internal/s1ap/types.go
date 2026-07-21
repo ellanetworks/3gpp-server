@@ -96,7 +96,7 @@ type SecurityContextJSON struct {
 
 type ERABSetupItemJSON struct {
 	ERABID                    int    `json:"erab_id"`
-	GTPTEID                   uint32 `json:"gtp_teid,omitempty"`
+	ULTeid                    uint32 `json:"ul_teid,omitempty"`
 	TransportLayerAddress     string `json:"transport_layer_address,omitempty"`
 	TransportLayerAddressIPv6 string `json:"transport_layer_address_ipv6,omitempty"`
 }

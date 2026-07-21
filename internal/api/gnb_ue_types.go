@@ -36,7 +36,7 @@ type SendGNBUENGAPRequest struct {
 
 	AlwaysOnRequested *bool `json:"always_on_requested,omitempty"`
 
-	FiveGSMCauseOverride *uint8 `json:"5gsm_cause,omitempty"`
+	FiveGSMCause *uint8 `json:"5gsm_cause,omitempty"`
 
 	NgKSI                        *uint8              `json:"ng_ksi,omitempty"`
 	MobileIdentityOverride       *string             `json:"mobile_identity_override,omitempty"`

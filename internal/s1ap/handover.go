@@ -56,7 +56,7 @@ func BuildHandoverRequired(p HandoverRequiredParams) ([]byte, error) {
 type HandoverAdmittedERAB struct {
 	ERABID uint8
 	DLTeid uint32
-	DLAddr string
+	DLIP   string
 }
 
 type HandoverRequestAcknowledgeParams struct {
@@ -70,7 +70,7 @@ func BuildHandoverRequestAcknowledge(p HandoverRequestAcknowledgeParams) ([]byte
 	admitted := make([]s1ap.ERABAdmittedItem, 0, len(p.Admitted))
 
 	for _, e := range p.Admitted {
-		addr, err := parseTransportAddr(e.DLAddr)
+		addr, err := parseTransportAddr(e.DLIP)
 		if err != nil {
 			return nil, err
 		}

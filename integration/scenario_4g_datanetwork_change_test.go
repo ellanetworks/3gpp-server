@@ -94,7 +94,7 @@ func Test4GDataNetworkChangeReactivatesBearer(t *testing.T) {
 		t.Fatalf("deactivate accept: HTTP %d\n  body: %s", s, ab)
 	}
 
-	if got := jsonGet(nasStep(t, enbID, ueID, "release_request"), "s1ap.message_type"); got != "UEContextReleaseCommand" {
+	if got := jsonGet(nasStep(t, enbID, ueID, "ue_context_release_request"), "s1ap.message_type"); got != "UEContextReleaseCommand" {
 		t.Errorf("UE not usable after PDN deactivation; release_request did not yield a UEContextReleaseCommand")
 	}
 }

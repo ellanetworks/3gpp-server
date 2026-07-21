@@ -253,11 +253,11 @@ func handleENBIdentityResponse(ctx context.Context, enb *store.ENBContext, ue *s
 }
 
 func handleENBAuthenticationFailure(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
-	if req.Cause == nil {
+	if req.EMMCause == nil {
 		return nil, httpErrorf(http.StatusBadRequest, "cause is required for authentication_failure")
 	}
 
-	cause := uint8(*req.Cause)
+	cause := uint8(*req.EMMCause)
 
 	var auts []byte
 	if cause == emmCauseSynchFailure {
@@ -380,7 +380,7 @@ func handleENBSecurityModeComplete(ctx context.Context, enb *store.ENBContext, u
 	if len(dl.ERABSetupItems) > 0 {
 		e := dl.ERABSetupItems[0]
 		ue.ERABID = uint8(e.ERABID)
-		ue.ULTeid = e.GTPTEID
+		ue.ULTeid = e.ULTeid
 		ue.SGWIP = erabSGWIP(enb, e)
 	}
 
@@ -401,8 +401,8 @@ func ueIPFromPDNAddress(pdnHex string) string {
 
 func handleENBSecurityModeReject(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	cause := emmCauseSecurityCapMismatch
-	if req.Cause != nil {
-		cause = uint8(*req.Cause)
+	if req.EMMCause != nil {
+		cause = uint8(*req.EMMCause)
 	}
 
 	pdu, err := naseps.BuildSecurityModeReject(cause)
@@ -614,7 +614,7 @@ func handleENBTrackingAreaUpdate(ctx context.Context, enb *store.ENBContext, ue 
 	return &SendENBUES1APResponse{S1AP: dl, NAS: nas, MACVerified: macVerified}, nil
 }
 
-func handleENBReleaseRequest(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
+func handleENBUEContextReleaseRequest(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	mmeID, enbID := forgeIDs(ue, req)
 
 	cause := s1ap.CauseRadioNetworkUserInactivity

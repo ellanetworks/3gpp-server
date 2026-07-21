@@ -20,7 +20,7 @@ func Test4GUECapabilityInfoReplay(t *testing.T) {
 
 	nasBody(t, enbID, ueID, fmt.Sprintf(`{"message_type":"ue_capability_info","ue_radio_capability":%q}`, radioCap))
 
-	nasStep(t, enbID, ueID, "release_request")
+	nasStep(t, enbID, ueID, "ue_context_release_request")
 
 	sr := nasStep(t, enbID, ueID, "service_request")
 	if got := jsonGet(sr, "s1ap.message_type"); got != "InitialContextSetupRequest" {

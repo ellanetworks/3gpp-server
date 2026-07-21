@@ -12,7 +12,7 @@ func Test4GServiceRequestUnknownUE(t *testing.T) {
 	ueID := mustCreateENBUE(t, enbID)
 
 	fullAttach(t, enbID, ueID)
-	nasStep(t, enbID, ueID, "release_request")
+	nasStep(t, enbID, ueID, "ue_context_release_request")
 
 	resp := nasBody(t, enbID, ueID, `{"message_type":"service_request","mtmsi":305419896,"timeout_ms":3000}`)
 
@@ -34,13 +34,13 @@ func Test4GServiceRequestReplay(t *testing.T) {
 	ueID := mustCreateENBUE(t, enbID)
 
 	fullAttach(t, enbID, ueID)
-	nasStep(t, enbID, ueID, "release_request")
+	nasStep(t, enbID, ueID, "ue_context_release_request")
 
 	if got := jsonGet(nasStep(t, enbID, ueID, "service_request"), "s1ap.message_type"); got != "InitialContextSetupRequest" {
 		t.Fatalf("first service request did not re-establish: got %q", got)
 	}
 
-	nasStep(t, enbID, ueID, "release_request")
+	nasStep(t, enbID, ueID, "ue_context_release_request")
 
 	resp := nasBody(t, enbID, ueID, `{"message_type":"service_request","nas_count":0,"timeout_ms":3000}`)
 

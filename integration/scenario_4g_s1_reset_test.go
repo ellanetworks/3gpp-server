@@ -22,7 +22,7 @@ func Test4GS1ResetAll(t *testing.T) {
 		t.Fatalf("S1 reset (all): s1ap.message_type = %q, want ResetAcknowledge (TS 36.413 §8.7.1.2.1); body: %s", got, resp)
 	}
 
-	after := nasBody(t, enbID, ueID, `{"message_type":"release_request","timeout_ms":3000}`)
+	after := nasBody(t, enbID, ueID, `{"message_type":"ue_context_release_request","timeout_ms":3000}`)
 	if got := jsonGet(after, "s1ap.message_type"); got == "UEContextReleaseCommand" {
 		t.Fatalf("UE S1 connection survived a reset-all; body: %s", after)
 	}
@@ -55,6 +55,6 @@ func Test4GS1ResetPartial(t *testing.T) {
 		t.Fatalf("partial reset ack eNB-UE-S1AP-ID = %q, want the reset connection %q; body: %s", got, enb, resp)
 	}
 
-	after := nasBody(t, enbID, ueID, `{"message_type":"release_request","timeout_ms":3000}`)
+	after := nasBody(t, enbID, ueID, `{"message_type":"ue_context_release_request","timeout_ms":3000}`)
 	assertEPSErrorIndication(t, after)
 }

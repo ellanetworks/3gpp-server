@@ -61,8 +61,8 @@ func (h *Handler) SendENBUES1AP(w http.ResponseWriter, r *http.Request) {
 		resp, herr = handleENBInjectNAS(ctx, enb, ue, t, &req)
 	case "detach_request":
 		resp, herr = handleENBDetach(ctx, enb, ue, t, &req)
-	case "release_request":
-		resp, herr = handleENBReleaseRequest(ctx, enb, ue, t, &req)
+	case "ue_context_release_request":
+		resp, herr = handleENBUEContextReleaseRequest(ctx, enb, ue, t, &req)
 	case "service_request":
 		resp, herr = handleENBServiceRequest(ctx, enb, ue, t, &req)
 	case "tracking_area_update":
