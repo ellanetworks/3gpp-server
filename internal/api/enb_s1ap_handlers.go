@@ -61,20 +61,20 @@ func (h *Handler) SendENBUES1AP(w http.ResponseWriter, r *http.Request) {
 		resp, herr = handleENBInjectNAS(ctx, enb, ue, t, &req)
 	case "detach_request":
 		resp, herr = handleENBDetach(ctx, enb, ue, t, &req)
-	case "release_request":
-		resp, herr = handleENBReleaseRequest(ctx, enb, ue, t, &req)
+	case "ue_context_release_request":
+		resp, herr = handleENBUEContextReleaseRequest(ctx, enb, ue, t, &req)
 	case "service_request":
 		resp, herr = handleENBServiceRequest(ctx, enb, ue, t, &req)
 	case "tracking_area_update":
 		resp, herr = handleENBTrackingAreaUpdate(ctx, enb, ue, t, &req)
 	case "ue_capability_info":
-		resp, herr = handleENBUeCapabilityInfo(ctx, enb, ue, t, &req)
+		resp, herr = handleENBUECapabilityInfo(ctx, enb, ue, t, &req)
 	case "handover_required":
 		resp, herr = handleENBHandoverRequired(h.Store, ue, t, &req)
 	case "handover_cancel":
 		resp, herr = handleENBHandoverCancel(ctx, ue, t, &req)
 	case "enb_status_transfer":
-		resp, herr = handleENBEnbStatusTransfer(ue, t, &req)
+		resp, herr = handleENBENBStatusTransfer(ue, t, &req)
 	case "error_indication":
 		resp, herr = handleENBErrorIndication(ctx, ue, t, &req)
 	case "initial_context_setup_failure":
@@ -164,6 +164,32 @@ func waitDownlink(ctx context.Context, t *transport.S1APTransport, ue *store.UEE
 	}
 
 	return t.WaitForMessageMatching(ctx, match, types...)
+}
+
+// waitDownlinkReq matches by the effective (override-aware) AP IDs, so an ERROR
+// INDICATION echoing the AP IDs a forged uplink carried (TS 36.413 §10.6) is
+// recognised. Without an override it behaves like waitDownlink.
+func waitDownlinkReq(ctx context.Context, t *transport.S1APTransport, ue *store.UEEPSContext, req *SendENBUES1APRequest, types ...string) (*s1ap.S1APResponse, error) {
+	mmeID, enbID := forgeIDs(ue, req)
+
+	match := func(r *s1ap.S1APResponse) bool {
+		if r.ENBUES1APID != nil && *r.ENBUES1APID == int64(enbID) {
+			return true
+		}
+
+		return r.MMEUES1APID != nil && mmeID != 0 && *r.MMEUES1APID == int64(mmeID)
+	}
+
+	return t.WaitForMessageMatching(ctx, match, types...)
+}
+
+func waitDownlinkTolerantReq(ctx context.Context, t *transport.S1APTransport, ue *store.UEEPSContext, req *SendENBUES1APRequest, types ...string) *s1ap.S1APResponse {
+	resp, err := waitDownlinkReq(ctx, t, ue, req, types...)
+	if err != nil {
+		return nil
+	}
+
+	return resp
 }
 
 func learnMMEID(ue *store.UEEPSContext, resp *s1ap.S1APResponse) {

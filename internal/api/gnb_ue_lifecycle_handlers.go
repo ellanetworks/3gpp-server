@@ -12,8 +12,8 @@ import (
 type PatchGNBUERequest struct {
 	K           *string `json:"k,omitempty"`
 	OPc         *string `json:"opc,omitempty"`
-	Amf         *string `json:"amf,omitempty"`
-	Sqn         *string `json:"sqn,omitempty"`
+	AMF         *string `json:"amf,omitempty"`
+	SQN         *string `json:"sqn,omitempty"`
 	AMFUENGAPID *int64  `json:"amf_ue_ngap_id,omitempty"`
 	DNN         *string `json:"dnn,omitempty"`
 	SST         *int32  `json:"sst,omitempty"`
@@ -49,11 +49,11 @@ func (h *Handler) PatchGNBUE(w http.ResponseWriter, r *http.Request) {
 	if req.OPc != nil {
 		ue.OPc = *req.OPc
 	}
-	if req.Amf != nil {
-		ue.Amf = *req.Amf
+	if req.AMF != nil {
+		ue.AMF = *req.AMF
 	}
-	if req.Sqn != nil {
-		ue.Sqn = *req.Sqn
+	if req.SQN != nil {
+		ue.SQN = *req.SQN
 	}
 	if req.AMFUENGAPID != nil {
 		ue.AMFUENGAPID = *req.AMFUENGAPID

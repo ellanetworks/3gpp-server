@@ -93,9 +93,9 @@ type GlobalRANNodeIDJSON struct {
 }
 
 type GlobalGNBIDJSON struct {
-	PLMNIdentity string `json:"plmn_identity"`
-	GNBID        string `json:"gnb_id"`
-	GNBIDBitLen  int    `json:"gnb_id_bit_length,omitempty"`
+	PLMNIdentity   string `json:"plmn_identity"`
+	GNBID          string `json:"gnb_id"`
+	GNBIDBitLength int    `json:"gnb_id_bit_length,omitempty"`
 }
 
 type SupportedTAListJSON struct {
@@ -141,6 +141,15 @@ type FiveGSTMSIJSON struct {
 	AMFSetID   string `json:"amf_set_id"`
 	AMFPointer string `json:"amf_pointer"`
 	FiveGTMSI  string `json:"five_g_tmsi"`
+}
+
+type PagingJSON struct {
+	FiveGSTMSI *FiveGSTMSIJSON `json:"five_g_s_tmsi,omitempty"`
+}
+
+type SecurityContextJSON struct {
+	NextHopChainingCount int    `json:"next_hop_chaining_count"`
+	NextHop              string `json:"next_hop"`
 }
 
 // Value indexes the ASN.1 enumeration of the named Cause CHOICE group (TS 38.413 §9.3.1.2).
@@ -206,7 +215,7 @@ type NGAPResponse struct {
 	NasPDU                  *string                      `json:"nas_pdu,omitempty"`
 	UserLocationInformation *UserLocationInformationJSON `json:"user_location_information,omitempty"`
 	RRCEstablishmentCause   *int64                       `json:"rrc_establishment_cause,omitempty"`
-	FiveGSTMSI              *FiveGSTMSIJSON              `json:"five_g_s_tmsi,omitempty"`
+	Paging                  *PagingJSON                  `json:"paging,omitempty"`
 	UEContextRequest        *int64                       `json:"ue_context_request,omitempty"`
 	Cause                   *CauseJSON                   `json:"cause,omitempty"`
 	AMFName                 *string                      `json:"amf_name,omitempty"`
@@ -231,8 +240,7 @@ type NGAPResponse struct {
 	PDUSessionSetupItems    []PDUSessionSetupItemJSON   `json:"pdu_session_setup_items,omitempty"`
 	PDUSessionIDs           []int64                     `json:"pdu_session_ids,omitempty"`
 	ReleasePDUSessionIDs    []int64                     `json:"release_pdu_session_ids,omitempty"`
-	NextHopChainingCount    *int64                      `json:"next_hop_chaining_count,omitempty"`
-	NextHop                 *string                     `json:"next_hop,omitempty"`
+	SecurityContext         *SecurityContextJSON        `json:"security_context,omitempty"`
 	UESecurityCapabilities  *UESecurityCapabilitiesJSON `json:"ue_security_capabilities,omitempty"`
 	RANStatusTransfer       *RANStatusTransferJSON      `json:"ran_status_transfer,omitempty"`
 	SourceToTargetContainer *string                     `json:"source_to_target_transparent_container,omitempty"`

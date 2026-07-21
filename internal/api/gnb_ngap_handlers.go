@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/ellanetworks/3gpp-server/internal/nas"
+	"github.com/ellanetworks/3gpp-server/internal/nas5gs"
 	"github.com/ellanetworks/3gpp-server/internal/ngap"
 	"github.com/ellanetworks/3gpp-server/internal/store"
 	"github.com/ellanetworks/3gpp-server/internal/transport"
@@ -232,7 +232,7 @@ func sendRawAndWait(ctx context.Context, ue *store.UEContext, t *transport.NGAPT
 		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for response: %v", err)
 	}
 
-	var nasResp *nas.NASResponse
+	var nasResp *nas5gs.NASResponse
 
 	var macVerified *bool
 
@@ -246,7 +246,7 @@ func sendRawAndWait(ctx context.Context, ue *store.UEContext, t *transport.NGAPT
 			if len(ue.Kamf) > 0 {
 				nasResp, macVerified = decodeGNBDownlinkNAS(ue, nasPDUBytes)
 			} else {
-				nasResp, _ = nas.Decode(nasPDUBytes)
+				nasResp, _ = nas5gs.Decode(nasPDUBytes)
 			}
 
 			if nasResp != nil && nasResp.RAND != "" {
@@ -261,7 +261,7 @@ func sendRawAndWait(ctx context.Context, ue *store.UEContext, t *transport.NGAPT
 			}
 
 			if nasResp != nil && nasResp.GUTI != nil {
-				ue.Guti = nas.GUTI5GFromStructured(nasResp.GUTI)
+				ue.Guti = nas5gs.GUTI5GFromStructured(nasResp.GUTI)
 			}
 		}
 	}

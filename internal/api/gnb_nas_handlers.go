@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/ellanetworks/3gpp-server/internal/crypto"
-	"github.com/ellanetworks/3gpp-server/internal/nas"
+	"github.com/ellanetworks/3gpp-server/internal/nas5gs"
 	"github.com/ellanetworks/3gpp-server/internal/ngap"
 	"github.com/ellanetworks/3gpp-server/internal/store"
 	"github.com/ellanetworks/3gpp-server/internal/transport"
@@ -20,8 +20,8 @@ import (
 	"github.com/free5gc/ngap/ngapType"
 )
 
-func registrationOverrides(req *SendGNBUENGAPRequest) *nas.RegistrationRequestOverrides {
-	return &nas.RegistrationRequestOverrides{
+func registrationOverrides(req *SendGNBUENGAPRequest) *nas5gs.RegistrationRequestOverrides {
+	return &nas5gs.RegistrationRequestOverrides{
 		NgKSI:                        req.NgKSI,
 		MobileIdentityOverride:       req.MobileIdentityOverride,
 		UESecurityCapabilityOverride: req.UESecurityCapabilityOverride,
@@ -83,7 +83,7 @@ func handleGNBRegistrationRequest(ctx context.Context, gnb *store.GNBContext, ue
 			return sendUplinkAndWait(ctx, gnb, ue, t, req, nasPDU, "DownlinkNASTransport", "ErrorIndication")
 		}
 
-		ngapMsg, err := ngap.BuildInitialUEMessageFromState(ngap.InitialUEMessageFromStateParams{
+		ngapMsg, err := ngap.BuildInitialUEMessage(ngap.InitialUEMessageParams{
 			RANUENGAPID: ue.RANUENGAPID,
 			NASPDU:      nasPDU,
 			MCC:         gnb.MCC,
@@ -99,13 +99,13 @@ func handleGNBRegistrationRequest(ctx context.Context, gnb *store.GNBContext, ue
 		return sendAndWait(ctx, ue, t, req, ngapMsg, "DownlinkNASTransport", "InitialContextSetupRequest", "ErrorIndication")
 	}
 
-	regType := uint8(nas.RegistrationTypeInitial)
+	regType := uint8(nas5gs.RegistrationTypeInitial)
 	if req.RegistrationType != nil {
 		regType = *req.RegistrationType
 	}
 
 	// A mobility or periodic update reuses its security context (TS 24.501 §5.5.1.3).
-	mobilityOrPeriodic := regType == nas.RegistrationTypeMobility || regType == nas.RegistrationTypePeriodic
+	mobilityOrPeriodic := regType == nas5gs.RegistrationTypeMobility || regType == nas5gs.RegistrationTypePeriodic
 	secured := mobilityOrPeriodic && len(ue.Kamf) > 0
 
 	ngKsi := ksiNoKey
@@ -113,7 +113,7 @@ func handleGNBRegistrationRequest(ctx context.Context, gnb *store.GNBContext, ue
 		ngKsi = ue.NgKsi
 	}
 
-	nasPDU, err := nas.BuildRegistrationRequest(&nas.RegistrationRequestOpts{
+	nasPDU, err := nas5gs.BuildRegistrationRequest(nas5gs.RegistrationRequestParams{
 		RegistrationType: regType,
 		Suci:             ue.Suci,
 		Guti:             ue.Guti,
@@ -136,7 +136,7 @@ func handleGNBRegistrationRequest(ctx context.Context, gnb *store.GNBContext, ue
 		return sendUplinkAndWait(ctx, gnb, ue, t, req, nasPDU, "DownlinkNASTransport", "ErrorIndication")
 	}
 
-	ngapMsg, err := ngap.BuildInitialUEMessageFromState(ngap.InitialUEMessageFromStateParams{
+	ngapMsg, err := ngap.BuildInitialUEMessage(ngap.InitialUEMessageParams{
 		RANUENGAPID: ue.RANUENGAPID,
 		NASPDU:      nasPDU,
 		MCC:         gnb.MCC,
@@ -175,7 +175,7 @@ func handleGNBAuthenticationResponse(ctx context.Context, gnb *store.GNBContext,
 		} else if len(ue.RAND) == 0 || len(ue.AUTN) == 0 {
 			resStar = make([]byte, 16)
 		} else {
-			akaResult, err := crypto.Compute5GAKA(ue.K, ue.OPc, ue.Sqn, ue.Supi, ue.MCC, ue.MNC, ue.RAND, ue.AUTN)
+			akaResult, err := crypto.Compute5GAKA(ue.K, ue.OPc, ue.SQN, ue.SUPI, ue.MCC, ue.MNC, ue.RAND, ue.AUTN)
 			if err != nil {
 				return nil, httpErrorf(http.StatusInternalServerError, "5G-AKA: %v", err)
 			}
@@ -186,7 +186,7 @@ func handleGNBAuthenticationResponse(ctx context.Context, gnb *store.GNBContext,
 
 		var err error
 
-		nasPDU, err = nas.BuildAuthenticationResponse(resStar)
+		nasPDU, err = nas5gs.BuildAuthenticationResponse(resStar)
 		if err != nil {
 			return nil, httpErrorf(http.StatusInternalServerError, "build AuthenticationResponse: %v", err)
 		}
@@ -206,12 +206,12 @@ func handleGNBSecurityModeComplete(ctx context.Context, gnb *store.GNBContext, u
 
 		nasPDU = raw
 	} else {
-		innerRegType := uint8(nas.RegistrationTypeInitial)
+		innerRegType := uint8(nas5gs.RegistrationTypeInitial)
 		if req.RegistrationType != nil {
 			innerRegType = *req.RegistrationType
 		}
 
-		regReqPDU, err := nas.BuildRegistrationRequest(&nas.RegistrationRequestOpts{
+		regReqPDU, err := nas5gs.BuildRegistrationRequest(nas5gs.RegistrationRequestParams{
 			RegistrationType: innerRegType,
 			Suci:             ue.Suci,
 			Guti:             ue.Guti,
@@ -223,7 +223,7 @@ func handleGNBSecurityModeComplete(ctx context.Context, gnb *store.GNBContext, u
 			return nil, httpErrorf(http.StatusInternalServerError, "build inner RegistrationRequest: %v", err)
 		}
 
-		smcPDU, err := nas.BuildSecurityModeComplete(regReqPDU, ue.IMEISV)
+		smcPDU, err := nas5gs.BuildSecurityModeComplete(regReqPDU, ue.IMEISV)
 		if err != nil {
 			return nil, httpErrorf(http.StatusInternalServerError, "build SecurityModeComplete: %v", err)
 		}
@@ -256,7 +256,7 @@ func handleGNBRegistrationComplete(ctx context.Context, gnb *store.GNBContext, u
 			return nil, httpErrorf(http.StatusBadRequest, "decode raw_nas_pdu: %v", err)
 		}
 	} else {
-		regCompletePDU, err := nas.BuildRegistrationComplete()
+		regCompletePDU, err := nas5gs.BuildRegistrationComplete()
 		if err != nil {
 			return nil, httpErrorf(http.StatusInternalServerError, "build RegistrationComplete: %v", err)
 		}
@@ -268,7 +268,53 @@ func handleGNBRegistrationComplete(ctx context.Context, gnb *store.GNBContext, u
 		}
 	}
 
-	return sendUplinkAndWait(ctx, gnb, ue, t, req, nasPDU, "DownlinkNASTransport", "ErrorIndication", "UEContextReleaseCommand")
+	resp, err := sendUplinkAndWait(ctx, gnb, ue, t, req, nasPDU, "DownlinkNASTransport", "ErrorIndication", "UEContextReleaseCommand")
+	if err != nil {
+		return nil, err
+	}
+
+	if err := ackConfigurationUpdate(gnb, ue, t, resp.NAS); err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+// ackConfigurationUpdate sends CONFIGURATION UPDATE COMPLETE when the received
+// command requested acknowledgement (TS 24.501 §5.4.4.3).
+func ackConfigurationUpdate(gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, nasResp *nas5gs.NASResponse) error {
+	if nasResp == nil || !nasResp.ConfigurationUpdateAckRequested {
+		return nil
+	}
+
+	pdu, err := nas5gs.BuildConfigurationUpdateComplete()
+	if err != nil {
+		return httpErrorf(http.StatusInternalServerError, "build ConfigurationUpdateComplete: %v", err)
+	}
+
+	secured, err := encodeGNBUplinkNAS(ue, pdu, gonas.SecurityHeaderTypeIntegrityProtectedAndCiphered, nil)
+	if err != nil {
+		return httpErrorf(http.StatusInternalServerError, "NAS security encode: %v", err)
+	}
+
+	encoded, err := ngap.BuildUplinkNASTransport(ngap.UplinkNASTransportParams{
+		AMFUENGAPID: ue.AMFUENGAPID,
+		RANUENGAPID: ue.RANUENGAPID,
+		NASPDU:      secured,
+		MCC:         gnb.MCC,
+		MNC:         gnb.MNC,
+		TAC:         gnb.TAC,
+		GNBID:       gnb.GNBID,
+	})
+	if err != nil {
+		return httpErrorf(http.StatusInternalServerError, "NGAP encode: %v", err)
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		return httpErrorf(http.StatusBadGateway, "SCTP send ConfigurationUpdateComplete: %v", err)
+	}
+
+	return nil
 }
 
 func handleGNBDeregistrationRequest(ctx context.Context, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendGNBUENGAPRequest) (*SendGNBUENGAPResponse, error) {
@@ -283,11 +329,11 @@ func handleGNBDeregistrationRequest(ctx context.Context, gnb *store.GNBContext, 
 		nasPDU = raw
 	} else {
 		switchOff := uint8(1)
-		if req.DeregSwitchOff != nil {
-			switchOff = *req.DeregSwitchOff
+		if req.SwitchOff != nil {
+			switchOff = *req.SwitchOff
 		}
 
-		deregPDU, err := nas.BuildDeregistrationRequest(&nas.DeregistrationRequestOpts{
+		deregPDU, err := nas5gs.BuildDeregistrationRequest(nas5gs.DeregistrationRequestParams{
 			Guti:      ue.Guti,
 			Suci:      &ue.Suci,
 			NgKsi:     ue.NgKsi,
@@ -328,7 +374,7 @@ func handleGNBDeregistrationRequest(ctx context.Context, gnb *store.GNBContext, 
 		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for response: %v", err)
 	}
 
-	var nasResp *nas.NASResponse
+	var nasResp *nas5gs.NASResponse
 
 	var macVerified *bool
 
@@ -414,7 +460,7 @@ func handleGNBIdentityResponse(ctx context.Context, gnb *store.GNBContext, ue *s
 			mobileIdentity = b
 		}
 
-		idPDU, err := nas.BuildIdentityResponse(mobileIdentity)
+		idPDU, err := nas5gs.BuildIdentityResponse(mobileIdentity)
 		if err != nil {
 			return nil, httpErrorf(http.StatusInternalServerError, "build IdentityResponse: %v", err)
 		}
@@ -451,7 +497,7 @@ func handleGNBAuthenticationFailure(ctx context.Context, gnb *store.GNBContext, 
 		var auts []byte
 
 		if cause == nasMessage.Cause5GMMSynchFailure {
-			a, err := crypto.ComputeAUTS(ue.K, ue.OPc, ue.Sqn, ue.RAND)
+			a, err := crypto.ComputeAUTS(ue.K, ue.OPc, ue.SQN, ue.RAND)
 			if err != nil {
 				return nil, httpErrorf(http.StatusInternalServerError, "compute AUTS: %v", err)
 			}
@@ -459,7 +505,7 @@ func handleGNBAuthenticationFailure(ctx context.Context, gnb *store.GNBContext, 
 			auts = a
 		}
 
-		pdu, err := nas.BuildAuthenticationFailure(cause, auts)
+		pdu, err := nas5gs.BuildAuthenticationFailure(cause, auts)
 		if err != nil {
 			return nil, httpErrorf(http.StatusInternalServerError, "build AuthenticationFailure: %v", err)
 		}
@@ -486,7 +532,7 @@ func handleGNBSecurityModeReject(ctx context.Context, gnb *store.GNBContext, ue 
 			cause = *req.FiveGMMCause
 		}
 
-		pdu, err := nas.BuildSecurityModeReject(cause)
+		pdu, err := nas5gs.BuildSecurityModeReject(cause)
 		if err != nil {
 			return nil, httpErrorf(http.StatusInternalServerError, "build SecurityModeReject: %v", err)
 		}
@@ -567,7 +613,7 @@ func handleGNBServiceRequest(ctx context.Context, gnb *store.GNBContext, ue *sto
 			return nil, httpErrorf(http.StatusBadRequest, "decode pdu_session_status: %v", err)
 		}
 
-		srPDU, err := nas.BuildServiceRequest(&nas.ServiceRequestOpts{
+		srPDU, err := nas5gs.BuildServiceRequest(nas5gs.ServiceRequestParams{
 			ServiceType:      serviceType,
 			NgKsi:            ue.NgKsi,
 			Guti:             ue.Guti,
@@ -596,7 +642,7 @@ func handleGNBServiceRequest(ctx context.Context, gnb *store.GNBContext, ue *sto
 		overrides.RRCEstablishmentCause = &moData
 	}
 
-	ngapMsg, err := ngap.BuildInitialUEMessageFromState(ngap.InitialUEMessageFromStateParams{
+	ngapMsg, err := ngap.BuildInitialUEMessage(ngap.InitialUEMessageParams{
 		RANUENGAPID: ue.RANUENGAPID,
 		NASPDU:      nasPDU,
 		MCC:         gnb.MCC,
@@ -625,7 +671,7 @@ func handleGNBServiceRequest(ctx context.Context, gnb *store.GNBContext, ue *sto
 		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for service request response: %v", err)
 	}
 
-	var nasResp *nas.NASResponse
+	var nasResp *nas5gs.NASResponse
 
 	var macVerified *bool
 

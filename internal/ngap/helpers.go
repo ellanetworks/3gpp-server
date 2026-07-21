@@ -11,7 +11,7 @@ import (
 	"github.com/free5gc/ngap/ngapType"
 )
 
-func tacInBytes(tacStr string) ([]byte, error) {
+func parseTAC(tacStr string) ([]byte, error) {
 	resu, err := hex.DecodeString(tacStr)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode tac to bytes: %v", err)

@@ -44,11 +44,11 @@ func (h *Handler) CreateGNBUE(w http.ResponseWriter, r *http.Request) {
 	ueID := fmt.Sprintf("%d", ranUeNgapID)
 
 	ue, err := store.NewUEContext(ueID, ranUeNgapID, len(gnb.MNC), &store.CreateUEOpts{
-		Supi:             req.SUPI,
+		SUPI:             req.SUPI,
 		K:                req.K,
 		OPc:              req.OPc,
-		Amf:              req.Amf,
-		Sqn:              req.Sqn,
+		AMF:              req.AMF,
+		SQN:              req.SQN,
 		SST:              req.SST,
 		SD:               req.SD,
 		DNN:              req.DNN,
@@ -71,7 +71,7 @@ func (h *Handler) CreateGNBUE(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusCreated, CreateGNBUEResponse{
 		UEID:        ue.ID,
-		SUPI:        ue.Supi,
+		SUPI:        ue.SUPI,
 		SUCI:        ue.SuciString,
 		RANUENGAPID: ue.RANUENGAPID,
 	})
@@ -102,7 +102,7 @@ func (h *Handler) GetGNBUE(w http.ResponseWriter, r *http.Request) {
 	sessions := make([]GNBUESession, 0, len(ids))
 	for _, id := range ids {
 		s := ue.PDUSessions[uint8(id)]
-		sessions = append(sessions, GNBUESession{PDUSessionID: s.PDUSessionID, UEIP: s.UEIP})
+		sessions = append(sessions, GNBUESession{PDUSessionID: s.PDUSessionID, DNN: s.DNN, UEIP: s.UEIP})
 	}
 
 	var ueIP string
@@ -114,7 +114,7 @@ func (h *Handler) GetGNBUE(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, GNBUEStateResponse{
 		UEID:                ue.ID,
-		SUPI:                ue.Supi,
+		SUPI:                ue.SUPI,
 		SUCI:                ue.SuciString,
 		IMEISV:              ue.IMEISV,
 		UEIP:                ueIP,

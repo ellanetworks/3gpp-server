@@ -97,7 +97,7 @@ func buildInitialUEMessageIE(ie *IE) (*ngapType.InitialUEMessageIEs, error) {
 			}
 			nr.TAI.PLMNIdentity.Value = taiPlmn
 
-			tac, err := tacInBytes(ie.UserLocationInformation.NR.TAI.TAC)
+			tac, err := parseTAC(ie.UserLocationInformation.NR.TAI.TAC)
 			if err != nil {
 				return nil, fmt.Errorf("decode tai tac: %w", err)
 			}
@@ -205,7 +205,7 @@ type InitialUEMessageOverrides struct {
 	RANUENGAPID           *int64
 }
 
-type InitialUEMessageFromStateParams struct {
+type InitialUEMessageParams struct {
 	RANUENGAPID int64
 	NASPDU      []byte
 	MCC         string
@@ -216,7 +216,7 @@ type InitialUEMessageFromStateParams struct {
 	Overrides   *InitialUEMessageOverrides
 }
 
-func BuildInitialUEMessageFromState(p InitialUEMessageFromStateParams) (*NGAPMessage, error) {
+func BuildInitialUEMessage(p InitialUEMessageParams) (*NGAPMessage, error) {
 	plmnID, err := encodePLMN(p.MCC, p.MNC)
 	if err != nil {
 		return nil, fmt.Errorf("PLMN: %w", err)
@@ -347,7 +347,7 @@ func BuildUplinkNASTransport(p UplinkNASTransportParams) ([]byte, error) {
 		return nil, fmt.Errorf("NRCellIdentity: %w", err)
 	}
 
-	tacBytes, err := tacInBytes(p.TAC)
+	tacBytes, err := parseTAC(p.TAC)
 	if err != nil {
 		return nil, fmt.Errorf("TAC: %w", err)
 	}

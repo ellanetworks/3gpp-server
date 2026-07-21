@@ -30,28 +30,6 @@ func SecurityHeaderTypeString(t SecurityHeaderType) string {
 	}
 }
 
-func SecurityHeader(b []byte) (SecurityHeaderType, error) {
-	if len(b) == 0 {
-		return 0, fmt.Errorf("naseps: empty NAS message")
-	}
-
-	if b[0]&0x0F != eps.PDEMM {
-		return 0, fmt.Errorf("naseps: not an EMM message (PD %#x)", b[0]&0x0F)
-	}
-
-	return SecurityHeaderType(b[0] >> 4), nil
-}
-
-// PeekProtectedPayload skips MAC verification: a Security Mode Command's algorithms must be read before the keys that depend on them exist.
-func PeekProtectedPayload(b []byte) ([]byte, error) {
-	m, err := eps.ParseSecurityProtectedMessage(b)
-	if err != nil {
-		return nil, err
-	}
-
-	return m.Payload, nil
-}
-
 func Decode(plain []byte) (*NASResponse, error) {
 	resp := &NASResponse{RawHex: hex.EncodeToString(plain)}
 

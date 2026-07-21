@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/ellanetworks/3gpp-server/internal/nas"
+	"github.com/ellanetworks/3gpp-server/internal/nas5gs"
 	"github.com/ellanetworks/3gpp-server/internal/ngap"
 	"github.com/ellanetworks/3gpp-server/internal/store"
 )
@@ -74,8 +74,8 @@ func (h *Handler) AwaitGNBUEMessage(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, SendGNBUENGAPResponse{NGAP: ngapResp, NAS: decodeNASFromNGAP(ue, ngapResp)})
 }
 
-func decodeNASFromNGAP(ue *store.UEContext, ngapResp *ngap.NGAPResponse) *nas.NASResponse {
-	var nasResp *nas.NASResponse
+func decodeNASFromNGAP(ue *store.UEContext, ngapResp *ngap.NGAPResponse) *nas5gs.NASResponse {
+	var nasResp *nas5gs.NASResponse
 
 	if ngapResp.NasPDU != nil {
 		if nasPDUBytes, err := hex.DecodeString(*ngapResp.NasPDU); err == nil {

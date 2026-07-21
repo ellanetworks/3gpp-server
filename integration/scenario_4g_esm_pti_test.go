@@ -27,7 +27,7 @@ func Test4GESMReservedPTIIgnored(t *testing.T) {
 			jsonGet(b, "s1ap.message_type"), b)
 	}
 
-	if got := jsonGet(nasStep(t, enbID, ueID, "release_request"), "s1ap.message_type"); got != "UEContextReleaseCommand" {
+	if got := jsonGet(nasStep(t, enbID, ueID, "ue_context_release_request"), "s1ap.message_type"); got != "UEContextReleaseCommand" {
 		t.Errorf("UE unusable after a reserved-PTI modify accept; release_request did not yield a UEContextReleaseCommand")
 	}
 }

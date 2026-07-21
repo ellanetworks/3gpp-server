@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Ella Networks Inc.
 // SPDX-License-Identifier: BUSL-1.1
 
-package nas
+package nas5gs
 
 type SNSSAIJSON struct {
 	SST int32  `json:"sst"`
@@ -57,6 +57,8 @@ type NASResponse struct {
 	FiveGSMCause *int `json:"5gsm_cause,omitempty"`
 
 	IdentityType *int `json:"identity_type,omitempty"`
+
+	ConfigurationUpdateAckRequested bool `json:"configuration_update_ack_requested,omitempty"`
 
 	InnerNASMessageType string `json:"inner_nas_message_type,omitempty"`
 

@@ -49,7 +49,7 @@ func Test4GServiceRequestBackToBack(t *testing.T) {
 
 	fullAttach(t, enbID, ueID)
 
-	if got := jsonGet(nasStep(t, enbID, ueID, "release_request"), "s1ap.message_type"); got != "UEContextReleaseCommand" {
+	if got := jsonGet(nasStep(t, enbID, ueID, "ue_context_release_request"), "s1ap.message_type"); got != "UEContextReleaseCommand" {
 		t.Fatalf("release: s1ap.message_type = %q, want UEContextReleaseCommand", got)
 	}
 

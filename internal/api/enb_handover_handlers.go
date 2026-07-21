@@ -41,7 +41,7 @@ func handleENBHandoverRequestAcknowledge(enb *store.ENBContext, t *transport.S1A
 			teid = *req.ENBUES1APID + 0x1000
 		}
 
-		admitted = append(admitted, s1ap.HandoverAdmittedERAB{ERABID: e.ID, DLTeid: teid, DLAddr: ip})
+		admitted = append(admitted, s1ap.HandoverAdmittedERAB{ERABID: e.ID, DLTeid: teid, DLIP: ip})
 	}
 
 	encoded, err := s1ap.BuildHandoverRequestAcknowledge(s1ap.HandoverRequestAcknowledgeParams{
@@ -128,14 +128,14 @@ func handleENBHandoverRequired(st *store.Store, ue *store.UEEPSContext, t *trans
 	}
 
 	encoded, err := s1ap.BuildHandoverRequired(s1ap.HandoverRequiredParams{
-		MMEUES1APID:     sourceMMEID(ue, req),
-		ENBUES1APID:     sourceENBID(ue, req),
-		Cause:           handoverRequiredCause(req),
-		TargetMCC:       target.MCC,
-		TargetMNC:       target.MNC,
-		TargetTAC:       target.TAC,
-		TargetENBID:     targetENBID,
-		TargetENBIDKind: targetENBIDKind,
+		MMEUES1APID:       sourceMMEID(ue, req),
+		ENBUES1APID:       sourceENBID(ue, req),
+		CauseRadioNetwork: handoverRequiredCause(req),
+		TargetMCC:         target.MCC,
+		TargetMNC:         target.MNC,
+		TargetTAC:         target.TAC,
+		TargetENBID:       targetENBID,
+		TargetENBIDKind:   targetENBIDKind,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("build HandoverRequired: %w", err)
@@ -171,7 +171,7 @@ func handleENBHandoverCancel(ctx context.Context, ue *store.UEEPSContext, t *tra
 	return &SendENBUES1APResponse{S1AP: resp}, nil
 }
 
-func handleENBEnbStatusTransfer(ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
+func handleENBENBStatusTransfer(ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
 	var container []byte
 
 	if req.StatusTransferContainer != nil {
@@ -195,7 +195,7 @@ func handleENBEnbStatusTransfer(ue *store.UEEPSContext, t *transport.S1APTranspo
 	return &SendENBUES1APResponse{}, nil
 }
 
-func handoverRequiredCause(req *SendENBUES1APRequest) int {
+func handoverRequiredCause(req *SendENBUES1APRequest) int64 {
 	if req != nil && req.HandoverRequiredCause != nil {
 		return *req.HandoverRequiredCause
 	}

@@ -8,7 +8,7 @@ import "github.com/free5gc/ngap/ngapType"
 const (
 	CauseRadioNetworkHandoverDesirableForRadioReason int64 = int64(ngapType.CauseRadioNetworkPresentHandoverDesirableForRadioReason)
 	CauseRadioNetworkHandoverCancelled               int64 = int64(ngapType.CauseRadioNetworkPresentHandoverCancelled)
-	CauseRadioNetworkHoFailureInTarget               int64 = int64(ngapType.CauseRadioNetworkPresentHoFailureInTarget5GCNgranNodeOrTargetSystem)
+	CauseRadioNetworkHOFailureInTarget               int64 = int64(ngapType.CauseRadioNetworkPresentHoFailureInTarget5GCNgranNodeOrTargetSystem)
 	CauseRadioNetworkRadioResourcesNotAvailable      int64 = int64(ngapType.CauseRadioNetworkPresentRadioResourcesNotAvailable)
 	CauseRadioNetworkUserInactivity                  int64 = int64(ngapType.CauseRadioNetworkPresentUserInactivity)
 

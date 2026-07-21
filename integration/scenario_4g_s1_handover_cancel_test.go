@@ -38,7 +38,7 @@ func Test4GS1HandoverCancel(t *testing.T) {
 		t.Errorf("await UEContextReleaseCommand on the target: HTTP %d — the EPC must release the resources it reserved for the cancelled handover preparation (TS 36.413 §8.4.5.2)\n  body: %s", status, rel)
 	}
 
-	if got := jsonGet(nasStep(t, sourceENB, ueID, "release_request"), "s1ap.message_type"); got != "UEContextReleaseCommand" {
+	if got := jsonGet(nasStep(t, sourceENB, ueID, "ue_context_release_request"), "s1ap.message_type"); got != "UEContextReleaseCommand" {
 		t.Errorf("after cancel the source must still serve the UE; release_request did not yield a UEContextReleaseCommand")
 	}
 }

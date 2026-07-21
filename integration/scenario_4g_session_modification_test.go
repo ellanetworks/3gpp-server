@@ -83,7 +83,7 @@ func Test4GSessionAMBRModification(t *testing.T) {
 		t.Fatalf("modify accept: HTTP %d\n  body: %s", s, ab)
 	}
 
-	if got := jsonGet(nasStep(t, enbID, ueID, "release_request"), "s1ap.message_type"); got != "UEContextReleaseCommand" {
+	if got := jsonGet(nasStep(t, enbID, ueID, "ue_context_release_request"), "s1ap.message_type"); got != "UEContextReleaseCommand" {
 		t.Errorf("UE not usable after bearer modification; release_request did not yield a UEContextReleaseCommand")
 	}
 }

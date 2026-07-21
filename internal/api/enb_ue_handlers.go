@@ -56,7 +56,7 @@ func (h *Handler) CreateENBUE(w http.ResponseWriter, r *http.Request) {
 
 	enb.CreateUE(ue)
 
-	writeJSON(w, http.StatusCreated, CreateENBUEResponse{UEID: ue.ID, ENBUES1APID: ue.ENBUES1APID})
+	writeJSON(w, http.StatusCreated, CreateENBUEResponse{UEID: ue.ID, IMSI: ue.IMSI, ENBUES1APID: ue.ENBUES1APID})
 }
 
 func (h *Handler) GetENBUE(w http.ResponseWriter, r *http.Request) {

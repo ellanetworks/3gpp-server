@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Ella Networks Inc.
 // SPDX-License-Identifier: BUSL-1.1
 
-package nas
+package nas5gs
 
 import (
 	"encoding/hex"
@@ -77,11 +77,24 @@ func decodeGmm(m *gonas.Message, resp *NASResponse) error {
 		decodeServiceReject(m, resp)
 	case gonas.MsgTypeStatus5GMM:
 		decodeStatus5GMM(m, resp)
+	case gonas.MsgTypeConfigurationUpdateCommand:
+		decodeConfigurationUpdateCommand(m, resp)
 	case gonas.MsgTypeDLNASTransport:
 		return decodeDLNASTransport(m, resp)
 	}
 
 	return nil
+}
+
+func decodeConfigurationUpdateCommand(m *gonas.Message, resp *NASResponse) {
+	c := m.ConfigurationUpdateCommand
+	if c == nil {
+		return
+	}
+
+	if c.ConfigurationUpdateIndication != nil && c.GetACK() != 0 {
+		resp.ConfigurationUpdateAckRequested = true
+	}
 }
 
 func unknownMessageType(m *gonas.Message) (string, error) {
@@ -247,11 +260,11 @@ func decodeDLNASTransport(m *gonas.Message, resp *NASResponse) error {
 
 	switch innerType {
 	case gonas.MsgTypePDUSessionEstablishmentAccept:
-		DecodePDUSessionEstablishmentAccept(resp, inner.GsmMessage)
+		decodePDUSessionEstablishmentAccept(resp, inner.GsmMessage)
 	case gonas.MsgTypePDUSessionEstablishmentReject:
-		DecodePDUSessionEstablishmentReject(resp, inner.GsmMessage)
+		decodePDUSessionEstablishmentReject(resp, inner.GsmMessage)
 	case gonas.MsgTypePDUSessionReleaseCommand:
-		DecodePDUSessionReleaseCommand(resp, inner.GsmMessage, payload)
+		decodePDUSessionReleaseCommand(resp, inner.GsmMessage, payload)
 	case gonas.MsgTypePDUSessionModificationReject:
 		if inner.PDUSessionModificationReject != nil {
 			cause := int(inner.PDUSessionModificationReject.GetCauseValue())

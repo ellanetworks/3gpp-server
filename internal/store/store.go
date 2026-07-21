@@ -24,9 +24,9 @@ func New() *Store {
 	}
 }
 
-func (s *Store) CreateGNB(mcc, mnc, tac, gnbID string, gnbIDBitLen int, name string, sst int32, sd string, slices []SliceConfig) *GNBContext {
+func (s *Store) CreateGNB(mcc, mnc, tac, gnbID string, gnbIDBitLength int, name string, sst int32, sd string, slices []SliceConfig) *GNBContext {
 	id := strconv.FormatInt(s.nextID.Add(1), 10)
-	gnb := NewGNBContext(id, mcc, mnc, tac, gnbID, gnbIDBitLen, name, sst, sd, slices)
+	gnb := NewGNBContext(id, mcc, mnc, tac, gnbID, gnbIDBitLength, name, sst, sd, slices)
 
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Ella Networks Inc.
 // SPDX-License-Identifier: BUSL-1.1
 
-package nas
+package nas5gs
 
 import (
 	"bytes"
@@ -14,7 +14,7 @@ import (
 	"github.com/free5gc/nas/nasType"
 )
 
-type PDUSessionEstablishmentRequestOpts struct {
+type PDUSessionEstablishmentRequestParams struct {
 	PDUSessionID   uint8
 	PDUSessionType uint8
 	PTI            uint8
@@ -25,7 +25,7 @@ type PDUSessionEstablishmentRequestOpts struct {
 }
 
 // BuildPDUSessionEstablishmentRequest builds a PDU SESSION ESTABLISHMENT REQUEST (TS 24.501 §8.3.1).
-func BuildPDUSessionEstablishmentRequest(opts *PDUSessionEstablishmentRequestOpts) ([]byte, error) {
+func BuildPDUSessionEstablishmentRequest(opts PDUSessionEstablishmentRequestParams) ([]byte, error) {
 	m := gonas.NewMessage()
 	m.GsmMessage = gonas.NewGsmMessage()
 	m.GsmHeader.SetMessageType(gonas.MsgTypePDUSessionEstablishmentRequest)
@@ -70,7 +70,7 @@ func BuildPDUSessionEstablishmentRequest(opts *PDUSessionEstablishmentRequestOpt
 	return data.Bytes(), nil
 }
 
-type ULNASTransportOpts struct {
+type ULNASTransportParams struct {
 	PduSessionID     uint8
 	PayloadContainer []byte
 	DNN              string
@@ -79,7 +79,7 @@ type ULNASTransportOpts struct {
 }
 
 // BuildULNASTransport wraps a 5GSM message establishing a new PDU session in a UL NAS TRANSPORT (TS 24.501 §8.2.10).
-func BuildULNASTransport(opts *ULNASTransportOpts) ([]byte, error) {
+func BuildULNASTransport(opts ULNASTransportParams) ([]byte, error) {
 	m := gonas.NewMessage()
 	m.GmmMessage = gonas.NewGmmMessage()
 	m.GmmHeader.SetMessageType(gonas.MsgTypeULNASTransport)
@@ -302,7 +302,7 @@ func BuildULNASTransportExisting(pduSessionID uint8, requestType *uint8, payload
 	return data.Bytes(), nil
 }
 
-func DecodePDUSessionEstablishmentAccept(nasResp *NASResponse, gsmMsg *gonas.GsmMessage) {
+func decodePDUSessionEstablishmentAccept(nasResp *NASResponse, gsmMsg *gonas.GsmMessage) {
 	if gsmMsg == nil || gsmMsg.PDUSessionEstablishmentAccept == nil {
 		return
 	}
@@ -357,7 +357,7 @@ func DecodePDUSessionEstablishmentAccept(nasResp *NASResponse, gsmMsg *gonas.Gsm
 	}
 }
 
-func DecodePDUSessionReleaseCommand(nasResp *NASResponse, gsmMsg *gonas.GsmMessage, raw []byte) {
+func decodePDUSessionReleaseCommand(nasResp *NASResponse, gsmMsg *gonas.GsmMessage, raw []byte) {
 	if gsmMsg == nil || gsmMsg.PDUSessionReleaseCommand == nil {
 		return
 	}
@@ -429,7 +429,7 @@ func releaseCommandHasAccessType(raw []byte) bool {
 	return false
 }
 
-func DecodePDUSessionEstablishmentReject(nasResp *NASResponse, gsmMsg *gonas.GsmMessage) {
+func decodePDUSessionEstablishmentReject(nasResp *NASResponse, gsmMsg *gonas.GsmMessage) {
 	if gsmMsg == nil || gsmMsg.PDUSessionEstablishmentReject == nil {
 		return
 	}

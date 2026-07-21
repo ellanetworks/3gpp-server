@@ -96,7 +96,7 @@ func Test4GESMStatus_SessionRemainsUsable(t *testing.T) {
 		}
 	}
 
-	if got := jsonGet(nasStep(t, enbID, ueID, "release_request"), "s1ap.message_type"); got != "UEContextReleaseCommand" {
+	if got := jsonGet(nasStep(t, enbID, ueID, "ue_context_release_request"), "s1ap.message_type"); got != "UEContextReleaseCommand" {
 		t.Errorf("UE not usable after sending ESM STATUS; release_request did not yield a UEContextReleaseCommand")
 	}
 }

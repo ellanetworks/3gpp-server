@@ -18,7 +18,7 @@ import (
 
 type ENBAwaitDownlinkRequest struct {
 	Ebi       uint8 `json:"ebi,omitempty"`
-	TimeoutMs int   `json:"timeout_ms"`
+	TimeoutMs int   `json:"timeout_ms,omitempty"`
 }
 
 type ENBUplinkRequest struct {
@@ -26,8 +26,8 @@ type ENBUplinkRequest struct {
 
 	ICMPEcho *struct {
 		Dst string `json:"dst"`
-		ID  uint16 `json:"id"`
-		Seq uint16 `json:"seq"`
+		ID  uint16 `json:"id,omitempty"`
+		Seq uint16 `json:"seq,omitempty"`
 	} `json:"icmp_echo,omitempty"`
 
 	UDP *struct {
@@ -271,12 +271,13 @@ func (h *Handler) AwaitENBDownlink(w http.ResponseWriter, r *http.Request) {
 }
 
 type ENBTunnelResponse struct {
-	EBI    uint8  `json:"ebi"`
-	APN    string `json:"apn,omitempty"`
-	UEIP   string `json:"ue_ip,omitempty"`
-	ULTeid uint32 `json:"ul_teid,omitempty"`
-	SGWIP  string `json:"sgw_ip,omitempty"`
-	DLTeid uint32 `json:"dl_teid,omitempty"`
+	EBI     uint8  `json:"ebi"`
+	N3ENBIP string `json:"n3_enb_ip"`
+	APN     string `json:"apn,omitempty"`
+	UEIP    string `json:"ue_ip,omitempty"`
+	ULTeid  uint32 `json:"ul_teid,omitempty"`
+	SGWIP   string `json:"sgw_ip,omitempty"`
+	DLTeid  uint32 `json:"dl_teid,omitempty"`
 }
 
 func (h *Handler) GetENBTunnel(w http.ResponseWriter, r *http.Request) {
@@ -310,7 +311,7 @@ func (h *Handler) GetENBTunnel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := ENBTunnelResponse{EBI: ebi, UEIP: ueIP, ULTeid: ulTeid, SGWIP: sgwIP, DLTeid: dlTeid}
+	resp := ENBTunnelResponse{EBI: ebi, N3ENBIP: enb.N3Addr, UEIP: ueIP, ULTeid: ulTeid, SGWIP: sgwIP, DLTeid: dlTeid}
 	if ebi == 0 || ebi == ue.EPSBearerID {
 		resp.EBI = ue.EPSBearerID
 	} else if b, exists := ue.Bearers[ebi]; exists {

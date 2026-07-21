@@ -171,7 +171,9 @@ func ngapHasCause(body []byte) bool {
 func ngapHasSecurityContext(body []byte) bool {
 	var top struct {
 		NGAP struct {
-			NCC *int64 `json:"next_hop_chaining_count"`
+			SecurityContext *struct {
+				NCC *int64 `json:"next_hop_chaining_count"`
+			} `json:"security_context"`
 		} `json:"ngap"`
 	}
 
@@ -179,7 +181,7 @@ func ngapHasSecurityContext(body []byte) bool {
 		return false
 	}
 
-	return top.NGAP.NCC != nil
+	return top.NGAP.SecurityContext != nil
 }
 
 // Drives an inter-NG-RAN N2 handover, preparation then execution (TS 23.502 §4.9.1.3).

@@ -90,7 +90,7 @@ func buildNGSetupRequestIE(ie *IE) (*ngapType.NGSetupRequestIEs, error) {
 		g.GlobalGNBID.GNBID.Present = ngapType.GNBIDPresentGNBID
 		g.GlobalGNBID.GNBID.GNBID = new(aper.BitString)
 
-		bitLen := gnbIDData.GNBIDBitLen
+		bitLen := gnbIDData.GNBIDBitLength
 		if bitLen == 0 {
 			bitLen = 24
 		}
@@ -197,19 +197,20 @@ type NGSetupSlice struct {
 	SD  string
 }
 
-type NGSetupRequestFromStoreParams struct {
-	MCC         string
-	MNC         string
-	TAC         string
-	GNBID       string
-	GNBIDBitLen int
-	Name        string
-	SST         int32
-	SD          string
-	Slices      []NGSetupSlice
+type NGSetupRequestParams struct {
+	MCC              string
+	MNC              string
+	TAC              string
+	GNBID            string
+	GNBIDBitLength   int
+	Name             string
+	SST              int32
+	SD               string
+	Slices           []NGSetupSlice
+	DefaultPagingDRX *int
 }
 
-func BuildNGSetupRequestFromStore(p NGSetupRequestFromStoreParams) (*NGAPMessage, error) {
+func BuildNGSetupRequest(p NGSetupRequestParams) (*NGAPMessage, error) {
 	plmnID, err := encodePLMN(p.MCC, p.MNC)
 	if err != nil {
 		return nil, fmt.Errorf("PLMN: %w", err)
@@ -235,6 +236,13 @@ func BuildNGSetupRequestFromStore(p NGSetupRequestFromStoreParams) (*NGAPMessage
 	}
 
 	pagingDRX := int64(ngapType.PagingDRXPresentV128)
+	if p.DefaultPagingDRX != nil {
+		if *p.DefaultPagingDRX < 0 || *p.DefaultPagingDRX > int(ngapType.PagingDRXPresentV256) {
+			return nil, fmt.Errorf("default_paging_drx must be 0..3 (v32, v64, v128, v256)")
+		}
+		pagingDRX = int64(*p.DefaultPagingDRX)
+	}
+
 	nodeName := p.Name
 
 	return &NGAPMessage{
@@ -248,9 +256,9 @@ func BuildNGSetupRequestFromStore(p NGSetupRequestFromStoreParams) (*NGAPMessage
 				GlobalRANNodeID: &GlobalRANNodeIDJSON{
 					Present: "global_gnb_id",
 					GlobalGNBID: &GlobalGNBIDJSON{
-						PLMNIdentity: plmnHex,
-						GNBID:        p.GNBID,
-						GNBIDBitLen:  p.GNBIDBitLen,
+						PLMNIdentity:   plmnHex,
+						GNBID:          p.GNBID,
+						GNBIDBitLength: p.GNBIDBitLength,
 					},
 				},
 			},

@@ -198,7 +198,7 @@ paths:
         - `attach_request` — ATTACH REQUEST inside an Initial UE Message.
         - `authentication_response` — Computes EPS-AKA RES from the stored
           RAND/AUTN and sends AUTHENTICATION RESPONSE.
-        - `authentication_failure` — AUTHENTICATION FAILURE with the EMM `cause`
+        - `authentication_failure` — AUTHENTICATION FAILURE with the EMM `emm_cause`
           (TS 24.301 §5.4.2.6); #21 synch failure auto-includes the AUTS.
         - `identity_response` — IDENTITY RESPONSE carrying the requested identity.
         - `security_mode_complete` — Derives the NAS keys and sends SECURITY MODE
@@ -241,7 +241,7 @@ paths:
         - `modify_response` — E-RAB MODIFY RESPONSE confirming a network-initiated
           E-RAB modification (§8.2.2). Send-only.
         - `error_indication` — ERROR INDICATION for the UE's connection (§8.7.2).
-        - `release_request` — UE CONTEXT RELEASE REQUEST; the MME's Release Command
+        - `ue_context_release_request` — UE CONTEXT RELEASE REQUEST; the MME's Release Command
           is acknowledged with Release Complete.
 
         ## Source-eNB side of S1 handover (TS 36.413 §8.4)
@@ -1215,6 +1215,11 @@ components:
         sd:
           type: string
           description: Slice Differentiator (hex, optional).
+        default_paging_drx:
+          type: integer
+          description: >
+            Default Paging DRX as the ASN.1 enum index: 0 v32, 1 v64, 2 v128,
+            3 v256. Defaults to v128. Ignored when ng_setup_ies is set.
         slices:
           type: array
           items:
@@ -1325,6 +1330,11 @@ components:
           example: 20
         name:
           type: string
+        default_paging_drx:
+          type: integer
+          description: >
+            Default Paging DRX as the ASN.1 enum index: 0 v32, 1 v64, 2 v128,
+            3 v256. Defaults to v128.
         enable_gtpu:
           type: boolean
           description: Bind an S1-U GTP-U endpoint so the eNB terminates the user-plane data path.
@@ -1460,6 +1470,8 @@ components:
       properties:
         ue_id:
           type: string
+        imsi:
+          type: string
         enb_ue_s1ap_id:
           type: integer
 
@@ -1504,7 +1516,7 @@ components:
       properties:
         message_type:
           type: string
-          enum: [attach_request, authentication_response, authentication_failure, identity_response, security_mode_complete, security_mode_reject, attach_complete, detach_request, release_request, service_request, ue_capability_info, tracking_area_update, pdn_connectivity, pdn_disconnect, bearer_resource_allocation_request, bearer_resource_modification_request, esm_information_response, modify_response, modify_eps_bearer_context_accept, deactivate_eps_bearer_context_accept, status_esm, reset, inject_nas, handover_required, handover_cancel, enb_status_transfer, initial_context_setup_failure, error_indication]
+          enum: [attach_request, authentication_response, authentication_failure, identity_response, security_mode_complete, security_mode_reject, attach_complete, detach_request, ue_context_release_request, service_request, ue_capability_info, tracking_area_update, pdn_connectivity, pdn_disconnect, bearer_resource_allocation_request, bearer_resource_modification_request, esm_information_response, modify_response, modify_eps_bearer_context_accept, deactivate_eps_bearer_context_accept, status_esm, reset, inject_nas, handover_required, handover_cancel, enb_status_transfer, initial_context_setup_failure, error_indication]
         pdn_type:
           type: integer
           description: "Requested PDN type for attach: 1=IPv4, 2=IPv6, 3=IPv4v6 (default 1)."
@@ -1520,6 +1532,81 @@ components:
         drx_parameter:
           type: string
           description: "attach_request override — DRX parameter (hex, 2 octets, TS 24.301 §9.9.3.8)."
+        old_ptmsi_signature:
+          type: string
+          description: "attach_request override — Old P-TMSI signature (hex, TS 24.301 §9.9.3.26)."
+        additional_guti:
+          type: string
+          description: "attach_request override — Additional GUTI (hex, TS 24.301 §9.9.3.12)."
+        last_visited_registered_tai:
+          type: string
+          description: "attach_request override — Last visited registered TAI (hex, TS 24.301 §9.9.3.32)."
+        old_location_area_identification:
+          type: string
+          description: "attach_request override — Old location area identification (hex, TS 24.301 §9.9.2.2)."
+        tmsi_status:
+          type: integer
+          description: "attach_request override — TMSI status (nibble, TS 24.301 §9.9.3.31)."
+        mobile_station_classmark_2:
+          type: string
+          description: "attach_request override — Mobile station classmark 2 (hex, TS 24.301 §9.9.2.4)."
+        mobile_station_classmark_3:
+          type: string
+          description: "attach_request override — Mobile station classmark 3 (hex, TS 24.301 §9.9.2.5)."
+        supported_codecs:
+          type: string
+          description: "attach_request override — Supported Codecs (hex, TS 24.301 §9.9.2.10)."
+        additional_update_type:
+          type: integer
+          description: "attach_request override — Additional update type (nibble, TS 24.301 §9.9.3.0B)."
+        voice_domain_preference:
+          type: string
+          description: "attach_request override — Voice domain preference and UE's usage setting (hex, TS 24.301 §9.9.3.44)."
+        device_properties:
+          type: integer
+          description: "attach_request override — Device properties (nibble, TS 24.301 §9.9.2.0A)."
+        old_guti_type:
+          type: integer
+          description: "attach_request override — Old GUTI type (nibble, TS 24.301 §9.9.3.45)."
+        ms_network_feature_support:
+          type: integer
+          description: "attach_request override — MS network feature support (nibble, TS 24.301 §9.9.3.20A)."
+        tmsi_based_nri_container:
+          type: string
+          description: "attach_request override — TMSI based NRI container (hex, TS 24.301 §9.9.3.24A)."
+        t3324_value:
+          type: string
+          description: "attach_request override — T3324 value (hex, TS 24.301 §9.9.3.16A)."
+        t3412_extended_value:
+          type: string
+          description: "attach_request override — T3412 extended value (hex, TS 24.301 §9.9.3.16B)."
+        extended_drx_parameters:
+          type: string
+          description: "attach_request override — Extended DRX parameters (hex, TS 24.301 §9.9.3.46)."
+        ue_additional_security_capability:
+          type: string
+          description: "attach_request override — UE additional security capability (hex, TS 24.301 §9.9.3.53)."
+        ue_status:
+          type: string
+          description: "attach_request override — UE status (hex, TS 24.301 §9.9.3.54)."
+        additional_information_requested:
+          type: string
+          description: "attach_request override — Additional information requested (hex, TS 24.301 §9.9.3.55)."
+        n1_ue_network_capability:
+          type: string
+          description: "attach_request override — N1 UE network capability (hex, TS 24.301 §9.9.3.57)."
+        ue_radio_capability_id_availability:
+          type: string
+          description: "attach_request override — UE radio capability ID availability (hex, TS 24.301 §9.9.3.58)."
+        requested_wus_assistance_information:
+          type: string
+          description: "attach_request override — Requested WUS assistance information (hex, TS 24.301 §9.9.3.62)."
+        drx_parameter_nb_s1_mode:
+          type: string
+          description: "attach_request override — DRX parameter in NB-S1 mode (hex, TS 24.301 §9.9.3.63)."
+        requested_imsi_offset:
+          type: string
+          description: "attach_request override — Requested IMSI offset (hex, TS 24.301 §9.9.3.64)."
         foreign_guti:
           type: boolean
           description: >
@@ -1559,7 +1646,7 @@ components:
           description: On detach_request, mark the UE as powering off (no Detach Accept expected).
         release_cause:
           type: integer
-          description: On release_request, the radio-network Cause value the eNB reports (TS 36.413 §9.2.1.3); default user-inactivity (20).
+          description: On ue_context_release_request, the radio-network Cause value the eNB reports (TS 36.413 §9.2.1.3); default user-inactivity (20).
         mtmsi:
           type: integer
           description: On service_request, override the S-TMSI M-TMSI (unknown-UE tests).
@@ -1593,7 +1680,7 @@ components:
         res_override:
           type: string
           description: Override the computed RES with these hex bytes (wrong-RES tests).
-        cause:
+        emm_cause:
           type: integer
           description: >
             EMM cause for an authentication_failure step: 20=MAC failure,
@@ -1790,6 +1877,8 @@ components:
             properties:
               pdu_session_id:
                 type: integer
+              dnn:
+                type: string
               ue_ip:
                 type: string
         dnn:
@@ -2052,7 +2141,7 @@ components:
           type: object
         rrc_establishment_cause:
           type: integer
-        five_g_s_tmsi:
+        paging:
           type: object
         ue_context_request:
           type: integer
@@ -2103,11 +2192,14 @@ components:
           type: array
           items:
             type: integer
-        next_hop_chaining_count:
-          type: integer
-        next_hop:
-          type: string
-          description: Next Hop key (NH) as hex (TS 33.501 §6.9.2.3.2).
+        security_context:
+          type: object
+          properties:
+            next_hop_chaining_count:
+              type: integer
+            next_hop:
+              type: string
+              description: Next Hop key (NH) as hex (TS 33.501 §6.9.2.3.2).
         ue_security_capabilities:
           type: object
         ran_status_transfer:

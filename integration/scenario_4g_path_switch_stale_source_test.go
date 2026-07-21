@@ -56,7 +56,7 @@ func Test4GPathSwitchStaleSourceReleaseRejected(t *testing.T) {
 
 	mmeID := moveENBPathToTarget(t, sourceENB, targetENB, ueID, 700001)
 
-	resp := nasBody(t, sourceENB, ueID, `{"message_type":"release_request","timeout_ms":4000}`)
+	resp := nasBody(t, sourceENB, ueID, `{"message_type":"ue_context_release_request","timeout_ms":4000}`)
 	if got := jsonGet(resp, "s1ap.message_type"); got != "ErrorIndication" {
 		t.Errorf("stale source UE Context Release Request: s1ap.message_type = %q, want ErrorIndication (TS 36.413 §10.6)\n  body: %s", got, resp)
 	}

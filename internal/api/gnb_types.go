@@ -8,16 +8,18 @@ import (
 )
 
 type CreateGNBRequest struct {
-	AMFAddress   string `json:"amf_address"`
-	GNBN2Address string `json:"gnb_n2_address"`
-	MCC          string `json:"mcc"`
-	MNC          string `json:"mnc"`
-	TAC          string `json:"tac"`
-	GNBID        string `json:"gnb_id"`
-	GNBIDBitLen  int    `json:"gnb_id_bit_length,omitempty"`
-	Name         string `json:"name"`
-	SST          int32  `json:"sst"`
-	SD           string `json:"sd,omitempty"`
+	AMFAddress     string `json:"amf_address"`
+	GNBN2Address   string `json:"gnb_n2_address"`
+	MCC            string `json:"mcc"`
+	MNC            string `json:"mnc"`
+	TAC            string `json:"tac"`
+	GNBID          string `json:"gnb_id"`
+	GNBIDBitLength int    `json:"gnb_id_bit_length,omitempty"`
+	Name           string `json:"name"`
+	SST            int32  `json:"sst"`
+	SD             string `json:"sd,omitempty"`
+
+	DefaultPagingDRX *int `json:"default_paging_drx,omitempty"`
 
 	Slices []SliceInput `json:"slices,omitempty"`
 
@@ -82,23 +84,23 @@ type AwaitRequest struct {
 }
 
 type GNBStateResponse struct {
-	ID          string `json:"id"`
-	MCC         string `json:"mcc"`
-	MNC         string `json:"mnc"`
-	TAC         string `json:"tac"`
-	GNBID       string `json:"gnb_id"`
-	GNBIDBitLen int    `json:"gnb_id_bit_length,omitempty"`
-	Name        string `json:"name"`
-	SST         int32  `json:"sst"`
-	SD          string `json:"sd,omitempty"`
+	ID             string `json:"id"`
+	MCC            string `json:"mcc"`
+	MNC            string `json:"mnc"`
+	TAC            string `json:"tac"`
+	GNBID          string `json:"gnb_id"`
+	GNBIDBitLength int    `json:"gnb_id_bit_length,omitempty"`
+	Name           string `json:"name"`
+	SST            int32  `json:"sst"`
+	SD             string `json:"sd,omitempty"`
 }
 
 type CreateGNBUERequest struct {
 	SUPI             string `json:"supi"`
 	K                string `json:"k"`
 	OPc              string `json:"opc"`
-	Amf              string `json:"amf,omitempty"`
-	Sqn              string `json:"sqn,omitempty"`
+	AMF              string `json:"amf,omitempty"`
+	SQN              string `json:"sqn,omitempty"`
 	SST              int32  `json:"sst,omitempty"`
 	SD               string `json:"sd,omitempty"`
 	DNN              string `json:"dnn,omitempty"`
@@ -140,5 +142,6 @@ type GNBUEStateResponse struct {
 
 type GNBUESession struct {
 	PDUSessionID uint8  `json:"pdu_session_id"`
+	DNN          string `json:"dnn,omitempty"`
 	UEIP         string `json:"ue_ip"`
 }

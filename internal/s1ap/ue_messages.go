@@ -53,21 +53,21 @@ func BuildInitialUEMessage(p InitialUEMessageParams) ([]byte, error) {
 	return m.Marshal()
 }
 
-func BuildUEContextReleaseRequest(mmeUEID, enbUEID uint32, cause int) ([]byte, error) {
+func BuildUEContextReleaseRequest(mmeUEID, enbUEID uint32, cause int64) ([]byte, error) {
 	m := &s1ap.UEContextReleaseRequest{
 		MMEUES1APID: s1ap.MMEUES1APID(mmeUEID),
 		ENBUES1APID: s1ap.ENBUES1APID(enbUEID),
-		Cause:       s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: cause},
+		Cause:       radioNetworkCause(cause),
 	}
 
 	return m.Marshal()
 }
 
-func BuildInitialContextSetupFailure(mmeUEID, enbUEID uint32, cause int) ([]byte, error) {
+func BuildInitialContextSetupFailure(mmeUEID, enbUEID uint32, cause int64) ([]byte, error) {
 	return (&s1ap.InitialContextSetupFailure{
 		MMEUES1APID: s1ap.MMEUES1APID(mmeUEID),
 		ENBUES1APID: s1ap.ENBUES1APID(enbUEID),
-		Cause:       s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: cause},
+		Cause:       s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: int(cause)},
 	}).Marshal()
 }
 
@@ -84,10 +84,10 @@ func BuildERABModifyResponse(mmeUEID, enbUEID uint32, modified []uint8) ([]byte,
 	}).Marshal()
 }
 
-func BuildErrorIndication(mmeUEID, enbUEID uint32, cause int) ([]byte, error) {
+func BuildErrorIndication(mmeUEID, enbUEID uint32, cause int64) ([]byte, error) {
 	mme := s1ap.MMEUES1APID(mmeUEID)
 	enb := s1ap.ENBUES1APID(enbUEID)
-	c := s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: cause}
+	c := s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: int(cause)}
 
 	return (&s1ap.ErrorIndication{
 		MMEUES1APID: &mme,

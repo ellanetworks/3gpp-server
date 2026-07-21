@@ -46,9 +46,9 @@ func handleGNBHandoverRequired(gnb *store.GNBContext, ue *store.UEContext, t *tr
 		AMFUENGAPID:       amfUeNgapID,
 		RANUENGAPID:       ranUeNgapID,
 		TargetGNBID:       *req.TargetGNBID,
-		MCC:               gnb.MCC,
-		MNC:               gnb.MNC,
-		TAC:               gnb.TAC,
+		TargetMCC:         gnb.MCC,
+		TargetMNC:         gnb.MNC,
+		TargetTAC:         gnb.TAC,
 		PDUSessionIDs:     pduSessionIDs,
 		CauseRadioNetwork: cause,
 	})
@@ -206,7 +206,7 @@ func handleGNBHandoverFailure(t *transport.NGAPTransport, req *SendGNBNGAPReques
 		return nil, httpErrorf(http.StatusBadRequest, "amf_ue_ngap_id is required for handover_failure")
 	}
 
-	cause := ngap.CauseRadioNetworkHoFailureInTarget
+	cause := ngap.CauseRadioNetworkHOFailureInTarget
 	if req.Cause != nil {
 		cause = *req.Cause
 	}

@@ -25,9 +25,9 @@ type HandoverRequiredParams struct {
 	AMFUENGAPID       int64
 	RANUENGAPID       int64
 	TargetGNBID       string
-	MCC               string
-	MNC               string
-	TAC               string
+	TargetMCC         string
+	TargetMNC         string
+	TargetTAC         string
 	PDUSessionIDs     []int64
 	CauseRadioNetwork int64
 }
@@ -70,12 +70,12 @@ func BuildHandoverRequired(p HandoverRequiredParams) ([]byte, error) {
 		RadioNetwork: &ngapType.CauseRadioNetwork{Value: aper.Enumerated(p.CauseRadioNetwork)},
 	}
 
-	plmnID, err := encodePLMN(p.MCC, p.MNC)
+	plmnID, err := encodePLMN(p.TargetMCC, p.TargetMNC)
 	if err != nil {
 		return nil, fmt.Errorf("target PLMN: %w", err)
 	}
 
-	tacBytes, err := tacInBytes(p.TAC)
+	tacBytes, err := parseTAC(p.TargetTAC)
 	if err != nil {
 		return nil, fmt.Errorf("target TAC: %w", err)
 	}
@@ -465,7 +465,7 @@ func BuildHandoverNotify(p HandoverNotifyParams) ([]byte, error) {
 		return nil, fmt.Errorf("PLMN: %w", err)
 	}
 
-	tacBytes, err := tacInBytes(p.TAC)
+	tacBytes, err := parseTAC(p.TAC)
 	if err != nil {
 		return nil, fmt.Errorf("TAC: %w", err)
 	}

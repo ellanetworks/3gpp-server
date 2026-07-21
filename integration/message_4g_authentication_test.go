@@ -63,7 +63,7 @@ func Test4GAuthenticationFailureNoProceed(t *testing.T) {
 			ueID := attachChallenge(t, enbID)
 
 			resp := nasBody(t, enbID, ueID,
-				fmt.Sprintf(`{"message_type":"authentication_failure","cause":%d}`, tt.cause))
+				fmt.Sprintf(`{"message_type":"authentication_failure","emm_cause":%d}`, tt.cause))
 
 			got := jsonGet(resp, "nas.message_type")
 			if got == "security_mode_command" {
@@ -82,7 +82,7 @@ func Test4GAuthenticationSynchFailure(t *testing.T) {
 	ueID := attachChallenge(t, enbID)
 
 	resync := nasBody(t, enbID, ueID,
-		`{"message_type":"authentication_failure","cause":21}`)
+		`{"message_type":"authentication_failure","emm_cause":21}`)
 
 	if got := jsonGet(resync, "nas.message_type"); got != "authentication_request" {
 		t.Fatalf("after synch failure, nas.message_type = %q, want a fresh authentication_request; body: %s", got, resync)

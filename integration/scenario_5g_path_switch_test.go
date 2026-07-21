@@ -167,7 +167,7 @@ func Test5GPathSwitchRequestAcknowledgeCarriesMandatoryIEs(t *testing.T) {
 
 	assertPathSwitchType(t, "acknowledge mandatory IEs", status, body, ngapPathSwitchRequestAcknowledge)
 
-	if ngapField(body, "next_hop_chaining_count") == nil {
+	if jsonGet(body, "ngap.security_context.next_hop_chaining_count") == "" {
 		t.Errorf("acknowledge is missing the mandatory Security Context IE and its Next Hop Chaining Count (TS 38.413 §9.2.3.9, TS 33.501 §6.9.2.3.2)\n  body: %s", body)
 	}
 
@@ -179,12 +179,19 @@ func Test5GPathSwitchRequestAcknowledgeCarriesMandatoryIEs(t *testing.T) {
 func pathSwitchNCC(t *testing.T, body []byte) int64 {
 	t.Helper()
 
-	v, ok := ngapField(body, "next_hop_chaining_count").(float64)
-	if !ok {
+	var top struct {
+		NGAP struct {
+			SecurityContext *struct {
+				NCC int64 `json:"next_hop_chaining_count"`
+			} `json:"security_context"`
+		} `json:"ngap"`
+	}
+
+	if err := json.Unmarshal(body, &top); err != nil || top.NGAP.SecurityContext == nil {
 		t.Fatalf("acknowledge missing Security Context Next Hop Chaining Count\n  body: %s", body)
 	}
 
-	return int64(v)
+	return top.NGAP.SecurityContext.NCC
 }
 
 func Test5GPathSwitchRequestNCCIncrements(t *testing.T) {

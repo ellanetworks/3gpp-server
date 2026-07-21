@@ -48,7 +48,7 @@ func handleENBPdnConnectivity(ctx context.Context, enb *store.ENBContext, ue *st
 		return nil, err
 	}
 
-	protected, err := naseps.Protect(esm, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
+	protected, err := encodeENBUplinkNAS(ue, esm, naseps.SHTIntegrityProtectedCiphered, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -67,32 +67,25 @@ func handleENBPdnConnectivity(ctx context.Context, enb *store.ENBContext, ue *st
 		return nil, err
 	}
 
-	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
-	if err != nil {
-		return nil, fmt.Errorf("unprotect pdn connectivity reply: %w", err)
+	nas, macVerified := decodeENBDownlinkNAS(ue, nasBytes)
+	if nas == nil {
+		return &SendENBUES1APResponse{S1AP: dl, MACVerified: macVerified}, nil
 	}
-
-	nas, err := naseps.Decode(plain)
-	if err != nil {
-		return nil, err
-	}
-
-	annotateSecurityHeaderType(nas, nasBytes)
 
 	if dl.MessageType != "ERABSetupRequest" || nas.MessageType != "activate_default_eps_bearer_context_request" {
-		return &SendENBUES1APResponse{S1AP: dl, NAS: nas}, nil
+		return &SendENBUES1APResponse{S1AP: dl, NAS: nas, MACVerified: macVerified}, nil
 	}
 
 	// Withholding the accept leaves timer T3485 running so its retransmission is observable (TS 24.301 §6.4.1.6 a).
 	if req.WithholdAccept {
-		return &SendENBUES1APResponse{S1AP: dl, NAS: nas}, nil
+		return &SendENBUES1APResponse{S1AP: dl, NAS: nas, MACVerified: macVerified}, nil
 	}
 
 	if err := acceptAdditionalBearer(enb, ue, t, dl, nas, req); err != nil {
 		return nil, err
 	}
 
-	return &SendENBUES1APResponse{S1AP: dl, NAS: nas}, nil
+	return &SendENBUES1APResponse{S1AP: dl, NAS: nas, MACVerified: macVerified}, nil
 }
 
 func acceptAdditionalBearer(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, dl *s1ap.S1APResponse, nas *naseps.NASResponse, req *SendENBUES1APRequest) error {
@@ -116,7 +109,7 @@ func acceptAdditionalBearer(enb *store.ENBContext, ue *store.UEEPSContext, t *tr
 
 	if len(dl.ERABSetupItems) > 0 {
 		e := dl.ERABSetupItems[0]
-		bearer.ULTeid = e.GTPTEID
+		bearer.ULTeid = e.ULTeid
 		bearer.SGWIP = erabSGWIP(enb, e)
 	}
 
@@ -139,7 +132,7 @@ func acceptAdditionalBearer(enb *store.ENBContext, ue *store.UEEPSContext, t *tr
 		return err
 	}
 
-	protectedAccept, err := naseps.Protect(accept, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
+	protectedAccept, err := encodeENBUplinkNAS(ue, accept, naseps.SHTIntegrityProtectedCiphered, nil)
 	if err != nil {
 		return err
 	}
@@ -167,7 +160,7 @@ func handleENBPdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *stor
 		return nil, err
 	}
 
-	protected, err := naseps.Protect(esm, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
+	protected, err := encodeENBUplinkNAS(ue, esm, naseps.SHTIntegrityProtectedCiphered, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -186,21 +179,14 @@ func handleENBPdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *stor
 		return nil, err
 	}
 
-	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
-	if err != nil {
-		return nil, fmt.Errorf("unprotect pdn disconnect reply: %w", err)
+	nas, macVerified := decodeENBDownlinkNAS(ue, nasBytes)
+	if nas == nil {
+		return &SendENBUES1APResponse{S1AP: dl, MACVerified: macVerified}, nil
 	}
-
-	nas, err := naseps.Decode(plain)
-	if err != nil {
-		return nil, err
-	}
-
-	annotateSecurityHeaderType(nas, nasBytes)
 
 	// Withholding the accept leaves timer T3495 running so its retransmission is observable (TS 24.301 §6.4.4.5 a).
 	if req.WithholdAccept {
-		return &SendENBUES1APResponse{S1AP: dl, NAS: nas}, nil
+		return &SendENBUES1APResponse{S1AP: dl, NAS: nas, MACVerified: macVerified}, nil
 	}
 
 	if nas.MessageType == "deactivate_eps_bearer_context_request" && nas.EPSBearerIdentity != nil {
@@ -227,7 +213,7 @@ func handleENBPdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *stor
 			return nil, berr
 		}
 
-		protectedAccept, perr := naseps.Protect(accept, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
+		protectedAccept, perr := encodeENBUplinkNAS(ue, accept, naseps.SHTIntegrityProtectedCiphered, nil)
 		if perr != nil {
 			return nil, perr
 		}
@@ -239,7 +225,7 @@ func handleENBPdnDisconnect(ctx context.Context, enb *store.ENBContext, ue *stor
 		delete(ue.Bearers, deactEBI)
 	}
 
-	return &SendENBUES1APResponse{S1AP: dl, NAS: nas}, nil
+	return &SendENBUES1APResponse{S1AP: dl, NAS: nas, MACVerified: macVerified}, nil
 }
 
 func handleENBStatusESM(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
@@ -326,7 +312,7 @@ func handleENBDeactivateBearerAccept(enb *store.ENBContext, ue *store.UEEPSConte
 }
 
 func sendESM(enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, esm []byte, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
-	protected, err := naseps.Protect(esm, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
+	protected, err := encodeENBUplinkNAS(ue, esm, naseps.SHTIntegrityProtectedCiphered, nil)
 	if err != nil {
 		return nil, err
 	}

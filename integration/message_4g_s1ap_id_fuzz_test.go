@@ -27,7 +27,7 @@ func assertEPSErrorIndication(t *testing.T, body []byte) {
 	}
 }
 
-func Test4GUplinkNASTransportS1APIDFuzz(t *testing.T) {
+func Test4GUplinkNASTransport_S1APIDFuzz(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
 
@@ -71,7 +71,7 @@ var s1apIDFuzzCases = []struct {
 	{"inconsistent eNB-UE-S1AP-ID", `"enb_ue_s1ap_id_override":16777215`},
 }
 
-func Test4GUECapabilityInfoS1APIDFuzz(t *testing.T) {
+func Test4GUECapabilityInfo_S1APIDFuzz(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
 
@@ -86,7 +86,7 @@ func Test4GUECapabilityInfoS1APIDFuzz(t *testing.T) {
 	}
 }
 
-func Test4GUEContextReleaseRequestS1APIDFuzz(t *testing.T) {
+func Test4GUEContextReleaseRequest_S1APIDFuzz(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)
 
@@ -95,7 +95,7 @@ func Test4GUEContextReleaseRequestS1APIDFuzz(t *testing.T) {
 	for _, tc := range s1apIDFuzzCases {
 		t.Run(tc.name, func(t *testing.T) {
 			resp := nasBody(t, enbID, ueID, fmt.Sprintf(
-				`{"message_type":"release_request",%s,"timeout_ms":3000}`, tc.overrides))
+				`{"message_type":"ue_context_release_request",%s,"timeout_ms":3000}`, tc.overrides))
 
 			if got := jsonGet(resp, "s1ap.message_type"); got == "UEContextReleaseCommand" {
 				t.Fatalf("MME issued a Release Command for a forged AP ID, tearing down a UE context (TS 36.413 §10.6); body: %s", resp)

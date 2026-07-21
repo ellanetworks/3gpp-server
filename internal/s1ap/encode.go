@@ -4,6 +4,8 @@
 package s1ap
 
 import (
+	"fmt"
+
 	"github.com/ellanetworks/core/s1ap"
 )
 
@@ -18,6 +20,14 @@ func BuildS1SetupRequest(p *S1SetupRequestParams) ([]byte, error) {
 		return nil, err
 	}
 
+	drx := s1ap.PagingDRXv128
+	if p.DefaultPagingDRX != nil {
+		if *p.DefaultPagingDRX < 0 || *p.DefaultPagingDRX > int(s1ap.PagingDRXv256) {
+			return nil, fmt.Errorf("default_paging_drx must be 0..3 (v32, v64, v128, v256)")
+		}
+		drx = s1ap.PagingDRX(*p.DefaultPagingDRX)
+	}
+
 	req := &s1ap.S1SetupRequest{
 		GlobalENBID: s1ap.GlobalENBID{
 			PLMNIdentity: enbPLMN,
@@ -25,7 +35,7 @@ func BuildS1SetupRequest(p *S1SetupRequestParams) ([]byte, error) {
 		},
 		ENBName:          p.ENBName,
 		SupportedTAs:     tas,
-		DefaultPagingDRX: s1ap.PagingDRXv128,
+		DefaultPagingDRX: drx,
 	}
 
 	return req.Marshal()

@@ -11,9 +11,9 @@ import (
 var handoverContainerStub = s1ap.TransparentContainer{0x00}
 
 type HandoverRequiredParams struct {
-	MMEUES1APID uint32
-	ENBUES1APID uint32
-	Cause       int
+	MMEUES1APID       uint32
+	ENBUES1APID       uint32
+	CauseRadioNetwork int64
 
 	TargetMCC       string
 	TargetMNC       string
@@ -37,7 +37,7 @@ func BuildHandoverRequired(p HandoverRequiredParams) ([]byte, error) {
 		MMEUES1APID:  s1ap.MMEUES1APID(p.MMEUES1APID),
 		ENBUES1APID:  s1ap.ENBUES1APID(p.ENBUES1APID),
 		HandoverType: s1ap.HandoverTypeIntraLTE,
-		Cause:        s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: p.Cause},
+		Cause:        s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: int(p.CauseRadioNetwork)},
 		TargetID: s1ap.TargetID{
 			TargeteNBID: s1ap.TargeteNBID{
 				GlobalENBID: s1ap.GlobalENBID{
@@ -56,7 +56,7 @@ func BuildHandoverRequired(p HandoverRequiredParams) ([]byte, error) {
 type HandoverAdmittedERAB struct {
 	ERABID uint8
 	DLTeid uint32
-	DLAddr string
+	DLIP   string
 }
 
 type HandoverRequestAcknowledgeParams struct {
@@ -70,7 +70,7 @@ func BuildHandoverRequestAcknowledge(p HandoverRequestAcknowledgeParams) ([]byte
 	admitted := make([]s1ap.ERABAdmittedItem, 0, len(p.Admitted))
 
 	for _, e := range p.Admitted {
-		addr, err := parseTransportAddr(e.DLAddr)
+		addr, err := parseTransportAddr(e.DLIP)
 		if err != nil {
 			return nil, err
 		}
@@ -86,7 +86,7 @@ func BuildHandoverRequestAcknowledge(p HandoverRequestAcknowledgeParams) ([]byte
 	for _, id := range p.FailedERABIDs {
 		failed = append(failed, s1ap.ERABItem{
 			ERABID: s1ap.ERABID(id),
-			Cause:  s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: CauseRadioNetworkHOFailureInTarget},
+			Cause:  s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: int(CauseRadioNetworkHOFailureInTarget)},
 		})
 	}
 
@@ -131,20 +131,20 @@ func BuildHandoverNotify(p HandoverNotifyParams) ([]byte, error) {
 	return m.Marshal()
 }
 
-func BuildHandoverCancel(mmeUES1APID, enbUES1APID uint32, cause int) ([]byte, error) {
+func BuildHandoverCancel(mmeUES1APID, enbUES1APID uint32, cause int64) ([]byte, error) {
 	m := &s1ap.HandoverCancel{
 		MMEUES1APID: s1ap.MMEUES1APID(mmeUES1APID),
 		ENBUES1APID: s1ap.ENBUES1APID(enbUES1APID),
-		Cause:       s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: cause},
+		Cause:       s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: int(cause)},
 	}
 
 	return m.Marshal()
 }
 
-func BuildHandoverFailure(mmeUES1APID uint32, cause int) ([]byte, error) {
+func BuildHandoverFailure(mmeUES1APID uint32, cause int64) ([]byte, error) {
 	m := &s1ap.HandoverFailure{
 		MMEUES1APID: s1ap.MMEUES1APID(mmeUES1APID),
-		Cause:       s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: cause},
+		Cause:       s1ap.Cause{Group: s1ap.CauseGroupRadioNetwork, Value: int(cause)},
 	}
 
 	return m.Marshal()

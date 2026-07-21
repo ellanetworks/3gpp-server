@@ -8,13 +8,14 @@ import (
 	"fmt"
 
 	"github.com/ellanetworks/3gpp-server/internal/crypto"
-	"github.com/ellanetworks/3gpp-server/internal/nas"
+	"github.com/ellanetworks/3gpp-server/internal/nas5gs"
 	"github.com/free5gc/nas/nasMessage"
 	"github.com/free5gc/nas/nasType"
 )
 
 type PDUSessionInfo struct {
 	PDUSessionID uint8
+	DNN          string
 	N3GNBIP      string
 	DLTeid       uint32
 	QFI          uint8
@@ -27,7 +28,7 @@ type PDUSessionInfo struct {
 type UEContext struct {
 	ID string
 
-	Supi             string
+	SUPI             string
 	Msin             string
 	MCC              string
 	MNC              string
@@ -35,8 +36,8 @@ type UEContext struct {
 
 	K   string
 	OPc string
-	Amf string
-	Sqn string
+	AMF string
+	SQN string
 
 	ProtectionScheme string
 	PublicKeyID      string
@@ -78,11 +79,11 @@ type UEContext struct {
 }
 
 type CreateUEOpts struct {
-	Supi             string
+	SUPI             string
 	K                string
 	OPc              string
-	Amf              string
-	Sqn              string
+	AMF              string
+	SQN              string
 	SST              int32
 	SD               string
 	DNN              string
@@ -98,7 +99,7 @@ type CreateUEOpts struct {
 }
 
 func NewUEContext(id string, ranUeNgapID int64, mncLength int, opts *CreateUEOpts) (*UEContext, error) {
-	supi := opts.Supi
+	supi := opts.SUPI
 	mcc, mnc, msin, err := crypto.ParseSUPI(supi, mncLength)
 	if err != nil {
 		return nil, err
@@ -118,12 +119,12 @@ func NewUEContext(id string, ranUeNgapID int64, mncLength int, opts *CreateUEOpt
 		routingInd = "0"
 	}
 
-	amf := opts.Amf
+	amf := opts.AMF
 	if amf == "" {
 		amf = "8000"
 	}
 
-	sqn := opts.Sqn
+	sqn := opts.SQN
 	if sqn == "" {
 		sqn = "000000000000"
 	}
@@ -167,7 +168,7 @@ func NewUEContext(id string, ranUeNgapID int64, mncLength int, opts *CreateUEOpt
 
 	suciStr := crypto.BuildSuciString(mcc, mnc, routingInd, protScheme, pubKeyID, suciBuffer)
 
-	capBuf := nas.DefaultUESecurityCapability
+	capBuf := nas5gs.DefaultUESecurityCapability
 	if opts.UESecurityCapability != "" {
 		if capBuf, err = hex.DecodeString(opts.UESecurityCapability); err != nil {
 			return nil, fmt.Errorf("decode ue_security_capability: %w", err)
@@ -182,15 +183,15 @@ func NewUEContext(id string, ranUeNgapID int64, mncLength int, opts *CreateUEOpt
 
 	ue := &UEContext{
 		ID:                   id,
-		Supi:                 supi,
+		SUPI:                 supi,
 		Msin:                 msin,
 		MCC:                  mcc,
 		MNC:                  mnc,
 		RoutingIndicator:     routingInd,
 		K:                    opts.K,
 		OPc:                  opts.OPc,
-		Amf:                  amf,
-		Sqn:                  sqn,
+		AMF:                  amf,
+		SQN:                  sqn,
 		ProtectionScheme:     protScheme,
 		PublicKeyID:          pubKeyID,
 		PublicKeyHex:         opts.PublicKeyHex,

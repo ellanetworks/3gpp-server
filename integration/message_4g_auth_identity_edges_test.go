@@ -14,12 +14,12 @@ func Test4GAuthenticationRepeatedSynchFailure(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := attachChallenge(t, enbID)
 
-	first := nasBody(t, enbID, ueID, `{"message_type":"authentication_failure","cause":21}`)
+	first := nasBody(t, enbID, ueID, `{"message_type":"authentication_failure","emm_cause":21}`)
 	if got := jsonGet(first, "nas.message_type"); got != "authentication_request" {
 		t.Fatalf("first synch failure: nas.message_type = %q, want a fresh authentication_request (TS 24.301 §5.4.2.7 e); body: %s", got, first)
 	}
 
-	second := nasBody(t, enbID, ueID, `{"message_type":"authentication_failure","cause":21}`)
+	second := nasBody(t, enbID, ueID, `{"message_type":"authentication_failure","emm_cause":21}`)
 
 	switch got := jsonGet(second, "nas.message_type"); got {
 	case "authentication_reject", "authentication_request":
