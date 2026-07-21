@@ -86,7 +86,7 @@ func Test5GDataNetworkChangeReleasesSession(t *testing.T) {
 	setDataNetworkMTUNamed(t, token, dn5GReactName, 1300)
 
 	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/await",
-		`{"message_types":["DownlinkNASTransport"],"timeout_ms":8000}`)
+		`{"message_types":["DownlinkNASTransport","PDUSessionResourceReleaseCommand"],"timeout_ms":8000}`)
 	if status != 200 {
 		t.Fatalf("no session release after MTU change (HTTP %d) — the network must release the PDU session for reactivation (TS 24.501 §6.3.x)\n  body: %s", status, body)
 	}

@@ -166,6 +166,32 @@ func waitDownlink(ctx context.Context, t *transport.S1APTransport, ue *store.UEE
 	return t.WaitForMessageMatching(ctx, match, types...)
 }
 
+// waitDownlinkReq matches by the effective (override-aware) AP IDs, so an ERROR
+// INDICATION echoing the AP IDs a forged uplink carried (TS 36.413 §10.6) is
+// recognised. Without an override it behaves like waitDownlink.
+func waitDownlinkReq(ctx context.Context, t *transport.S1APTransport, ue *store.UEEPSContext, req *SendENBUES1APRequest, types ...string) (*s1ap.S1APResponse, error) {
+	mmeID, enbID := forgeIDs(ue, req)
+
+	match := func(r *s1ap.S1APResponse) bool {
+		if r.ENBUES1APID != nil && *r.ENBUES1APID == int64(enbID) {
+			return true
+		}
+
+		return r.MMEUES1APID != nil && mmeID != 0 && *r.MMEUES1APID == int64(mmeID)
+	}
+
+	return t.WaitForMessageMatching(ctx, match, types...)
+}
+
+func waitDownlinkTolerantReq(ctx context.Context, t *transport.S1APTransport, ue *store.UEEPSContext, req *SendENBUES1APRequest, types ...string) *s1ap.S1APResponse {
+	resp, err := waitDownlinkReq(ctx, t, ue, req, types...)
+	if err != nil {
+		return nil
+	}
+
+	return resp
+}
+
 func learnMMEID(ue *store.UEEPSContext, resp *s1ap.S1APResponse) {
 	if resp.MMEUES1APID != nil {
 		ue.MMEUES1APID = uint32(*resp.MMEUES1APID)

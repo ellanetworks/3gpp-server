@@ -208,50 +208,9 @@ func handleENBAuthenticationResponse(ctx context.Context, enb *store.ENBContext,
 		return nil, err
 	}
 
-	sht, err := naseps.SecurityHeader(nasBytes)
-	if err != nil {
-		return nil, err
-	}
+	nasResp, macVerified := decodeENBDownlinkNAS(ue, nasBytes)
 
-	if sht == naseps.SHTPlain {
-		nas, derr := naseps.Decode(nasBytes)
-		if derr != nil {
-			return nil, derr
-		}
-
-		return &SendENBUES1APResponse{S1AP: dl, NAS: annotateENBSecurityHeaderType(nas, nasBytes)}, nil
-	}
-
-	// The Security Mode Command is not ciphered, so the algorithms it selects are readable before their keys exist.
-	inner, err := naseps.PeekProtectedPayload(nasBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	smc, err := naseps.Decode(inner)
-	if err != nil {
-		return nil, err
-	}
-
-	if smc.SelectedCipheringAlgorithm == nil || smc.SelectedIntegrityAlgorithm == nil {
-		return nil, fmt.Errorf("expected Security Mode Command, got %s", smc.MessageType)
-	}
-
-	ue.CipheringAlg = uint8(*smc.SelectedCipheringAlgorithm)
-	ue.IntegrityAlg = uint8(*smc.SelectedIntegrityAlgorithm)
-
-	if ue.KnasEnc, ue.KnasInt, err = crypto.DeriveEPSNASKeys(ue.Kasme, ue.CipheringAlg, ue.IntegrityAlg); err != nil {
-		return nil, err
-	}
-
-	ue.SecurityActive = true
-	ue.ULCount = 0
-	ue.DLCount = 0
-
-	_, verr := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
-	verified := verr == nil
-
-	return &SendENBUES1APResponse{S1AP: dl, NAS: annotateENBSecurityHeaderType(smc, nasBytes), MACVerified: &verified}, nil
+	return &SendENBUES1APResponse{S1AP: dl, NAS: nasResp, MACVerified: macVerified}, nil
 }
 
 func handleENBIdentityResponse(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
@@ -264,7 +223,7 @@ func handleENBIdentityResponse(ctx context.Context, enb *store.ENBContext, ue *s
 		return nil, err
 	}
 
-	dl, err := waitDownlink(ctx, t, ue, "DownlinkNASTransport", "ErrorIndication")
+	dl, err := waitDownlinkReq(ctx, t, ue, req, "DownlinkNASTransport", "ErrorIndication")
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +276,7 @@ func handleENBAuthenticationFailure(ctx context.Context, enb *store.ENBContext, 
 		return nil, err
 	}
 
-	dl, err := waitDownlink(ctx, t, ue, "DownlinkNASTransport", "ErrorIndication")
+	dl, err := waitDownlinkReq(ctx, t, ue, req, "DownlinkNASTransport", "ErrorIndication")
 	if err != nil {
 		return nil, err
 	}
@@ -356,14 +315,9 @@ func handleENBSecurityModeComplete(ctx context.Context, enb *store.ENBContext, u
 		return nil, err
 	}
 
-	protected, err := naseps.Protect(smc, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
+	protected, err := encodeENBUplinkNAS(ue, smc, naseps.SHTIntegrityProtectedCiphered, req)
 	if err != nil {
 		return nil, err
-	}
-
-	if req.CorruptMAC {
-		// protected[1] is the first octet of the NAS-MAC (header‖MAC‖seq‖payload).
-		protected[1] ^= 0xff
 	}
 
 	if err := sendUplink(enb, ue, t, protected, req); err != nil {
@@ -371,10 +325,10 @@ func handleENBSecurityModeComplete(ctx context.Context, enb *store.ENBContext, u
 	}
 
 	if req.CorruptMAC {
-		return &SendENBUES1APResponse{S1AP: waitDownlinkTolerant(ctx, t, ue, "InitialContextSetupRequest")}, nil
+		return &SendENBUES1APResponse{S1AP: waitDownlinkTolerantReq(ctx, t, ue, req, "InitialContextSetupRequest")}, nil
 	}
 
-	dl, err := waitDownlink(ctx, t, ue, "InitialContextSetupRequest", "ErrorIndication")
+	dl, err := waitDownlinkReq(ctx, t, ue, req, "InitialContextSetupRequest", "ErrorIndication")
 	if err != nil {
 		return nil, err
 	}
@@ -388,17 +342,10 @@ func handleENBSecurityModeComplete(ctx context.Context, enb *store.ENBContext, u
 		return nil, err
 	}
 
-	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
-	if err != nil {
-		return nil, fmt.Errorf("unprotect attach accept: %w", err)
+	nas, macVerified := decodeENBDownlinkNAS(ue, nasBytes)
+	if nas == nil {
+		return &SendENBUES1APResponse{S1AP: dl, MACVerified: macVerified}, nil
 	}
-
-	nas, err := naseps.Decode(plain)
-	if err != nil {
-		return nil, err
-	}
-
-	annotateENBSecurityHeaderType(nas, nasBytes)
 
 	if nas.EPSBearerIdentity != nil {
 		ue.EPSBearerID = uint8(*nas.EPSBearerIdentity)
@@ -429,7 +376,7 @@ func handleENBSecurityModeComplete(ctx context.Context, enb *store.ENBContext, u
 	ue.DLTeid = ue.ENBUES1APID
 	ue.UEIP = ueIPFromPDNAddress(nas.PDNAddress)
 
-	return &SendENBUES1APResponse{S1AP: dl, NAS: nas}, nil
+	return &SendENBUES1APResponse{S1AP: dl, NAS: nas, MACVerified: macVerified}, nil
 }
 
 func ueIPFromPDNAddress(pdnHex string) string {
@@ -456,7 +403,7 @@ func handleENBSecurityModeReject(ctx context.Context, enb *store.ENBContext, ue 
 		return nil, err
 	}
 
-	dl, err := waitDownlink(ctx, t, ue, "UEContextReleaseCommand", "ErrorIndication")
+	dl, err := waitDownlinkReq(ctx, t, ue, req, "UEContextReleaseCommand", "ErrorIndication")
 	if err != nil {
 		return nil, err
 	}
@@ -487,7 +434,7 @@ func handleENBAttachComplete(ctx context.Context, enb *store.ENBContext, ue *sto
 		return nil, err
 	}
 
-	protected, err := naseps.Protect(ac, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
+	protected, err := encodeENBUplinkNAS(ue, ac, naseps.SHTIntegrityProtectedCiphered, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -502,15 +449,12 @@ func handleENBAttachComplete(ctx context.Context, enb *store.ENBContext, ue *sto
 
 	resp := &SendENBUES1APResponse{}
 
-	if dl := waitDownlinkTolerant(wctx, t, ue, "DownlinkNASTransport", "ErrorIndication"); dl != nil {
+	if dl := waitDownlinkTolerantReq(wctx, t, ue, req, "DownlinkNASTransport", "ErrorIndication"); dl != nil {
 		resp.S1AP = dl
 
 		if dl.NASPDU != nil {
 			if nasBytes, berr := nasPDUBytes(dl); berr == nil {
-				if plain, perr := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt); perr == nil {
-					resp.NAS, _ = naseps.Decode(plain)
-					resp.NAS = annotateENBSecurityHeaderType(resp.NAS, nasBytes)
-				}
+				resp.NAS, resp.MACVerified = decodeENBDownlinkNAS(ue, nasBytes)
 			}
 		}
 	}
@@ -596,18 +540,9 @@ func handleENBTrackingAreaUpdate(ctx context.Context, enb *store.ENBContext, ue 
 		return nil, err
 	}
 
-	count := ue.NextUL()
-	if req.NASCountOverride != nil {
-		count = *req.NASCountOverride
-	}
-
-	protected, err := naseps.Protect(tau, naseps.SHTIntegrityProtectedCiphered, count, ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
+	protected, err := encodeENBUplinkNAS(ue, tau, naseps.SHTIntegrityProtectedCiphered, req)
 	if err != nil {
 		return nil, err
-	}
-
-	if req.CorruptMAC {
-		protected[1] ^= 0xff
 	}
 
 	if err := sendUplink(enb, ue, t, protected, req); err != nil {
@@ -624,27 +559,10 @@ func handleENBTrackingAreaUpdate(ctx context.Context, enb *store.ENBContext, ue 
 		return nil, err
 	}
 
-	sht, err := naseps.SecurityHeader(nasBytes)
-	if err != nil {
-		return nil, err
+	nas, macVerified := decodeENBDownlinkNAS(ue, nasBytes)
+	if nas == nil {
+		return &SendENBUES1APResponse{S1AP: dl, MACVerified: macVerified}, nil
 	}
-
-	if sht == naseps.SHTPlain {
-		nas, derr := naseps.Decode(nasBytes)
-		return &SendENBUES1APResponse{S1AP: dl, NAS: annotateENBSecurityHeaderType(nas, nasBytes)}, derr
-	}
-
-	plain, err := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
-	if err != nil {
-		return nil, fmt.Errorf("unprotect TAU accept: %w", err)
-	}
-
-	nas, err := naseps.Decode(plain)
-	if err != nil {
-		return nil, err
-	}
-
-	annotateENBSecurityHeaderType(nas, nasBytes)
 
 	if nas.GUTI != nil {
 		ue.GUTIMCC = nas.GUTI.MCC
@@ -661,7 +579,7 @@ func handleENBTrackingAreaUpdate(ctx context.Context, enb *store.ENBContext, ue 
 			return nil, berr
 		}
 
-		protectedC, perr := naseps.Protect(complete, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
+		protectedC, perr := encodeENBUplinkNAS(ue, complete, naseps.SHTIntegrityProtectedCiphered, nil)
 		if perr != nil {
 			return nil, perr
 		}
@@ -671,7 +589,7 @@ func handleENBTrackingAreaUpdate(ctx context.Context, enb *store.ENBContext, ue 
 		}
 	}
 
-	return &SendENBUES1APResponse{S1AP: dl, NAS: nas}, nil
+	return &SendENBUES1APResponse{S1AP: dl, NAS: nas, MACVerified: macVerified}, nil
 }
 
 func handleENBReleaseRequest(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
@@ -782,14 +700,7 @@ func handleENBServiceRequest(ctx context.Context, enb *store.ENBContext, ue *sto
 	case "DownlinkNASTransport":
 		if dl.NASPDU != nil {
 			if nasBytes, berr := nasPDUBytes(dl); berr == nil {
-				plain := nasBytes
-				if sht, serr := naseps.SecurityHeader(nasBytes); serr == nil && sht != naseps.SHTPlain {
-					if dec, uerr := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt); uerr == nil {
-						plain = dec
-					}
-				}
-				resp.NAS, _ = naseps.Decode(plain)
-				resp.NAS = annotateENBSecurityHeaderType(resp.NAS, nasBytes)
+				resp.NAS, resp.MACVerified = decodeENBDownlinkNAS(ue, nasBytes)
 			}
 		}
 	}
@@ -822,7 +733,7 @@ func handleENBDetach(ctx context.Context, enb *store.ENBContext, ue *store.UEEPS
 			return nil, err
 		}
 
-		nasPDU, err = naseps.Protect(pdu, naseps.SHTIntegrityProtectedCiphered, ue.NextUL(), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
+		nasPDU, err = encodeENBUplinkNAS(ue, pdu, naseps.SHTIntegrityProtectedCiphered, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -849,16 +760,7 @@ func handleENBDetach(ctx context.Context, enb *store.ENBContext, ue *store.UEEPS
 			return nil, berr
 		}
 
-		plain, perr := naseps.Unprotect(nasBytes, ue.NextDL(epsDLSequenceNumber(nasBytes)), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
-		if perr != nil {
-			return nil, fmt.Errorf("unprotect detach accept: %w", perr)
-		}
-
-		if resp.NAS, err = naseps.Decode(plain); err != nil {
-			return nil, err
-		}
-
-		resp.NAS = annotateENBSecurityHeaderType(resp.NAS, nasBytes)
+		resp.NAS, resp.MACVerified = decodeENBDownlinkNAS(ue, nasBytes)
 	}
 
 	return resp, nil

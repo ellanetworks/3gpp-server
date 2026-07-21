@@ -77,42 +77,19 @@ func (h *Handler) AwaitENBUEMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, SendENBUES1APResponse{S1AP: resp, NAS: decodeENBDownlinkNAS(ue, resp)})
+	writeJSON(w, http.StatusOK, SendENBUES1APResponse{S1AP: resp, NAS: decodeNASFromS1AP(ue, resp)})
 }
 
-// b[5] is the sequence number, which is the DL NAS COUNT until the first overflow.
-func decodeENBDownlinkNAS(ue *store.UEEPSContext, resp *s1ap.S1APResponse) *naseps.NASResponse {
-	if resp == nil || resp.NASPDU == nil {
-		return nil
+func decodeNASFromS1AP(ue *store.UEEPSContext, resp *s1ap.S1APResponse) *naseps.NASResponse {
+	var nasResp *naseps.NASResponse
+
+	if resp.NASPDU != nil {
+		if b, err := hex.DecodeString(*resp.NASPDU); err == nil {
+			nasResp, _ = decodeENBDownlinkNAS(ue, b)
+		}
 	}
 
-	b, err := hex.DecodeString(*resp.NASPDU)
-	if err != nil {
-		return nil
-	}
-
-	sht, err := naseps.SecurityHeader(b)
-	if err != nil {
-		return nil
-	}
-
-	if sht == naseps.SHTPlain {
-		nas, _ := naseps.Decode(b)
-		return annotateENBSecurityHeaderType(nas, b)
-	}
-
-	if !ue.SecurityActive || len(b) < 6 {
-		return nil
-	}
-
-	plain, err := naseps.Unprotect(b, uint32(b[5]), ue.CipheringAlg, ue.IntegrityAlg, ue.KnasEnc, ue.KnasInt)
-	if err != nil {
-		return nil
-	}
-
-	nas, _ := naseps.Decode(plain)
-
-	return annotateENBSecurityHeaderType(nas, b)
+	return nasResp
 }
 
 // An mmeID of 0 means the MME has not assigned one yet, so it cannot match.

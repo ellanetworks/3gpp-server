@@ -53,7 +53,7 @@ func s1HandoverHop(t *testing.T, srcENB, ueID, tgtENB string) string {
 	}
 
 	status, body = doRequest(t, "POST", "/enb/"+srcENB+"/ue/"+ueID+"/migrate",
-		fmt.Sprintf(`{"target_enb_id":%q,"enb_ue_s1ap_id":%d}`, tgtENB, tgtENBUE))
+		fmt.Sprintf(`{"target_enb_id":%q,"mme_ue_s1ap_id":%s,"enb_ue_s1ap_id":%d}`, tgtENB, targetMME, tgtENBUE))
 	if status != 200 {
 		t.Fatalf("migrate UE %s->%s: HTTP %d\n  body: %s", srcENB, tgtENB, status, body)
 	}
