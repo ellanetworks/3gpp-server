@@ -310,17 +310,28 @@ func handleENBSecurityModeComplete(ctx context.Context, enb *store.ENBContext, u
 		return nil, fmt.Errorf("no NAS security context; run authentication_response first")
 	}
 
-	smc, err := naseps.BuildSecurityModeComplete(ue.IMEISV)
-	if err != nil {
-		return nil, err
+	var nasPDU []byte
+
+	if req.RawNASPDU != nil {
+		raw, err := hex.DecodeString(*req.RawNASPDU)
+		if err != nil {
+			return nil, httpErrorf(http.StatusBadRequest, "raw_nas_pdu must be hex: %v", err)
+		}
+
+		nasPDU = raw
+	} else {
+		smc, err := naseps.BuildSecurityModeComplete(ue.IMEISV)
+		if err != nil {
+			return nil, err
+		}
+
+		nasPDU, err = encodeENBUplinkNAS(ue, smc, naseps.SHTIntegrityProtectedCiphered, req)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	protected, err := encodeENBUplinkNAS(ue, smc, naseps.SHTIntegrityProtectedCiphered, req)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := sendUplink(enb, ue, t, protected, req); err != nil {
+	if err := sendUplink(enb, ue, t, nasPDU, req); err != nil {
 		return nil, err
 	}
 
@@ -424,22 +435,33 @@ func handleENBAttachComplete(ctx context.Context, enb *store.ENBContext, ue *sto
 		return nil, err
 	}
 
-	esm, err := naseps.BuildActivateDefaultEPSBearerContextAccept(ue.EPSBearerID, ue.PTI)
-	if err != nil {
-		return nil, err
+	var nasPDU []byte
+
+	if req.RawNASPDU != nil {
+		raw, err := hex.DecodeString(*req.RawNASPDU)
+		if err != nil {
+			return nil, httpErrorf(http.StatusBadRequest, "raw_nas_pdu must be hex: %v", err)
+		}
+
+		nasPDU = raw
+	} else {
+		esm, err := naseps.BuildActivateDefaultEPSBearerContextAccept(ue.EPSBearerID, ue.PTI)
+		if err != nil {
+			return nil, err
+		}
+
+		ac, err := naseps.BuildAttachComplete(esm)
+		if err != nil {
+			return nil, err
+		}
+
+		nasPDU, err = encodeENBUplinkNAS(ue, ac, naseps.SHTIntegrityProtectedCiphered, nil)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	ac, err := naseps.BuildAttachComplete(esm)
-	if err != nil {
-		return nil, err
-	}
-
-	protected, err := encodeENBUplinkNAS(ue, ac, naseps.SHTIntegrityProtectedCiphered, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := sendUplink(enb, ue, t, protected, req); err != nil {
+	if err := sendUplink(enb, ue, t, nasPDU, req); err != nil {
 		return nil, err
 	}
 
@@ -640,23 +662,36 @@ func handleENBServiceRequest(ctx context.Context, enb *store.ENBContext, ue *sto
 		return nil, httpErrorf(http.StatusBadRequest, "no NAS security context; complete an attach first")
 	}
 
-	count := ue.NextUL()
-	if req.NASCountOverride != nil {
-		count = *req.NASCountOverride
-	}
+	var sr []byte
 
-	sr, err := naseps.BuildServiceRequest(naseps.ServiceRequestParams{
-		KSI:     ue.KSI,
-		Count:   count,
-		KnasInt: ue.KnasInt,
-		EIA:     ue.IntegrityAlg,
-	})
-	if err != nil {
-		return nil, err
-	}
+	if req.RawNASPDU != nil {
+		raw, err := hex.DecodeString(*req.RawNASPDU)
+		if err != nil {
+			return nil, httpErrorf(http.StatusBadRequest, "raw_nas_pdu must be hex: %v", err)
+		}
 
-	if req.CorruptMAC {
-		sr[3] ^= 0xff
+		sr = raw
+	} else {
+		count := ue.NextUL()
+		if req.NASCountOverride != nil {
+			count = *req.NASCountOverride
+		}
+
+		built, err := naseps.BuildServiceRequest(naseps.ServiceRequestParams{
+			KSI:     ue.KSI,
+			Count:   count,
+			KnasInt: ue.KnasInt,
+			EIA:     ue.IntegrityAlg,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if req.CorruptMAC {
+			built[3] ^= 0xff
+		}
+
+		sr = built
 	}
 
 	mtmsi := ue.GUTIMTMSI

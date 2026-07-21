@@ -101,10 +101,10 @@ func Test4GAttachRequest_Fuzz(t *testing.T) {
 }
 
 // Test4GAttachComplete_Fuzz is the 4G twin of Test5GRegistrationComplete_Fuzz:
-// after the UE reaches ATTACH ACCEPT it injects mutated NAS bytes where the
-// ATTACH COMPLETE belongs. An unprotected or malformed PDU fails integrity under
-// the active EPS security context (TS 24.301 §4.4.4.3); the MME must not crash,
-// and a fresh attach must still complete afterward.
+// after the UE reaches ATTACH ACCEPT it sends mutated NAS bytes under the
+// attach_complete message type via raw_nas_pdu. An unprotected or malformed PDU
+// fails integrity under the active EPS security context (TS 24.301 §4.4.4.3); the
+// MME must not crash, and a fresh attach must still complete afterward.
 func Test4GAttachComplete_Fuzz(t *testing.T) {
 	tests := []struct {
 		name string
@@ -112,30 +112,30 @@ func Test4GAttachComplete_Fuzz(t *testing.T) {
 	}{
 		{
 			name: "raw NAS: empty PDU",
-			body: `{"message_type":"inject_nas","raw_nas_pdu":"","timeout_ms":1500}`,
+			body: `{"message_type":"attach_complete","raw_nas_pdu":"","timeout_ms":1500}`,
 		},
 		{
 			name: "raw NAS: garbage bytes",
-			body: `{"message_type":"inject_nas","raw_nas_pdu":"deadbeefcafebabe","timeout_ms":1500}`,
+			body: `{"message_type":"attach_complete","raw_nas_pdu":"deadbeefcafebabe","timeout_ms":1500}`,
 		},
 		{
 			// 07 plain EMM header, 43 ATTACH COMPLETE, unprotected under an active context.
 			name: "raw NAS: plain attach complete, no integrity",
-			body: `{"message_type":"inject_nas","raw_nas_pdu":"0743","timeout_ms":1500}`,
+			body: `{"message_type":"attach_complete","raw_nas_pdu":"0743","timeout_ms":1500}`,
 		},
 		{
 			// 27 integrity-protected-and-ciphered EMM header, zeroed MAC, then 07 43.
 			name: "raw NAS: integrity header with zeroed MAC",
-			body: `{"message_type":"inject_nas","raw_nas_pdu":"2700000000000743","timeout_ms":1500}`,
+			body: `{"message_type":"attach_complete","raw_nas_pdu":"2700000000000743","timeout_ms":1500}`,
 		},
 		{
 			// TS 24.501/24.301 §7.2: a lone header octet is too short for a message type.
 			name: "raw NAS: single EMM header byte",
-			body: `{"message_type":"inject_nas","raw_nas_pdu":"07","timeout_ms":1500}`,
+			body: `{"message_type":"attach_complete","raw_nas_pdu":"07","timeout_ms":1500}`,
 		},
 		{
 			name: "raw NAS: plain header, undefined message type 0xff",
-			body: `{"message_type":"inject_nas","raw_nas_pdu":"07ff","timeout_ms":1500}`,
+			body: `{"message_type":"attach_complete","raw_nas_pdu":"07ff","timeout_ms":1500}`,
 		},
 	}
 
@@ -165,10 +165,11 @@ func Test4GAttachComplete_Fuzz(t *testing.T) {
 }
 
 // Test4GSecurityModeComplete_Fuzz is the 4G twin of Test5GSecurityModeComplete_Fuzz:
-// after the SECURITY MODE COMMAND it injects mutated NAS bytes where the SECURITY
-// MODE COMPLETE belongs. An unprotected or bad-MAC PDU fails integrity
-// (TS 24.301 §4.4.4.3), so the MME must not complete the context by answering an
-// Initial Context Setup Request.
+// after the SECURITY MODE COMMAND it sends mutated NAS bytes under the
+// security_mode_complete message type via raw_nas_pdu. An unprotected or bad-MAC
+// PDU fails integrity (TS 24.301 §4.4.4.3), so the MME discards it with no reply
+// (the handler times out, 504) and must never complete the context by answering
+// an Initial Context Setup Request.
 func Test4GSecurityModeComplete_Fuzz(t *testing.T) {
 	tests := []struct {
 		name string
@@ -176,34 +177,34 @@ func Test4GSecurityModeComplete_Fuzz(t *testing.T) {
 	}{
 		{
 			name: "raw NAS: empty PDU",
-			body: `{"message_type":"inject_nas","raw_nas_pdu":"","timeout_ms":1500}`,
+			body: `{"message_type":"security_mode_complete","raw_nas_pdu":"","timeout_ms":1500}`,
 		},
 		{
 			name: "raw NAS: garbage bytes",
-			body: `{"message_type":"inject_nas","raw_nas_pdu":"deadbeefcafebabe0011223344556677","timeout_ms":1500}`,
+			body: `{"message_type":"security_mode_complete","raw_nas_pdu":"deadbeefcafebabe0011223344556677","timeout_ms":1500}`,
 		},
 		{
 			// 07 plain EMM header, 5e SECURITY MODE COMPLETE, unprotected.
 			name: "raw NAS: plain security mode complete, no integrity",
-			body: `{"message_type":"inject_nas","raw_nas_pdu":"075e00","timeout_ms":1500}`,
+			body: `{"message_type":"security_mode_complete","raw_nas_pdu":"075e00","timeout_ms":1500}`,
 		},
 		{
 			// 27 integrity-protected-and-ciphered EMM header, zeroed MAC, then 07 5e.
 			name: "raw NAS: integrity header with zeroed MAC",
-			body: `{"message_type":"inject_nas","raw_nas_pdu":"270000000000075e00","timeout_ms":1500}`,
+			body: `{"message_type":"security_mode_complete","raw_nas_pdu":"270000000000075e00","timeout_ms":1500}`,
 		},
 		{
 			// 17 integrity-protected EMM header, zeroed MAC, then 07 5e.
 			name: "raw NAS: integrity-only header with zeroed MAC",
-			body: `{"message_type":"inject_nas","raw_nas_pdu":"170000000000075e00","timeout_ms":1500}`,
+			body: `{"message_type":"security_mode_complete","raw_nas_pdu":"170000000000075e00","timeout_ms":1500}`,
 		},
 		{
 			name: "raw NAS: single EMM header byte",
-			body: `{"message_type":"inject_nas","raw_nas_pdu":"07","timeout_ms":1500}`,
+			body: `{"message_type":"security_mode_complete","raw_nas_pdu":"07","timeout_ms":1500}`,
 		},
 		{
 			name: "raw NAS: plain header, undefined message type 0xff",
-			body: `{"message_type":"inject_nas","raw_nas_pdu":"07ff","timeout_ms":1500}`,
+			body: `{"message_type":"security_mode_complete","raw_nas_pdu":"07ff","timeout_ms":1500}`,
 		},
 	}
 
@@ -220,11 +221,11 @@ func Test4GSecurityModeComplete_Fuzz(t *testing.T) {
 			}
 
 			status, body := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap", tt.body)
-			if status != 200 {
-				t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
+			if status != 200 && status != 504 {
+				t.Fatalf("HTTP %d, want 200 or 504\n  body: %s", status, body)
 			}
 
-			if got := jsonGet(body, "s1ap.message_type"); got == "InitialContextSetupRequest" {
+			if status == 200 && jsonGet(body, "s1ap.message_type") == "InitialContextSetupRequest" {
 				t.Fatalf("MME completed the security context on a mutated Security Mode Complete (TS 24.301 §4.4.4.3); body: %s", body)
 			}
 		})
@@ -234,8 +235,8 @@ func Test4GSecurityModeComplete_Fuzz(t *testing.T) {
 }
 
 // Test4GServiceRequest_Fuzz is the 4G twin of Test5GServiceRequest_Fuzz: from an
-// idle registered UE it re-establishes with mutated SERVICE REQUEST bytes in a
-// fresh InitialUEMessage via raw_nas_pdu. A short-MAC failure (TS 24.301
+// idle registered UE it re-establishes with mutated SERVICE REQUEST bytes under
+// the service_request message type via raw_nas_pdu. A short-MAC failure (TS 24.301
 // §5.6.1.5) or garbage must not draw a re-establishment (Initial Context Setup
 // Request), and the request must not hang.
 func Test4GServiceRequest_Fuzz(t *testing.T) {
@@ -245,21 +246,21 @@ func Test4GServiceRequest_Fuzz(t *testing.T) {
 	}{
 		{
 			name: "raw NAS: empty PDU",
-			body: `{"message_type":"attach_request","raw_nas_pdu":"","timeout_ms":1500}`,
+			body: `{"message_type":"service_request","raw_nas_pdu":"","timeout_ms":1500}`,
 		},
 		{
 			name: "raw NAS: garbage bytes",
-			body: `{"message_type":"attach_request","raw_nas_pdu":"deadbeefcafebabe","timeout_ms":1500}`,
+			body: `{"message_type":"service_request","raw_nas_pdu":"deadbeefcafebabe","timeout_ms":1500}`,
 		},
 		{
 			// c7 SERVICE REQUEST security header (SHT 12, EMM PD), KSI/seq 00, zeroed short MAC.
 			name: "raw NAS: service request with zeroed short MAC",
-			body: `{"message_type":"attach_request","raw_nas_pdu":"c7000000","timeout_ms":1500}`,
+			body: `{"message_type":"service_request","raw_nas_pdu":"c7000000","timeout_ms":1500}`,
 		},
 		{
 			// c7 SERVICE REQUEST header truncated before the short MAC.
 			name: "raw NAS: truncated service request",
-			body: `{"message_type":"attach_request","raw_nas_pdu":"c7","timeout_ms":1500}`,
+			body: `{"message_type":"service_request","raw_nas_pdu":"c7","timeout_ms":1500}`,
 		},
 	}
 
