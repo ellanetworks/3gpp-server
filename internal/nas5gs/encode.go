@@ -465,6 +465,29 @@ func BuildRegistrationComplete() ([]byte, error) {
 	return data.Bytes(), nil
 }
 
+// BuildConfigurationUpdateComplete acknowledges a CONFIGURATION UPDATE COMMAND
+// that requested acknowledgement (TS 24.501 §5.4.4.3).
+func BuildConfigurationUpdateComplete() ([]byte, error) {
+	m := nas.NewMessage()
+	m.GmmMessage = nas.NewGmmMessage()
+	m.GmmHeader.SetMessageType(nas.MsgTypeConfigurationUpdateComplete)
+
+	complete := nasMessage.NewConfigurationUpdateComplete(0)
+	complete.SetExtendedProtocolDiscriminator(nasMessage.Epd5GSMobilityManagementMessage)
+	complete.SetSecurityHeaderType(nas.SecurityHeaderTypePlainNas)
+	complete.SetSpareHalfOctet(0)
+	complete.SetMessageType(nas.MsgTypeConfigurationUpdateComplete)
+
+	m.ConfigurationUpdateComplete = complete
+
+	data := new(bytes.Buffer)
+	if err := m.GmmMessageEncode(data); err != nil {
+		return nil, fmt.Errorf("nas: GMM encode ConfigurationUpdateComplete: %w", err)
+	}
+
+	return data.Bytes(), nil
+}
+
 func buildIMEISV(imeisv string) (*nasType.IMEISV, error) {
 	if len(imeisv) != 16 {
 		return nil, fmt.Errorf("nas: IMEISV must be 16 digits")

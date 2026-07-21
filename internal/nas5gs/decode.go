@@ -77,11 +77,24 @@ func decodeGmm(m *gonas.Message, resp *NASResponse) error {
 		decodeServiceReject(m, resp)
 	case gonas.MsgTypeStatus5GMM:
 		decodeStatus5GMM(m, resp)
+	case gonas.MsgTypeConfigurationUpdateCommand:
+		decodeConfigurationUpdateCommand(m, resp)
 	case gonas.MsgTypeDLNASTransport:
 		return decodeDLNASTransport(m, resp)
 	}
 
 	return nil
+}
+
+func decodeConfigurationUpdateCommand(m *gonas.Message, resp *NASResponse) {
+	c := m.ConfigurationUpdateCommand
+	if c == nil {
+		return
+	}
+
+	if c.ConfigurationUpdateIndication != nil && c.GetACK() != 0 {
+		resp.ConfigurationUpdateAckRequested = true
+	}
 }
 
 func unknownMessageType(m *gonas.Message) (string, error) {

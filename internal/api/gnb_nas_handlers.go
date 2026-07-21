@@ -268,7 +268,53 @@ func handleGNBRegistrationComplete(ctx context.Context, gnb *store.GNBContext, u
 		}
 	}
 
-	return sendUplinkAndWait(ctx, gnb, ue, t, req, nasPDU, "DownlinkNASTransport", "ErrorIndication", "UEContextReleaseCommand")
+	resp, err := sendUplinkAndWait(ctx, gnb, ue, t, req, nasPDU, "DownlinkNASTransport", "ErrorIndication", "UEContextReleaseCommand")
+	if err != nil {
+		return nil, err
+	}
+
+	if err := ackConfigurationUpdate(gnb, ue, t, resp.NAS); err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+// ackConfigurationUpdate sends CONFIGURATION UPDATE COMPLETE when the received
+// command requested acknowledgement (TS 24.501 §5.4.4.3).
+func ackConfigurationUpdate(gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, nasResp *nas5gs.NASResponse) error {
+	if nasResp == nil || !nasResp.ConfigurationUpdateAckRequested {
+		return nil
+	}
+
+	pdu, err := nas5gs.BuildConfigurationUpdateComplete()
+	if err != nil {
+		return httpErrorf(http.StatusInternalServerError, "build ConfigurationUpdateComplete: %v", err)
+	}
+
+	secured, err := encodeGNBUplinkNAS(ue, pdu, gonas.SecurityHeaderTypeIntegrityProtectedAndCiphered, nil)
+	if err != nil {
+		return httpErrorf(http.StatusInternalServerError, "NAS security encode: %v", err)
+	}
+
+	encoded, err := ngap.BuildUplinkNASTransport(ngap.UplinkNASTransportParams{
+		AMFUENGAPID: ue.AMFUENGAPID,
+		RANUENGAPID: ue.RANUENGAPID,
+		NASPDU:      secured,
+		MCC:         gnb.MCC,
+		MNC:         gnb.MNC,
+		TAC:         gnb.TAC,
+		GNBID:       gnb.GNBID,
+	})
+	if err != nil {
+		return httpErrorf(http.StatusInternalServerError, "NGAP encode: %v", err)
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		return httpErrorf(http.StatusBadGateway, "SCTP send ConfigurationUpdateComplete: %v", err)
+	}
+
+	return nil
 }
 
 func handleGNBDeregistrationRequest(ctx context.Context, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendGNBUENGAPRequest) (*SendGNBUENGAPResponse, error) {

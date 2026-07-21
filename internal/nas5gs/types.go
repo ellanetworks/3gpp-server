@@ -58,6 +58,8 @@ type NASResponse struct {
 
 	IdentityType *int `json:"identity_type,omitempty"`
 
+	ConfigurationUpdateAckRequested bool `json:"configuration_update_ack_requested,omitempty"`
+
 	InnerNASMessageType string `json:"inner_nas_message_type,omitempty"`
 
 	RawHex string `json:"raw_hex"`
