@@ -175,32 +175,47 @@ func handleENBAttachRequestRaw(ctx context.Context, enb *store.ENBContext, ue *s
 }
 
 func handleENBAuthenticationResponse(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
-	aka, err := crypto.ComputeEPSAKA(ue.K, ue.OPc, ue.SQN, enb.MCC, enb.MNC, ue.RAND, ue.AUTN)
-	if err != nil {
-		return nil, fmt.Errorf("eps-aka: %w", err)
-	}
+	var pdu []byte
 
-	ue.Kasme = aka.Kasme
-
-	res := aka.RES
-	if req.RESOverride != nil {
-		if res, err = hex.DecodeString(*req.RESOverride); err != nil {
-			return nil, httpErrorf(http.StatusBadRequest, "res_override must be hex: %v", err)
+	if req.RawNASPDU != nil {
+		raw, err := hex.DecodeString(*req.RawNASPDU)
+		if err != nil {
+			return nil, httpErrorf(http.StatusBadRequest, "decode raw_nas_pdu: %v", err)
 		}
-	}
 
-	pdu, err := naseps.BuildAuthenticationResponse(res)
-	if err != nil {
-		return nil, err
+		pdu = raw
+	} else {
+		aka, err := crypto.ComputeEPSAKA(ue.K, ue.OPc, ue.SQN, enb.MCC, enb.MNC, ue.RAND, ue.AUTN)
+		if err != nil {
+			return nil, fmt.Errorf("eps-aka: %w", err)
+		}
+
+		ue.Kasme = aka.Kasme
+
+		res := aka.RES
+		if req.RESOverride != nil {
+			if res, err = hex.DecodeString(*req.RESOverride); err != nil {
+				return nil, httpErrorf(http.StatusBadRequest, "res_override must be hex: %v", err)
+			}
+		}
+
+		pdu, err = naseps.BuildAuthenticationResponse(res)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if err := sendUplink(enb, ue, t, pdu, req); err != nil {
 		return nil, err
 	}
 
-	dl, err := waitDownlink(ctx, t, ue, "DownlinkNASTransport")
+	dl, err := waitDownlinkReq(ctx, t, ue, req, "DownlinkNASTransport", "ErrorIndication")
 	if err != nil {
-		return nil, err
+		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for response: %v", err)
+	}
+
+	if dl.NASPDU == nil {
+		return &SendENBUES1APResponse{S1AP: dl}, nil
 	}
 
 	nasBytes, err := nasPDUBytes(dl)
@@ -567,14 +582,31 @@ func handleENBTrackingAreaUpdate(ctx context.Context, enb *store.ENBContext, ue 
 		return nil, err
 	}
 
-	if err := sendUplink(enb, ue, t, protected, req); err != nil {
-		return nil, err
+	if req.ExistingConnection {
+		if err := sendUplink(enb, ue, t, protected, req); err != nil {
+			return nil, err
+		}
+	} else {
+		init, err := s1ap.BuildInitialUEMessage(s1ap.InitialUEMessageParams{
+			ENBUES1APID: ue.ENBUES1APID, NASPDU: protected, MCC: enb.MCC, MNC: enb.MNC, TAC: enb.TAC, CellID: 1,
+			STMSI:                 &s1ap.STMSIParams{MMEC: ue.GUTICode, MTMSI: ue.GUTIMTMSI},
+			RRCEstablishmentCause: req.RRCEstablishmentCauseOverride,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		if err := t.Send(init, false); err != nil {
+			return nil, err
+		}
 	}
 
 	dl := waitDownlinkTolerant(ctx, t, ue, "DownlinkNASTransport")
 	if dl == nil {
 		return &SendENBUES1APResponse{}, nil
 	}
+
+	learnMMEID(ue, dl)
 
 	nasBytes, err := nasPDUBytes(dl)
 	if err != nil {

@@ -353,7 +353,7 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 				"message_type":"registration_request",
 				"mico_indication":1,
 				"network_slicing_indication":3,
-				"ue_status":3
+				"ue_status":"03"
 			}`,
 			wantHTTP:        200,
 			wantNGAPMsgType: ngapDownlinkNASTransport,
@@ -402,7 +402,7 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 				"s1_ue_network_capability":"e0e0",
 				"requested_drx_parameters":2,
 				"mico_indication":0,
-				"ue_status":1,
+				"ue_status":"01",
 				"network_slicing_indication":0,
 				"pdu_session_status":"0000",
 				"uplink_data_status":"0000",

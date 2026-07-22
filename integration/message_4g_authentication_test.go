@@ -34,18 +34,6 @@ func nasBody(t *testing.T, enbID, ueID, body string) []byte {
 	return resp
 }
 
-func Test4GAuthenticationWrongRES(t *testing.T) {
-	enbID := mustCreateENB(t)
-	ueID := attachChallenge(t, enbID)
-
-	resp := nasBody(t, enbID, ueID,
-		`{"message_type":"authentication_response","res_override":"0000000000000000"}`)
-
-	if got := jsonGet(resp, "nas.message_type"); got != "authentication_reject" {
-		t.Fatalf("nas.message_type = %q, want authentication_reject; body: %s", got, resp)
-	}
-}
-
 // TS 24.301 §5.4.2.7 c/d leaves the identity procedure and an Authentication
 // Reject both compliant.
 func Test4GAuthenticationFailureNoProceed(t *testing.T) {

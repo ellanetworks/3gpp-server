@@ -64,7 +64,7 @@ func s1HandoverHop(t *testing.T, srcENB, ueID, tgtENB string) string {
 func assertMobilityTAUAccepted(t *testing.T, enbID, ueID string) {
 	t.Helper()
 
-	resp := nasStep(t, enbID, ueID, "tracking_area_update")
+	resp := nasBody(t, enbID, ueID, `{"message_type":"tracking_area_update","existing_connection":true}`)
 	if got := jsonGet(resp, "nas.message_type"); got != "tracking_area_update_accept" {
 		t.Errorf("post-handover TAU: nas.message_type = %q, want tracking_area_update_accept (TS 24.301 §5.5.3)\n  body: %s", got, resp)
 	}
