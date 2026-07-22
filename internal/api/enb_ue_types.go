@@ -60,8 +60,9 @@ type SendENBUES1APRequest struct {
 	DRXParameterNBS1Mode            *string `json:"drx_parameter_nb_s1_mode,omitempty"`
 	RequestedIMSIOffset             *string `json:"requested_imsi_offset,omitempty"`
 
-	RawNASPDU  *string `json:"raw_nas_pdu,omitempty"`
-	CorruptMAC bool    `json:"corrupt_mac,omitempty"`
+	RawNASPDU          *string `json:"raw_nas_pdu,omitempty"`
+	CorruptMAC         bool    `json:"corrupt_mac,omitempty"`
+	ExistingConnection bool    `json:"existing_connection,omitempty"`
 
 	MMEUES1APIDOverride           *uint32 `json:"mme_ue_s1ap_id_override,omitempty"`
 	ENBUES1APIDOverride           *uint32 `json:"enb_ue_s1ap_id_override,omitempty"`

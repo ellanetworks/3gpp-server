@@ -38,7 +38,7 @@ type RegistrationRequestOverrides struct {
 	UplinkDataStatus             *string
 	PDUSessionStatus             *string
 	MICOIndication               *uint8
-	UEStatus                     *uint8
+	UEStatus                     *string
 	AdditionalGUTI               *string
 	AllowedPDUSessionStatus      *string
 	UEsUsageSetting              *uint8
@@ -117,7 +117,9 @@ func BuildRegistrationRequest(opts RegistrationRequestParams) ([]byte, error) {
 	registrationRequest.SetFOR(forBit)
 
 	if opts.Overrides != nil {
-		applyRegistrationRequestOverrides(registrationRequest, opts.Overrides)
+		if err := applyRegistrationRequestOverrides(registrationRequest, opts.Overrides); err != nil {
+			return nil, err
+		}
 	}
 
 	m.RegistrationRequest = registrationRequest
@@ -130,7 +132,152 @@ func BuildRegistrationRequest(opts RegistrationRequestParams) ([]byte, error) {
 	return data.Bytes(), nil
 }
 
-func applyRegistrationRequestOverrides(rr *nasMessage.RegistrationRequest, req *RegistrationRequestOverrides) {
+// applyRegistrationRequestOverrides mirrors naseps' hexIEs/applyTV1Override split:
+// a hex-string table for the length-value IEs, then the bit-packed TV IEs. The
+// per-IE apply bodies stay distinct because free5gc models each optional IE as a
+// heterogeneous typed field (Buffer vs fixed Octet vs bit-packed) with no common setter.
+func applyRegistrationRequestOverrides(rr *nasMessage.RegistrationRequest, req *RegistrationRequestOverrides) error {
+	hexIEs := []struct {
+		name  string
+		src   *string
+		apply func([]byte) error
+	}{
+		{"capability_5gmm", req.Capability5GMM, func(b []byte) error {
+			if len(b) == 0 {
+				return nil
+			}
+			rr.Capability5GMM = &nasType.Capability5GMM{
+				Iei: nasMessage.RegistrationRequestCapability5GMMType,
+				Len: uint8(len(b)),
+			}
+			copy(rr.Capability5GMM.Octet[:], b)
+			return nil
+		}},
+		{"last_visited_registered_tai", req.LastVisitedRegisteredTAI, func(b []byte) error {
+			if len(b) != 6 {
+				return nil
+			}
+			rr.LastVisitedRegisteredTAI = nasType.NewLastVisitedRegisteredTAI(nasMessage.RegistrationRequestLastVisitedRegisteredTAIType)
+			copy(rr.LastVisitedRegisteredTAI.Octet[:], b)
+			return nil
+		}},
+		{"s1_ue_network_capability", req.S1UENetworkCapability, func(b []byte) error {
+			if len(b) == 0 {
+				return nil
+			}
+			rr.S1UENetworkCapability = nasType.NewS1UENetworkCapability(nasMessage.RegistrationRequestS1UENetworkCapabilityType)
+			rr.S1UENetworkCapability.SetLen(uint8(len(b)))
+			copy(rr.S1UENetworkCapability.Buffer, b)
+			return nil
+		}},
+		{"uplink_data_status", req.UplinkDataStatus, func(b []byte) error {
+			if len(b) < 2 {
+				return nil
+			}
+			rr.UplinkDataStatus = new(nasType.UplinkDataStatus)
+			rr.UplinkDataStatus.SetIei(nasMessage.RegistrationRequestUplinkDataStatusType)
+			rr.UplinkDataStatus.SetLen(uint8(len(b)))
+			rr.UplinkDataStatus.Buffer = b
+			return nil
+		}},
+		{"pdu_session_status", req.PDUSessionStatus, func(b []byte) error {
+			if len(b) < 2 {
+				return nil
+			}
+			rr.PDUSessionStatus = new(nasType.PDUSessionStatus)
+			rr.PDUSessionStatus.SetIei(nasMessage.RegistrationRequestPDUSessionStatusType)
+			rr.PDUSessionStatus.SetLen(uint8(len(b)))
+			rr.PDUSessionStatus.Buffer = b
+			return nil
+		}},
+		{"ue_status", req.UEStatus, func(b []byte) error {
+			if len(b) < 1 {
+				return nil
+			}
+			rr.UEStatus = nasType.NewUEStatus(nasMessage.RegistrationRequestUEStatusType)
+			rr.UEStatus.SetLen(1)
+			rr.UEStatus.Octet = b[0]
+			return nil
+		}},
+		{"additional_guti", req.AdditionalGUTI, func(b []byte) error {
+			if len(b) == 0 || len(b) > 11 {
+				return nil
+			}
+			rr.AdditionalGUTI = nasType.NewAdditionalGUTI(nasMessage.RegistrationRequestAdditionalGUTIType)
+			rr.AdditionalGUTI.SetLen(uint16(len(b)))
+			copy(rr.AdditionalGUTI.Octet[:], b)
+			return nil
+		}},
+		{"allowed_pdu_session_status", req.AllowedPDUSessionStatus, func(b []byte) error {
+			if len(b) < 2 {
+				return nil
+			}
+			rr.AllowedPDUSessionStatus = nasType.NewAllowedPDUSessionStatus(nasMessage.RegistrationRequestAllowedPDUSessionStatusType)
+			rr.AllowedPDUSessionStatus.SetLen(uint8(len(b)))
+			rr.AllowedPDUSessionStatus.Buffer = b
+			return nil
+		}},
+		{"eps_nas_message_container", req.EPSNASMessageContainer, func(b []byte) error {
+			rr.EPSNASMessageContainer = nasType.NewEPSNASMessageContainer(nasMessage.RegistrationRequestEPSNASMessageContainerType)
+			rr.EPSNASMessageContainer.SetLen(uint16(len(b)))
+			copy(rr.EPSNASMessageContainer.Buffer, b)
+			return nil
+		}},
+		{"ladn_indication", req.LADNIndication, func(b []byte) error {
+			rr.LADNIndication = nasType.NewLADNIndication(nasMessage.RegistrationRequestLADNIndicationType)
+			rr.LADNIndication.SetLen(uint16(len(b)))
+			copy(rr.LADNIndication.Buffer, b)
+			return nil
+		}},
+		{"payload_container", req.PayloadContainer, func(b []byte) error {
+			rr.PayloadContainer = nasType.NewPayloadContainer(nasMessage.RegistrationRequestPayloadContainerType)
+			rr.PayloadContainer.SetLen(uint16(len(b)))
+			copy(rr.PayloadContainer.Buffer, b)
+			return nil
+		}},
+		{"update_type_5gs", req.UpdateType5GS, func(b []byte) error {
+			if len(b) == 0 {
+				return nil
+			}
+			rr.UpdateType5GS = nasType.NewUpdateType5GS(nasMessage.RegistrationRequestUpdateType5GSType)
+			rr.UpdateType5GS.SetLen(uint8(len(b)))
+			rr.SetSMSRequested(b[0] & 0x01)
+			rr.SetNGRanRcu((b[0] >> 1) & 0x01)
+			return nil
+		}},
+		{"nas_message_container", req.NASMessageContainer, func(b []byte) error {
+			rr.NASMessageContainer = nasType.NewNASMessageContainer(nasMessage.RegistrationRequestNASMessageContainerType)
+			rr.NASMessageContainer.SetLen(uint16(len(b)))
+			rr.NASMessageContainer.Buffer = b
+			return nil
+		}},
+		{"eps_bearer_context_status", req.EPSBearerContextStatus, func(b []byte) error {
+			if len(b) < 2 {
+				return nil
+			}
+			rr.EPSBearerContextStatus = nasType.NewEPSBearerContextStatus(nasMessage.RegistrationRequestEPSBearerContextStatusType)
+			rr.EPSBearerContextStatus.SetLen(2)
+			rr.EPSBearerContextStatus.Octet[0] = b[0]
+			rr.EPSBearerContextStatus.Octet[1] = b[1]
+			return nil
+		}},
+	}
+
+	for _, ie := range hexIEs {
+		if ie.src == nil {
+			continue
+		}
+
+		b, err := hex.DecodeString(*ie.src)
+		if err != nil {
+			return fmt.Errorf("%s: %w", ie.name, err)
+		}
+
+		if err := ie.apply(b); err != nil {
+			return fmt.Errorf("%s: %w", ie.name, err)
+		}
+	}
+
 	if req.NonCurrentNativeNASKSI != nil {
 		rr.NoncurrentNativeNASKeySetIdentifier = new(nasType.NoncurrentNativeNASKeySetIdentifier)
 		rr.NoncurrentNativeNASKeySetIdentifier.SetIei(nasMessage.RegistrationRequestNoncurrentNativeNASKeySetIdentifierType)
@@ -138,14 +285,27 @@ func applyRegistrationRequestOverrides(rr *nasMessage.RegistrationRequest, req *
 		rr.SetTsc((*req.NonCurrentNativeNASKSI >> 3) & 0x01)
 	}
 
-	if req.Capability5GMM != nil {
-		if capBytes, err := hex.DecodeString(*req.Capability5GMM); err == nil && len(capBytes) > 0 {
-			rr.Capability5GMM = &nasType.Capability5GMM{
-				Iei: nasMessage.RegistrationRequestCapability5GMMType,
-				Len: uint8(len(capBytes)),
-			}
-			copy(rr.Capability5GMM.Octet[:], capBytes)
-		}
+	if req.MICOIndication != nil {
+		rr.MICOIndication = nasType.NewMICOIndication(nasMessage.RegistrationRequestMICOIndicationType)
+		rr.SetRAAI(*req.MICOIndication & 0x01)
+	}
+
+	if req.UEsUsageSetting != nil {
+		rr.UesUsageSetting = nasType.NewUesUsageSetting(nasMessage.RegistrationRequestUesUsageSettingType)
+		rr.UesUsageSetting.SetLen(1)
+		rr.SetUesUsageSetting(*req.UEsUsageSetting & 0x01)
+	}
+
+	if req.RequestedDRXParameters != nil {
+		rr.RequestedDRXParameters = nasType.NewRequestedDRXParameters(nasMessage.RegistrationRequestRequestedDRXParametersType)
+		rr.RequestedDRXParameters.SetLen(1)
+		rr.SetDRXValue(*req.RequestedDRXParameters)
+	}
+
+	if req.NetworkSlicingIndication != nil {
+		rr.NetworkSlicingIndication = nasType.NewNetworkSlicingIndication(nasMessage.RegistrationRequestNetworkSlicingIndicationType)
+		rr.SetNSSCI(*req.NetworkSlicingIndication & 0x01)
+		rr.SetDCNI((*req.NetworkSlicingIndication >> 1) & 0x01)
 	}
 
 	if len(req.RequestedNSSAI) > 0 {
@@ -168,134 +328,7 @@ func applyRegistrationRequestOverrides(rr *nasMessage.RegistrationRequest, req *
 		copy(rr.RequestedNSSAI.Buffer, buf)
 	}
 
-	if req.LastVisitedRegisteredTAI != nil {
-		if taiBytes, err := hex.DecodeString(*req.LastVisitedRegisteredTAI); err == nil && len(taiBytes) == 6 {
-			rr.LastVisitedRegisteredTAI = nasType.NewLastVisitedRegisteredTAI(nasMessage.RegistrationRequestLastVisitedRegisteredTAIType)
-			copy(rr.LastVisitedRegisteredTAI.Octet[:], taiBytes)
-		}
-	}
-
-	if req.S1UENetworkCapability != nil {
-		if capBytes, err := hex.DecodeString(*req.S1UENetworkCapability); err == nil && len(capBytes) > 0 {
-			rr.S1UENetworkCapability = nasType.NewS1UENetworkCapability(nasMessage.RegistrationRequestS1UENetworkCapabilityType)
-			rr.S1UENetworkCapability.SetLen(uint8(len(capBytes)))
-			copy(rr.S1UENetworkCapability.Buffer, capBytes)
-		}
-	}
-
-	if req.UplinkDataStatus != nil {
-		if statusBytes, err := hex.DecodeString(*req.UplinkDataStatus); err == nil && len(statusBytes) >= 2 {
-			rr.UplinkDataStatus = new(nasType.UplinkDataStatus)
-			rr.UplinkDataStatus.SetIei(nasMessage.RegistrationRequestUplinkDataStatusType)
-			rr.UplinkDataStatus.SetLen(uint8(len(statusBytes)))
-			rr.UplinkDataStatus.Buffer = statusBytes
-		}
-	}
-
-	if req.PDUSessionStatus != nil {
-		if statusBytes, err := hex.DecodeString(*req.PDUSessionStatus); err == nil && len(statusBytes) >= 2 {
-			rr.PDUSessionStatus = new(nasType.PDUSessionStatus)
-			rr.PDUSessionStatus.SetIei(nasMessage.RegistrationRequestPDUSessionStatusType)
-			rr.PDUSessionStatus.SetLen(uint8(len(statusBytes)))
-			rr.PDUSessionStatus.Buffer = statusBytes
-		}
-	}
-
-	if req.MICOIndication != nil {
-		rr.MICOIndication = nasType.NewMICOIndication(nasMessage.RegistrationRequestMICOIndicationType)
-		rr.SetRAAI(*req.MICOIndication & 0x01)
-	}
-
-	if req.UEStatus != nil {
-		rr.UEStatus = nasType.NewUEStatus(nasMessage.RegistrationRequestUEStatusType)
-		rr.UEStatus.SetLen(1)
-		rr.SetN1ModeReg((*req.UEStatus >> 1) & 0x01)
-		rr.SetS1ModeReg(*req.UEStatus & 0x01)
-	}
-
-	if req.AdditionalGUTI != nil {
-		if gutiBytes, err := hex.DecodeString(*req.AdditionalGUTI); err == nil && len(gutiBytes) > 0 && len(gutiBytes) <= 11 {
-			rr.AdditionalGUTI = nasType.NewAdditionalGUTI(nasMessage.RegistrationRequestAdditionalGUTIType)
-			rr.AdditionalGUTI.SetLen(uint16(len(gutiBytes)))
-			copy(rr.AdditionalGUTI.Octet[:], gutiBytes)
-		}
-	}
-
-	if req.AllowedPDUSessionStatus != nil {
-		if statusBytes, err := hex.DecodeString(*req.AllowedPDUSessionStatus); err == nil && len(statusBytes) >= 2 {
-			rr.AllowedPDUSessionStatus = nasType.NewAllowedPDUSessionStatus(nasMessage.RegistrationRequestAllowedPDUSessionStatusType)
-			rr.AllowedPDUSessionStatus.SetLen(uint8(len(statusBytes)))
-			rr.AllowedPDUSessionStatus.Buffer = statusBytes
-		}
-	}
-
-	if req.UEsUsageSetting != nil {
-		rr.UesUsageSetting = nasType.NewUesUsageSetting(nasMessage.RegistrationRequestUesUsageSettingType)
-		rr.UesUsageSetting.SetLen(1)
-		rr.SetUesUsageSetting(*req.UEsUsageSetting & 0x01)
-	}
-
-	if req.RequestedDRXParameters != nil {
-		rr.RequestedDRXParameters = nasType.NewRequestedDRXParameters(nasMessage.RegistrationRequestRequestedDRXParametersType)
-		rr.RequestedDRXParameters.SetLen(1)
-		rr.SetDRXValue(*req.RequestedDRXParameters)
-	}
-
-	if req.EPSNASMessageContainer != nil {
-		if epsBytes, err := hex.DecodeString(*req.EPSNASMessageContainer); err == nil {
-			rr.EPSNASMessageContainer = nasType.NewEPSNASMessageContainer(nasMessage.RegistrationRequestEPSNASMessageContainerType)
-			rr.EPSNASMessageContainer.SetLen(uint16(len(epsBytes)))
-			copy(rr.EPSNASMessageContainer.Buffer, epsBytes)
-		}
-	}
-
-	if req.LADNIndication != nil {
-		if ladnBytes, err := hex.DecodeString(*req.LADNIndication); err == nil {
-			rr.LADNIndication = nasType.NewLADNIndication(nasMessage.RegistrationRequestLADNIndicationType)
-			rr.LADNIndication.SetLen(uint16(len(ladnBytes)))
-			copy(rr.LADNIndication.Buffer, ladnBytes)
-		}
-	}
-
-	if req.PayloadContainer != nil {
-		if pcBytes, err := hex.DecodeString(*req.PayloadContainer); err == nil {
-			rr.PayloadContainer = nasType.NewPayloadContainer(nasMessage.RegistrationRequestPayloadContainerType)
-			rr.PayloadContainer.SetLen(uint16(len(pcBytes)))
-			copy(rr.PayloadContainer.Buffer, pcBytes)
-		}
-	}
-
-	if req.NetworkSlicingIndication != nil {
-		rr.NetworkSlicingIndication = nasType.NewNetworkSlicingIndication(nasMessage.RegistrationRequestNetworkSlicingIndicationType)
-		rr.SetNSSCI(*req.NetworkSlicingIndication & 0x01)
-		rr.SetDCNI((*req.NetworkSlicingIndication >> 1) & 0x01)
-	}
-
-	if req.UpdateType5GS != nil {
-		if utBytes, err := hex.DecodeString(*req.UpdateType5GS); err == nil && len(utBytes) > 0 {
-			rr.UpdateType5GS = nasType.NewUpdateType5GS(nasMessage.RegistrationRequestUpdateType5GSType)
-			rr.UpdateType5GS.SetLen(uint8(len(utBytes)))
-			rr.SetSMSRequested(utBytes[0] & 0x01)
-			rr.SetNGRanRcu((utBytes[0] >> 1) & 0x01)
-		}
-	}
-
-	if req.NASMessageContainer != nil {
-		if nmcBytes, err := hex.DecodeString(*req.NASMessageContainer); err == nil {
-			rr.NASMessageContainer = nasType.NewNASMessageContainer(nasMessage.RegistrationRequestNASMessageContainerType)
-			rr.NASMessageContainer.SetLen(uint16(len(nmcBytes)))
-			rr.NASMessageContainer.Buffer = nmcBytes
-		}
-	}
-
-	if req.EPSBearerContextStatus != nil {
-		if ebcBytes, err := hex.DecodeString(*req.EPSBearerContextStatus); err == nil && len(ebcBytes) >= 2 {
-			rr.EPSBearerContextStatus = nasType.NewEPSBearerContextStatus(nasMessage.RegistrationRequestEPSBearerContextStatusType)
-			rr.EPSBearerContextStatus.SetLen(2)
-			rr.EPSBearerContextStatus.Octet[0] = ebcBytes[0]
-			rr.EPSBearerContextStatus.Octet[1] = ebcBytes[1]
-		}
-	}
+	return nil
 }
 
 // maxAuthenticationResponseParameterLen is the IE's maximum, TS 24.501 §9.11.3.17.

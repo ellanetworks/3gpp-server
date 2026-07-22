@@ -49,7 +49,7 @@ type SendGNBUENGAPRequest struct {
 	UplinkDataStatus             *string             `json:"uplink_data_status,omitempty"`
 	PDUSessionStatus             *string             `json:"pdu_session_status,omitempty"`
 	MICOIndication               *uint8              `json:"mico_indication,omitempty"`
-	UEStatus                     *uint8              `json:"ue_status,omitempty"`
+	UEStatus                     *string             `json:"ue_status,omitempty"`
 	AdditionalGUTI               *string             `json:"additional_guti,omitempty"`
 	AllowedPDUSessionStatus      *string             `json:"allowed_pdu_session_status,omitempty"`
 	UEsUsageSetting              *uint8              `json:"ues_usage_setting,omitempty"`

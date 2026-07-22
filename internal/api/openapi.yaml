@@ -1615,13 +1615,17 @@ components:
         raw_nas_pdu:
           type: string
           description: >
-            On attach_request, hex NAS bytes sent verbatim in the Initial UE
-            Message (malformed-NAS robustness tests).
+            On attach_request or authentication_response, hex NAS bytes sent
+            verbatim (malformed-NAS robustness tests): Initial UE Message for
+            attach_request, Uplink NAS Transport for authentication_response.
         corrupt_mac:
           type: boolean
           description: >
             On security_mode_complete, flip a NAS-MAC byte so the MME's integrity
             check fails; the MME must discard the message.
+        existing_connection:
+          type: boolean
+          description: "Send a tracking_area_update over the existing UE-associated connection (Uplink NAS Transport) instead of an Initial UE Message — e.g. a TAU after an S1 handover."
         mme_ue_s1ap_id_override:
           type: integer
           description: >
