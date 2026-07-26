@@ -80,6 +80,8 @@ type SendGNBUENGAPRequest struct {
 
 	ExistingConnection bool `json:"existing_connection,omitempty"`
 
+	Reestablish bool `json:"reestablish,omitempty"`
+
 	CorruptMAC bool `json:"corrupt_mac,omitempty"`
 
 	NASCountOverride *uint32 `json:"nas_count,omitempty"`

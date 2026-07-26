@@ -582,6 +582,10 @@ func handleENBTrackingAreaUpdate(ctx context.Context, enb *store.ENBContext, ue 
 		return nil, err
 	}
 
+	if req.Reestablish {
+		return reestablishENBConnection(ctx, enb, ue, t, protected)
+	}
+
 	if req.ExistingConnection {
 		if err := sendUplink(enb, ue, t, protected, req); err != nil {
 			return nil, err
@@ -644,6 +648,41 @@ func handleENBTrackingAreaUpdate(ctx context.Context, enb *store.ENBContext, ue 
 	}
 
 	return &SendENBUES1APResponse{S1AP: dl, NAS: nas, MACVerified: macVerified}, nil
+}
+
+// reestablishENBConnection sends nasPDU in an INITIAL UE MESSAGE under a fresh
+// eNB-UE-S1AP-ID, so the MME sees a second UE-associated connection toward the same UE
+// and releases the superseded one toward the eNB (TS 36.413 §8.3.3.1). It returns that
+// connection's UE CONTEXT RELEASE COMMAND.
+func reestablishENBConnection(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, nasPDU []byte) (*SendENBUES1APResponse, error) {
+	oldMME, oldENB := ue.MMEUES1APID, ue.ENBUES1APID
+
+	init, err := s1ap.BuildInitialUEMessage(s1ap.InitialUEMessageParams{
+		ENBUES1APID: enb.AllocateENBUES1APID(), NASPDU: nasPDU, MCC: enb.MCC, MNC: enb.MNC, TAC: enb.TAC, CellID: 1,
+		STMSI: &s1ap.STMSIParams{MMEC: ue.GUTICode, MTMSI: ue.GUTIMTMSI},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	if err := t.Send(init, false); err != nil {
+		return nil, err
+	}
+
+	rel, err := t.WaitForMessageMatching(ctx, func(r *s1ap.S1APResponse) bool {
+		return r.ENBUES1APID != nil && *r.ENBUES1APID == int64(oldENB)
+	}, "UEContextReleaseCommand", "ErrorIndication")
+	if err != nil {
+		return &SendENBUES1APResponse{}, nil
+	}
+
+	if rel.MessageType == "UEContextReleaseCommand" {
+		if comp, cerr := s1ap.BuildUEContextReleaseComplete(oldMME, oldENB); cerr == nil {
+			_ = t.Send(comp, false)
+		}
+	}
+
+	return &SendENBUES1APResponse{S1AP: rel}, nil
 }
 
 func handleENBUEContextReleaseRequest(ctx context.Context, enb *store.ENBContext, ue *store.UEEPSContext, t *transport.S1APTransport, req *SendENBUES1APRequest) (*SendENBUES1APResponse, error) {
