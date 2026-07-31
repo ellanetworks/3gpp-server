@@ -15,6 +15,7 @@ func Test4GAuthenticationResponse(t *testing.T) {
 		wantS1APMsgType string
 		wantNASMsgType  string
 		wantNASCauseEMM int
+		mustNotAuth     bool
 	}{
 		{
 			name:            "correct RES (happy path)",
@@ -38,20 +39,21 @@ func Test4GAuthenticationResponse(t *testing.T) {
 			wantNASMsgType:  nasAuthenticationReject,
 		},
 		{
-			// EPS RES is a variable-length LV (TS 24.301 §9.9.3.4), so an oversized value
-			// decodes as a mismatching RES and draws a reject, not a syntax error.
-			name:            "oversized RES: 32 bytes",
-			body:            `{"message_type":"authentication_response","res_override":"0000000000000000000000000000000000000000000000000000000000000000"}`,
-			wantHTTP:        200,
-			wantS1APMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  nasAuthenticationReject,
+			// EPS RES is variable-length (TS 24.301 §9.9.3.4, 4–16 octets), so an oversized
+			// value is a malformed mandatory IE, not a mismatching RES; the network's
+			// rejection mechanism is unspecified (§7.7.2). Only "must not authenticate the
+			// UE" is spec-mandated — unlike 5G, whose fixed 16-octet RES* truncates to a
+			// valid mismatching value.
+			name:        "oversized RES: 32 bytes",
+			body:        `{"message_type":"authentication_response","res_override":"0000000000000000000000000000000000000000000000000000000000000000"}`,
+			mustNotAuth: true,
 		},
 		{
-			name:            "empty RES",
-			body:            `{"message_type":"authentication_response","res_override":""}`,
-			wantHTTP:        200,
-			wantS1APMsgType: "DownlinkNASTransport",
-			wantNASMsgType:  nasAuthenticationReject,
+			// A zero-length RES is below the IE minimum (TS 24.301 §9.9.3.4): a malformed
+			// mandatory IE whose rejection mechanism the network chooses (§7.7.2).
+			name:        "empty RES",
+			body:        `{"message_type":"authentication_response","res_override":""}`,
+			mustNotAuth: true,
 		},
 		{
 			name:            "raw NAS PDU: valid AuthResponse structure with garbage RES",
@@ -80,6 +82,21 @@ func Test4GAuthenticationResponse(t *testing.T) {
 			ueID := attachChallenge(t, enbID)
 
 			status, body := doRequest(t, "POST", "/enb/"+enbID+"/ue/"+ueID+"/s1ap", tt.body)
+
+			if tt.mustNotAuth {
+				switch status {
+				case 200:
+					if got := jsonGet(body, "nas.message_type"); got == nasSecurityModeCommand {
+						t.Errorf("malformed RES authenticated the UE: nas.message_type = %q\n  body: %s", got, body)
+					}
+				case 504:
+				default:
+					t.Fatalf("HTTP %d, want 200 (rejected) or 504 (ignored)\n  body: %s", status, body)
+				}
+
+				return
+			}
+
 			if status != tt.wantHTTP {
 				t.Fatalf("HTTP %d, want %d\n  body: %s", status, tt.wantHTTP, body)
 			}

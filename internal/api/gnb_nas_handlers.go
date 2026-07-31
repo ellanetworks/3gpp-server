@@ -132,6 +132,10 @@ func handleGNBRegistrationRequest(ctx context.Context, gnb *store.GNBContext, ue
 		}
 	}
 
+	if req.Reestablish {
+		return reestablishGNBConnection(ctx, gnb, ue, t, nasPDU)
+	}
+
 	if req.ExistingConnection {
 		return sendUplinkAndWait(ctx, gnb, ue, t, req, nasPDU, "DownlinkNASTransport", "ErrorIndication")
 	}
@@ -150,6 +154,50 @@ func handleGNBRegistrationRequest(ctx context.Context, gnb *store.GNBContext, ue
 	}
 
 	return sendAndWait(ctx, ue, t, req, ngapMsg, "DownlinkNASTransport", "InitialContextSetupRequest", "ErrorIndication")
+}
+
+// reestablishGNBConnection sends nasPDU in an INITIAL UE MESSAGE under a fresh
+// RAN-UE-NGAP-ID, so the AMF sees a second UE-associated connection toward the same UE
+// and releases the superseded one toward the gNB (TS 38.413 §8.3.2). It returns that
+// connection's UE CONTEXT RELEASE COMMAND.
+func reestablishGNBConnection(ctx context.Context, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, nasPDU []byte) (*SendGNBUENGAPResponse, error) {
+	oldAMF, oldRAN := ue.AMFUENGAPID, ue.RANUENGAPID
+
+	ngapMsg, err := ngap.BuildInitialUEMessage(ngap.InitialUEMessageParams{
+		RANUENGAPID: gnb.AllocateRANUENGAPID(),
+		NASPDU:      nasPDU,
+		MCC:         gnb.MCC,
+		MNC:         gnb.MNC,
+		TAC:         gnb.TAC,
+		GNBID:       gnb.GNBID,
+	})
+	if err != nil {
+		return nil, httpErrorf(http.StatusBadRequest, "build initial ue message: %v", err)
+	}
+
+	encoded, err := ngap.Encode(ngapMsg)
+	if err != nil {
+		return nil, httpErrorf(http.StatusInternalServerError, "NGAP encode: %v", err)
+	}
+
+	if err := t.Send(encoded, false); err != nil {
+		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
+	}
+
+	rel, err := t.WaitForMessageMatching(ctx, func(r *ngap.NGAPResponse) bool {
+		return r.RANUENGAPID != nil && *r.RANUENGAPID == oldRAN
+	}, "UEContextReleaseCommand", "ErrorIndication")
+	if err != nil {
+		return &SendGNBUENGAPResponse{}, nil
+	}
+
+	if rel.MessageType == "UEContextReleaseCommand" {
+		if comp, cerr := ngap.BuildUEContextReleaseComplete(oldAMF, oldRAN); cerr == nil {
+			_ = t.Send(comp, false)
+		}
+	}
+
+	return &SendGNBUENGAPResponse{NGAP: rel}, nil
 }
 
 func handleGNBAuthenticationResponse(ctx context.Context, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendGNBUENGAPRequest) (*SendGNBUENGAPResponse, error) {
@@ -368,8 +416,11 @@ func handleGNBDeregistrationRequest(ctx context.Context, gnb *store.GNBContext, 
 		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
 	}
 
+	// A non-switch-off de-registration draws a DEREGISTRATION ACCEPT then a release
+	// command (TS 24.501 §5.5.2.2.2); match the NAS-bearing accept first when both are
+	// buffered, so the release command does not mask it.
 	ngapResp, err := t.WaitForMessageMatching(ctx, ueNGAPMatcher(effectiveRanID(req, ue), effectiveAmfID(req, ue)),
-		"UEContextReleaseCommand", "DownlinkNASTransport", "ErrorIndication")
+		"DownlinkNASTransport", "UEContextReleaseCommand", "ErrorIndication")
 	if err != nil {
 		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for response: %v", err)
 	}

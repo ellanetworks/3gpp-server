@@ -29,9 +29,11 @@ func Test5GDeregistration_Fuzz(t *testing.T) {
 			wantHTTP: 200,
 		},
 		{
+			// EPD 0xde is a reserved Extended Protocol Discriminator (TS 24.007
+			// §11.2.3.1.1A): not a NAS message, so the AMF discards it with no reply.
 			name:     "raw NAS: garbage",
 			body:     `{"message_type":"deregistration_request","raw_nas_pdu":"deadbeefcafebabe"}`,
-			wantHTTP: 200,
+			wantHTTP: 504,
 		},
 		{
 			name:     "raw NAS: plain deregistration (no security)",

@@ -145,16 +145,20 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 	gnbID := mustCreateGNB(t)
 
 	tests := []struct {
-		name            string
-		body            string
-		wantHTTP        int
-		wantNGAPMsgType string
-		wantNASMsgType  string
-		wantNASFields   map[string]fieldCheck
+		name             string
+		body             string
+		wantHTTP         int
+		wantNGAPMsgType  string
+		wantNASMsgType   string
+		wantNASFields    map[string]fieldCheck
+		noUsableIdentity bool
 	}{
 		{
+			// Well-formed null-scheme SUCI (PLMN 001/01, routing indicator "0" as valid
+			// TBCD f0ff per TS 24.501 §9.11.3.4) whose SUPI is not provisioned: the AMF
+			// decodes it, cannot derive a subscriber, and rejects (5GMM cause #9).
 			name:            "unknown subscriber SUPI (not provisioned in AMF)",
-			body:            `{"message_type":"registration_request","mobile_identity_override":"0100f110f00000000001"}`,
+			body:            `{"message_type":"registration_request","mobile_identity_override":"0100f110f0ff00000001"}`,
 			wantHTTP:        200,
 			wantNGAPMsgType: ngapDownlinkNASTransport,
 			wantNASMsgType:  nasRegistrationReject,
@@ -178,10 +182,9 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
-			name:            "mobile identity override: single zero byte",
-			body:            `{"message_type":"registration_request","mobile_identity_override":"00"}`,
-			wantHTTP:        200,
-			wantNGAPMsgType: ngapDownlinkNASTransport,
+			name:             "mobile identity override: single zero byte",
+			body:             `{"message_type":"registration_request","mobile_identity_override":"00"}`,
+			noUsableIdentity: true,
 		},
 		{
 			name:            "mobile identity override: empty string",
@@ -197,10 +200,9 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
-			name:            "mobile identity override: 255 bytes of 0xff",
-			body:            `{"message_type":"registration_request","mobile_identity_override":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}`,
-			wantHTTP:        200,
-			wantNGAPMsgType: ngapDownlinkNASTransport,
+			name:             "mobile identity override: 255 bytes of 0xff",
+			body:             `{"message_type":"registration_request","mobile_identity_override":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}`,
+			noUsableIdentity: true,
 		},
 		{
 			name: "security capability: only null algorithms (EA0+IA0)",
@@ -516,6 +518,26 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ueID := mustCreateUE(t, gnbID)
 			status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap", tt.body)
+
+			if tt.noUsableIdentity {
+				// A REGISTRATION REQUEST that presents no usable subscriber identity cannot
+				// be authenticated or accepted. The AMF may discard it (TS 24.501 §7.8),
+				// reject it, request identity (§5.4.3.2 "may"), or return a 5GMM STATUS
+				// (§7.5.1) — the only non-conformant outcome is proceeding to authenticate
+				// or register the UE.
+				if status == 504 {
+					return
+				}
+				if status != 200 {
+					t.Fatalf("HTTP %d, want 200 or 504\n  body: %s", status, body)
+				}
+				switch got := jsonGet(body, "nas.message_type"); got {
+				case nasAuthenticationRequest, nasSecurityModeCommand, nasRegistrationAccept:
+					t.Errorf("no usable identity was processed as authenticable: nas.message_type = %q\n  body: %s", got, body)
+				}
+
+				return
+			}
 
 			if status != tt.wantHTTP {
 				t.Fatalf("HTTP %d, want %d\n  body: %s", status, tt.wantHTTP, body)

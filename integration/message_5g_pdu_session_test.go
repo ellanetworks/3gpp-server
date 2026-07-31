@@ -99,12 +99,12 @@ func Test5GPDUSessionEstablishment_Fuzz(t *testing.T) {
 			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
-			name:             "raw NAS: garbage bytes",
-			body:             `{"message_type":"pdu_session_establishment_request","raw_nas_pdu":"deadbeefcafebabe"}`,
-			wantHTTP:         200,
-			wantNGAPMsgType:  ngapDownlinkNASTransport,
-			wantNASMsgType:   nasStatus5GMM,
-			wantNASCause5GMM: cause5GMMProtocolErrorUnspecified,
+			// EPD 0xde is a reserved Extended Protocol Discriminator (TS 24.007
+			// §11.2.3.1.1A), so this is not a NAS message: the AMF discards it with no
+			// reply. §7.4 (which would draw a 5GMM STATUS) applies only to a defined EPD.
+			name:     "raw NAS: garbage bytes",
+			body:     `{"message_type":"pdu_session_establishment_request","raw_nas_pdu":"deadbeefcafebabe"}`,
+			wantHTTP: 504,
 		},
 		{
 			name:             "raw NAS: valid 5GMM header but wrong message type",
@@ -173,12 +173,14 @@ func Test5GPDUSessionEstablishment_InnerSMFuzz(t *testing.T) {
 			wantNASCause5GSM: cause5GSMProtocolErrorUnspecified,
 		},
 		{
+			// An unknown 5GSM message type is answered with a 5GSM STATUS, cause #97
+			// "message type non-existent or not implemented" (TS 24.501 §7.4), not a reject.
 			name: "inner SM: valid 5GSM header but wrong message type 0xff",
 			// 2E EPD, 01 PDU session ID, 01 PTI, FF unknown msg type
 			innerSMPayload:   "2e0101ff",
 			wantNGAPMsgType:  ngapDownlinkNASTransport,
-			wantInnerNASType: nasPDUSessionEstablishmentReject,
-			wantNASCause5GSM: cause5GSMProtocolErrorUnspecified,
+			wantInnerNASType: nas5GSMStatus,
+			wantNASCause5GSM: cause5GSMMessageTypeNonExistent,
 		},
 		{
 			name: "inner SM: PDU SESSION ESTABLISHMENT ACCEPT (wrong direction, truncated)",

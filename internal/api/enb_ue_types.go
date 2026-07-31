@@ -63,6 +63,7 @@ type SendENBUES1APRequest struct {
 	RawNASPDU          *string `json:"raw_nas_pdu,omitempty"`
 	CorruptMAC         bool    `json:"corrupt_mac,omitempty"`
 	ExistingConnection bool    `json:"existing_connection,omitempty"`
+	Reestablish        bool    `json:"reestablish,omitempty"`
 
 	MMEUES1APIDOverride           *uint32 `json:"mme_ue_s1ap_id_override,omitempty"`
 	ENBUES1APIDOverride           *uint32 `json:"enb_ue_s1ap_id_override,omitempty"`

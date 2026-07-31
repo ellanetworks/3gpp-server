@@ -1626,6 +1626,9 @@ components:
         existing_connection:
           type: boolean
           description: "Send a tracking_area_update over the existing UE-associated connection (Uplink NAS Transport) instead of an Initial UE Message — e.g. a TAU after an S1 handover."
+        reestablish:
+          type: boolean
+          description: "Send a tracking_area_update in an Initial UE Message under a fresh eNB-UE-S1AP-ID, superseding the UE's current S1 connection; returns the old connection's UE Context Release Command (TS 36.413 §8.3.3.1)."
         mme_ue_s1ap_id_override:
           type: integer
           description: >
@@ -2014,6 +2017,9 @@ components:
         existing_connection:
           type: boolean
           description: "Send a registration_request over the existing UE-associated connection (Uplink NAS Transport) instead of an Initial UE Message — e.g. a Mobility Registration Update after an N2 handover."
+        reestablish:
+          type: boolean
+          description: "Send a registration_request in an Initial UE Message under a fresh RAN-UE-NGAP-ID, superseding the UE's current NG connection; returns the old connection's UE Context Release Command (TS 38.413 §8.3.2)."
         switch_off:
           type: integer
           description: "Deregistration switch-off flag (TS 24.501 §9.11.3.20). Default 1 (switch off, no accept). 0 = normal de-registration (AMF replies with Deregistration Accept)."

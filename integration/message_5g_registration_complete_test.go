@@ -28,10 +28,11 @@ func Test5GRegistrationComplete_Fuzz(t *testing.T) {
 			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
-			name:            "raw NAS: garbage bytes",
-			body:            `{"message_type":"registration_complete","raw_nas_pdu":"deadbeefcafebabe"}`,
-			wantHTTP:        200,
-			wantNGAPMsgType: ngapDownlinkNASTransport,
+			// EPD 0xde is a reserved Extended Protocol Discriminator (TS 24.007
+			// §11.2.3.1.1A): not a NAS message, so the AMF discards it with no reply.
+			name:     "raw NAS: garbage bytes",
+			body:     `{"message_type":"registration_complete","raw_nas_pdu":"deadbeefcafebabe"}`,
+			wantHTTP: 504,
 		},
 		{
 			name: "raw NAS: plain RegistrationComplete (no security)",
