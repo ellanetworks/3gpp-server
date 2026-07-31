@@ -35,6 +35,7 @@ const (
 	cause5GSMMissingOrUnknownDNNInASlice               = 70
 	cause5GSMPTIMismatch                               = 47
 	cause5GSMInvalidPTIValue                           = 81
+	cause5GSMMessageTypeNonExistent                    = 97
 	cause5GSMMessageTypeNotCompatibleWithProtocolState = 98
 	cause5GSMProtocolErrorUnspecified                  = 111
 )

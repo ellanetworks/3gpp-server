@@ -43,9 +43,10 @@ func Test5GSecurityModeComplete_Fuzz(t *testing.T) {
 	}{
 		{
 			name: "raw NAS: plain SecurityModeComplete (no integrity protection)",
-			// 7E EPD, 00 SHT plain, 5e SecurityModeComplete: TS 24.501 §4.4.4.3 discards
-			// it unprotected — no reply.
-			body:     `{"message_type":"security_mode_complete","raw_nas_pdu":"7e005e00"}`,
+			// 7E EPD, 00 SHT plain, 5E SecurityModeComplete: SECURITY MODE COMPLETE is not
+			// in the AMF's cleartext-allowed list and must be integrity protected
+			// (TS 24.501 §4.4.4.3, §5.4.2.3), so an unprotected one is discarded — no reply.
+			body:     `{"message_type":"security_mode_complete","raw_nas_pdu":"7e005e"}`,
 			wantHTTP: 504,
 		},
 		{
@@ -74,10 +75,11 @@ func Test5GSecurityModeComplete_Fuzz(t *testing.T) {
 			wantNGAPMsgType: ngapErrorIndication,
 		},
 		{
-			name:            "raw NAS: garbage bytes",
-			body:            `{"message_type":"security_mode_complete","raw_nas_pdu":"deadbeefcafebabe0011223344556677"}`,
-			wantHTTP:        200,
-			wantNGAPMsgType: ngapDownlinkNASTransport,
+			// EPD 0xde is a reserved Extended Protocol Discriminator (TS 24.007
+			// §11.2.3.1.1A): not a NAS message, so the AMF discards it with no reply.
+			name:     "raw NAS: garbage bytes",
+			body:     `{"message_type":"security_mode_complete","raw_nas_pdu":"deadbeefcafebabe0011223344556677"}`,
+			wantHTTP: 504,
 		},
 		{
 			// TS 24.501 §7.4: reception of a 5GMM message is foreseen in this state, so

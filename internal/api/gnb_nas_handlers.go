@@ -416,8 +416,11 @@ func handleGNBDeregistrationRequest(ctx context.Context, gnb *store.GNBContext, 
 		return nil, httpErrorf(http.StatusBadGateway, "SCTP send: %v", err)
 	}
 
+	// A non-switch-off de-registration draws a DEREGISTRATION ACCEPT then a release
+	// command (TS 24.501 §5.5.2.2.2); match the NAS-bearing accept first when both are
+	// buffered, so the release command does not mask it.
 	ngapResp, err := t.WaitForMessageMatching(ctx, ueNGAPMatcher(effectiveRanID(req, ue), effectiveAmfID(req, ue)),
-		"UEContextReleaseCommand", "DownlinkNASTransport", "ErrorIndication")
+		"DownlinkNASTransport", "UEContextReleaseCommand", "ErrorIndication")
 	if err != nil {
 		return nil, httpErrorf(http.StatusGatewayTimeout, "waiting for response: %v", err)
 	}
