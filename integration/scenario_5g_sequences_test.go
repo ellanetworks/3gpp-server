@@ -156,7 +156,7 @@ func Test5GNGSetup_UnknownPLMN(t *testing.T) {
 		t.Errorf("ng_setup_response.message_type = %q, want NGSetupFailure (TS 38.413 §8.7.1.3)\n  body: %s", got, resp)
 	}
 
-	assertNGAPCauseMisc(t, resp, "ng_setup_response", causeMiscUnknownPLMNOrSNPN)
+	assertNGAPCause(t, resp, "ng_setup_response", &wantCause{causePresentMisc, causeMiscUnknownPLMNOrSNPN})
 }
 
 func Test5GRegistration_DuringSecurityMode(t *testing.T) {
