@@ -122,7 +122,9 @@ const (
 
 // NGAP Cause, Protocol group — TS 38.413 §9.3.1.2 (CauseProtocol).
 const (
-	causeProtocolTransferSyntaxError = 0
+	causePresentProtocol                                  = "protocol"
+	causeProtocolTransferSyntaxError                      = 0
+	causeProtocolAbstractSyntaxErrorFalselyConstructedMsg = 5
 )
 
 // NGAP procedure codes — TS 38.413 §9.4.7 (Constant Definitions).
@@ -194,17 +196,22 @@ func ngapCause(body []byte, responseKey string) (string, int) {
 	return group, 0
 }
 
-func assertNGAPCauseMisc(t *testing.T, body []byte, responseKey string, want int) {
+type wantCause struct {
+	group string
+	value int
+}
+
+func assertNGAPCause(t *testing.T, body []byte, responseKey string, want *wantCause) {
 	t.Helper()
 
-	if want == 0 {
+	if want == nil {
 		return
 	}
 
 	group, val := ngapCause(body, responseKey)
-	if group != causePresentMisc || val != want {
+	if group != want.group || val != want.value {
 		t.Errorf("%s NGAP cause = (%q, %d), want (%q, %d)\n  body: %s",
-			responseKey, group, val, causePresentMisc, want, body)
+			responseKey, group, val, want.group, want.value, body)
 	}
 }
 

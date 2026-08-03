@@ -12,12 +12,12 @@ import (
 
 func Test5GNGSetup(t *testing.T) {
 	tests := []struct {
-		name              string
-		body              string
-		wantHTTP          int
-		wantContain       string
-		wantAbsent        string
-		wantFailCauseMisc int
+		name          string
+		body          string
+		wantHTTP      int
+		wantContain   string
+		wantAbsent    string
+		wantFailCause *wantCause
 	}{
 		{
 			name:        "basic NGSetup MCC=001 MNC=01 SST=1",
@@ -44,25 +44,25 @@ func Test5GNGSetup(t *testing.T) {
 			wantContain: ngapNGSetupResponse,
 		},
 		{
-			name:              "wrong MCC (999/01) → NGSetupFailure",
-			body:              `{"amf_address":"10.3.0.2:38412","gnb_n2_address":"10.3.0.3","mcc":"999","mnc":"01","tac":"000001","gnb_id":"000006","name":"test-gnb-wrongmcc","sst":1}`,
-			wantHTTP:          201,
-			wantContain:       ngapNGSetupFailure,
-			wantFailCauseMisc: causeMiscUnknownPLMNOrSNPN,
+			name:          "wrong MCC (999/01) → NGSetupFailure",
+			body:          `{"amf_address":"10.3.0.2:38412","gnb_n2_address":"10.3.0.3","mcc":"999","mnc":"01","tac":"000001","gnb_id":"000006","name":"test-gnb-wrongmcc","sst":1}`,
+			wantHTTP:      201,
+			wantContain:   ngapNGSetupFailure,
+			wantFailCause: &wantCause{causePresentMisc, causeMiscUnknownPLMNOrSNPN},
 		},
 		{
-			name:              "wrong MNC (001/99) → NGSetupFailure",
-			body:              `{"amf_address":"10.3.0.2:38412","gnb_n2_address":"10.3.0.3","mcc":"001","mnc":"99","tac":"000001","gnb_id":"000007","name":"test-gnb-wrongmnc","sst":1}`,
-			wantHTTP:          201,
-			wantContain:       ngapNGSetupFailure,
-			wantFailCauseMisc: causeMiscUnknownPLMNOrSNPN,
+			name:          "wrong MNC (001/99) → NGSetupFailure",
+			body:          `{"amf_address":"10.3.0.2:38412","gnb_n2_address":"10.3.0.3","mcc":"001","mnc":"99","tac":"000001","gnb_id":"000007","name":"test-gnb-wrongmnc","sst":1}`,
+			wantHTTP:      201,
+			wantContain:   ngapNGSetupFailure,
+			wantFailCause: &wantCause{causePresentMisc, causeMiscUnknownPLMNOrSNPN},
 		},
 		{
-			name:              "completely wrong PLMN (310/410) → NGSetupFailure",
-			body:              `{"amf_address":"10.3.0.2:38412","gnb_n2_address":"10.3.0.3","mcc":"310","mnc":"410","tac":"000001","gnb_id":"000008","name":"test-gnb-us-plmn","sst":1}`,
-			wantHTTP:          201,
-			wantContain:       ngapNGSetupFailure,
-			wantFailCauseMisc: causeMiscUnknownPLMNOrSNPN,
+			name:          "completely wrong PLMN (310/410) → NGSetupFailure",
+			body:          `{"amf_address":"10.3.0.2:38412","gnb_n2_address":"10.3.0.3","mcc":"310","mnc":"410","tac":"000001","gnb_id":"000008","name":"test-gnb-us-plmn","sst":1}`,
+			wantHTTP:      201,
+			wantContain:   ngapNGSetupFailure,
+			wantFailCause: &wantCause{causePresentMisc, causeMiscUnknownPLMNOrSNPN},
 		},
 		{
 			name: "custom IEs valid NGSetup",
@@ -134,7 +134,8 @@ func Test5GNGSetup(t *testing.T) {
 			wantContain: ngapNGSetupResponse,
 		},
 		{
-			name: "custom IEs reversed order",
+			// NGSetupRequestIEs orders the container 27, 82, 102, 21 (TS 38.413 §9.4.1, §10.3.6).
+			name: "custom IEs wrong IE order → NGSetupFailure",
 			body: `{
 				"amf_address":"10.3.0.2:38412", "gnb_n2_address":"10.3.0.3",
 				"ng_setup_ies": [
@@ -144,8 +145,10 @@ func Test5GNGSetup(t *testing.T) {
 					{"id":21,"criticality":"ignore","default_paging_drx":3}
 				]
 			}`,
-			wantHTTP:    201,
-			wantContain: ngapNGSetupResponse,
+			wantHTTP:      201,
+			wantContain:   ngapNGSetupFailure,
+			wantAbsent:    ngapNGSetupResponse,
+			wantFailCause: &wantCause{causePresentProtocol, causeProtocolAbstractSyntaxErrorFalselyConstructedMsg},
 		},
 		{
 			name: "custom IEs no RANNodeName (optional omitted)",
@@ -202,9 +205,9 @@ func Test5GNGSetup(t *testing.T) {
 					{"id":21,"criticality":"ignore","default_paging_drx":3}
 				]
 			}`,
-			wantHTTP:          201,
-			wantContain:       ngapNGSetupFailure,
-			wantFailCauseMisc: causeMiscUnknownPLMNOrSNPN,
+			wantHTTP:      201,
+			wantContain:   ngapNGSetupFailure,
+			wantFailCause: &wantCause{causePresentMisc, causeMiscUnknownPLMNOrSNPN},
 		},
 		{
 			// Empty SupportedTAList cannot be encoded (ASN.1 SEQUENCE OF lower bound),
@@ -270,7 +273,7 @@ func Test5GNGSetup(t *testing.T) {
 				t.Errorf("body should not contain %q\n  body: %s", tt.wantAbsent, bodyStr)
 			}
 
-			assertNGAPCauseMisc(t, body, "ng_setup_response", tt.wantFailCauseMisc)
+			assertNGAPCause(t, body, "ng_setup_response", tt.wantFailCause)
 
 			if status == 201 {
 				gnbID := jsonGet(body, "gnb_id")
