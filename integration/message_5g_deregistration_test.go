@@ -24,9 +24,12 @@ func Test5GDeregistration_Fuzz(t *testing.T) {
 			wantHTTP: 200,
 		},
 		{
-			name:     "raw NAS: empty",
+			// An empty NAS-PDU is a valid zero-length OCTET STRING (TS 38.413), so it is no
+			// NGAP error; the AMF forwards it to NAS, which ignores a too-short message
+			// (TS 24.501 §7.2.1) — silent drop, as on the 4G side.
+			name:     "raw NAS: empty (silently dropped)",
 			body:     `{"message_type":"deregistration_request","raw_nas_pdu":""}`,
-			wantHTTP: 200,
+			wantHTTP: 504,
 		},
 		{
 			// EPD 0xde is a reserved Extended Protocol Discriminator (TS 24.007
