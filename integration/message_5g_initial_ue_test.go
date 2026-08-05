@@ -465,10 +465,12 @@ func Test5GInitialUEMessage_Fuzz(t *testing.T) {
 			wantNGAPMsgType: ngapDownlinkNASTransport,
 		},
 		{
-			name:            "raw NAS: completely empty PDU → ErrorIndication",
-			body:            `{"message_type":"registration_request","raw_nas_pdu":""}`,
-			wantHTTP:        200,
-			wantNGAPMsgType: ngapErrorIndication,
+			// An empty NAS-PDU is a valid zero-length OCTET STRING (TS 38.413), so it is no
+			// NGAP error; the AMF forwards it to NAS, which ignores a too-short message
+			// (TS 24.501 §7.2.1) — silent drop, as on the 4G side.
+			name:     "raw NAS: completely empty PDU (silently dropped)",
+			body:     `{"message_type":"registration_request","raw_nas_pdu":""}`,
+			wantHTTP: 504,
 		},
 		{
 			name: "raw NAS: single byte 0x7e (5GMM EPD only)",

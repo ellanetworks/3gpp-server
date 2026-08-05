@@ -272,12 +272,16 @@ func Test5GServiceRequest_ServiceTypes(t *testing.T) {
 
 func Test5GServiceRequest_Fuzz(t *testing.T) {
 	tests := []struct {
-		name string
-		body string
+		name     string
+		body     string
+		silentOK bool
 	}{
 		{
-			name: "raw NAS: empty",
-			body: `{"message_type":"service_request","raw_nas_pdu":""}`,
+			// An empty NAS-PDU is a valid zero-length OCTET STRING (TS 38.413), so it is no
+			// NGAP error; NAS ignores a too-short message (TS 24.501 §7.2.1) — silent drop.
+			name:     "raw NAS: empty (silently dropped)",
+			body:     `{"message_type":"service_request","raw_nas_pdu":""}`,
+			silentOK: true,
 		},
 		{
 			name: "raw NAS: garbage",
@@ -300,6 +304,9 @@ func Test5GServiceRequest_Fuzz(t *testing.T) {
 			status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap", tt.body)
 			// A local build rejection (400/500) is as conformant as an AMF answer.
 			if status == 504 {
+				if tt.silentOK {
+					return
+				}
 				t.Fatalf("service request hung (HTTP 504)\n  body: %s", body)
 			}
 		})
