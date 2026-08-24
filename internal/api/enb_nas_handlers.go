@@ -340,7 +340,7 @@ func handleENBSecurityModeComplete(ctx context.Context, enb *store.ENBContext, u
 			return nil, err
 		}
 
-		nasPDU, err = encodeENBUplinkNAS(ue, smc, naseps.SHTIntegrityProtectedCiphered, req)
+		nasPDU, err = encodeENBUplinkNAS(ue, smc, naseps.SHTIntegrityProtectedCipheredNew, req)
 		if err != nil {
 			return nil, err
 		}
@@ -765,21 +765,29 @@ func handleENBServiceRequest(ctx context.Context, enb *store.ENBContext, ue *sto
 		sr = built
 	}
 
-	mtmsi := ue.GUTIMTMSI
-	if req.MTMSIOverride != nil {
-		mtmsi = *req.MTMSIOverride
-	}
+	// A UE in EMM-CONNECTED mode carries the SERVICE REQUEST over its existing S1
+	// connection, so it rides an Uplink NAS Transport (TS 24.301 §5.6.1.1).
+	if req.ExistingConnection {
+		if err := sendUplink(enb, ue, t, sr, req); err != nil {
+			return nil, err
+		}
+	} else {
+		mtmsi := ue.GUTIMTMSI
+		if req.MTMSIOverride != nil {
+			mtmsi = *req.MTMSIOverride
+		}
 
-	init, err := s1ap.BuildInitialUEMessage(s1ap.InitialUEMessageParams{
-		ENBUES1APID: ue.ENBUES1APID, NASPDU: sr, MCC: enb.MCC, MNC: enb.MNC, TAC: enb.TAC, CellID: 1,
-		STMSI: &s1ap.STMSIParams{MMEC: ue.GUTICode, MTMSI: mtmsi},
-	})
-	if err != nil {
-		return nil, err
-	}
+		init, err := s1ap.BuildInitialUEMessage(s1ap.InitialUEMessageParams{
+			ENBUES1APID: ue.ENBUES1APID, NASPDU: sr, MCC: enb.MCC, MNC: enb.MNC, TAC: enb.TAC, CellID: 1,
+			STMSI: &s1ap.STMSIParams{MMEC: ue.GUTICode, MTMSI: mtmsi},
+		})
+		if err != nil {
+			return nil, err
+		}
 
-	if err := t.Send(init, false); err != nil {
-		return nil, err
+		if err := t.Send(init, false); err != nil {
+			return nil, err
+		}
 	}
 
 	dl := waitDownlinkTolerant(ctx, t, ue, "InitialContextSetupRequest", "DownlinkNASTransport")

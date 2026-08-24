@@ -769,6 +769,11 @@ func decodePDUSessionResourceSetupRequest(msg *ngapType.PDUSessionResourceSetupR
 					resp.PDUSessionSetupItems = append(resp.PDUSessionSetupItems, setupItem)
 				}
 			}
+		case ngapType.ProtocolIEIDNASPDU:
+			if ie.Value.NASPDU != nil && resp.NasPDU == nil {
+				s := hex.EncodeToString(ie.Value.NASPDU.Value)
+				resp.NasPDU = &s
+			}
 		default:
 			resp.UnknownIEs = append(resp.UnknownIEs, unknownIE(ie.Id.Value, ie.Criticality.Value, ie.Value))
 		}

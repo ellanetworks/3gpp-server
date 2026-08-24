@@ -177,6 +177,34 @@ func Test5GServiceRequest_PDUStatusMismatch(t *testing.T) {
 	assertServiceAcceptPDUSessionStatus(t, body)
 }
 
+// TS 24.501 §5.6.1.1 case e: a UE in 5GMM-CONNECTED mode carries the SERVICE REQUEST
+// over its existing N1 connection, so it reaches the AMF in an NGAP Uplink NAS
+// Transport. A PDU session status IE obliges a matching one in the SERVICE ACCEPT
+// (§5.6.1.4.1).
+func Test5GServiceRequest_ConnectedExistingConnection(t *testing.T) {
+	gnbID := mustCreateGNB(t)
+	ueID := mustCreateUE(t, gnbID)
+
+	doRegistrationFlow(t, gnbID, ueID)
+
+	status, body := doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+		`{"message_type":"pdu_session_establishment_request"}`)
+	if status != 200 {
+		t.Fatalf("pdu_session: HTTP %d\n  body: %s", status, body)
+	}
+
+	status, body = doRequest(t, "POST", "/gnb/"+gnbID+"/ue/"+ueID+"/ngap",
+		`{"message_type":"service_request","existing_connection":true,"pdu_session_status":"0200"}`)
+	if status != 200 {
+		t.Fatalf("HTTP %d, want 200\n  body: %s", status, body)
+	}
+	if got := jsonGet(body, "nas.message_type"); got != nasServiceAccept {
+		t.Fatalf("nas.message_type = %q, want service_accept\n  body: %s", got, body)
+	}
+
+	assertServiceAcceptPDUSessionStatus(t, body)
+}
+
 // Out-of-state: accept and reject are both conformant, so only a hang fails.
 func Test5GServiceRequest_WhileConnected(t *testing.T) {
 	gnbID := mustCreateGNB(t)
