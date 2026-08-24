@@ -43,6 +43,29 @@ func Test4GServiceRequestWhileConnected(t *testing.T) {
 	fullAttach(t, enbID, fresh)
 }
 
+// The plain SERVICE REQUEST is an EMM-IDLE trigger (TS 24.301 §5.6.1.1); EPS routes
+// its EMM-CONNECTED triggers through the EXTENDED and CONTROL PLANE SERVICE REQUEST
+// messages. This probes the MME's handling of a SERVICE REQUEST arriving over the
+// existing S1 connection in an Uplink NAS Transport: processing, rejecting and
+// ignoring are all conformant (§5.6.1).
+func Test4GServiceRequestConnectedExistingConnection(t *testing.T) {
+	enbID := mustCreateENB(t)
+	ueID := mustCreateENBUE(t, enbID)
+
+	fullAttach(t, enbID, ueID)
+
+	sr := nasBody(t, enbID, ueID, `{"message_type":"service_request","existing_connection":true,"timeout_ms":3000}`)
+
+	switch got := jsonGet(sr, "s1ap.message_type"); got {
+	case "InitialContextSetupRequest", "DownlinkNASTransport", "":
+	default:
+		t.Fatalf("service request over existing connection: unexpected s1ap.message_type %q; body: %s", got, sr)
+	}
+
+	fresh := mustCreateENBUE(t, enbID)
+	fullAttach(t, enbID, fresh)
+}
+
 func Test4GServiceRequestBackToBack(t *testing.T) {
 	enbID := mustCreateENB(t)
 	ueID := mustCreateENBUE(t, enbID)

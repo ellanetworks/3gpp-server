@@ -642,7 +642,9 @@ func serviceRequestPDUStatus(ue *store.UEContext, req *SendGNBUENGAPRequest) (*[
 }
 
 func handleGNBServiceRequest(ctx context.Context, gnb *store.GNBContext, ue *store.UEContext, t *transport.NGAPTransport, req *SendGNBUENGAPRequest) (*SendGNBUENGAPResponse, error) {
-	ue.RANUENGAPID = gnb.AllocateRANUENGAPID()
+	if !req.ExistingConnection {
+		ue.RANUENGAPID = gnb.AllocateRANUENGAPID()
+	}
 
 	var nasPDU []byte
 
@@ -682,6 +684,13 @@ func handleGNBServiceRequest(ctx context.Context, gnb *store.GNBContext, ue *sto
 		} else {
 			nasPDU = srPDU
 		}
+	}
+
+	// A UE in 5GMM-CONNECTED mode carries the SERVICE REQUEST over its existing N1
+	// connection (TS 24.501 §5.6.1.1 case e), so it rides an Uplink NAS Transport.
+	if req.ExistingConnection {
+		return sendUplinkAndWait(ctx, gnb, ue, t, req, nasPDU,
+			"InitialContextSetupRequest", "DownlinkNASTransport", "PDUSessionResourceSetupRequest", "ErrorIndication")
 	}
 
 	overrides := initialUEOverrides(req)
