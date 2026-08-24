@@ -340,7 +340,7 @@ func handleENBSecurityModeComplete(ctx context.Context, enb *store.ENBContext, u
 			return nil, err
 		}
 
-		nasPDU, err = encodeENBUplinkNAS(ue, smc, naseps.SHTIntegrityProtectedCiphered, req)
+		nasPDU, err = encodeENBUplinkNAS(ue, smc, naseps.SHTIntegrityProtectedCipheredNew, req)
 		if err != nil {
 			return nil, err
 		}
